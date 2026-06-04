@@ -59,3 +59,25 @@ logs/
 # ===========================
 .cache/
 coverage/
+
+# ===========================
+# Secrets & Firebase
+# ===========================
+backend/firebase-adminsdk.json
+*firebase-adminsdk*.json
+*service-account*.json
+
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+backend/db.sqlite3
+
+# ===========================
+# Django media & static
+# ===========================
+backend/media/
+backend/staticfiles/

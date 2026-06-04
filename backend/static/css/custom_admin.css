@@ -1,0 +1,414 @@
+/* ================================================================
+   COVOITURAGE ADMIN — CSS Personnalisé
+   Couleurs exactes du frontend (theme.ts)
+   primary:     #3B82F6
+   primaryDark: #1D4ED8
+   secondary:   #0284C7
+   bg:          #F8FAFC
+   card:        #FFFFFF
+   text:        #0F172A
+   textLight:   #475569
+   border:      #E2E8F0
+   success:     #10B981
+   warning:     #F59E0B
+   error:       #EF4444
+================================================================ */
+
+/* ---- Variables CSS ---- */
+:root {
+  --primary: #3B82F6;
+  --primary-dark: #1D4ED8;
+  --secondary: #0284C7;
+  --bg: #F8FAFC;
+  --card: #FFFFFF;
+  --text: #0F172A;
+  --text-light: #475569;
+  --text-muted: #94A3B8;
+  --border: #E2E8F0;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --sidebar-bg: #0F172A;
+  --sidebar-text: #CBD5E1;
+  --sidebar-active: #3B82F6;
+  --radius: 10px;
+}
+
+/* ---- Body / Fond général ---- */
+body {
+  background-color: var(--bg) !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  color: var(--text) !important;
+}
+
+/* ---- Navbar supérieure ---- */
+.main-header.navbar {
+  background-color: var(--card) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+.navbar-white.navbar-light .navbar-nav > .nav-item > .nav-link {
+  color: var(--text-light) !important;
+}
+.navbar-white.navbar-light .navbar-nav > .nav-item > .nav-link:hover {
+  color: var(--primary) !important;
+}
+
+/* ---- Brand (nom de l'app) ---- */
+.brand-link {
+  background-color: var(--primary) !important;
+  border-bottom: 1px solid var(--primary-dark) !important;
+}
+.brand-link:hover {
+  background-color: var(--primary-dark) !important;
+}
+.brand-text {
+  color: #fff !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.3px;
+}
+
+/* ---- Sidebar / Menu latéral ---- */
+.main-sidebar {
+  background-color: var(--sidebar-bg) !important;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.12) !important;
+}
+.sidebar {
+  background-color: var(--sidebar-bg) !important;
+}
+.sidebar a, .nav-sidebar .nav-link {
+  color: var(--sidebar-text) !important;
+}
+.nav-sidebar .nav-item .nav-link:hover {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  margin: 0 8px !important;
+}
+.nav-sidebar .nav-item .nav-link.active {
+  background-color: var(--primary) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  margin: 0 8px !important;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35) !important;
+}
+.nav-sidebar .nav-link .nav-icon {
+  color: var(--text-muted) !important;
+}
+.nav-sidebar .nav-link.active .nav-icon,
+.nav-sidebar .nav-link:hover .nav-icon {
+  color: #fff !important;
+}
+.nav-header {
+  color: #64748B !important;
+  font-size: 10px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  padding: 12px 16px 4px !important;
+}
+
+/* ---- Contenu principal ---- */
+.content-wrapper {
+  background-color: var(--bg) !important;
+}
+
+/* ---- Cartes / Modules ---- */
+.card, .module {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+  background-color: var(--card) !important;
+}
+.card-header {
+  background-color: var(--card) !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: var(--radius) var(--radius) 0 0 !important;
+  padding: 14px 20px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+}
+
+/* ---- Tableaux de liste ---- */
+#result_list {
+  border-radius: var(--radius) !important;
+  overflow: hidden !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+#result_list thead th {
+  background-color: var(--bg) !important;
+  color: var(--text-light) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 12px 16px !important;
+}
+#result_list thead th a {
+  color: var(--text-light) !important;
+}
+#result_list thead th a:hover {
+  color: var(--primary) !important;
+}
+#result_list tbody tr:hover {
+  background-color: #EFF6FF !important;
+}
+#result_list tbody td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  vertical-align: middle !important;
+}
+#result_list tbody tr:last-child td {
+  border-bottom: none !important;
+}
+#result_list .action-checkbox-column {
+  width: 40px !important;
+}
+
+/* ---- Liens dans les tableaux ---- */
+#result_list tbody td a,
+#result_list tbody td a:visited {
+  color: var(--primary) !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+}
+#result_list tbody td a:hover {
+  color: var(--primary-dark) !important;
+  text-decoration: underline !important;
+}
+
+/* ---- Boutons ---- */
+.btn-primary,
+.button, input[type=submit], input[type=button], .submit-row input,
+a.button:not(.closelink) {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 8px 18px !important;
+  transition: background-color 0.2s, box-shadow 0.2s !important;
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.2) !important;
+}
+.btn-primary:hover,
+.button:hover, input[type=submit]:hover {
+  background-color: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+  box-shadow: 0 3px 8px rgba(59, 130, 246, 0.35) !important;
+}
+.btn-danger, a.deletelink {
+  background-color: var(--error) !important;
+  border-color: var(--error) !important;
+  border-radius: 8px !important;
+}
+.btn-danger:hover, a.deletelink:hover {
+  background-color: #dc2626 !important;
+}
+.btn-success, a.addlink {
+  background-color: var(--success) !important;
+  border-color: var(--success) !important;
+  border-radius: 8px !important;
+  color: #fff !important;
+}
+
+/* ---- Formulaires ---- */
+input[type=text], input[type=email], input[type=password], input[type=number],
+textarea, select, .form-control {
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  color: var(--text) !important;
+  background-color: var(--bg) !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+input[type=text]:focus, input[type=email]:focus, input[type=password]:focus,
+textarea:focus, select:focus, .form-control:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+  outline: none !important;
+  background-color: #fff !important;
+}
+
+/* ---- Filtres (panneau droit) ---- */
+#changelist-filter {
+  background-color: var(--card) !important;
+  border-left: 1px solid var(--border) !important;
+  border-radius: 0 var(--radius) var(--radius) 0 !important;
+}
+#changelist-filter h2 {
+  background-color: var(--bg) !important;
+  color: var(--text-light) !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  font-weight: 700 !important;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+#changelist-filter h3 {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+#changelist-filter li.selected a {
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+}
+#changelist-filter a {
+  color: var(--text-light) !important;
+}
+#changelist-filter a:hover {
+  color: var(--primary) !important;
+}
+
+/* ---- Breadcrumbs ---- */
+.breadcrumb {
+  background-color: transparent !important;
+  padding: 6px 0 !important;
+}
+.breadcrumb a {
+  color: var(--primary) !important;
+}
+
+/* ---- Page de connexion ---- */
+#login-form input[type=text],
+#login-form input[type=password] {
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  padding: 12px 14px !important;
+  font-size: 15px !important;
+}
+#login-form input[type=submit] {
+  width: 100% !important;
+  height: 48px !important;
+  font-size: 15px !important;
+  letter-spacing: 0.3px !important;
+}
+.login-logo a, .login-logo-title {
+  color: var(--primary) !important;
+}
+.login-box {
+  border-radius: 16px !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1) !important;
+}
+
+/* ---- Messages de succès / erreur ---- */
+.alert-success, li.success {
+  background-color: #D1FAE5 !important;
+  color: #065F46 !important;
+  border-left: 4px solid var(--success) !important;
+  border-radius: 8px !important;
+}
+.alert-error, li.error, .errornote {
+  background-color: #FEE2E2 !important;
+  color: #991B1B !important;
+  border-left: 4px solid var(--error) !important;
+  border-radius: 8px !important;
+}
+ul.messagelist li.success {
+  background-color: #D1FAE5 !important;
+  color: #065F46 !important;
+  border-left: 4px solid var(--success) !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  font-weight: 500 !important;
+}
+ul.messagelist li.warning {
+  background-color: #FEF3C7 !important;
+  color: #92400E !important;
+  border-left: 4px solid var(--warning) !important;
+  border-radius: 8px !important;
+}
+
+/* ---- Badges de statut ---- */
+.badge {
+  border-radius: 20px !important;
+  padding: 3px 10px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+/* ---- Pagination ---- */
+.paginator a {
+  color: var(--primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  padding: 4px 10px !important;
+  margin: 0 2px !important;
+}
+.paginator a:hover {
+  background-color: #EFF6FF !important;
+  border-color: var(--primary) !important;
+}
+.paginator .this-page {
+  background-color: var(--primary) !important;
+  color: #fff !important;
+  border-radius: 6px !important;
+  padding: 4px 10px !important;
+}
+
+/* ---- Barre de recherche ---- */
+#searchbar {
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+#searchbar:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12) !important;
+  outline: none !important;
+}
+#changelist-search input[type=submit] {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  border-radius: 8px !important;
+}
+
+/* ---- Tabs dans les formulaires ---- */
+.nav-tabs .nav-link {
+  color: var(--text-light) !important;
+  border-bottom: 2px solid transparent !important;
+}
+.nav-tabs .nav-link.active {
+  color: var(--primary) !important;
+  border-bottom: 2px solid var(--primary) !important;
+  font-weight: 600 !important;
+}
+
+/* ---- Submit row (bas de formulaire) ---- */
+.submit-row {
+  background-color: var(--card) !important;
+  border-top: 1px solid var(--border) !important;
+  border-radius: 0 0 var(--radius) var(--radius) !important;
+  padding: 14px 20px !important;
+}
+
+/* ---- Footer ---- */
+.main-footer {
+  background-color: var(--card) !important;
+  border-top: 1px solid var(--border) !important;
+  color: var(--text-muted) !important;
+  font-size: 12px !important;
+}
+
+/* ---- Ajustements globaux ---- */
+h1, h2, h3, h4 {
+  color: var(--text) !important;
+}
+a {
+  color: var(--primary) !important;
+}
+a:hover {
+  color: var(--primary-dark) !important;
+}
+.content h1 {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  margin-bottom: 16px !important;
+}

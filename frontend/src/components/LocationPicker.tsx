@@ -1,0 +1,1068 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  StatusBar,
+  Platform,
+  Keyboard,
+  Dimensions,
+  Animated,
+  Modal,
+} from 'react-native';
+import { WebView } from 'react-native-webview';
+import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../styles/theme';
+import * as Location from 'expo-location';
+
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+
+interface LocationData {
+  latitude: number;
+  longitude: number;
+  name: string;
+  address?: string;
+  city?: string;
+  country?: string;
+}
+
+interface LocationPickerProps {
+  onLocationSelected: (location: LocationData) => void;
+  onCancel: () => void;
+  initialLocation?: LocationData;
+  title?: string;
+}
+
+const DEFAULT_LAT = 6.3703;
+const DEFAULT_LON = 2.3764;
+
+export default function LocationPicker({
+  onLocationSelected,
+  onCancel,
+  initialLocation,
+  title = 'Choisir un lieu',
+}: LocationPickerProps) {
+  const webviewRef = useRef<WebView>(null);
+  const searchInputRef = useRef<TextInput>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(initialLocation || null);
+  const [currentLat, setCurrentLat] = useState(initialLocation?.latitude ?? DEFAULT_LAT);
+  const [currentLon, setCurrentLon] = useState(initialLocation?.longitude ?? DEFAULT_LON);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bottomSheetAnim = useRef(new Animated.Value(0)).current;
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mapInitializedRef = useRef(false);
+
+  useEffect(() => {
+    initializeLocation();
+    animateBottomSheet();
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+    };
+  }, []);
+
+  const animateBottomSheet = () => {
+    Animated.spring(bottomSheetAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    }).start();
+  };
+
+  const initializeLocation = async () => {
+    if (hasInitialized) return;
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setHasInitialized(true);
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const location = {
+        lat: loc.coords.latitude,
+        lon: loc.coords.longitude,
+      };
+
+      setUserLocation(location);
+
+      if (!initialLocation) {
+        setCurrentLat(location.lat);
+        setCurrentLon(location.lon);
+
+        if (mapReady) {
+          sendToMap({ type: 'setView', lat: location.lat, lon: location.lon, zoom: 14 });
+          sendToMap({ type: 'setUserMarker', lat: location.lat, lon: location.lon });
+          await reverseGeocode(location.lat, location.lon);
+        }
+      } else {
+        if (mapReady) {
+          sendToMap({ type: 'setView', lat: initialLocation.latitude, lon: initialLocation.longitude, zoom: 15 });
+          setSelectedLocation(initialLocation);
+        }
+      }
+
+      setHasInitialized(true);
+    } catch (error) {
+      console.error('Error getting location:', error);
+      setHasInitialized(true);
+    }
+  };
+
+  const sendToMap = useCallback((message: object) => {
+    webviewRef.current?.injectJavaScript(
+      `window.handleMessage && window.handleMessage(${JSON.stringify(message)}); true;`
+    );
+  }, []);
+
+  const reverseGeocode = async (lat: number, lon: number) => {
+    setIsLoadingAddress(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+        {
+          headers: { 'User-Agent': 'CovoitBeninApp/1.0' },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data?.address) {
+        const address = data.address;
+
+        let name = '';
+        if (address.road) name = address.road;
+        else if (address.pedestrian) name = address.pedestrian;
+        else if (address.footway) name = address.footway;
+        else if (address.neighbourhood) name = address.neighbourhood;
+        else if (address.suburb) name = address.suburb;
+        else name = 'Position choisie';
+
+        if (address.house_number) name = `${address.house_number} ${name}`;
+
+        const city = address.city || address.town || address.village;
+        const country = address.country;
+
+        setSelectedLocation({
+          latitude: lat,
+          longitude: lon,
+          name: name,
+          address: [address.suburb, address.district].filter(Boolean).join(', '),
+          city: city,
+          country: country,
+        });
+      } else if (data.display_name) {
+        const parts = data.display_name.split(',');
+        setSelectedLocation({
+          latitude: lat,
+          longitude: lon,
+          name: parts[0],
+          address: parts.slice(1, 3).join(',').trim(),
+          city: parts[2]?.trim(),
+          country: parts[parts.length - 1]?.trim(),
+        });
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+    } finally {
+      setIsLoadingAddress(false);
+    }
+  };
+
+  const searchPlaces = async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1`,
+        {
+          headers: { 'User-Agent': 'CovoitBeninApp/1.0' },
+        }
+      );
+
+      const data = await response.json();
+      setSearchResults(data);
+      setShowResults(data.length > 0);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchPlaces(text);
+    }, 400);
+  };
+
+  const handleSelectResult = (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+
+    setCurrentLat(lat);
+    setCurrentLon(lon);
+    setSearchQuery('');
+    setShowResults(false);
+    Keyboard.dismiss();
+
+    const parts = item.display_name.split(',');
+    const name = parts[0];
+    const address = parts.slice(1, 3).join(',').trim();
+    const city = parts[2]?.trim();
+    const country = parts[parts.length - 1]?.trim();
+
+    setSelectedLocation({
+      latitude: lat,
+      longitude: lon,
+      name: name,
+      address: address,
+      city: city,
+      country: country,
+    });
+
+    sendToMap({ type: 'setView', lat, lon, zoom: 16 });
+  };
+
+  const goToMyLocation = () => {
+    if (userLocation) {
+      setCurrentLat(userLocation.lat);
+      setCurrentLon(userLocation.lon);
+      sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 15 });
+      reverseGeocode(userLocation.lat, userLocation.lon);
+    }
+  };
+
+  const handleConfirmPress = () => {
+    setShowConfirmModal(true);
+  };
+
+  const confirmLocation = async () => {
+    if (!selectedLocation) {
+      await reverseGeocode(currentLat, currentLon);
+    }
+
+    setIsConfirming(true);
+    setShowConfirmModal(false);
+
+    setTimeout(() => {
+      if (selectedLocation) {
+        onLocationSelected(selectedLocation);
+      } else {
+        onLocationSelected({
+          latitude: currentLat,
+          longitude: currentLon,
+          name: 'Position choisie',
+        });
+      }
+      setIsConfirming(false);
+    }, 300);
+  };
+
+  const zoomIn = () => {
+    sendToMap({ type: 'zoomIn' });
+  };
+
+  const zoomOut = () => {
+    sendToMap({ type: 'zoomOut' });
+  };
+
+  const onMapMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+
+      if (data.type === 'centerChanged') {
+        const latDiff = Math.abs(data.lat - currentLat);
+        const lonDiff = Math.abs(data.lon - currentLon);
+
+        if (latDiff < 0.00001 && lonDiff < 0.00001 && !isDragging) {
+          return;
+        }
+
+        setCurrentLat(data.lat);
+        setCurrentLon(data.lon);
+        setIsDragging(true);
+
+        if (dragTimeoutRef.current) {
+          clearTimeout(dragTimeoutRef.current);
+        }
+
+        dragTimeoutRef.current = setTimeout(() => {
+          reverseGeocode(data.lat, data.lon);
+          setIsDragging(false);
+        }, 500);
+
+      } else if (data.type === 'ready') {
+        setMapReady(true);
+
+        if (!mapInitializedRef.current) {
+          mapInitializedRef.current = true;
+
+          if (userLocation && !initialLocation) {
+            sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 14 });
+            sendToMap({ type: 'setUserMarker', lat: userLocation.lat, lon: userLocation.lon });
+            if (!selectedLocation) {
+              reverseGeocode(userLocation.lat, userLocation.lon);
+            }
+          } else if (initialLocation) {
+            sendToMap({ type: 'setView', lat: initialLocation.latitude, lon: initialLocation.longitude, zoom: 15 });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Map message error:', error);
+    }
+  };
+
+  const leafletHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html, #map { width: 100%; height: 100%; background: #f0f0f0; }
+    
+    .center-marker {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      pointer-events: none;
+      transition: transform 0.2s ease;
+    }
+    
+    .center-marker.dragging {
+      transform: translate(-50%, -50%) scale(0.8);
+    }
+    
+    .marker-pin {
+      width: 32px;
+      height: 32px;
+      border-radius: 50% 50% 50% 0;
+      background: #FF4444;
+      position: absolute;
+      transform: rotate(-45deg);
+      left: 50%;
+      top: 50%;
+      margin: -16px 0 0 -16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      border: 3px solid white;
+      transition: all 0.2s ease;
+    }
+    
+    .center-marker.dragging .marker-pin {
+      transform: rotate(-45deg) scale(0.8);
+      opacity: 0.7;
+    }
+    
+    .marker-pin::after {
+      content: '';
+      width: 10px;
+      height: 10px;
+      margin: 7px 0 0 8px;
+      background: white;
+      position: absolute;
+      border-radius: 50%;
+    }
+    
+    .pulse {
+      width: 60px;
+      height: 60px;
+      background: rgba(255,68,68,0.3);
+      border-radius: 50%;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      margin: -30px 0 0 -30px;
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+    
+    .user-marker {
+      width: 16px;
+      height: 16px;
+      background: #4285F4;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .leaflet-control-attribution { display: none !important; }
+    .leaflet-control-zoom { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="center-marker" id="centerMarker">
+    <div class="marker-pin"></div>
+    <div class="pulse"></div>
+  </div>
+  
+  <script>
+    var map = L.map('map', { 
+      zoomControl: false
+    }).setView([${currentLat}, ${currentLon}], ${initialLocation ? 15 : 13});
+    
+    // Utilisation d'OpenStreetMap standard pour un meilleur rendu
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors',
+      detectRetina: true
+    }).addTo(map);
+    
+    var userMarker = null;
+    var isMoving = false;
+    var markerElement = document.getElementById('centerMarker');
+    
+    map.on('movestart', function() {
+      isMoving = true;
+      if (markerElement) {
+        markerElement.classList.add('dragging');
+      }
+    });
+    
+    map.on('moveend', function() {
+      setTimeout(function() {
+        isMoving = false;
+        if (markerElement) {
+          markerElement.classList.remove('dragging');
+        }
+        var center = map.getCenter();
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'centerChanged',
+          lat: center.lat,
+          lon: center.lng
+        }));
+      }, 100);
+    });
+    
+    map.whenReady(function() {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+    });
+    
+    window.handleMessage = function(msg) {
+      if (msg.type === 'setView') {
+        map.setView([msg.lat, msg.lon], msg.zoom || 15, { animate: true, duration: 0.5 });
+      } else if (msg.type === 'setUserMarker') {
+        var userIcon = L.divIcon({
+          className: '',
+          html: '<div class="user-marker"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+        
+        if (userMarker) {
+          userMarker.setLatLng([msg.lat, msg.lon]);
+        } else {
+          userMarker = L.marker([msg.lat, msg.lon], { icon: userIcon, zIndexOffset: 200 }).addTo(map);
+        }
+      } else if (msg.type === 'zoomIn') {
+        map.zoomIn();
+      } else if (msg.type === 'zoomOut') {
+        map.zoomOut();
+      }
+    };
+  </script>
+</body>
+</html>`;
+
+  const bottomSheetTransform = {
+    transform: [{
+      translateY: bottomSheetAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [300, 0],
+      }),
+    }],
+  };
+
+  const ConfirmModal = () => (
+    <Modal
+      visible={showConfirmModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowConfirmModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalIcon}>
+            <Ionicons name="location" size={48} color={theme.colors.primary} />
+          </View>
+
+          <Text style={styles.modalTitle}>Confirmer l'emplacement</Text>
+
+          <View style={styles.modalLocationInfo}>
+            <Ionicons name="navigate-circle" size={20} color={theme.colors.primary} />
+            <Text style={styles.modalLocationName} numberOfLines={2}>
+              {selectedLocation?.name || 'Chargement...'}
+            </Text>
+          </View>
+
+          {selectedLocation?.address && (
+            <Text style={styles.modalLocationAddress} numberOfLines={2}>
+              {selectedLocation.address}
+            </Text>
+          )}
+
+          {selectedLocation?.city && (
+            <Text style={styles.modalLocationCity}>
+              {[selectedLocation.city, selectedLocation.country].filter(Boolean).join(', ')}
+            </Text>
+          )}
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalButtonCancel]}
+              onPress={() => setShowConfirmModal(false)}
+            >
+              <Text style={styles.modalButtonCancelText}>Annuler</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalButtonConfirm]}
+              onPress={confirmLocation}
+            >
+              <Text style={styles.modalButtonConfirmText}>Confirmer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+
+      <WebView
+        ref={webviewRef}
+        originWhitelist={['*']}
+        source={{ html: leafletHtml }}
+        onMessage={onMapMessage}
+        javaScriptEnabled
+        domStorageEnabled
+        cacheEnabled
+        style={styles.map}
+        scrollEnabled={false}
+      />
+
+      {!mapReady && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Chargement de la carte...</Text>
+        </View>
+      )}
+
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={onCancel}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder="Rechercher un lieu..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => {
+              setSearchQuery('');
+              setSearchResults([]);
+              setShowResults(false);
+            }}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.zoomControls}>
+        <TouchableOpacity style={styles.zoomButton} onPress={zoomIn}>
+          <Ionicons name="add" size={24} color="#333" />
+        </TouchableOpacity>
+        <View style={styles.zoomDivider} />
+        <TouchableOpacity style={styles.zoomButton} onPress={zoomOut}>
+          <Ionicons name="remove" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+
+      {showResults && (
+        <View style={styles.resultsContainer}>
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => item.place_id?.toString() || item.lat + item.lon}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item, index }) => (
+              <TouchableOpacity
+                style={[
+                  styles.resultItem,
+                  index === searchResults.length - 1 && styles.resultItemLast
+                ]}
+                onPress={() => handleSelectResult(item)}
+              >
+                <View style={styles.resultIconContainer}>
+                  <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
+                </View>
+                <View style={styles.resultContent}>
+                  <Text style={styles.resultTitle} numberOfLines={1}>
+                    {item.display_name.split(',')[0]}
+                  </Text>
+                  <Text style={styles.resultSubtitle} numberOfLines={1}>
+                    {item.display_name.split(',').slice(1, 4).join(',').trim()}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
+
+      <TouchableOpacity style={styles.myLocationButton} onPress={goToMyLocation}>
+        <Ionicons name="locate" size={22} color="#333" />
+      </TouchableOpacity>
+
+      <Animated.View style={[styles.bottomSheet, bottomSheetTransform]}>
+        <View style={styles.bottomSheetHandle} />
+
+        <View style={styles.locationInfo}>
+          <View style={styles.locationIconContainer}>
+            <Ionicons name="location" size={24} color={theme.colors.primary} />
+          </View>
+
+          <View style={styles.locationDetails}>
+            {isLoadingAddress ? (
+              <>
+                <View style={styles.skeletonText} />
+                <View style={[styles.skeletonText, styles.skeletonTextSmall]} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.locationName} numberOfLines={2}>
+                  {selectedLocation?.name || 'Déplacez la carte pour choisir un lieu'}
+                </Text>
+                {selectedLocation?.address && (
+                  <Text style={styles.locationAddress} numberOfLines={1}>
+                    {selectedLocation.address}
+                  </Text>
+                )}
+                {selectedLocation?.city && (
+                  <Text style={styles.locationCity} numberOfLines={1}>
+                    {selectedLocation.city}
+                  </Text>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.confirmButton, isConfirming && styles.confirmButtonDisabled]}
+          onPress={handleConfirmPress}
+          disabled={isConfirming || isLoadingAddress}
+        >
+          {isConfirming ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.confirmButtonText}>Confirmer l'emplacement</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.confirmButtonIcon} />
+            </>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+
+      <ConfirmModal />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  map: {
+    flex: 1,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#999',
+  },
+  header: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 40,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 10,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  searchContainer: {
+    flex: 1,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  zoomControls: {
+    position: 'absolute',
+    right: 16,
+    bottom: SCREEN_HEIGHT * 0.35,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    zIndex: 10,
+  },
+  zoomButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  zoomDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+  },
+  resultsContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 100,
+    left: 16,
+    right: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    maxHeight: SCREEN_HEIGHT * 0.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 10,
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f0f0f0',
+  },
+  resultItemLast: {
+    borderBottomWidth: 0,
+  },
+  resultIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  resultContent: {
+    flex: 1,
+  },
+  resultTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  resultSubtitle: {
+    fontSize: 13,
+    color: '#999',
+  },
+  myLocationButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: SCREEN_HEIGHT * 0.45,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    zIndex: 10,
+  },
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  locationIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  locationDetails: {
+    flex: 1,
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  locationAddress: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 2,
+  },
+  locationCity: {
+    fontSize: 12,
+    color: '#999',
+  },
+  skeletonText: {
+    height: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '80%',
+  },
+  skeletonTextSmall: {
+    height: 16,
+    width: '60%',
+    marginBottom: 0,
+  },
+  confirmButton: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
+    height: 52,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmButtonDisabled: {
+    opacity: 0.7,
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginRight: 8,
+  },
+  confirmButtonIcon: {
+    marginLeft: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    width: SCREEN_WIDTH - 48,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 20,
+  },
+  modalLocationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    backgroundColor: '#f8f8f8',
+    padding: 12,
+    borderRadius: 12,
+    width: '100%',
+  },
+  modalLocationName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+  },
+  modalLocationAddress: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalLocationCity: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: '#f5f5f5',
+  },
+  modalButtonCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalButtonConfirm: {
+    backgroundColor: theme.colors.primary,
+  },
+  modalButtonConfirmText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+});

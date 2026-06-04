@@ -1,15 +1,15 @@
 export const theme = {
   colors: {
-    // Primary - Deep Benin Teal (professional, safe, premium)
-    primary: '#0D9488',
-    primaryLight: '#CCFBF1',
-    primaryDark: '#115E59',
-    
-    // Secondary - Golden Sun of Benin (warm, inviting)
-    secondary: '#F59E0B',
-    secondaryLight: '#FEF3C7',
-    secondaryDark: '#B45309',
-    
+    // Primary - Blue (from index.tsx: #3B82F6)
+    primary: '#3B82F6',
+    primaryLight: '#EFF6FF',
+    primaryDark: '#1D4ED8',
+
+    // Secondary - Sky Blue accent (from index.tsx: #0284C7)
+    secondary: '#0284C7',
+    secondaryLight: '#E0F2FE',
+    secondaryDark: '#0369A1',
+
     // Grayscale
     background: '#F8FAFC',
     card: '#FFFFFF',
@@ -17,19 +17,21 @@ export const theme = {
     textLight: '#475569',
     textMuted: '#94A3B8',
     border: '#E2E8F0',
-    
+
     // Feedback
     success: '#10B981',
     successLight: '#D1FAE5',
     error: '#EF4444',
     errorLight: '#FEE2E2',
     warning: '#F59E0B',
-    
+    warningLight: '#FEF3C7',
+    warningDark: '#B45309',
+
     // Custom overlays / opacity colors
     overlay: 'rgba(0, 0, 0, 0.4)',
     glass: 'rgba(255, 255, 255, 0.8)',
   },
-  
+
   spacing: {
     xs: 4,
     sm: 8,
@@ -38,7 +40,7 @@ export const theme = {
     xl: 32,
     xxl: 48,
   },
-  
+
   borderRadius: {
     xs: 4,
     sm: 8,
@@ -47,7 +49,7 @@ export const theme = {
     xl: 24,
     full: 9999,
   },
-  
+
   typography: {
     h1: {
       fontSize: 32,
@@ -90,7 +92,7 @@ export const theme = {
       lineHeight: 14,
     },
   },
-  
+
   shadows: {
     sm: {
       shadowColor: '#000',
