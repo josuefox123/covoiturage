@@ -7,7 +7,7 @@ import random
 
 from .models import Vehicle, UserPreference, Ride, Booking, Conversation, Message
 from .serializers import (
-    UserSerializer, VehicleSerializer, UserPreferenceSerializer, 
+    UserSerializer, AdminUserSerializer, VehicleSerializer, UserPreferenceSerializer, 
     RideSerializer, BookingSerializer, ConversationSerializer, MessageSerializer
 )
 
@@ -111,8 +111,9 @@ def login_user(request):
     return Response({'error': 'Identifiants invalides.'}, status=status.HTTP_401_UNAUTHORIZED)
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+    queryset = User.objects.all().order_by('-created_at')
+    serializer_class = AdminUserSerializer
+    permission_classes = [permissions.AllowAny]  # Dashboard admin access
 
 class VehicleViewSet(viewsets.ModelViewSet):
     queryset = Vehicle.objects.all()
