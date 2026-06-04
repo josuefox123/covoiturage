@@ -320,7 +320,7 @@ export default function ProfileScreen() {
         value={value}
         onValueChange={onToggle}
         trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-        thumbColor="#fff"
+        thumbColor={theme.colors.white}
       />
     </View>
   );
@@ -381,15 +381,15 @@ export default function ProfileScreen() {
                 </LinearGradient>
               )}
               <View style={styles.avatarEditBadge}>
-                <Ionicons name="camera" size={14} color="#fff" />
+                <Ionicons name="camera" size={14} color={theme.colors.white} />
               </View>
             </TouchableOpacity>
 
             <View style={styles.profileText}>
               <Text style={styles.profileName}>{user.full_name || 'Profil incomplet'}</Text>
               <Text style={styles.profilePhone}>{user.phone || 'Numéro non renseigné'}</Text>
-              <View style={[styles.verifiedBadge, { backgroundColor: user.is_verified ? '#10B981' : '#F59E0B' }]}>
-                <Ionicons name={user.is_verified ? "checkmark-circle" : "time"} size={12} color="#fff" />
+              <View style={[styles.verifiedBadge, { backgroundColor: user.is_verified ? '#10B981' : theme.colors.warning }]}>
+                <Ionicons name={user.is_verified ? "checkmark-circle" : "time"} size={12} color={theme.colors.white} />
                 <Text style={styles.verifiedText}>{user.is_verified ? "Identité vérifiée" : "Non vérifié"}</Text>
               </View>
             </View>
@@ -405,7 +405,7 @@ export default function ProfileScreen() {
             <View style={styles.statCol}>
               <Text style={styles.statNumber}>{user.rating?.toFixed(1) || '0.0'}</Text>
               <View style={styles.ratingInline}>
-                <Ionicons name="star" size={12} color="#F59E0B" />
+                <Ionicons name="star" size={12} color={theme.colors.warning} />
                 <Text style={styles.statLabel}> Note</Text>
               </View>
             </View>
@@ -430,9 +430,9 @@ export default function ProfileScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Ionicons name="alert-circle" size={20} color="#fff" />
+            <Ionicons name="alert-circle" size={20} color={theme.colors.white} />
             <Text style={styles.completionText}>Complétez votre profil pour publier un trajet</Text>
-            <Ionicons name="chevron-forward" size={16} color="#fff" />
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.white} />
           </TouchableOpacity>
         )}
 
@@ -549,12 +549,12 @@ export default function ProfileScreen() {
                   <View style={styles.avatarWrapper}>
                     <Image source={{ uri: avatarUri }} style={styles.modernAvatar} />
                     <View style={styles.modernAvatarEditBadge}>
-                      <Ionicons name="camera" size={16} color="#fff" />
+                      <Ionicons name="camera" size={16} color={theme.colors.white} />
                     </View>
                   </View>
                 ) : (
                   <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.modernAvatarPlaceholder}>
-                    <Ionicons name="camera" size={40} color="#fff" />
+                    <Ionicons name="camera" size={40} color={theme.colors.white} />
                     <Text style={styles.modernAvatarText}>Ajouter une photo</Text>
                   </LinearGradient>
                 )}
@@ -604,7 +604,7 @@ export default function ProfileScreen() {
               {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
 
               <TouchableOpacity style={styles.modalBtnSave} onPress={handleSavePersonalInfo} disabled={isSaving}>
-                {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnSaveText}>Enregistrer</Text>}
+                {isSaving ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnSaveText}>Enregistrer</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -625,7 +625,7 @@ export default function ProfileScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.vehicleIconContainer}>
                 <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
-                  <Ionicons name="car-outline" size={48} color="#fff" />
+                  <Ionicons name="car-outline" size={48} color={theme.colors.white} />
                 </LinearGradient>
               </View>
 
@@ -658,7 +658,7 @@ export default function ProfileScreen() {
               />
 
               <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveVehicle} disabled={isSaving}>
-                {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnSaveText}>{vehicleId ? 'Mettre à jour' : 'Ajouter le véhicule'}</Text>}
+                {isSaving ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnSaveText}>{vehicleId ? 'Mettre à jour' : 'Ajouter le véhicule'}</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -686,7 +686,7 @@ export default function ProfileScreen() {
               <PrefRow label="❄️ Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
 
               <TouchableOpacity style={[styles.modalBtnSave, { marginTop: 24 }]} onPress={handleSavePreferences} disabled={isSaving}>
-                {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnSaveText}>Sauvegarder</Text>}
+                {isSaving ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnSaveText}>Sauvegarder</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -697,7 +697,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.md,
@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     marginBottom: theme.spacing.md,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -728,7 +728,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  avatarBigText: { color: '#fff', fontSize: 28, fontWeight: '800' },
+  avatarBigText: { color: theme.colors.white, fontSize: 28, fontWeight: '800' },
   avatarEditBadge: {
     position: 'absolute',
     bottom: 0,
@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: theme.colors.white,
   },
   profileText: { flex: 1 },
   profileName: { fontSize: 20, fontWeight: '800', color: theme.colors.text, marginBottom: 2 },
@@ -751,18 +751,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignSelf: 'flex-start', gap: 4,
   },
-  verifiedText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  verifiedText: { color: theme.colors.white, fontSize: 10, fontWeight: '700' },
   statsRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: theme.spacing.md,
+    borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.md,
   },
   statCol: { alignItems: 'center', flex: 1 },
   statNumber: { fontSize: 20, fontWeight: '800', color: theme.colors.text },
   statLabel: { fontSize: 11, color: theme.colors.textLight, fontWeight: '500', marginTop: 2 },
   ratingInline: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  statDivider: { width: 1, height: 30, backgroundColor: '#E2E8F0' },
+  statDivider: { width: 1, height: 30, backgroundColor: theme.colors.border },
   completionBanner: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: theme.colors.warning,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: theme.borderRadius.lg,
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     gap: 8,
   },
-  completionText: { flex: 1, color: '#fff', fontWeight: '600', fontSize: 13 },
+  completionText: { flex: 1, color: theme.colors.white, fontWeight: '600', fontSize: 13 },
   section: { marginBottom: theme.spacing.lg },
   sectionTitle: {
     fontSize: 16,
@@ -780,9 +780,9 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   menuCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.lg,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row', alignItems: 'center',
     padding: theme.spacing.md,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
   },
   menuIconContainer: {
     width: 40, height: 40, borderRadius: 20,
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
   menuTextContainer: { flex: 1 },
   menuTitle: { fontSize: 15, fontWeight: '600', color: theme.colors.text },
   menuSubtitle: { fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
-  menuDivider: { height: 1, backgroundColor: '#E2E8F0', marginHorizontal: theme.spacing.md },
+  menuDivider: { height: 1, backgroundColor: theme.colors.border, marginHorizontal: theme.spacing.md },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, backgroundColor: '#FEE2E2', height: 52,
@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginButtonText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: theme.spacing.xl,
@@ -872,7 +872,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#fff',
+    borderColor: theme.colors.white,
   },
   modernAvatarEditBadge: {
     position: 'absolute',
@@ -885,7 +885,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: theme.colors.white,
   },
   modernAvatarPlaceholder: {
     width: 100,
@@ -896,7 +896,7 @@ const styles = StyleSheet.create({
   },
   modernAvatarText: {
     fontSize: 11,
-    color: '#fff',
+    color: theme.colors.white,
     fontWeight: '600',
     marginTop: 4,
   },
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
     padding: 14,
     fontSize: 15,
@@ -937,7 +937,7 @@ const styles = StyleSheet.create({
   modalBtnSaveText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.white,
   },
   errorText: {
     color: theme.colors.error,
@@ -957,6 +957,6 @@ const styles = StyleSheet.create({
   },
   prefDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.border,
   },
 });

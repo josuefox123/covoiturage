@@ -243,7 +243,7 @@ export default function PublishScreen() {
         value={value}
         onValueChange={onToggle}
         trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-        thumbColor="#fff"
+        thumbColor={theme.colors.white}
       />
     </View>
   );
@@ -414,7 +414,7 @@ export default function PublishScreen() {
                       onPress={() => seats > 1 && setSeats(seats - 1)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="remove" size={18} color="#fff" />
+                      <Ionicons name="remove" size={18} color={theme.colors.white} />
                     </TouchableOpacity>
                     <Text style={styles.counterText}>{seats}</Text>
                     <TouchableOpacity
@@ -422,7 +422,7 @@ export default function PublishScreen() {
                       onPress={() => seats < 8 && setSeats(seats + 1)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="add" size={18} color="#fff" />
+                      <Ionicons name="add" size={18} color={theme.colors.white} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -439,10 +439,10 @@ export default function PublishScreen() {
                 >
                   <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.publishGradient}>
                     {loading ? (
-                      <ActivityIndicator color="#fff" size="small" />
+                      <ActivityIndicator color={theme.colors.white} size="small" />
                     ) : (
                       <>
-                        <Ionicons name="send-outline" size={20} color="#fff" />
+                        <Ionicons name="send-outline" size={20} color={theme.colors.white} />
                         <Text style={styles.publishBtnText}>Publier mon annonce</Text>
                       </>
                     )}
@@ -468,9 +468,9 @@ export default function PublishScreen() {
                     PROFILE_STEPS.indexOf(profileStep) > i && styles.stepDotDone
                   ]}>
                     {PROFILE_STEPS.indexOf(profileStep) > i ? (
-                      <Ionicons name="checkmark" size={12} color="#fff" />
+                      <Ionicons name="checkmark" size={12} color={theme.colors.white} />
                     ) : (
-                      <Text style={[styles.stepDotText, profileStep === step && { color: '#fff' }]}>{i + 1}</Text>
+                      <Text style={[styles.stepDotText, profileStep === step && { color: theme.colors.white }]}>{i + 1}</Text>
                     )}
                   </View>
                   {i < 2 && <View style={[styles.stepLine, PROFILE_STEPS.indexOf(profileStep) > i && styles.stepLineDone]} />}
@@ -489,12 +489,12 @@ export default function PublishScreen() {
                     <View style={styles.avatarWrapper}>
                       <Image source={{ uri: avatarUri }} style={styles.avatar} />
                       <View style={styles.avatarBadge}>
-                        <Ionicons name="camera" size={16} color="#fff" />
+                        <Ionicons name="camera" size={16} color={theme.colors.white} />
                       </View>
                     </View>
                   ) : (
                     <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.avatarPlaceholder}>
-                      <Ionicons name="camera" size={40} color="#fff" />
+                      <Ionicons name="camera" size={40} color={theme.colors.white} />
                       <Text style={styles.avatarPlaceholderText}>Ajouter une photo</Text>
                     </LinearGradient>
                   )}
@@ -521,7 +521,7 @@ export default function PublishScreen() {
                 />
 
                 <TouchableOpacity style={styles.modalBtn} onPress={handleSavePersonal} disabled={isSavingProfile}>
-                  {isSavingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
+                  {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
                 </TouchableOpacity>
               </>
             )}
@@ -565,7 +565,7 @@ export default function PublishScreen() {
                     <Text style={styles.modalBtnSkipText}>Passer</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSaveVehicle} disabled={isSavingProfile}>
-                    {isSavingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
+                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
                   </TouchableOpacity>
                 </View>
               </>
@@ -589,7 +589,7 @@ export default function PublishScreen() {
                     <Text style={styles.modalBtnSkipText}>Passer</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSavePrefs} disabled={isSavingProfile}>
-                    {isSavingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnText}>Terminer 🚀</Text>}
+                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Terminer 🚀</Text>}
                   </TouchableOpacity>
                 </View>
               </>
@@ -615,7 +615,7 @@ export default function PublishScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 32 },
   header: { marginVertical: 20 },
   title: { fontSize: 28, fontWeight: '800', color: '#1F2937', marginBottom: 4 },
@@ -624,13 +624,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#FEF3C7', borderRadius: 12,
     padding: 12, marginBottom: 16,
-    borderWidth: 1, borderColor: '#F59E0B',
+    borderWidth: 1, borderColor: theme.colors.warning,
   },
   profileWarningText: { flex: 1, color: '#B45309', fontWeight: '600', fontSize: 13 },
   form: {
     borderRadius: 24,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 8 },
   locationButton: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', padding: 12,
+    backgroundColor: theme.colors.white, padding: 12,
     borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
   },
   locationIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
@@ -655,14 +655,14 @@ const styles = StyleSheet.create({
   pillsContainer: { gap: 8, paddingVertical: 4 },
   pill: {
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB',
+    backgroundColor: theme.colors.white, borderWidth: 1, borderColor: '#E5E7EB',
   },
   pillSelected: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   pillText: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
-  pillTextSelected: { color: '#fff', fontWeight: '700' },
+  pillTextSelected: { color: theme.colors.white, fontWeight: '700' },
   timeButton: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', padding: 14,
+    backgroundColor: theme.colors.white, padding: 14,
     borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
   },
   timeText: { flex: 1, fontSize: 15, color: '#1F2937', fontWeight: '500' },
@@ -670,13 +670,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12 },
   priceInput: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', paddingHorizontal: 14,
+    backgroundColor: theme.colors.white, paddingHorizontal: 14,
     borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', height: 50,
   },
   priceField: { flex: 1, fontSize: 15, color: '#1F2937' },
   counter: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', paddingHorizontal: 8,
+    backgroundColor: theme.colors.white, paddingHorizontal: 8,
     borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', height: 50,
   },
   counterBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center' },
@@ -684,38 +684,38 @@ const styles = StyleSheet.create({
   publishBtn: { marginTop: 24, overflow: 'hidden', borderRadius: 12 },
   publishBtnDisabled: { opacity: 0.6 },
   publishGradient: { flexDirection: 'row', height: 52, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  publishBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  publishBtnText: { fontSize: 16, fontWeight: '700', color: theme.colors.white },
   notLoggedTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937', marginTop: 16, marginBottom: 8, textAlign: 'center' },
   notLoggedText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 24 },
   notLoggedButton: { borderRadius: 12, overflow: 'hidden' },
   notLoggedGradient: { paddingHorizontal: 32, paddingVertical: 14, justifyContent: 'center', alignItems: 'center' },
-  notLoggedButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  notLoggedButtonText: { color: theme.colors.white, fontWeight: 'bold', fontSize: 16 },
   // Modal styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: theme.colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 24, paddingBottom: 36, maxHeight: '90%',
   },
   stepIndicator: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
   stepWrapper: { flexDirection: 'row', alignItems: 'center' },
   stepDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', borderWidth: 2, borderColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' },
   stepDotActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },
-  stepDotDone: { borderColor: '#10B981', backgroundColor: '#10B981' },
+  stepDotDone: { borderColor: theme.colors.success, backgroundColor: theme.colors.success },
   stepDotText: { fontSize: 14, fontWeight: '700', color: '#9CA3AF' },
   stepLine: { width: 40, height: 2, backgroundColor: '#E5E7EB' },
-  stepLineDone: { backgroundColor: '#10B981' },
+  stepLineDone: { backgroundColor: theme.colors.success },
   modalTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937', marginBottom: 4 },
   modalSubtitle: { fontSize: 14, color: '#6B7280', marginBottom: 20 },
   avatarPicker: { alignSelf: 'center', marginBottom: 24 },
   avatarWrapper: { position: 'relative' },
-  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: '#fff' },
-  avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: theme.colors.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
+  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: theme.colors.white },
+  avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: theme.colors.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.colors.white },
   avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
-  avatarPlaceholderText: { fontSize: 11, color: '#fff', fontWeight: '600', marginTop: 4 },
+  avatarPlaceholderText: { fontSize: 11, color: theme.colors.white, fontWeight: '600', marginTop: 4 },
   modalLabel: { fontSize: 14, fontWeight: '600', color: '#6B7280', marginBottom: 8 },
   modalInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 16, color: '#1F2937' },
   modalBtn: { backgroundColor: theme.colors.primary, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
-  modalBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  modalBtnText: { fontSize: 16, fontWeight: '700', color: theme.colors.white },
   modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
   modalBtnSkip: { height: 50, paddingHorizontal: 20, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
   modalBtnSkipText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },

@@ -148,7 +148,7 @@ export default function LoginScreen() {
   return (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
       <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" translucent backgroundColor="transparent" />
+        <StatusBar style="dark" translucent backgroundColor={theme.colors.transparent} />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -278,13 +278,13 @@ export default function LoginScreen() {
                     >
                       {loading ? (
                         <View style={styles.loadingContainer}>
-                          <ActivityIndicator color="#fff" size="small" />
+                          <ActivityIndicator color={theme.colors.white} size="small" />
                           <Text style={styles.loginButtonText}>Connexion en cours...</Text>
                         </View>
                       ) : (
                         <View style={styles.buttonContent}>
                           <Text style={styles.loginButtonText}>Se connecter</Text>
-                          <Ionicons name="arrow-forward" size={20} color="#fff" />
+                          <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
                         </View>
                       )}
                     </LinearGradient>
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.xl,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     marginBottom: theme.spacing.xl,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.white,
     letterSpacing: 0.5,
   },
   disabledButton: {
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,

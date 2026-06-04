@@ -175,7 +175,7 @@ export default function RegisterScreen() {
             >
               {loading ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={theme.colors.white} size="small" />
                   <Text style={styles.registerButtonText}>Veuillez patienter...</Text>
                 </View>
               ) : (
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: theme.colors.text, ...theme.typography.bodyMedium, height: '100%' },
   registerButton: { backgroundColor: theme.colors.primary, height: 52, borderRadius: theme.borderRadius.md, justifyContent: 'center', alignItems: 'center', marginTop: theme.spacing.sm, ...theme.shadows.sm },
   disabledButton: { opacity: 0.6 },
-  registerButtonText: { ...theme.typography.button, color: '#fff' },
+  registerButtonText: { ...theme.typography.button, color: theme.colors.white },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 'auto' },
   footerText: { ...theme.typography.bodyMedium, color: theme.colors.textLight },
   loginLink: { ...theme.typography.bodyMedium, color: theme.colors.primary, fontWeight: '700' },

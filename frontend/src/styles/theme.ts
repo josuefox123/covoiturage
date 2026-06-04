@@ -18,6 +18,14 @@ export const theme = {
     textMuted: '#94A3B8',
     border: '#E2E8F0',
 
+    // Generic
+    white: '#FFFFFF',
+    black: '#000000',
+    transparent: 'transparent',
+    gray: '#9CA3AF',
+    grayLight: '#E5E7EB',
+    grayDark: '#4B5563',
+
     // Feedback
     success: '#10B981',
     successLight: '#D1FAE5',

@@ -138,7 +138,7 @@ export default function RideDetailScreen() {
             <View style={styles.driverInfo}>
               <Text style={styles.driverName}>{driverName}</Text>
               <View style={styles.ratingRow}>
-                <Ionicons name="star" size={16} color="#F59E0B" />
+                <Ionicons name="star" size={16} color={theme.colors.warning} />
                 <Text style={styles.ratingText}>{ride.driver_details?.rating || 0} • Avis certifiés</Text>
               </View>
             </View>
@@ -219,5 +219,5 @@ const styles = StyleSheet.create({
   messageBtn: { width: 52, height: 52, borderRadius: theme.borderRadius.lg, borderWidth: 1.5, borderColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center' },
   bookBtn: { flex: 1, height: 52, backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.lg, justifyContent: 'center', alignItems: 'center', ...theme.shadows.sm },
   bookedBtn: { backgroundColor: theme.colors.success },
-  bookBtnText: { ...theme.typography.button, color: '#fff' },
+  bookBtnText: { ...theme.typography.button, color: theme.colors.white },
 });

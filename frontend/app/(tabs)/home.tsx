@@ -38,15 +38,15 @@ interface Ride {
 }
 
 const ADS_DATA = [
-  { id: '1', title: '50% sur votre 1er trajet !', subtitle: 'Offre exclusive de bienvenue', color1: '#10B981', color2: '#059669', icon: 'ticket-outline' },
+  { id: '1', title: '50% sur votre 1er trajet !', subtitle: 'Offre exclusive de bienvenue', color1: theme.colors.success, color2: '#059669', icon: 'ticket-outline' },
   { id: '2', title: 'Devenez chauffeur', subtitle: 'Gagnez plus avec vos trajets quotidiens', color1: theme.colors.primary, color2: theme.colors.primaryDark, icon: 'car-outline' },
-  { id: '3', title: 'Parrainez un ami', subtitle: 'Recevez 2000 FCFA pour chaque ami invité', color1: '#F59E0B', color2: '#D97706', icon: 'gift-outline' },
+  { id: '3', title: 'Parrainez un ami', subtitle: 'Recevez 2000 FCFA pour chaque ami invité', color1: theme.colors.warning, color2: '#D97706', icon: 'gift-outline' },
 ];
 
 const QUICK_ACTIONS = [
   { icon: 'car-outline', label: 'Publier', color: theme.colors.primary },
-  { icon: 'calendar-outline', label: 'Réserver', color: '#10B981' },
-  { icon: 'chatbubbles-outline', label: 'Messages', color: '#3B82F6' },
+  { icon: 'calendar-outline', label: 'Réserver', color: theme.colors.success },
+  { icon: 'chatbubbles-outline', label: 'Messages', color: theme.colors.primary },
   { icon: 'person-outline', label: 'Profil', color: '#8B5CF6' },
 ];
 
@@ -94,7 +94,7 @@ const RideCard = React.memo(({ item, index, onPress }: { item: Ride; index: numb
               <View>
                 <Text style={styles.driverName}>{driverName}</Text>
                 <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={14} color="#F59E0B" />
+                  <Ionicons name="star" size={14} color={theme.colors.warning} />
                   <Text style={styles.ratingText}>{item.driver_details?.rating || 4.5}</Text>
                 </View>
               </View>
@@ -337,7 +337,7 @@ export default function HomeScreen() {
                     setDeparture(destination);
                     setDestination(temp);
                   }}>
-                    <Ionicons name="swap-vertical" size={14} color="#fff" />
+                    <Ionicons name="swap-vertical" size={14} color={theme.colors.white} />
                   </TouchableOpacity>
                 </View>
 
@@ -354,7 +354,7 @@ export default function HomeScreen() {
 
                 <TouchableOpacity style={styles.searchButton} onPress={() => fetchRides()}>
                   <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.searchButtonGradient}>
-                    <Ionicons name="search-outline" size={20} color="#fff" />
+                    <Ionicons name="search-outline" size={20} color={theme.colors.white} />
                     <Text style={styles.searchButtonText}>Rechercher</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -452,19 +452,19 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: theme.colors.background },
   headerBackground: { position: 'absolute', top: 0, left: 0, right: 0, height: 280, overflow: 'hidden' },
   headerPattern: { flex: 1, opacity: 0.1 },
-  patternDot: { position: 'absolute', width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' },
+  patternDot: { position: 'absolute', width: 4, height: 4, borderRadius: 2, backgroundColor: theme.colors.white },
   safeArea: { flex: 1 },
   listContent: { paddingBottom: theme.spacing.xl },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginTop: 10, marginBottom: theme.spacing.lg },
   greeting: { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-  title: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 2 },
-  profileBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, overflow: 'hidden' },
+  title: { fontSize: 22, fontWeight: '800', color: theme.colors.white, marginTop: 2 },
+  profileBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, overflow: 'hidden' },
   profileAvatar: { width: 48, height: 48, borderRadius: 24 },
-  profileDefault: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
-  searchCard: { backgroundColor: '#fff', borderRadius: 24, padding: theme.spacing.md, marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
+  profileDefault: { width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center' },
+  searchCard: { backgroundColor: theme.colors.white, borderRadius: 24, padding: theme.spacing.md, marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md, shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
   searchRow: { flexDirection: 'row', alignItems: 'center' },
   searchIconDeparture: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${theme.colors.primary}15`, justifyContent: 'center', alignItems: 'center' },
   searchIconArrival: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${theme.colors.secondary}15`, justifyContent: 'center', alignItems: 'center' },
@@ -476,11 +476,11 @@ const styles = StyleSheet.create({
   swapBtn: { position: 'absolute', left: 20, top: -8, width: 28, height: 28, borderRadius: 14, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 },
   searchButton: { marginTop: theme.spacing.md },
   searchButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12 },
-  searchButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  searchButtonText: { color: theme.colors.white, fontSize: 15, fontWeight: '700' },
   activeFilters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
   filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${theme.colors.primary}10`, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   filterChipText: { fontSize: 13, color: theme.colors.primary, fontWeight: '500' },
-  searchHistory: { backgroundColor: '#fff', marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md, borderRadius: 16, padding: theme.spacing.md, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  searchHistory: { backgroundColor: theme.colors.white, marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md, borderRadius: 16, padding: theme.spacing.md, shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   searchHistoryTitle: { fontSize: 14, fontWeight: '600', color: theme.colors.text, marginBottom: 12 },
   historyItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   historyText: { flex: 1, fontSize: 14, color: theme.colors.textLight },
@@ -492,17 +492,17 @@ const styles = StyleSheet.create({
   carouselContainer: { marginBottom: theme.spacing.xl },
   adCard: { width: 280, height: 110, borderRadius: 16, padding: theme.spacing.md, justifyContent: 'center', position: 'relative', overflow: 'hidden', marginRight: 12 },
   adContent: { zIndex: 2 },
-  adTitle: { fontSize: 16, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  adTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.white, marginBottom: 4 },
   adSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   adIcon: { position: 'absolute', right: -10, bottom: -10, zIndex: 1, transform: [{ rotate: '-15deg' }] },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.text },
   sectionCount: { fontSize: 13, color: theme.colors.textLight, fontWeight: '500' },
   filtersScroll: { paddingHorizontal: theme.spacing.lg, gap: 10, marginBottom: theme.spacing.md },
-  filterPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: theme.colors.border },
+  filterPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: theme.colors.white, borderWidth: 1, borderColor: theme.colors.border },
   filterPillActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   filterPillText: { fontSize: 13, color: theme.colors.textLight, fontWeight: '600' },
-  filterPillTextActive: { color: '#fff' },
+  filterPillTextActive: { color: theme.colors.white },
   rideCard: { marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
   rideCardGradient: { borderRadius: 20, padding: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.border },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.md },
@@ -534,6 +534,6 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '700', color: theme.colors.text, marginTop: 16, marginBottom: 8 },
   emptyText: { fontSize: 14, color: theme.colors.textLight, textAlign: 'center', marginBottom: 24 },
   emptyButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-  emptyButtonText: { color: '#fff', fontWeight: '700' },
+  emptyButtonText: { color: theme.colors.white, fontWeight: '700' },
   loader: { marginTop: 40 },
 });

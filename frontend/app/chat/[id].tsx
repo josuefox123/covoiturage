@@ -192,7 +192,7 @@ export default function ChatScreen() {
             disabled={!inputText.trim()}
             activeOpacity={0.8}
           >
-            <Ionicons name="send" size={18} color="#fff" />
+            <Ionicons name="send" size={18} color={theme.colors.white} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   myBubble: { backgroundColor: theme.colors.primary, borderBottomRightRadius: 2 },
   otherBubble: { backgroundColor: theme.colors.card, borderBottomLeftRadius: 2 },
   messageText: { ...theme.typography.bodyMedium },
-  myText: { color: '#fff' },
+  myText: { color: theme.colors.white },
   otherText: { color: theme.colors.text },
   timeText: { fontSize: 9, alignSelf: 'flex-end', marginTop: 4 },
   myTime: { color: 'rgba(255, 255, 255, 0.7)' },

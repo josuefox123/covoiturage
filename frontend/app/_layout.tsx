@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AnimatedSplash from '../src/components/AnimatedSplash';
 import { AuthProvider } from '../src/context/AuthContext';
+import { theme } from '../src/styles/theme';
 
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
@@ -19,7 +20,7 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: '#F8FAFC' },
+            contentStyle: { backgroundColor: theme.colors.background },
           }}
         >
           <Stack.Screen name="index" />

@@ -90,7 +90,7 @@ export default function MessagesScreen() {
           style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: theme.borderRadius.lg }}
           onPress={() => router.push('/(auth)/login')}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Se connecter</Text>
+          <Text style={{ color: theme.colors.white, fontWeight: 'bold' }}>Se connecter</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -138,14 +138,14 @@ const styles = StyleSheet.create({
   avatarContainer: { position: 'relative', marginRight: theme.spacing.md },
   avatarCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: theme.colors.secondaryLight, justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: theme.colors.secondaryDark, fontWeight: '700', fontSize: 16 },
-  activeIndicator: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: theme.colors.success, borderWidth: 2, borderColor: '#fff' },
+  activeIndicator: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: theme.colors.success, borderWidth: 2, borderColor: theme.colors.white },
   chatDetails: { flex: 1 },
   chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   userName: { ...theme.typography.bodyLarge, fontWeight: '600', color: theme.colors.text },
   lastMessage: { ...theme.typography.bodyMedium, color: theme.colors.textLight, marginTop: 4 },
   rightActions: { marginLeft: theme.spacing.sm, justifyContent: 'center', alignItems: 'center' },
   unreadBadge: { backgroundColor: theme.colors.primary, width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
-  unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  unreadText: { color: theme.colors.white, fontSize: 11, fontWeight: '700' },
   separator: { height: theme.spacing.md },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80, paddingHorizontal: theme.spacing.xl },
   emptyTitle: { ...theme.typography.h3, color: theme.colors.text, marginTop: theme.spacing.md, marginBottom: theme.spacing.xs },

@@ -574,7 +574,7 @@ export default function LocationPicker({
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.transparent} translucent />
 
       <WebView
         ref={webviewRef}
@@ -597,16 +597,16 @@ export default function LocationPicker({
 
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onCancel}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
 
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color={theme.colors.textMuted} style={styles.searchIcon} />
           <TextInput
             ref={searchInputRef}
             style={styles.searchInput}
             placeholder="Rechercher un lieu..."
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textMuted}
             value={searchQuery}
             onChangeText={handleSearch}
             returnKeyType="search"
@@ -618,7 +618,7 @@ export default function LocationPicker({
               setSearchResults([]);
               setShowResults(false);
             }}>
-              <Ionicons name="close-circle" size={20} color="#999" />
+              <Ionicons name="close-circle" size={20} color={theme.colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -626,11 +626,11 @@ export default function LocationPicker({
 
       <View style={styles.zoomControls}>
         <TouchableOpacity style={styles.zoomButton} onPress={zoomIn}>
-          <Ionicons name="add" size={24} color="#333" />
+          <Ionicons name="add" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.zoomDivider} />
         <TouchableOpacity style={styles.zoomButton} onPress={zoomOut}>
-          <Ionicons name="remove" size={24} color="#333" />
+          <Ionicons name="remove" size={24} color={theme.colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -659,7 +659,7 @@ export default function LocationPicker({
                     {item.display_name.split(',').slice(1, 4).join(',').trim()}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.border} />
               </TouchableOpacity>
             )}
           />
@@ -667,7 +667,7 @@ export default function LocationPicker({
       )}
 
       <TouchableOpacity style={styles.myLocationButton} onPress={goToMyLocation}>
-        <Ionicons name="locate" size={22} color="#333" />
+        <Ionicons name="locate" size={22} color={theme.colors.text} />
       </TouchableOpacity>
 
       <Animated.View style={[styles.bottomSheet, bottomSheetTransform]}>
@@ -710,11 +710,11 @@ export default function LocationPicker({
           disabled={isConfirming || isLoadingAddress}
         >
           {isConfirming ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={theme.colors.white} />
           ) : (
             <>
               <Text style={styles.confirmButtonText}>Confirmer l'emplacement</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.confirmButtonIcon} />
+              <Ionicons name="arrow-forward" size={20} color={theme.colors.white} style={styles.confirmButtonIcon} />
             </>
           )}
         </TouchableOpacity>
@@ -728,7 +728,7 @@ export default function LocationPicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
   },
   map: {
     flex: 1,
@@ -739,14 +739,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   header: {
     position: 'absolute',
@@ -762,10 +762,10 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -776,10 +776,10 @@ const styles = StyleSheet.create({
     height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     borderRadius: 12,
     paddingHorizontal: 12,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -791,16 +791,16 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.text,
   },
   zoomControls: {
     position: 'absolute',
     right: 16,
     bottom: SCREEN_HEIGHT * 0.35,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -812,21 +812,21 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
   },
   zoomDivider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.background,
   },
   resultsContainer: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 110 : 100,
     left: 16,
     right: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     borderRadius: 12,
     maxHeight: SCREEN_HEIGHT * 0.5,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.background,
   },
   resultItemLast: {
     borderBottomWidth: 0,
@@ -859,12 +859,12 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 2,
   },
   resultSubtitle: {
     fontSize: 13,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   myLocationButton: {
     position: 'absolute',
@@ -873,10 +873,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -888,13 +888,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     paddingHorizontal: 20,
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
   bottomSheetHandle: {
     width: 40,
     height: 4,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.colors.border,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 20,
@@ -928,21 +928,21 @@ const styles = StyleSheet.create({
   locationName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 2,
   },
   locationAddress: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textLight,
     marginBottom: 2,
   },
   locationCity: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   skeletonText: {
     height: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.colors.background,
     borderRadius: 4,
     marginBottom: 8,
     width: '80%',
@@ -971,7 +971,7 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.colors.white,
     marginRight: 8,
   },
   confirmButtonIcon: {
@@ -984,12 +984,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     borderRadius: 24,
     padding: 24,
     width: SCREEN_WIDTH - 48,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
@@ -1007,7 +1007,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 20,
   },
   modalLocationInfo: {
@@ -1015,7 +1015,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: theme.colors.background,
     padding: 12,
     borderRadius: 12,
     width: '100%',
@@ -1024,17 +1024,17 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   modalLocationAddress: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textLight,
     marginBottom: 8,
     textAlign: 'center',
   },
   modalLocationCity: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textMuted,
     marginBottom: 20,
   },
   modalButtons: {
@@ -1055,7 +1055,7 @@ const styles = StyleSheet.create({
   modalButtonCancelText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textLight,
   },
   modalButtonConfirm: {
     backgroundColor: theme.colors.primary,
@@ -1063,6 +1063,6 @@ const styles = StyleSheet.create({
   modalButtonConfirmText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.white,
   },
 });

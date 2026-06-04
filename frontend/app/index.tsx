@@ -140,8 +140,8 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" translucent backgroundColor="transparent" />
-      <RNStatusBar translucent barStyle="light-content" backgroundColor="transparent" />
+      <StatusBar style="light" translucent backgroundColor={theme.colors.transparent} />
+      <RNStatusBar translucent barStyle="light-content" backgroundColor={theme.colors.transparent} />
 
       {/* Image de fond animée */}
       <Animated.View
@@ -232,7 +232,7 @@ export default function OnboardingScreen() {
                 <View style={styles.btnContent}>
                   <Text style={styles.primaryBtnText}>SE CONNECTER</Text>
                   <View style={styles.btnIconCircle}>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
                   </View>
                 </View>
 
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   primaryBtnText: {
-    color: '#ffffff',
+    color: theme.colors.white,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 1,
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.colors.primary,
     overflow: 'hidden',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
     ...Platform.select({
       ios: {
         shadowColor: theme.colors.primary,
