@@ -35,6 +35,6 @@
 
 <style scoped>
 a {
-  color: theme('colors.text.light');
+  color: theme('colors.textLight');
 }
 </style>

@@ -20,4 +20,19 @@ export default defineNuxtConfig({
       },
     },
   },
+
+  icon: {
+    serverBundle: {
+      collections: ['ph']
+    }
+  },
+
+  vite: {
+    optimizeDeps: {
+      include: [
+        '@vue/devtools-core',
+        '@vue/devtools-kit',
+      ]
+    }
+  }
 })

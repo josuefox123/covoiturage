@@ -16,11 +16,9 @@ export default <Partial<Config>>{
         },
         background: '#F8FAFC',
         card: '#FFFFFF',
-        text: {
-          DEFAULT: '#0F172A',
-          light: '#475569',
-          muted: '#94A3B8',
-        },
+        text: '#0F172A',
+        textLight: '#475569',
+        textMuted: '#94A3B8',
         border: '#E2E8F0',
         success: {
           light: '#D1FAE5',

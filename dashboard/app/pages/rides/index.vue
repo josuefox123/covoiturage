@@ -87,12 +87,21 @@
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
-                <button class="p-1 text-textLight hover:text-primary transition-colors" title="Détails">
-                  <Icon name="ph:eye" class="w-5 h-5" />
-                </button>
-                <button class="p-1 text-textLight hover:text-error transition-colors ml-2" title="Supprimer">
-                  <Icon name="ph:trash" class="w-5 h-5" />
-                </button>
+                <div class="flex items-center justify-end space-x-2">
+                  <button class="p-2 bg-primary text-white shadow-sm hover:bg-primary-dark rounded-lg transition-colors flex items-center justify-center" title="Détails">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <button class="p-2 bg-error text-white shadow-sm hover:bg-red-700 rounded-lg transition-colors flex items-center justify-center" title="Supprimer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>

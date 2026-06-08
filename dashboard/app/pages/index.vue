@@ -5,28 +5,28 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <StatsCard 
         title="Total Utilisateurs" 
-        value="2,451" 
+        :value="stats?.total_users || 0" 
         icon="ph:users-fill" 
         :trend="12.5" 
         colorClass="bg-primary/10 text-primary" 
       />
       <StatsCard 
         title="Trajets Actifs" 
-        value="124" 
+        :value="stats?.active_rides || 0" 
         icon="ph:car-fill" 
         :trend="8.2" 
         colorClass="bg-secondary/10 text-secondary" 
       />
       <StatsCard 
         title="Réservations du mois" 
-        value="845" 
+        :value="stats?.monthly_bookings || 0" 
         icon="ph:ticket-fill" 
         :trend="-2.4" 
         colorClass="bg-warning/10 text-warning" 
       />
       <StatsCard 
         title="Revenus estimés (FCFA)" 
-        value="1.2M" 
+        :value="stats?.estimated_revenue || 0" 
         icon="ph:money-fill" 
         :trend="15.3" 
         colorClass="bg-success/10 text-success" 
@@ -69,3 +69,18 @@
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+
+const { fetchApi } = useApi()
+const stats = ref<any>(null)
+
+onMounted(async () => {
+  try {
+    stats.value = await fetchApi('/dashboard/stats/')
+  } catch (e) {
+    console.error('Failed to load stats', e)
+  }
+})
+</script>

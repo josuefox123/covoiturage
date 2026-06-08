@@ -103,12 +103,29 @@ def login_user(request):
 
     if user and user.check_password(password):
         refresh = RefreshToken.for_user(user)
+        user_data = UserSerializer(user).data
+        user_data['is_staff'] = user.is_staff
+        user_data['is_superuser'] = user.is_superuser
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'user': UserSerializer(user).data
+            'user': user_data
         })
     return Response({'error': 'Identifiants invalides.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+@api_view(['GET'])
+def dashboard_stats(request):
+    total_users = User.objects.count()
+    total_rides = Ride.objects.count()
+    total_bookings = Booking.objects.count()
+    
+    # Just basic statistics for the dashboard
+    return Response({
+        'total_users': total_users,
+        'active_rides': total_rides,
+        'monthly_bookings': total_bookings,
+        'estimated_revenue': total_bookings * 500  # just a placeholder metric
+    })
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('-created_at')

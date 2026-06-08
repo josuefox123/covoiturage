@@ -113,7 +113,7 @@
 
             <!-- Rows -->
             <tr
-              v-for="user in filteredUsers"
+              v-for="user in paginatedUsers"
               :key="user.id"
               class="hover:bg-background/30 transition-colors group"
             >
@@ -153,30 +153,39 @@
               </td>
 
               <td class="px-5 py-4">
-                <div class="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="flex items-center justify-end space-x-2">
                   <!-- Détails -->
                   <button
                     @click="openDetailModal(user)"
-                    class="p-2 text-textLight hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                    class="p-2 bg-primary text-white shadow-sm hover:bg-primary-dark rounded-lg transition-colors flex items-center justify-center"
                     title="Voir les détails"
                   >
-                    <Icon name="ph:eye" class="w-4 h-4" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
                   </button>
                   <!-- Modifier -->
                   <button
                     @click="openEditModal(user)"
-                    class="p-2 text-textLight hover:text-secondary hover:bg-secondary/10 rounded-lg transition-colors"
+                    class="p-2 bg-secondary text-white shadow-sm hover:bg-secondary-dark rounded-lg transition-colors flex items-center justify-center"
                     title="Modifier"
                   >
-                    <Icon name="ph:pencil-simple" class="w-4 h-4" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    </svg>
                   </button>
                   <!-- Supprimer -->
                   <button
                     @click="openDeleteModal(user)"
-                    class="p-2 text-textLight hover:text-error hover:bg-error/10 rounded-lg transition-colors"
+                    class="p-2 bg-error text-white shadow-sm hover:bg-red-700 rounded-lg transition-colors flex items-center justify-center"
                     title="Supprimer"
                   >
-                    <Icon name="ph:trash" class="w-4 h-4" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
                   </button>
                 </div>
               </td>
@@ -187,7 +196,7 @@
 
       <!-- Footer -->
       <div class="p-4 border-t border-border flex items-center justify-between text-sm text-textLight">
-        <span>{{ filteredUsers.length }} résultat(s) sur {{ users.length }}</span>
+        <span>Affichage de {{ paginatedUsers.length }} sur {{ filteredUsers.length }} résultat(s)</span>
         <div class="flex items-center space-x-1">
           <button
             class="px-3 py-1.5 rounded-lg border border-border hover:bg-background disabled:opacity-40 transition-colors"
@@ -196,9 +205,10 @@
           >
             <Icon name="ph:caret-left" class="w-4 h-4" />
           </button>
-          <span class="px-3 py-1.5 text-text font-medium">Page {{ page }}</span>
+          <span class="px-3 py-1.5 text-text font-medium">Page {{ page }} / {{ totalPages || 1 }}</span>
           <button
-            class="px-3 py-1.5 rounded-lg border border-border hover:bg-background transition-colors"
+            class="px-3 py-1.5 rounded-lg border border-border hover:bg-background disabled:opacity-40 transition-colors"
+            :disabled="page >= totalPages"
             @click="page++"
           >
             <Icon name="ph:caret-right" class="w-4 h-4" />
@@ -220,6 +230,7 @@ const pending = ref(true)
 const search = ref('')
 const filterVerified = ref('')
 const page = ref(1)
+const pageSize = ref(10)
 
 // --- Modals ---
 const formModal = reactive({ show: false, user: null as any })
@@ -257,6 +268,18 @@ const filteredUsers = computed(() => {
     list = list.filter(u => u.is_verified === v)
   }
   return list
+})
+
+const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize.value))
+
+const paginatedUsers = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredUsers.value.slice(start, end)
+})
+
+watch([search, filterVerified], () => {
+  page.value = 1
 })
 
 // --- API ---

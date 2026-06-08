@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    verify_code, register_user, login_user,
+    verify_code, register_user, login_user, dashboard_stats,
     UserViewSet, VehicleViewSet, UserPreferenceViewSet,
     RideViewSet, BookingViewSet, ConversationViewSet, MessageViewSet
 )
@@ -19,5 +19,6 @@ urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),
     path('auth/register/', register_user, name='register_user'),
     path('auth/login/', login_user, name='login_user'),
+    path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path('', include(router.urls)),
 ]
