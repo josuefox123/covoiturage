@@ -18,13 +18,13 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [showWarning, setShowWarning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   // Phone number regex detection (Benin formats: 8 digits, spaces, hyphens, and international +229)
   const PHONE_REGEX = /(\+229|00229)?\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{2}/g;
 
   useEffect(() => {
     fetchChatData();
-    // In a real app, use WebSockets. Here we poll every 5 seconds for simplicity.
     const interval = setInterval(() => {
       fetchMessagesOnly();
     }, 5000);
@@ -36,10 +36,9 @@ export default function ChatScreen() {
       setLoading(true);
       const convData = await authFetch(`/conversations/${id}/`);
       setConversation(convData);
-      
       await fetchMessagesOnly();
     } catch (error) {
-      console.error(error);
+      console.error('Erreur chargement conversation:', error);
     } finally {
       setLoading(false);
     }
@@ -47,34 +46,33 @@ export default function ChatScreen() {
 
   const fetchMessagesOnly = async () => {
     try {
-      const msgsData = await authFetch('/messages/');
-      // Filter for this conversation
-      const filtered = msgsData.filter((m: any) => m.conversation === id);
-      // Sort by created_at
-      filtered.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-      setMessages(filtered);
-    } catch (error) {
+      const msgsData = await authFetch(`/messages/?conversation=${id}`);
+      const sorted = Array.isArray(msgsData)
+        ? [...msgsData].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        : [];
+      setMessages(sorted);
+    } catch {
       // silent fail for polling
     }
   };
 
   const handleInputChange = (text: string) => {
     setInputText(text);
-    if (PHONE_REGEX.test(text)) {
-      setShowWarning(true);
-    } else {
-      setShowWarning(false);
-    }
+    // Reset phone regex lastIndex
+    PHONE_REGEX.lastIndex = 0;
+    setShowWarning(PHONE_REGEX.test(text));
   };
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
+    PHONE_REGEX.lastIndex = 0;
     if (PHONE_REGEX.test(inputText)) {
       setShowWarning(true);
       return;
     }
 
+    setSending(true);
     try {
       await authFetch('/messages/', {
         method: 'POST',
@@ -85,16 +83,34 @@ export default function ChatScreen() {
       });
       setInputText('');
       setShowWarning(false);
-      fetchMessagesOnly();
+      await fetchMessagesOnly();
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 300);
     } catch (error) {
       console.error(error);
+    } finally {
+      setSending(false);
     }
   };
 
+  const isSystemMessage = (item: any) => {
+    // A system message is the first message (index 0) sent by the driver that starts with 🤝
+    return item.content?.startsWith('🤝');
+  };
+
   const renderMessage = ({ item }: { item: any }) => {
+    // System welcome message gets special centered style
+    if (isSystemMessage(item)) {
+      return (
+        <View style={styles.systemMsgContainer}>
+          <View style={styles.systemMsgBubble}>
+            <Text style={styles.systemMsgText}>{item.content}</Text>
+          </View>
+        </View>
+      );
+    }
+
     const isMe = item.sender === user?.id || item.sender_details?.id === user?.id;
     const time = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
@@ -128,6 +144,9 @@ export default function ChatScreen() {
   const partnerName = otherUser?.full_name || 'Utilisateur';
   const partnerInitials = partnerName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
+  // Ride details banner
+  const rideInfo = conversation.ride_details || null;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -142,13 +161,13 @@ export default function ChatScreen() {
           </View>
           <View>
             <Text style={styles.headerName}>{partnerName}</Text>
-            <Text style={styles.statusText}>En ligne</Text>
+            {rideInfo && (
+              <Text style={styles.rideInfoText} numberOfLines={1}>
+                🚗 {rideInfo.departure_location} → {rideInfo.arrival_location}
+              </Text>
+            )}
           </View>
         </View>
-        
-        <TouchableOpacity style={styles.callButton}>
-          <Ionicons name="call-outline" size={22} color={theme.colors.primary} />
-        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView 
@@ -159,9 +178,9 @@ export default function ChatScreen() {
         {/* Anti-number warning banner */}
         {showWarning && (
           <View style={styles.warningBanner}>
-            <Ionicons name="warning" size={18} color="#92400E" />
+            <Ionicons name="warning" size={18} color={theme.colors.warningDark} />
             <Text style={styles.warningText}>
-              ⚠️ Sécurité : Ne partagez pas de numéro de téléphone. Le système détectera et bloquera le message.
+              ⚠️ Sécurité : Ne partagez pas de numéro de téléphone. Ce message sera bloqué.
             </Text>
           </View>
         )}
@@ -174,6 +193,13 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          ListEmptyComponent={
+            <View style={styles.emptyChat}>
+              <Ionicons name="chatbubbles-outline" size={40} color={theme.colors.textMuted} />
+              <Text style={styles.emptyChatText}>Aucun message pour l'instant.</Text>
+              <Text style={styles.emptyChatSub}>Commencez la discussion !</Text>
+            </View>
+          }
         />
 
         {/* Input Bar */}
@@ -187,12 +213,16 @@ export default function ChatScreen() {
             multiline
           />
           <TouchableOpacity 
-            style={[styles.sendButton, !inputText.trim() && styles.disabledSend]} 
+            style={[styles.sendButton, (!inputText.trim() || sending) && styles.disabledSend]} 
             onPress={handleSend}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() || sending}
             activeOpacity={0.8}
           >
-            <Ionicons name="send" size={18} color={theme.colors.white} />
+            {sending ? (
+              <ActivityIndicator size="small" color={theme.colors.white} />
+            ) : (
+              <Ionicons name="send" size={18} color={theme.colors.white} />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -201,16 +231,20 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.sm, backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.border, ...theme.shadows.sm },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.sm, backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.border, ...theme.shadows.sm, gap: theme.spacing.sm },
   backButton: { width: 36, height: 36, justifyContent: 'center', alignItems: 'flex-start' },
   headerUser: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   headerName: { ...theme.typography.bodyLarge, fontWeight: '700', color: theme.colors.text },
-  statusText: { fontSize: 11, color: theme.colors.success, fontWeight: '600' },
-  callButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border },
-  warningBanner: { backgroundColor: '#FEF3C7', borderBottomWidth: 1, borderBottomColor: '#FCD34D', flexDirection: 'row', alignItems: 'center', padding: theme.spacing.sm, gap: 6 },
-  warningText: { fontSize: 11, color: '#92400E', fontWeight: '600', flex: 1 },
+  rideInfoText: { fontSize: 11, color: theme.colors.textMuted, marginTop: 1 },
+  warningBanner: { backgroundColor: theme.colors.warningLight, borderBottomWidth: 1, borderBottomColor: theme.colors.warning, flexDirection: 'row', alignItems: 'center', padding: theme.spacing.sm, gap: 6 },
+  warningText: { fontSize: 11, color: theme.colors.warningDark, fontWeight: '600', flex: 1 },
   messagesList: { padding: theme.spacing.lg, gap: theme.spacing.md },
+  // System message
+  systemMsgContainer: { alignItems: 'center', marginVertical: theme.spacing.md },
+  systemMsgBubble: { backgroundColor: theme.colors.primaryLight, borderRadius: theme.borderRadius.lg, padding: theme.spacing.md, maxWidth: '90%', borderWidth: 1, borderColor: theme.colors.primaryLight },
+  systemMsgText: { fontSize: 13, color: theme.colors.primaryDark, lineHeight: 20, textAlign: 'left' },
+  // Regular messages
   messageRow: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.sm, maxWidth: '80%' },
   myRow: { alignSelf: 'flex-end' },
   otherRow: { alignSelf: 'flex-start' },
@@ -225,6 +259,9 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 9, alignSelf: 'flex-end', marginTop: 4 },
   myTime: { color: 'rgba(255, 255, 255, 0.7)' },
   otherTime: { color: theme.colors.textMuted },
+  emptyChat: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 8 },
+  emptyChatText: { ...theme.typography.bodyLarge, color: theme.colors.text, fontWeight: '600' },
+  emptyChatSub: { ...theme.typography.bodyMedium, color: theme.colors.textMuted },
   inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, padding: theme.spacing.md, borderTopWidth: 1, borderTopColor: theme.colors.border, gap: theme.spacing.sm },
   textInput: { flex: 1, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.xl, paddingHorizontal: theme.spacing.md, paddingVertical: 10, maxHeight: 100, color: theme.colors.text, ...theme.typography.bodyMedium },
   sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', ...theme.shadows.sm },

@@ -1,14 +1,19 @@
 export const theme = {
   colors: {
-    // Primary - Blue (from index.tsx: #3B82F6)
-    primary: '#3B82F6',
-    primaryLight: '#EFF6FF',
-    primaryDark: '#1D4ED8',
+    // Primary - Bleu de confiance (Trust & Professional)
+    primary: '#2563EB', // Blue 600
+    primaryLight: '#DBEAFE', // Blue 100
+    primaryDark: '#1D4ED8', // Blue 700
 
-    // Secondary - Sky Blue accent (from index.tsx: #0284C7)
-    secondary: '#0284C7',
-    secondaryLight: '#E0F2FE',
-    secondaryDark: '#0369A1',
+    // Secondary - Vert (Eco-friendly, Covoiturage, Go)
+    secondary: '#10B981', // Emerald 500
+    secondaryLight: '#D1FAE5', // Emerald 100
+    secondaryDark: '#059669', // Emerald 600
+
+    // Accent - Couleur de base originale (Banana/Orange) à utiliser par touches
+    accent: '#FFAA00',
+    accentLight: '#FFF3D6',
+    accentDark: '#CC8800',
 
     // Grayscale
     background: '#F8FAFC',
@@ -24,11 +29,14 @@ export const theme = {
     transparent: 'transparent',
     gray: '#9CA3AF',
     grayLight: '#E5E7EB',
+    grayLighter: '#F3F4F6',
+    grayLightest: '#F9FAFB',
     grayDark: '#4B5563',
 
     // Feedback
     success: '#10B981',
     successLight: '#D1FAE5',
+    successLightest: '#F0FDF4',
     error: '#EF4444',
     errorLight: '#FEE2E2',
     warning: '#F59E0B',
@@ -38,6 +46,9 @@ export const theme = {
     // Custom overlays / opacity colors
     overlay: 'rgba(0, 0, 0, 0.4)',
     glass: 'rgba(255, 255, 255, 0.8)',
+    
+    // Extra
+    violet: '#8B5CF6',
   },
 
   spacing: {

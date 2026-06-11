@@ -33,11 +33,11 @@ export default function LoginScreen() {
   const passwordInputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [phoneFocused, setPhoneFocused] = useState(false);
+  const [identifierFocused, setIdentifierFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'error' as any });
 
@@ -62,8 +62,8 @@ export default function LoginScreen() {
   }, []);
 
   // Gérer le focus pour scroller automatiquement
-  const handlePhoneFocus = () => {
-    setPhoneFocused(true);
+  const handleIdentifierFocus = () => {
+    setIdentifierFocused(true);
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 200, animated: true });
     }, 100);
@@ -97,7 +97,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     Keyboard.dismiss();
 
-    if (!phone || !password) {
+    if (!identifier || !password) {
       setAlertConfig({
         visible: true,
         title: "Champs manquants",
@@ -109,7 +109,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      await loginWithPassword(phone.trim(), password);
+      await loginWithPassword(identifier.trim(), password);
       router.replace('/(tabs)/home');
     } catch (error: any) {
       setAlertConfig({
@@ -133,15 +133,13 @@ export default function LoginScreen() {
     });
   };
 
-  const formatPhoneNumber = (text: string) => {
-    let cleaned = text.replace(/\D/g, '');
-    if (cleaned.length > 10) cleaned = cleaned.slice(0, 10);
-    setPhone(cleaned);
+  const handleIdentifierChange = (text: string) => {
+    setIdentifier(text);
   };
 
   const dismissKeyboard = () => {
     Keyboard.dismiss();
-    setPhoneFocused(false);
+    setIdentifierFocused(false);
     setPasswordFocused(false);
   };
 
@@ -181,37 +179,37 @@ export default function LoginScreen() {
 
               {/* Formulaire */}
               <Animated.View style={[styles.form, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-                {/* Champ Téléphone */}
+                {/* Champ Identifiant */}
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Numéro de téléphone</Text>
+                  <Text style={styles.label}>Email ou Téléphone</Text>
                   <View style={[
                     styles.inputWrapper,
-                    phoneFocused && styles.inputWrapperFocused,
-                    phone && styles.inputWrapperFilled
+                    identifierFocused && styles.inputWrapperFocused,
+                    identifier && styles.inputWrapperFilled
                   ]}>
                     <Ionicons
-                      name="call-outline"
+                      name="person-outline"
                       size={20}
-                      color={phoneFocused ? theme.colors.primary : theme.colors.textMuted}
+                      color={identifierFocused ? theme.colors.primary : theme.colors.textMuted}
                       style={styles.inputIcon}
                     />
                     <TextInput
                       ref={phoneInputRef}
                       style={styles.input}
-                      placeholder="01 95 95 95 95"
+                      placeholder="ex: jean@mail.com ou 0195959595"
                       placeholderTextColor={theme.colors.textMuted}
-                      value={phone}
-                      onChangeText={formatPhoneNumber}
-                      onFocus={handlePhoneFocus}
-                      onBlur={() => setPhoneFocused(false)}
+                      value={identifier}
+                      onChangeText={handleIdentifierChange}
+                      onFocus={handleIdentifierFocus}
+                      onBlur={() => setIdentifierFocused(false)}
                       autoCapitalize="none"
-                      keyboardType="phone-pad"
+                      keyboardType="default"
                       returnKeyType="next"
                       onSubmitEditing={() => passwordInputRef.current?.focus()}
                       blurOnSubmit={false}
                     />
-                    {phone.length > 0 && (
-                      <TouchableOpacity onPress={() => setPhone('')}>
+                    {identifier.length > 0 && (
+                      <TouchableOpacity onPress={() => setIdentifier('')}>
                         <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
                       </TouchableOpacity>
                     )}
@@ -263,9 +261,9 @@ export default function LoginScreen() {
                 {/* Bouton Connexion animé */}
                 <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                   <TouchableOpacity
-                    style={[styles.loginButton, (!phone || !password || loading) && styles.disabledButton]}
+                    style={[styles.loginButton, (!identifier || !password || loading) && styles.disabledButton]}
                     onPress={handleLogin}
-                    disabled={loading || !phone || !password}
+                    disabled={loading || !identifier || !password}
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
                     activeOpacity={0.9}

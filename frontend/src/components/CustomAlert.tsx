@@ -60,9 +60,9 @@ export default function CustomAlert({
 
   const getIconConfig = () => {
     switch (type) {
-      case 'error': return { name: 'warning', color: theme.colors.error, bgColor: '#FEE2E2' };
-      case 'success': return { name: 'checkmark-circle', color: theme.colors.success, bgColor: '#D1FAE5' };
-      case 'info': return { name: 'information-circle', color: theme.colors.primary, bgColor: '#DBEAFE' };
+      case 'error': return { name: 'warning', color: theme.colors.error, bgColor: theme.colors.errorLight };
+      case 'success': return { name: 'checkmark-circle', color: theme.colors.success, bgColor: theme.colors.secondaryLight };
+      case 'info': return { name: 'information-circle', color: theme.colors.primary, bgColor: theme.colors.primaryLight };
       default: return { name: 'alert-circle', color: theme.colors.primary, bgColor: '#FCE7F3' };
     }
   };
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   overlayBg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   alertBox: {
     width: width * 0.85,

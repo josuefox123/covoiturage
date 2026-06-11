@@ -5,15 +5,18 @@ import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
+import { CustomAlert } from '../../src/utils/CustomAlert';
 
 export default function RideDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
 
   const [ride, setRide] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [booked, setBooked] = useState(false);
+  const [hasBooked, setHasBooked] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
 
   useEffect(() => {
     fetchRide();
@@ -24,48 +27,65 @@ export default function RideDetailScreen() {
       setLoading(true);
       const data = await authFetch(`/rides/${id}/`);
       setRide(data);
+      
+      if (user) {
+        const bookings = await authFetch(`/bookings/?passenger=${user.id}`);
+        const myBooking = bookings.find((b: any) => b.ride === id || b.ride?.id === id);
+        if (myBooking) setHasBooked(true);
+      }
     } catch (error) {
-      Alert.alert("Erreur", "Impossible de charger les détails du trajet.");
+      CustomAlert.alert("Erreur", "Impossible de charger les détails du trajet.");
       router.back();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBooking = async () => {
+  /**
+   * Opens (or creates) the ride conversation via the ride-chat endpoint.
+   * On first creation, the backend automatically posts a system welcome message.
+   */
+  const openChat = async () => {
+    setChatLoading(true);
     try {
-      setBooked(true);
+      const conv = await authFetch('/conversations/ride-chat/', {
+        method: 'POST',
+        body: JSON.stringify({ ride_id: id }),
+      });
+      router.push(`/chat/${conv.id}`);
+    } catch (error: any) {
+      CustomAlert.alert('Messagerie', error.message || 'Impossible d\'ouvrir la conversation.');
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleBooking = async () => {
+    if (!user?.is_verified) {
+      CustomAlert.alert('Compte non vérifié', 'Votre compte doit être vérifié pour effectuer une réservation.');
+      return;
+    }
+    
+    try {
+      setBookingLoading(true);
       await authFetch('/bookings/', {
         method: 'POST',
-        body: JSON.stringify({
-          ride: id,
-          seats_booked: 1
-        })
+        body: JSON.stringify({ ride: id, seats_booked: 1 })
       });
 
-      // Optionally create a conversation
-      const convData = await authFetch('/conversations/', {
-        method: 'POST',
-        body: JSON.stringify({
-          ride: id,
-          participant_2: ride.driver_details.id // Assuming backend accepts this or it's handled differently. 
-          // For a fully working app, we should adjust the backend to handle conversation creation gracefully.
-        })
-      }).catch(e => null);
-
-      Alert.alert(
+      setHasBooked(true);
+      CustomAlert.alert(
         'Réservation confirmée ! 🎉',
-        `Votre place avec ${ride.driver_details.full_name} a été réservée.`,
+        `Votre place avec ${ride.driver_details?.full_name} a été réservée. Vous pouvez maintenant discuter avec le chauffeur.`,
         [
-          {
-            text: 'Fermer',
-            style: 'cancel'
-          }
+          { text: 'Discuter maintenant', onPress: openChat },
+          { text: 'Fermer', style: 'cancel' }
         ]
       );
     } catch (error: any) {
-      setBooked(false);
-      Alert.alert('Erreur', error.message || 'Impossible de réserver ce trajet.');
+      CustomAlert.alert('Erreur', error.message || 'Impossible de réserver ce trajet.');
+    } finally {
+      setBookingLoading(false);
     }
   };
 
@@ -79,6 +99,8 @@ export default function RideDetailScreen() {
 
   const driverName = ride.driver_details?.full_name || 'Inconnu';
   const driverAvatar = driverName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+  const isOwnRide = user?.id === ride.driver_details?.id;
+  const canChat = hasBooked || isOwnRide;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -143,6 +165,27 @@ export default function RideDetailScreen() {
               </View>
             </View>
           </View>
+          
+          {ride.driver_details?.preference && (
+             <View style={styles.preferencesContainer}>
+                <View style={styles.prefItem}>
+                   <Ionicons name={ride.driver_details.preference.music ? "musical-notes" : "musical-notes-outline"} size={20} color={ride.driver_details.preference.music ? theme.colors.primary : theme.colors.textMuted} />
+                   <Text style={styles.prefText}>{ride.driver_details.preference.music ? "Musique" : "Pas de musique"}</Text>
+                </View>
+                <View style={styles.prefItem}>
+                   <Ionicons name="logo-no-smoking" size={20} color={ride.driver_details.preference.smoking ? theme.colors.error : theme.colors.success} />
+                   <Text style={styles.prefText}>{ride.driver_details.preference.smoking ? "Fumeur" : "Non-fumeur"}</Text>
+                </View>
+                <View style={styles.prefItem}>
+                   <Ionicons name={ride.driver_details.preference.chatty ? "chatbubbles" : "chatbubbles-outline"} size={20} color={ride.driver_details.preference.chatty ? theme.colors.primary : theme.colors.textMuted} />
+                   <Text style={styles.prefText}>{ride.driver_details.preference.chatty ? "Bavard" : "Calme"}</Text>
+                </View>
+                <View style={styles.prefItem}>
+                   <Ionicons name={ride.driver_details.preference.air_conditioner ? "snow-outline" : "snow-outline"} size={20} color={ride.driver_details.preference.air_conditioner ? theme.colors.primary : theme.colors.textMuted} />
+                   <Text style={styles.prefText}>{ride.driver_details.preference.air_conditioner ? "Climatisation" : "Sans clim"}</Text>
+                </View>
+             </View>
+          )}
         </View>
 
         {/* Anti-number policy note */}
@@ -157,26 +200,50 @@ export default function RideDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Footer Booking Buttons */}
       <View style={styles.footer}>
+        {/* Message button */}
         <TouchableOpacity
-          style={styles.messageBtn}
-          onPress={() => { }} // Needs conversation ID logic for full implementation
+          style={[styles.messageBtn, !canChat && styles.messageBtnDisabled]}
+          onPress={() => {
+            if (!canChat) {
+              CustomAlert.alert("Messagerie", "Vous devez réserver ce trajet avant de pouvoir discuter avec le chauffeur.");
+            } else if (isOwnRide) {
+              // Driver: go to messages tab to see all conversations for this ride
+              router.push('/(tabs)/messages');
+            } else {
+              openChat();
+            }
+          }}
+          disabled={chatLoading}
           activeOpacity={0.8}
         >
-          <Ionicons name="chatbubble-outline" size={22} color={theme.colors.primary} />
+          {chatLoading ? (
+            <ActivityIndicator color={theme.colors.primary} size="small" />
+          ) : (
+            <Ionicons name="chatbubble-outline" size={22} color={canChat ? theme.colors.primary : theme.colors.textMuted} />
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.bookBtn, booked && styles.bookedBtn]}
-          onPress={handleBooking}
-          disabled={booked}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.bookBtnText}>
-            {booked ? 'Place Réservée ✓' : 'Réserver une place'}
-          </Text>
-        </TouchableOpacity>
+        {!isOwnRide ? (
+          <TouchableOpacity
+            style={[styles.bookBtn, hasBooked && styles.bookedBtn, bookingLoading && { opacity: 0.7 }]}
+            onPress={handleBooking}
+            disabled={hasBooked || bookingLoading}
+            activeOpacity={0.8}
+          >
+            {bookingLoading ? (
+               <ActivityIndicator color={theme.colors.white} />
+            ) : (
+               <Text style={styles.bookBtnText}>
+                 {hasBooked ? 'Place Réservée ✓' : 'Réserver une place'}
+               </Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.bookBtn, { backgroundColor: theme.colors.border }]}>
+             <Text style={[styles.bookBtnText, { color: theme.colors.textLight }]}>C'est votre trajet</Text>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -217,7 +284,11 @@ const styles = StyleSheet.create({
   policyDesc: { ...theme.typography.bodySmall, color: theme.colors.secondaryDark, marginTop: 2, lineHeight: 16 },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.border, padding: theme.spacing.md, flexDirection: 'row', gap: theme.spacing.md, ...theme.shadows.lg },
   messageBtn: { width: 52, height: 52, borderRadius: theme.borderRadius.lg, borderWidth: 1.5, borderColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center' },
+  messageBtnDisabled: { borderColor: theme.colors.border, backgroundColor: theme.colors.background },
   bookBtn: { flex: 1, height: 52, backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.lg, justifyContent: 'center', alignItems: 'center', ...theme.shadows.sm },
   bookedBtn: { backgroundColor: theme.colors.success },
   bookBtnText: { ...theme.typography.button, color: theme.colors.white },
+  preferencesContainer: { marginTop: theme.spacing.md, flexDirection: 'row', flexWrap: 'wrap', gap: 12, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.md },
+  prefItem: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.colors.background, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  prefText: { fontSize: 13, color: theme.colors.text },
 });

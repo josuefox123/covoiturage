@@ -70,7 +70,7 @@ export default function RegisterScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Créer un compte 🚀</Text>
             <Text style={styles.subtitle}>
-              Rejoignez notre réseau de covoiturage pour vous déplacer facilement.
+              Rejoignez Zemy pour vous déplacer facilement.
             </Text>
           </View>
 

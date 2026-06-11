@@ -164,11 +164,12 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 JAZZMIN_SETTINGS = {
-    "site_title": "Covoiturage Admin",
-    "site_header": "🚗 Covoiturage",
-    "site_brand": "Covoiturage",
+    "site_title": "Zemy Admin",
+    "site_header": "🚗 Zemy",
+    "site_brand": "Zemy",
+    "site_icon": "images/favicon.png",
     "welcome_sign": "Bienvenue sur l'administration",
-    "copyright": "Covoiturage © 2026",
+    "copyright": "Zemy © 2026",
     "search_model": ["api.User", "api.Ride"],
     "user_avatar": "avatar",
     "topmenu_links": [

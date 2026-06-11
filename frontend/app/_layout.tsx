@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import AnimatedSplash from '../src/components/AnimatedSplash';
 import { AuthProvider } from '../src/context/AuthContext';
 import { theme } from '../src/styles/theme';
+import LiveRideModal from '../src/components/LiveRideModal';
+import { CustomAlertProvider } from '../src/utils/CustomAlert';
 
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
@@ -28,7 +30,10 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
           <Stack.Screen name="ride/[id]" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="chat/[id]" options={{ presentation: 'card', headerShown: false }} />
+          <Stack.Screen name="support_chat" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
         </Stack>
+        <LiveRideModal />
+        <CustomAlertProvider />
       </AuthProvider>
     </SafeAreaProvider>
   );

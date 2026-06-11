@@ -25,7 +25,9 @@ export default function MessagesScreen() {
     try {
       setLoading(true);
       const data = await authFetch('/conversations/');
-      setConversations(data);
+      // On masque les conversations de support dans cet onglet (elles restent dans la bulle)
+      const filtered = Array.isArray(data) ? data.filter((c: any) => c.conversation_type !== 'support') : (data.results ? data.results.filter((c: any) => c.conversation_type !== 'support') : []);
+      setConversations(filtered);
     } catch (error) {
       console.log('Erreur fetchConversations:', error);
     } finally {

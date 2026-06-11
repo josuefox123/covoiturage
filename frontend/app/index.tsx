@@ -15,23 +15,20 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../src/styles/theme';
 
+
 const { width, height } = Dimensions.get('window');
+const PRIMARY_COLOR = theme.colors.primary;
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
-  // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const buttonScale1 = useRef(new Animated.Value(1)).current;
-  const buttonScale2 = useRef(new Animated.Value(1)).current;
-  const imageScale = useRef(new Animated.Value(1.1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const badgeSlideAnim = useRef(new Animated.Value(-50)).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -40,260 +37,128 @@ export default function OnboardingScreen() {
   }, [isLoading, user]);
 
   useEffect(() => {
-    // Animation d'entrée principale
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.spring(imageScale, {
-        toValue: 1,
-        friction: 10,
-        tension: 30,
-        useNativeDriver: true,
-      }),
-      Animated.spring(badgeSlideAnim, {
-        toValue: 0,
-        friction: 8,
-        tension: 40,
+        duration: 600,
         useNativeDriver: true,
       }),
     ]).start();
-
-    // Animation de glow en boucle
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
-  const handlePressIn = (buttonNumber: number) => {
-    if (buttonNumber === 1) {
-      Animated.spring(buttonScale1, {
-        toValue: 0.97,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.spring(buttonScale2, {
-        toValue: 0.97,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-    }
+  const handlePressIn = () => {
+    Animated.spring(buttonScale, {
+      toValue: 0.96,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const handlePressOut = (buttonNumber: number) => {
-    if (buttonNumber === 1) {
-      Animated.spring(buttonScale1, {
-        toValue: 1,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.spring(buttonScale2, {
-        toValue: 1,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-    }
+  const handlePressOut = () => {
+    Animated.spring(buttonScale, {
+      toValue: 1,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleLogin = () => {
     router.push('/(auth)/login');
   };
 
-  const handleRegister = () => {
-    router.push('/(auth)/register');
-  };
-
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0, 0.4, 0],
-  });
-
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" translucent backgroundColor={theme.colors.transparent} />
-      <RNStatusBar translucent barStyle="light-content" backgroundColor={theme.colors.transparent} />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar style="dark" />
+      <RNStatusBar barStyle="dark-content" />
 
-      {/* Image de fond animée */}
-      <Animated.View
-        style={[
-          styles.imageContainer,
-          {
-            transform: [{ scale: imageScale }],
-          },
-        ]}
-      >
+      {/* Image pleine largeur avec dégradé */}
+      <View style={styles.imageWrapper}>
         <Image
           source={require('../assets/images/welcome_car.png')}
-          style={styles.image}
+          style={styles.fullWidthImage}
           resizeMode="cover"
         />
 
-        {/* Dégradé amélioré */}
+        {/* Dégradé vers le blanc */}
         <LinearGradient
-          colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.1)', theme.colors.background]}
-          locations={[0, 0.4, 1]}
+          colors={['rgba(255,255,255,0)', theme.colors.white, theme.colors.white]}
+          locations={[0.4, 0.75, 1]}
           style={styles.gradientOverlay}
         />
-      </Animated.View>
+      </View>
 
-      {/* Badge décoratif animé */}
-      <Animated.View
-        style={[
-          styles.badgeContainer,
-          {
-            transform: [{ translateY: badgeSlideAnim }],
-          },
-        ]}
-      >
-        <View style={styles.badge}>
-          <View style={styles.badgeIcon}>
-            <Ionicons name="car-sport" size={18} color={theme.colors.primary} />
-          </View>
-          <Text style={styles.badgeText}>Covoiturage Bénin</Text>
-        </View>
-      </Animated.View>
-
-      {/* Contenu inférieur animé */}
+      {/* Contenu sur fond blanc */}
       <Animated.View
         style={[
           styles.contentContainer,
           {
             opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
-          },
+            transform: [{ translateY: slideAnim }],
+          }
         ]}
       >
-        <View style={styles.textContent}>
-          <Text style={styles.title}>
-            Voyagez{"\n"}
-            <Text style={styles.titleHighlight}>autrement</Text>
-          </Text>
-
-          <View style={styles.titleUnderline}>
-            <LinearGradient
-              colors={[theme.colors.secondary, theme.colors.primary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.underlineGradient}
-            />
-          </View>
+        <View style={styles.textWrapper}>
+          <Image 
+            source={require('../assets/images/logozemy.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
 
           <Text style={styles.subtitle}>
-            Rejoignez une communauté de voyageurs partageant les mêmes idées.
-            Économisez, rencontrez et partagez la route.
+            Voyagez malin, économisez sur vos trajets et faites de belles rencontres
           </Text>
         </View>
 
-        <View style={styles.actionContainer}>
-          {/* Bouton Connexion */}
-          <Animated.View style={{ transform: [{ scale: buttonScale1 }] }}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPressIn={() => handlePressIn(1)}
-              onPressOut={() => handlePressOut(1)}
-              onPress={handleLogin}
+        {/* Bouton Se connecter */}
+        <Animated.View style={{ transform: [{ scale: buttonScale }], width: '100%' }}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onPress={handleLogin}
+          >
+            <LinearGradient
+              colors={[PRIMARY_COLOR, theme.colors.primaryDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.loginButton}
             >
-              <LinearGradient
-                colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryBtn}
-              >
-                <View style={styles.btnContent}>
-                  <Text style={styles.primaryBtnText}>SE CONNECTER</Text>
-                  <View style={styles.btnIconCircle}>
-                    <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
-                  </View>
-                </View>
+              <Text style={styles.loginButtonText}>Se connecter</Text>
+              <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
 
-                {/* Animation de glow */}
-                <Animated.View
-                  style={[
-                    styles.btnGlow,
-                    {
-                      opacity: glowOpacity,
-                    },
-                  ]}
-                />
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Bouton Inscription */}
-          <Animated.View style={{ transform: [{ scale: buttonScale2 }] }}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPressIn={() => handlePressIn(2)}
-              onPressOut={() => handlePressOut(2)}
-              onPress={handleRegister}
-            >
-              <LinearGradient
-                colors={['rgba(0,0,0,0.03)', 'rgba(0,0,0,0.01)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.secondaryBtn}
-              >
-                <View style={styles.btnContentSecondary}>
-                  <Ionicons name="person-add-outline" size={20} color={theme.colors.primary} />
-                  <Text style={styles.secondaryBtnText}>CRÉER UN COMPTE</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-
-
-        </View>
+        {/* Petit texte d'information */}
+        <Text style={styles.footerText}>
+          Rejoignez des milliers de voyageurs
+        </Text>
       </Animated.View>
-
-
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.white,
   },
-  imageContainer: {
+  imageWrapper: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.65,
+    height: height * 0.6,
   },
-  image: {
-    width: '100%',
+  fullWidthImage: {
+    width: width,
     height: '100%',
   },
   gradientOverlay: {
@@ -301,198 +166,55 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: height * 0.4,
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    left: 20,
-    right: 20,
-    zIndex: 10,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    alignSelf: 'flex-start',
-  },
-  badgeIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: theme.colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    height: height * 0.3,
   },
   contentContainer: {
     flex: 1,
-    marginTop: height * 0.52,
+    marginTop: height * 0.52, // Descendu un peu plus bas dans le blanc (avant 0.48)
     paddingHorizontal: 28,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 32,
+    justifyContent: 'space-between',
   },
-  textContent: {
+  textWrapper: {
+    alignItems: 'center',
     marginBottom: 40,
   },
-  title: {
-    fontSize: 42,
-    fontWeight: '800',
-    color: theme.colors.text,
-    marginBottom: 12,
-    letterSpacing: -0.5,
-    lineHeight: 50,
-  },
-  titleHighlight: {
-    color: theme.colors.primary,
-    position: 'relative',
-  },
-  titleUnderline: {
-    width: 60,
-    height: 4,
-    marginBottom: 20,
-  },
-  underlineGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 2,
+  logoImage: {
+    width: 200, // Ajuste la largeur selon les dimensions de ton logo
+    height: 80,  // Ajuste la hauteur
+    marginBottom: 16,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 16,
     color: theme.colors.textLight,
-    lineHeight: 22,
-    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 16,
   },
-  actionContainer: {
-    gap: 16,
-  },
-  primaryBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    position: 'relative',
-    ...Platform.select({
-      ios: {
-        shadowColor: theme.colors.primary,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
-  },
-  btnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-  },
-  btnContentSecondary: {
+  loginButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
     paddingVertical: 18,
-    paddingHorizontal: 24,
+    borderRadius: 16,
+    shadowColor: PRIMARY_COLOR,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 20,
   },
-  primaryBtnText: {
+  loginButtonText: {
     color: theme.colors.white,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
-  btnIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  btnGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    borderRadius: 16,
-  },
-  secondaryBtn: {
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.white,
-    ...Platform.select({
-      ios: {
-        shadowColor: theme.colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  secondaryBtnText: {
-    color: theme.colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  guestLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 16,
-  },
-  guestLinkText: {
-    fontSize: 14,
-    color: theme.colors.textLight,
+  footerText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: theme.colors.gray,
     fontWeight: '500',
-  },
-  pageIndicator: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 100 : 80,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.border,
-  },
-  dotActive: {
-    width: 24,
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  dotGradient: {
-    width: '100%',
-    height: '100%',
   },
 });

@@ -99,9 +99,10 @@ class Ride(models.Model):
 
 class Booking(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('confirmed', 'Confirmed'),
-        ('cancelled', 'Cancelled'),
+        ('pending', 'En attente'),
+        ('confirmed', 'Confirmée'),
+        ('cancelled', 'Annulée'),
+        ('completed', 'Terminée'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -119,10 +120,16 @@ class Booking(models.Model):
         return f"Reservation {self.id} pour {self.ride}"
 
 class Conversation(models.Model):
+    CONVERSATION_TYPE_CHOICES = [
+        ('ride', 'Ride'),
+        ('support', 'Support'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation_type = models.CharField(max_length=10, choices=CONVERSATION_TYPE_CHOICES, default='ride')
     ride = models.ForeignKey(Ride, on_delete=models.SET_NULL, null=True, blank=True)
     participant_1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversations_1')
-    participant_2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversations_2')
+    participant_2 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='conversations_2')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -131,19 +138,69 @@ class Conversation(models.Model):
         verbose_name_plural = "Conversations"
 
     def __str__(self):
-        return f"Conversation {self.id}"
+        return f"Conversation [{self.conversation_type}] {self.id}"
 
 class Message(models.Model):
+    MESSAGE_TYPE_CHOICES = [
+        ('text', 'Text'),
+        ('image', 'Image'),
+        ('audio', 'Audio'),
+        ('file', 'File'),
+        ('location', 'Location'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
-    content = models.TextField()
+    content = models.TextField(blank=True, default='')
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPE_CHOICES, default='text')
+    attachment = models.FileField(upload_to='support_attachments/', blank=True, null=True)
+    location_lat = models.FloatField(blank=True, null=True)
+    location_lng = models.FloatField(blank=True, null=True)
     is_read = models.BooleanField(default=False)
+    is_urgent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Message"
         verbose_name_plural = "Messages"
+        ordering = ['created_at']
 
     def __str__(self):
-        return f"Message {self.id}"
+        return f"Message [{self.message_type}] {self.id}"
+
+class Notification(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Notification {self.title} to {self.user.email if self.user else 'All'}"
+
+class AppBranding(models.Model):
+    logo = models.ImageField(upload_to='branding/', null=True, blank=True)
+    logo_scale = models.FloatField(default=1.0)
+    logo_position_x = models.FloatField(default=0.0)
+    logo_position_y = models.FloatField(default=0.0)
+    animation_type = models.CharField(max_length=50, default='fade_scale', choices=[
+        ('fade_scale', 'Fondu & Zoom'),
+        ('bounce', 'Rebond'),
+        ('pulse', 'Pulsation')
+    ])
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # We only want one active branding configuration
+        if self.is_active:
+            AppBranding.objects.filter(is_active=True).update(is_active=False)
+        super(AppBranding, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f"App Branding ({'Active' if self.is_active else 'Inactive'})"

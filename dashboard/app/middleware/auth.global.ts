@@ -2,8 +2,9 @@
 // Redirige vers /login si le cookie de token n'est pas présent
 
 export default defineNuxtRouteMiddleware((to) => {
-  // La page de login est accessible sans authentification
-  if (to.path === '/login') return
+  // Les pages publiques sont accessibles sans authentification
+  const publicRoutes = ['/', '/about', '/download', '/contact', '/login']
+  if (publicRoutes.includes(to.path)) return
 
   const token = useCookie('admin_token')
 

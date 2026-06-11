@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView,
-  Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Modal, Image, Switch, Animated, Dimensions, Keyboard,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
+  Modal, Image, Animated, Dimensions, Keyboard,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,11 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import LocationPicker from '../../src/components/LocationPicker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CustomAlert } from '../../src/utils/CustomAlert';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-const BENIN_CITIES = ['Cotonou', 'Porto-Novo', 'Parakou', 'Bohicon', 'Abomey-Calavi', 'Ouidah', 'Natitingou', 'Djougou'];
-const DATES = ["Aujourd'hui", 'Demain', 'Dans 2 jours', 'Autre'];
 const PROFILE_STEPS = ['personal', 'vehicle', 'preferences'] as const;
 type ProfileStep = typeof PROFILE_STEPS[number];
 
@@ -31,7 +30,8 @@ export default function PublishScreen() {
   // Ride form state
   const [departure, setDeparture] = useState('');
   const [arrival, setArrival] = useState('');
-  const [date, setDate] = useState("Aujourd'hui");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDateObj, setSelectedDateObj] = useState(new Date());
   const [time, setTime] = useState('');
   const [price, setPrice] = useState('');
   const [seats, setSeats] = useState(3);
@@ -39,6 +39,21 @@ export default function PublishScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [timeDate, setTimeDate] = useState(new Date());
   const [pickingLocationFor, setPickingLocationFor] = useState<'departure' | 'arrival' | null>(null);
+
+  // Coordinates for estimation
+  const [departureCords, setDepartureCords] = useState<{ lat: number; lon: number } | null>(null);
+  const [arrivalCords, setArrivalCords] = useState<{ lat: number; lon: number } | null>(null);
+
+  // Estimation results
+  const [estimation, setEstimation] = useState<{ distanceKm: number; durationMin: number; fuelCostFcfa: number } | null>(null);
+  const [estimationLoading, setEstimationLoading] = useState(false);
+
+  // Ride Options state
+  const [optLuggage, setOptLuggage] = useState(true);
+  const [optAirCond, setOptAirCond] = useState(true);
+  const [optCharge, setOptCharge] = useState(false);
+  const [optPets, setOptPets] = useState(false);
+  const [optStops, setOptStops] = useState(false);
 
   // Profile completion modal
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -52,6 +67,8 @@ export default function PublishScreen() {
   const [brandModel, setBrandModel] = useState('');
   const [vehicleColor, setVehicleColor] = useState('');
   const [plate, setPlate] = useState('');
+  
+  // Prefs state
   const [music, setMusic] = useState(true);
   const [smoking, setSmoking] = useState(false);
   const [chatty, setChatty] = useState(true);
@@ -95,6 +112,53 @@ export default function PublishScreen() {
     }).start();
   };
 
+  // ─── Route estimation helpers ──────────────────────────────────────────────
+  const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const computeEstimation = (
+    depCords: { lat: number; lon: number },
+    arrCords: { lat: number; lon: number }
+  ) => {
+    setEstimationLoading(true);
+    // Use a road-distance factor of 1.25 over straight-line distance
+    const straightKm = haversineKm(depCords.lat, depCords.lon, arrCords.lat, arrCords.lon);
+    const distanceKm = Math.round(straightKm * 1.25);
+    // Average speed 70 km/h on Beninese roads
+    const durationMin = Math.round((distanceKm / 70) * 60);
+    // Fuel: 7 L/100 km, price 700 FCFA/L
+    const fuelCostFcfa = Math.round((distanceKm / 100) * 7 * 700);
+    setEstimation({ distanceKm, durationMin, fuelCostFcfa });
+    setEstimationLoading(false);
+  };
+
+  const formatDuration = (totalMin: number): string => {
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h === 0) return `${m} min`;
+    if (m === 0) return `${h}h`;
+    return `${h}h${m.toString().padStart(2, '0')}`;
+  };
+
+  const getSuggestedPrice = (): string => {
+    if (!estimation) return '4 000 - 6 000 FCFA';
+    // Base: 15 FCFA/km, range ±20%
+    const base = Math.round(estimation.distanceKm * 15);
+    const low = Math.round(base * 0.8 / 500) * 500;
+    const high = Math.round(base * 1.2 / 500) * 500;
+    return `${low.toLocaleString()} - ${high.toLocaleString()} FCFA`;
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   const isProfileComplete = () => !!(user?.full_name && user.full_name.trim() !== '');
 
   const handlePublishPress = () => {
@@ -109,27 +173,18 @@ export default function PublishScreen() {
   };
 
   const handlePublish = async () => {
-    if (!departure || !arrival || !date || !time || !price) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires.');
+    if (!departure || !arrival || !time || !price) {
+      CustomAlert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires.');
       return;
     }
     if (departure === arrival) {
-      Alert.alert('Erreur', "Le lieu de départ et d'arrivée doivent être différents.");
+      CustomAlert.alert('Erreur', "Le lieu de départ et d'arrivée doivent être différents.");
       return;
     }
 
     setLoading(true);
     try {
-      let dateString = new Date().toISOString().split('T')[0];
-      if (date === 'Demain') {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        dateString = tomorrow.toISOString().split('T')[0];
-      } else if (date === 'Dans 2 jours') {
-        const d2 = new Date();
-        d2.setDate(d2.getDate() + 2);
-        dateString = d2.toISOString().split('T')[0];
-      }
+      const dateString = selectedDateObj.toISOString().split('T')[0];
 
       await authFetch('/rides/', {
         method: 'POST',
@@ -145,7 +200,7 @@ export default function PublishScreen() {
         }),
       });
 
-      Alert.alert('Félicitations ! 🎉', `Votre trajet de ${departure} vers ${arrival} a été publié !`, [
+      CustomAlert.alert('Félicitations ! 🎉', `Votre trajet de ${departure} vers ${arrival} a été publié !`, [
         { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
       ]);
 
@@ -153,7 +208,7 @@ export default function PublishScreen() {
       setPrice('');
       setSeats(3);
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de publier le trajet.');
+      CustomAlert.alert('Erreur', error.message || 'Impossible de publier le trajet.');
     } finally {
       setLoading(false);
     }
@@ -162,7 +217,7 @@ export default function PublishScreen() {
   const pickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Autorisez l\'accès à vos photos.');
+      CustomAlert.alert('Permission refusée', 'Autorisez l\'accès à vos photos.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -176,7 +231,7 @@ export default function PublishScreen() {
 
   const handleSavePersonal = async () => {
     if (!editName.trim()) {
-      Alert.alert('Erreur', 'Le nom complet est obligatoire.');
+      CustomAlert.alert('Erreur', 'Le nom complet est obligatoire.');
       return;
     }
     setIsSavingProfile(true);
@@ -196,7 +251,7 @@ export default function PublishScreen() {
       updateUser({ full_name: editName, avatar: avatarUri, email: editEmail });
       setProfileStep('vehicle');
     } catch (e: any) {
-      Alert.alert('Erreur', e.message || 'Impossible de sauvegarder.');
+      CustomAlert.alert('Erreur', e.message || 'Impossible de sauvegarder.');
     } finally {
       setIsSavingProfile(false);
     }
@@ -236,17 +291,32 @@ export default function PublishScreen() {
     handlePublish();
   };
 
-  const PrefRow = ({ label, value, onToggle }: { label: string; value: boolean; onToggle: () => void }) => (
-    <View style={styles.prefRow}>
-      <Text style={styles.prefLabel}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-        thumbColor={theme.colors.white}
-      />
-    </View>
+  const OptionCheckbox = ({ label, value, onChange }: any) => (
+    <TouchableOpacity style={styles.optionCheckbox} onPress={() => onChange(!value)} activeOpacity={0.8}>
+      <Ionicons name={value ? "checkbox" : "square-outline"} size={24} color={value ? theme.colors.primary : theme.colors.textMuted} />
+      <Text style={styles.optionCheckboxLabel}>{label}</Text>
+    </TouchableOpacity>
   );
+
+  const PrefCard = ({ label, value, onToggle, icon }: any) => (
+    <TouchableOpacity
+      style={[styles.prefCard, value && styles.prefCardActive]}
+      onPress={onToggle}
+      activeOpacity={0.8}
+    >
+      <Ionicons name={icon} size={28} color={value ? theme.colors.primary : theme.colors.textMuted} style={{ marginBottom: 12 }} />
+      <Text style={[styles.prefCardLabel, value && styles.prefCardLabelActive]}>{label}</Text>
+      <View style={[styles.prefBadge, value ? styles.prefBadgeActive : styles.prefBadgeInactive]}>
+        <Ionicons name={value ? "checkmark" : "close"} size={12} color={value ? theme.colors.white : theme.colors.textMuted} />
+      </View>
+    </TouchableOpacity>
+  );
+
+  const getProfileProgress = () => {
+    if (profileStep === 'personal') return 33;
+    if (profileStep === 'vehicle') return 66;
+    return 100;
+  };
 
   if (!user) {
     return (
@@ -263,6 +333,19 @@ export default function PublishScreen() {
     );
   }
 
+  if (!user.is_verified) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }]}>
+        <Ionicons name="shield-checkmark-outline" size={80} color={theme.colors.textMuted} />
+        <Text style={styles.notLoggedTitle}>Compte non vérifié</Text>
+        <Text style={styles.notLoggedText}>Votre compte doit être vérifié pour proposer un trajet.</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const showEstimation = departure && arrival;
+  const showSummary = departure && arrival && time && price;
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -272,10 +355,35 @@ export default function PublishScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>Publier un trajet 🚗</Text>
-              <Text style={styles.subtitle}>Voyagez à travers le Bénin et partagez vos frais.</Text>
+            
+            {/* Driver Profile Recap Card */}
+            <View style={styles.driverRecapCard}>
+              <View style={styles.driverInfoRow}>
+                {user.avatar ? (
+                  <Image source={{ uri: user.avatar }} style={styles.driverAvatar} />
+                ) : (
+                  <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.driverAvatarPlaceholder}>
+                    <Text style={styles.driverAvatarInitials}>{user.full_name?.charAt(0) || '?'}</Text>
+                  </LinearGradient>
+                )}
+                <View style={styles.driverDetails}>
+                  <Text style={styles.driverName}>{user.full_name || 'Complétez votre profil'}</Text>
+                  <View style={styles.driverBadgesRow}>
+                    <View style={styles.driverBadgeRating}>
+                      <Ionicons name="star" size={12} color="#F59E0B" />
+                      <Text style={styles.driverBadgeRatingText}>{user.rating?.toFixed(1) || '4.8'}</Text>
+                    </View>
+                    <View style={styles.driverBadgeVerified}>
+                      <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                      <Text style={styles.driverBadgeVerifiedText}>Vérifié</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.driverVehicleRow}>
+                <Ionicons name="car" size={16} color={theme.colors.textLight} />
+                <Text style={styles.driverVehicleText}>Toyota Corolla</Text>
+              </View>
             </View>
 
             {/* Profile incomplete warning */}
@@ -292,78 +400,103 @@ export default function PublishScreen() {
             )}
 
             {/* Form */}
-            <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={styles.form} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <LinearGradient colors={[theme.colors.white, theme.colors.background]} style={styles.form} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              
               <Text style={styles.sectionLabel}>Itinéraire 📍</Text>
+              
+              <View style={styles.timelineContainer}>
+                <View style={styles.timelineGraphic}>
+                  <View style={[styles.timelineDot, { backgroundColor: '#10B981', borderWidth: 3, borderColor: '#A7F3D0' }]} />
+                  <View style={styles.timelineLine} />
+                  <View style={[styles.timelineDot, { backgroundColor: '#EF4444', borderWidth: 3, borderColor: '#FECACA' }]} />
+                </View>
+                
+                <View style={styles.timelineContent}>
+                  <TouchableOpacity
+                    style={styles.locationButtonModern}
+                    onPress={() => setPickingLocationFor('departure')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={departure ? styles.locationButtonText : styles.locationButtonPlaceholder}>
+                      {departure || "Lieu de départ (ex: Cotonou)"}
+                    </Text>
+                  </TouchableOpacity>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Départ</Text>
-                <TouchableOpacity
-                  style={styles.locationButton}
-                  onPress={() => setPickingLocationFor('departure')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.locationIcon, { backgroundColor: `${theme.colors.primary}15` }]}>
-                    <Ionicons name="location" size={22} color={theme.colors.primary} />
-                  </View>
-                  <Text style={departure ? styles.locationButtonText : styles.locationButtonPlaceholder}>
-                    {departure || "Choisir le point de départ"}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.locationButtonModern}
+                    onPress={() => setPickingLocationFor('arrival')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={arrival ? styles.locationButtonText : styles.locationButtonPlaceholder}>
+                      {arrival || "Lieu d'arrivée (ex: Parakou)"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              <View style={styles.routeLineContainer}>
-                <View style={styles.routeDotStart} />
-                <View style={styles.routeLine} />
-                <View style={styles.routeDotEnd} />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Arrivée</Text>
-                <TouchableOpacity
-                  style={styles.locationButton}
-                  onPress={() => setPickingLocationFor('arrival')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.locationIcon, { backgroundColor: `${theme.colors.secondary}15` }]}>
-                    <Ionicons name="flag" size={22} color={theme.colors.secondary} />
-                  </View>
-                  <Text style={arrival ? styles.locationButtonText : styles.locationButtonPlaceholder}>
-                    {arrival || "Choisir le point d'arrivée"}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-                </TouchableOpacity>
-              </View>
+              {/* Estimation */}
+              {showEstimation && (
+                <View style={styles.estimationCard}>
+                  {estimationLoading ? (
+                    <ActivityIndicator size="small" color="#0369A1" style={{ flex: 1 }} />
+                  ) : estimation ? (
+                    <>
+                      <View style={styles.estItem}>
+                        <Text style={styles.estIcon}>📏</Text>
+                        <Text style={styles.estText}>{estimation.distanceKm.toLocaleString()} km</Text>
+                      </View>
+                      <View style={styles.estItem}>
+                        <Text style={styles.estIcon}>⏱</Text>
+                        <Text style={styles.estText}>{formatDuration(estimation.durationMin)}</Text>
+                      </View>
+                      <View style={styles.estItem}>
+                        <Text style={styles.estIcon}>⛽</Text>
+                        <Text style={styles.estText}>{estimation.fuelCostFcfa.toLocaleString()} FCFA</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={[styles.estText, { opacity: 0.5 }]}>Calcul en cours…</Text>
+                  )}
+                </View>
+              )}
 
               <View style={styles.divider} />
 
               <Text style={styles.sectionLabel}>Date et Heure ⏰</Text>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Date du trajet</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsContainer}>
-                  {DATES.map((item) => (
-                    <TouchableOpacity
-                      key={item}
-                      style={[styles.pill, date === item && styles.pillSelected]}
-                      onPress={() => setDate(item)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.pillText, date === item && styles.pillTextSelected]}>{item}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
+              <View style={styles.row}>
+                <TouchableOpacity style={[styles.timeButtonModern, { flex: 1 }]} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+                  <Ionicons name="calendar" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                  <Text style={styles.timeText}>
+                    {selectedDateObj.toLocaleDateString('fr-FR')}
+                  </Text>
+                </TouchableOpacity>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Heure de départ</Text>
-                <TouchableOpacity style={styles.timeButton} onPress={() => setShowTimePicker(true)} activeOpacity={0.7}>
-                  <Ionicons name="time-outline" size={20} color={theme.colors.primary} />
+                <TouchableOpacity style={[styles.timeButtonModern, { flex: 0.8 }]} onPress={() => setShowTimePicker(true)} activeOpacity={0.7}>
+                  <Ionicons name="time" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
                   <Text style={time ? styles.timeText : styles.timePlaceholder}>
-                    {time || "Choisir l'heure"}
+                    {time || "10:00"}
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={selectedDateObj}
+                  mode="date"
+                  display="default"
+                  minimumDate={new Date()}
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(Platform.OS === 'ios');
+                    if (event.type === 'set' && selectedDate) {
+                      setShowDatePicker(false);
+                      setSelectedDateObj(selectedDate);
+                    } else if (event.type === 'dismissed') {
+                      setShowDatePicker(false);
+                    }
+                  }}
+                />
+              )}
 
               {showTimePicker && (
                 <DateTimePicker
@@ -390,43 +523,70 @@ export default function PublishScreen() {
 
               <Text style={styles.sectionLabel}>Prix et Places 💰</Text>
 
-              <View style={styles.row}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Prix par place (FCFA)</Text>
-                  <View style={styles.priceInput}>
-                    <Ionicons name="cash-outline" size={20} color={theme.colors.primary} />
-                    <TextInput
-                      style={styles.priceField}
-                      placeholder="5000"
-                      placeholderTextColor={theme.colors.textMuted}
-                      value={price}
-                      onChangeText={setPrice}
-                      keyboardType="numeric"
-                    />
-                  </View>
+              {showEstimation && (
+                <View style={styles.suggestedPriceBox}>
+                  <Ionicons name="information-circle" size={16} color={theme.colors.primary} />
+                  <Text style={styles.suggestedPriceText}>Prix conseillé : {getSuggestedPrice()}</Text>
                 </View>
+              )}
 
-                <View style={[styles.inputGroup, { flex: 0.8 }]}>
-                  <Text style={styles.label}>Places libres</Text>
-                  <View style={styles.counter}>
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => seats > 1 && setSeats(seats - 1)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="remove" size={18} color={theme.colors.white} />
-                    </TouchableOpacity>
-                    <Text style={styles.counterText}>{seats}</Text>
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => seats < 8 && setSeats(seats + 1)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="add" size={18} color={theme.colors.white} />
-                    </TouchableOpacity>
+              <View style={styles.priceInputModern}>
+                <Ionicons name="cash" size={24} color={theme.colors.textMuted} />
+                <TextInput
+                  style={styles.priceFieldModern}
+                  placeholder="5000"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={price}
+                  onChangeText={setPrice}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.priceCurrency}>FCFA</Text>
+              </View>
+
+              <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Places libres 👥</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.seatChipsContainer}>
+                {[1, 2, 3, 4, 5, 6].map(num => (
+                  <TouchableOpacity
+                    key={num}
+                    style={[styles.seatChip, seats === num && styles.seatChipActive]}
+                    onPress={() => setSeats(num)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.seatChipText, seats === num && styles.seatChipTextActive]}>{num} place{num > 1 ? 's' : ''}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={styles.divider} />
+              
+              <Text style={styles.sectionLabel}>Options du trajet ⚙️</Text>
+              <View style={styles.optionsContainer}>
+                <OptionCheckbox label="Bagages autorisés" value={optLuggage} onChange={setOptLuggage} />
+                <OptionCheckbox label="Climatisation" value={optAirCond} onChange={setOptAirCond} />
+                <OptionCheckbox label="Recharge téléphone" value={optCharge} onChange={setOptCharge} />
+                <OptionCheckbox label="Animaux acceptés" value={optPets} onChange={setOptPets} />
+                <OptionCheckbox label="Arrêts intermédiaires" value={optStops} onChange={setOptStops} />
+              </View>
+
+              {/* Summary Card */}
+              {showSummary && (
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryCardTitle}>Aperçu de l'annonce</Text>
+                  <View style={styles.summaryRoute}>
+                    <Text style={styles.summaryRouteText}>📍 {departure}</Text>
+                    <Ionicons name="arrow-down" size={16} color={theme.colors.textMuted} style={{ marginVertical: 4, marginLeft: 6 }} />
+                    <Text style={styles.summaryRouteText}>📍 {arrival}</Text>
+                  </View>
+                  <View style={styles.summaryDetailsRow}>
+                    <Text style={styles.summaryDetailItem}>📅 {selectedDateObj.toLocaleDateString('fr-FR')}</Text>
+                    <Text style={styles.summaryDetailItem}>🕐 {time}</Text>
+                  </View>
+                  <View style={styles.summaryDetailsRow}>
+                    <Text style={styles.summaryDetailItemPrice}>💰 {price} FCFA</Text>
+                    <Text style={styles.summaryDetailItem}>👥 {seats} place{seats > 1 ? 's' : ''}</Text>
                   </View>
                 </View>
-              </View>
+              )}
 
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                 <TouchableOpacity
@@ -437,13 +597,13 @@ export default function PublishScreen() {
                   activeOpacity={0.9}
                   disabled={loading}
                 >
-                  <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.publishGradient}>
+                  <LinearGradient colors={['#2563EB', '#3B82F6', '#60A5FA']} style={styles.publishGradient}>
                     {loading ? (
                       <ActivityIndicator color={theme.colors.white} size="small" />
                     ) : (
                       <>
-                        <Ionicons name="send-outline" size={20} color={theme.colors.white} />
-                        <Text style={styles.publishBtnText}>Publier mon annonce</Text>
+                        <Ionicons name="rocket" size={20} color={theme.colors.white} />
+                        <Text style={styles.publishBtnText}>Publier mon trajet</Text>
                       </>
                     )}
                   </LinearGradient>
@@ -458,32 +618,21 @@ export default function PublishScreen() {
       <Modal visible={profileModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Step indicator */}
-            <View style={styles.stepIndicator}>
-              {PROFILE_STEPS.map((step, i) => (
-                <View key={step} style={styles.stepWrapper}>
-                  <View style={[
-                    styles.stepDot,
-                    profileStep === step && styles.stepDotActive,
-                    PROFILE_STEPS.indexOf(profileStep) > i && styles.stepDotDone
-                  ]}>
-                    {PROFILE_STEPS.indexOf(profileStep) > i ? (
-                      <Ionicons name="checkmark" size={12} color={theme.colors.white} />
-                    ) : (
-                      <Text style={[styles.stepDotText, profileStep === step && { color: theme.colors.white }]}>{i + 1}</Text>
-                    )}
-                  </View>
-                  {i < 2 && <View style={[styles.stepLine, PROFILE_STEPS.indexOf(profileStep) > i && styles.stepLineDone]} />}
-                </View>
-              ))}
+            
+            <View style={styles.modalHeaderModern}>
+              <Text style={styles.modalTitle}>Complétion du profil</Text>
+            </View>
+
+            <View style={styles.progressContainer}>
+              <Text style={styles.progressLabel}>Étape {PROFILE_STEPS.indexOf(profileStep) + 1} sur 3 ({Math.round(getProfileProgress())}%)</Text>
+              <View style={styles.progressBar}>
+                 <View style={[styles.progressFill, { width: `${getProfileProgress()}%` }]} />
+              </View>
             </View>
 
             {/* Step 1: Personal Info */}
             {profileStep === 'personal' && (
               <>
-                <Text style={styles.modalTitle}>👤 Informations personnelles</Text>
-                <Text style={styles.modalSubtitle}>Complétez votre profil pour publier un trajet.</Text>
-
                 <TouchableOpacity style={styles.avatarPicker} onPress={pickAvatar} activeOpacity={0.8}>
                   {avatarUri ? (
                     <View style={styles.avatarWrapper}>
@@ -500,28 +649,34 @@ export default function PublishScreen() {
                   )}
                 </TouchableOpacity>
 
-                <Text style={styles.modalLabel}>Nom complet *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={editName}
-                  onChangeText={setEditName}
-                  placeholder="Ex: Jean Dupont"
-                  placeholderTextColor={theme.colors.textMuted}
-                />
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="person-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInputModern}
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder="Nom complet"
+                    placeholderTextColor={theme.colors.textMuted}
+                  />
+                </View>
 
-                <Text style={styles.modalLabel}>Email (optionnel)</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={editEmail}
-                  onChangeText={setEditEmail}
-                  placeholder="votre@email.com"
-                  placeholderTextColor={theme.colors.textMuted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInputModern}
+                    value={editEmail}
+                    onChangeText={setEditEmail}
+                    placeholder="votre@email.com"
+                    placeholderTextColor={theme.colors.textMuted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
 
                 <TouchableOpacity style={styles.modalBtn} onPress={handleSavePersonal} disabled={isSavingProfile}>
-                  {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
+                  <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
+                  </LinearGradient>
                 </TouchableOpacity>
               </>
             )}
@@ -529,43 +684,48 @@ export default function PublishScreen() {
             {/* Step 2: Vehicle */}
             {profileStep === 'vehicle' && (
               <>
-                <Text style={styles.modalTitle}>🚗 Mon véhicule</Text>
-                <Text style={styles.modalSubtitle}>Ajoutez votre véhicule (optionnel).</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="car-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInputModern}
+                    value={brandModel}
+                    onChangeText={setBrandModel}
+                    placeholder="Marque et Modèle"
+                    placeholderTextColor={theme.colors.textMuted}
+                  />
+                </View>
 
-                <Text style={styles.modalLabel}>Marque et modèle</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={brandModel}
-                  onChangeText={setBrandModel}
-                  placeholder="Ex: Toyota Corolla"
-                  placeholderTextColor={theme.colors.textMuted}
-                />
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="color-palette-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInputModern}
+                    value={vehicleColor}
+                    onChangeText={setVehicleColor}
+                    placeholder="Couleur"
+                    placeholderTextColor={theme.colors.textMuted}
+                  />
+                </View>
 
-                <Text style={styles.modalLabel}>Couleur</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={vehicleColor}
-                  onChangeText={setVehicleColor}
-                  placeholder="Ex: Blanc"
-                  placeholderTextColor={theme.colors.textMuted}
-                />
-
-                <Text style={styles.modalLabel}>Plaque d'immatriculation</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={plate}
-                  onChangeText={setPlate}
-                  placeholder="Ex: AB-1234-CD"
-                  placeholderTextColor={theme.colors.textMuted}
-                  autoCapitalize="characters"
-                />
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="pricetag-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInputModern}
+                    value={plate}
+                    onChangeText={setPlate}
+                    placeholder="Immatriculation"
+                    placeholderTextColor={theme.colors.textMuted}
+                    autoCapitalize="characters"
+                  />
+                </View>
 
                 <View style={styles.modalBtnRow}>
                   <TouchableOpacity style={styles.modalBtnSkip} onPress={() => setProfileStep('preferences')}>
                     <Text style={styles.modalBtnSkipText}>Passer</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSaveVehicle} disabled={isSavingProfile}>
-                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
+                    <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                      {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </>
@@ -574,14 +734,11 @@ export default function PublishScreen() {
             {/* Step 3: Preferences */}
             {profileStep === 'preferences' && (
               <>
-                <Text style={styles.modalTitle}>⚙️ Préférences de voyage</Text>
-                <Text style={styles.modalSubtitle}>Dites-en plus aux passagers.</Text>
-
-                <View style={styles.prefCard}>
-                  <PrefRow label="🎵 Musique" value={music} onToggle={() => setMusic(!music)} />
-                  <PrefRow label="🚬 Fumeurs acceptés" value={smoking} onToggle={() => setSmoking(!smoking)} />
-                  <PrefRow label="💬 Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
-                  <PrefRow label="❄️ Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
+                <View style={styles.prefCardsContainer}>
+                  <PrefCard icon="musical-notes" label="Musique" value={music} onToggle={() => setMusic(!music)} />
+                  <PrefCard icon="chatbubbles" label="Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
+                  <PrefCard icon="logo-no-smoking" label="Fumeurs" value={smoking} onToggle={() => setSmoking(!smoking)} />
+                  <PrefCard icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
                 </View>
 
                 <View style={styles.modalBtnRow}>
@@ -589,7 +746,9 @@ export default function PublishScreen() {
                     <Text style={styles.modalBtnSkipText}>Passer</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSavePrefs} disabled={isSavingProfile}>
-                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Terminer 🚀</Text>}
+                    <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                      {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Terminer 🚀</Text>}
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </>
@@ -603,8 +762,18 @@ export default function PublishScreen() {
         <LocationPicker
           title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
           onLocationSelected={(loc) => {
-            if (pickingLocationFor === 'departure') setDeparture(loc.name);
-            else setArrival(loc.name);
+            const cords = { lat: loc.latitude, lon: loc.longitude };
+            if (pickingLocationFor === 'departure') {
+              setDeparture(loc.name);
+              setDepartureCords(cords);
+              // Recompute if arrival is already set
+              if (arrivalCords) computeEstimation(cords, arrivalCords);
+            } else {
+              setArrival(loc.name);
+              setArrivalCords(cords);
+              // Recompute if departure is already set
+              if (departureCords) computeEstimation(departureCords, cords);
+            }
             setPickingLocationFor(null);
           }}
           onCancel={() => setPickingLocationFor(null)}
@@ -616,17 +785,41 @@ export default function PublishScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 32 },
-  header: { marginVertical: 20 },
-  title: { fontSize: 28, fontWeight: '800', color: '#1F2937', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#6B7280' },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 32, paddingTop: 16 },
+  
+  driverRecapCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  driverInfoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  driverAvatar: { width: 50, height: 50, borderRadius: 25 },
+  driverAvatarPlaceholder: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  driverAvatarInitials: { color: theme.colors.white, fontSize: 18, fontWeight: 'bold' },
+  driverDetails: { marginLeft: 12, flex: 1 },
+  driverName: { fontSize: 16, fontWeight: '700', color: theme.colors.text, marginBottom: 4 },
+  driverBadgesRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  driverBadgeRating: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEB', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 4 },
+  driverBadgeRatingText: { fontSize: 11, fontWeight: '700', color: '#B45309' },
+  driverBadgeVerified: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 4 },
+  driverBadgeVerifiedText: { fontSize: 11, fontWeight: '700', color: '#047857' },
+  driverVehicleRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12, gap: 8 },
+  driverVehicleText: { fontSize: 13, color: theme.colors.textLight, fontWeight: '500' },
+
   profileWarning: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FEF3C7', borderRadius: 12,
+    backgroundColor: theme.colors.warningLight, borderRadius: 12,
     padding: 12, marginBottom: 16,
     borderWidth: 1, borderColor: theme.colors.warning,
   },
-  profileWarningText: { flex: 1, color: '#B45309', fontWeight: '600', fontSize: 13 },
+  profileWarningText: { flex: 1, color: theme.colors.warningDark, fontWeight: '600', fontSize: 13 },
+  
   form: {
     borderRadius: 24,
     padding: 20,
@@ -636,90 +829,132 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  sectionLabel: { fontSize: 16, fontWeight: '700', color: '#1F2937', marginBottom: 16 },
-  inputGroup: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 8 },
-  locationButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: theme.colors.white, padding: 12,
-    borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
+  sectionLabel: { fontSize: 16, fontWeight: '700', color: theme.colors.text, marginBottom: 16 },
+  
+  timelineContainer: { flexDirection: 'row', marginBottom: 16 },
+  timelineGraphic: { width: 24, alignItems: 'center', marginRight: 12, marginTop: 12 },
+  timelineDot: { width: 14, height: 14, borderRadius: 7 },
+  timelineLine: { width: 2, height: 44, backgroundColor: theme.colors.border, marginVertical: 4 },
+  timelineContent: { flex: 1, gap: 12 },
+  
+  locationButtonModern: {
+    backgroundColor: '#F7F8FA', padding: 16,
+    borderRadius: 16, height: 56, justifyContent: 'center'
   },
-  locationIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  locationButtonText: { flex: 1, fontSize: 15, color: '#1F2937', fontWeight: '500' },
-  locationButtonPlaceholder: { flex: 1, fontSize: 15, color: '#9CA3AF' },
-  routeLineContainer: { alignItems: 'center', marginBottom: 8, marginLeft: 16 },
-  routeDotStart: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.primary },
-  routeDotEnd: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.secondary },
-  routeLine: { width: 2, height: 24, backgroundColor: '#D1D5DB', marginVertical: 4 },
-  divider: { height: 1, backgroundColor: '#E5E7EB', marginVertical: 16 },
-  pillsContainer: { gap: 8, paddingVertical: 4 },
-  pill: {
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: theme.colors.white, borderWidth: 1, borderColor: '#E5E7EB',
+  locationButtonText: { fontSize: 15, color: theme.colors.text, fontWeight: '600' },
+  locationButtonPlaceholder: { fontSize: 15, color: theme.colors.textMuted },
+  
+  estimationCard: {
+    flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F0F9FF',
+    padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BAE6FD'
   },
-  pillSelected: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  pillText: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
-  pillTextSelected: { color: theme.colors.white, fontWeight: '700' },
-  timeButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: theme.colors.white, padding: 14,
-    borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
-  },
-  timeText: { flex: 1, fontSize: 15, color: '#1F2937', fontWeight: '500' },
-  timePlaceholder: { flex: 1, fontSize: 15, color: '#9CA3AF' },
+  estItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  estIcon: { fontSize: 14 },
+  estText: { fontSize: 13, fontWeight: '600', color: '#0369A1' },
+
   row: { flexDirection: 'row', gap: 12 },
-  priceInput: {
+  timeButtonModern: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F7F8FA', padding: 14,
+    borderRadius: 16, height: 56,
+  },
+  timeText: { fontSize: 15, color: theme.colors.text, fontWeight: '600' },
+  timePlaceholder: { fontSize: 15, color: theme.colors.textMuted },
+
+  divider: { height: 1, backgroundColor: theme.colors.grayLight, marginVertical: 20 },
+  
+  suggestedPriceBox: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.primaryLight,
+    padding: 10, borderRadius: 10, marginBottom: 12, gap: 8
+  },
+  suggestedPriceText: { fontSize: 13, fontWeight: '600', color: theme.colors.primaryDark },
+  
+  priceInputModern: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: theme.colors.white, paddingHorizontal: 14,
-    borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', height: 50,
+    backgroundColor: '#F7F8FA', paddingHorizontal: 16,
+    borderRadius: 16, height: 56,
   },
-  priceField: { flex: 1, fontSize: 15, color: '#1F2937' },
-  counter: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: theme.colors.white, paddingHorizontal: 8,
-    borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', height: 50,
+  priceFieldModern: { flex: 1, fontSize: 18, fontWeight: '700', color: theme.colors.text },
+  priceCurrency: { fontSize: 15, fontWeight: '600', color: theme.colors.textMuted },
+
+  seatChipsContainer: { gap: 10, paddingBottom: 8 },
+  seatChip: {
+    paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24,
+    backgroundColor: '#F7F8FA', borderWidth: 1, borderColor: 'transparent',
   },
-  counterBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center' },
-  counterText: { fontSize: 18, fontWeight: '700', color: '#1F2937', minWidth: 30, textAlign: 'center' },
-  publishBtn: { marginTop: 24, overflow: 'hidden', borderRadius: 12 },
+  seatChipActive: { backgroundColor: `${theme.colors.primary}15`, borderColor: theme.colors.primary },
+  seatChipText: { fontSize: 14, color: theme.colors.textLight, fontWeight: '600' },
+  seatChipTextActive: { color: theme.colors.primary, fontWeight: '700' },
+
+  optionsContainer: { gap: 8, marginBottom: 16 },
+  optionCheckbox: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  optionCheckboxLabel: { fontSize: 15, color: theme.colors.text },
+
+  summaryCard: {
+    backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, marginTop: 8, marginBottom: 24,
+    borderWidth: 1, borderColor: '#E2E8F0'
+  },
+  summaryCardTitle: { fontSize: 13, fontWeight: '700', color: theme.colors.textLight, marginBottom: 12, textTransform: 'uppercase' },
+  summaryRoute: { marginBottom: 12 },
+  summaryRouteText: { fontSize: 15, fontWeight: '700', color: theme.colors.text },
+  summaryDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  summaryDetailItem: { fontSize: 14, color: theme.colors.textLight, fontWeight: '500' },
+  summaryDetailItemPrice: { fontSize: 16, color: theme.colors.success, fontWeight: '800' },
+
+  publishBtn: { marginTop: 8, overflow: 'hidden', borderRadius: 16, shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   publishBtnDisabled: { opacity: 0.6 },
-  publishGradient: { flexDirection: 'row', height: 52, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  publishBtnText: { fontSize: 16, fontWeight: '700', color: theme.colors.white },
-  notLoggedTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937', marginTop: 16, marginBottom: 8, textAlign: 'center' },
-  notLoggedText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 24 },
+  publishGradient: { flexDirection: 'row', height: 56, justifyContent: 'center', alignItems: 'center', gap: 10 },
+  publishBtnText: { fontSize: 18, fontWeight: '800', color: theme.colors.white },
+  
+  notLoggedTitle: { fontSize: 22, fontWeight: '800', color: theme.colors.text, marginTop: 16, marginBottom: 8, textAlign: 'center' },
+  notLoggedText: { fontSize: 14, color: theme.colors.textLight, textAlign: 'center', marginBottom: 24 },
   notLoggedButton: { borderRadius: 12, overflow: 'hidden' },
   notLoggedGradient: { paddingHorizontal: 32, paddingVertical: 14, justifyContent: 'center', alignItems: 'center' },
   notLoggedButtonText: { color: theme.colors.white, fontWeight: 'bold', fontSize: 16 },
+  
   // Modal styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: theme.colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 24, paddingBottom: 36, maxHeight: '90%',
   },
-  stepIndicator: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
-  stepWrapper: { flexDirection: 'row', alignItems: 'center' },
-  stepDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', borderWidth: 2, borderColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' },
-  stepDotActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },
-  stepDotDone: { borderColor: theme.colors.success, backgroundColor: theme.colors.success },
-  stepDotText: { fontSize: 14, fontWeight: '700', color: '#9CA3AF' },
-  stepLine: { width: 40, height: 2, backgroundColor: '#E5E7EB' },
-  stepLineDone: { backgroundColor: theme.colors.success },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937', marginBottom: 4 },
-  modalSubtitle: { fontSize: 14, color: '#6B7280', marginBottom: 20 },
+  modalHeaderModern: { marginBottom: 20 },
+  progressContainer: { marginBottom: 24 },
+  progressLabel: { fontSize: 13, fontWeight: '700', color: theme.colors.textLight, marginBottom: 8, textAlign: 'right' },
+  progressBar: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 4 },
+
+  modalTitle: { fontSize: 22, fontWeight: '800', color: theme.colors.text },
+  
   avatarPicker: { alignSelf: 'center', marginBottom: 24 },
   avatarWrapper: { position: 'relative' },
   avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: theme.colors.white },
   avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: theme.colors.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.colors.white },
   avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
   avatarPlaceholderText: { fontSize: 11, color: theme.colors.white, fontWeight: '600', marginTop: 4 },
-  modalLabel: { fontSize: 14, fontWeight: '600', color: '#6B7280', marginBottom: 8 },
-  modalInput: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 16, color: '#1F2937' },
-  modalBtn: { backgroundColor: theme.colors.primary, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
+  
+  inputWrapper: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F7F8FA', borderRadius: 16, height: 56,
+    paddingHorizontal: 16, marginBottom: 16,
+  },
+  inputIcon: { marginRight: 12 },
+  modalInputModern: { flex: 1, fontSize: 15, color: theme.colors.text },
+  
+  modalBtn: { marginTop: 8, overflow: 'hidden', borderRadius: 16 },
+  modalBtnGradient: { flexDirection: 'row', height: 56, justifyContent: 'center', alignItems: 'center', gap: 8 },
   modalBtnText: { fontSize: 16, fontWeight: '700', color: theme.colors.white },
+  
   modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  modalBtnSkip: { height: 50, paddingHorizontal: 20, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
-  modalBtnSkipText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
-  prefCard: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#E5E7EB' },
-  prefRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
-  prefLabel: { fontSize: 15, color: '#1F2937' },
+  modalBtnSkip: { flex: 0.5, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9' },
+  modalBtnSkipText: { fontSize: 15, fontWeight: '600', color: theme.colors.textLight },
+  
+  prefCardsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 20 },
+  prefCard: { width: '48%', backgroundColor: '#F7F8FA', padding: 16, borderRadius: 16, alignItems: 'flex-start', borderWidth: 1, borderColor: 'transparent' },
+  prefCardActive: { backgroundColor: `${theme.colors.primary}10`, borderColor: `${theme.colors.primary}30` },
+  prefCardLabel: { fontSize: 14, fontWeight: '600', color: theme.colors.text, marginBottom: 8 },
+  prefCardLabelActive: { color: theme.colors.primary },
+  prefBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8 },
+  prefBadgeInactive: { backgroundColor: '#E5E7EB' },
+  prefBadgeActive: { backgroundColor: theme.colors.primary },
 });

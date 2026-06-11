@@ -5,14 +5,19 @@ export default <Partial<Config>>{
     extend: {
       colors: {
         primary: {
-          light: '#EFF6FF',
-          DEFAULT: '#3B82F6',
-          dark: '#1D4ED8',
+          light: '#DBEAFE', // Blue 100
+          DEFAULT: '#2563EB', // Blue 600
+          dark: '#1D4ED8', // Blue 700
         },
         secondary: {
-          light: '#E0F2FE',
-          DEFAULT: '#0284C7',
-          dark: '#0369A1',
+          light: '#D1FAE5', // Emerald 100
+          DEFAULT: '#10B981', // Emerald 500
+          dark: '#059669', // Emerald 600
+        },
+        accent: {
+          light: '#FFF3D6',
+          DEFAULT: '#FFAA00',
+          dark: '#CC8800',
         },
         background: '#F8FAFC',
         card: '#FFFFFF',

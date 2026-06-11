@@ -9,11 +9,10 @@
 
       <!-- Content -->
       <div class="relative z-10 text-white text-center max-w-md">
-        <div class="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center mx-auto mb-8 shadow-lg">
-          <Icon name="ph:car-profile-fill" class="w-10 h-10 text-white" />
+        <div class="flex items-center justify-center mx-auto mb-8">
+          <img src="/images/logozemy.png" alt="Zemy Logo" class="h-16 object-contain" style="filter: brightness(0) invert(1);">
         </div>
         <h1 class="text-4xl font-extrabold mb-4 leading-tight">
-          Covoiturage<br />
           <span class="text-white/70">Administration</span>
         </h1>
         <p class="text-white/60 text-lg leading-relaxed">
@@ -42,10 +41,8 @@
     <div class="flex-1 flex flex-col items-center justify-center p-8">
       <!-- Mobile logo -->
       <div class="lg:hidden flex items-center mb-8 space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-          <Icon name="ph:car-profile-fill" class="w-5 h-5 text-white" />
-        </div>
-        <span class="text-xl font-bold text-text">Covoiturage Admin</span>
+        <img src="/images/logozemy.png" alt="Zemy Logo" class="h-10 object-contain">
+        <span class="text-xl font-bold text-text">Admin</span>
       </div>
 
       <div class="w-full max-w-md">
@@ -126,7 +123,7 @@
         <!-- Footer note -->
         <p class="text-center text-xs text-textMuted mt-8">
           Accès réservé aux administrateurs de la plateforme.<br />
-          <span class="text-primary">Covoiturage &copy; {{ new Date().getFullYear() }}</span>
+          <span class="text-primary">Zemy &copy; {{ new Date().getFullYear() }}</span>
         </p>
       </div>
     </div>
@@ -171,7 +168,7 @@ async function handleLogin() {
     }
 
     authCookie.value = res.access
-    await router.push('/')
+    await router.push('/dashboard')
   } catch (e: any) {
     const data = e?.data
     if (data?.error) {

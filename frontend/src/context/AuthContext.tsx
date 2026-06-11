@@ -36,8 +36,8 @@ const defaultContext: AuthContextData = {
 
 const AuthContext = createContext<AuthContextData>(defaultContext);
 
-const STORAGE_TOKEN_KEY = '@covoiturage_access_token';
-const STORAGE_USER_KEY = '@covoiturage_user';
+const STORAGE_TOKEN_KEY = '@zemy_access_token';
+const STORAGE_USER_KEY = '@zemy_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -92,6 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await AsyncStorage.setItem(STORAGE_TOKEN_KEY, data.access);
         await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
       } catch (e) {}
+    } catch (error) {
+      throw error; // Propage l'erreur vers l'appelant (LoginScreen)
     } finally {
       setIsLoading(false);
     }
@@ -110,6 +112,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await AsyncStorage.setItem(STORAGE_TOKEN_KEY, data.access);
         await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
       } catch (e) {}
+    } catch (error) {
+      throw error; // Propage l'erreur vers l'appelant (RegisterScreen)
     } finally {
       setIsLoading(false);
     }
@@ -128,7 +132,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const authFetch = async (endpoint: string, options: RequestInit = {}) => {
     const headers = new Headers(options.headers || {});
-    if (!(options.body instanceof FormData)) {
+    const isFormData = options.body && (options.body instanceof FormData || (options.body as any).append !== undefined);
+    if (!isFormData) {
       headers.set('Content-Type', 'application/json');
     }
     if (token) {

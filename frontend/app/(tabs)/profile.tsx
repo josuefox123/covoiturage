@@ -8,9 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
-  Alert,
   Image,
-  Switch,
   RefreshControl,
   Dimensions,
   Animated,
@@ -20,9 +18,9 @@ import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
-import type { User } from '../../src/context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CustomAlert } from '../../src/utils/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -42,16 +40,16 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Personal info state
-  const [editFirstName, setEditFirstName] = useState('');
-  const [editLastName, setEditLastName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
+  const [editFullName, setEditFullName] = useState(user?.full_name || '');
+  const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [editEmail, setEditEmail] = useState(user?.email || '');
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar || null);
 
   // Vehicle state
-  const [brandModel, setBrandModel] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
   const [color, setColor] = useState('');
   const [plate, setPlate] = useState('');
 
@@ -83,6 +81,10 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (user) {
+      setEditFullName(user.full_name || '');
+      setEditPhone(user.phone || '');
+      setEditEmail(user.email || '');
+      setAvatarUri(user.avatar || null);
       fetchPreferences();
       fetchVehicle();
     }
@@ -109,7 +111,9 @@ export default function ProfileScreen() {
       if (data && data.length > 0) {
         const vehicle = data[0];
         setVehicleId(vehicle.id);
-        setBrandModel(vehicle.brand_model || '');
+        const parts = (vehicle.brand_model || '').split(' ');
+        setBrand(parts[0] || '');
+        setModel(parts.slice(1).join(' ') || '');
         setColor(vehicle.color || '');
         setPlate(vehicle.license_plate || '');
       }
@@ -125,7 +129,7 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = () => {
-    Alert.alert(
+    CustomAlert.alert(
       'Déconnexion',
       'Voulez-vous vraiment vous déconnecter ?',
       [
@@ -143,7 +147,7 @@ export default function ProfileScreen() {
   const pickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Vous devez autoriser l\'accès à vos photos.');
+      CustomAlert.alert('Permission refusée', 'Vous devez autoriser l\'accès à vos photos.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -170,9 +174,7 @@ export default function ProfileScreen() {
       } else {
         setEmailError('');
       }
-    } catch (e) {
-      // ignore network errors
-    }
+    } catch (e) { }
   };
 
   const handlePhoneBlur = async () => {
@@ -187,30 +189,32 @@ export default function ProfileScreen() {
       } else {
         setPhoneError('');
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) { }
   };
 
   const handleSavePersonalInfo = async () => {
-    if (!editFirstName.trim() || !editLastName.trim()) {
-      Alert.alert('Erreur', 'Le prénom et le nom sont obligatoires.');
+    if (!editFullName.trim()) {
+      CustomAlert.alert('Erreur', 'Le nom complet est obligatoire.');
       return;
     }
     if (!editEmail.trim()) {
-      Alert.alert('Erreur', 'L\'email est obligatoire.');
+      CustomAlert.alert('Erreur', 'L\'email est obligatoire.');
       return;
     }
     if (emailError || phoneError) {
-      Alert.alert('Erreur', 'Corrigez les champs avant de sauvegarder.');
+      CustomAlert.alert('Erreur', 'Corrigez les champs avant de sauvegarder.');
       return;
     }
 
     setIsSaving(true);
     try {
+      const parts = editFullName.trim().split(' ');
+      const first = parts[0] || '';
+      const last = parts.slice(1).join(' ');
+
       const formData = new FormData();
-      formData.append('first_name', editFirstName);
-      formData.append('last_name', editLastName);
+      formData.append('first_name', first);
+      formData.append('last_name', last);
       formData.append('phone', editPhone);
       if (editEmail) formData.append('email', editEmail);
 
@@ -231,46 +235,47 @@ export default function ProfileScreen() {
       });
 
       updateUser({
-        full_name: `${editFirstName} ${editLastName}`,
+        full_name: editFullName,
         email: editEmail,
         phone: editPhone,
         avatar: avatarUri
       });
 
-      Alert.alert('Succès ✅', 'Informations personnelles mises à jour !');
+      CustomAlert.alert('Succès ✅', 'Informations personnelles mises à jour !');
       setInfoModalVisible(false);
     } catch (e: any) {
-      Alert.alert('Erreur', e.message || 'Impossible de mettre à jour.');
+      CustomAlert.alert('Erreur', e.message || 'Impossible de mettre à jour.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSaveVehicle = async () => {
-    if (!brandModel.trim() || !color.trim() || !plate.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs du véhicule.');
+    if (!brand.trim() || !model.trim() || !color.trim() || !plate.trim()) {
+      CustomAlert.alert('Erreur', 'Veuillez remplir tous les champs du véhicule.');
       return;
     }
 
     setIsSaving(true);
+    const brand_model = `${brand.trim()} ${model.trim()}`;
     try {
       if (vehicleId) {
         await authFetch(`/vehicles/${vehicleId}/`, {
           method: 'PATCH',
-          body: JSON.stringify({ brand_model: brandModel, color, license_plate: plate }),
+          body: JSON.stringify({ brand_model, color, license_plate: plate }),
         });
-        Alert.alert('Succès ✅', 'Véhicule mis à jour !');
+        CustomAlert.alert('Succès ✅', 'Véhicule mis à jour !');
       } else {
         const res = await authFetch('/vehicles/', {
           method: 'POST',
-          body: JSON.stringify({ brand_model: brandModel, color, license_plate: plate, owner: user!.id }),
+          body: JSON.stringify({ brand_model, color, license_plate: plate, owner: user!.id }),
         });
         if (res && res.id) setVehicleId(res.id);
-        Alert.alert('Succès ✅', 'Véhicule ajouté !');
+        CustomAlert.alert('Succès ✅', 'Véhicule ajouté !');
       }
       setVehicleModalVisible(false);
     } catch (e: any) {
-      Alert.alert('Erreur', e.message || 'Impossible d\'ajouter le véhicule.');
+      CustomAlert.alert('Erreur', e.message || 'Impossible d\'ajouter le véhicule.');
     } finally {
       setIsSaving(false);
     }
@@ -289,10 +294,10 @@ export default function ProfileScreen() {
           air_conditioner: airCond
         }),
       });
-      Alert.alert('Succès ✅', 'Préférences sauvegardées !');
+      CustomAlert.alert('Succès ✅', 'Préférences sauvegardées !');
       setPrefsModalVisible(false);
     } catch (e: any) {
-      Alert.alert('Erreur', e.message || 'Impossible de sauvegarder les préférences.');
+      CustomAlert.alert('Erreur', e.message || 'Impossible de sauvegarder les préférences.');
     } finally {
       setIsSaving(false);
     }
@@ -313,16 +318,21 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  const PrefRow = ({ label, value, onToggle }: { label: string; value: boolean; onToggle: () => void }) => (
-    <View style={styles.prefRow}>
-      <Text style={styles.prefLabel}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-        thumbColor={theme.colors.white}
-      />
-    </View>
+  const PrefCard = ({ label, value, onToggle, icon }: any) => (
+    <TouchableOpacity
+      style={[styles.prefCard, value && styles.prefCardActive]}
+      onPress={onToggle}
+      activeOpacity={0.8}
+    >
+      <Ionicons name={icon} size={28} color={value ? theme.colors.primary : theme.colors.textMuted} style={{ marginBottom: 12 }} />
+      <Text style={[styles.prefCardLabel, value && styles.prefCardLabelActive]}>{label}</Text>
+      <View style={[styles.prefBadge, value ? styles.prefBadgeActive : styles.prefBadgeInactive]}>
+        <Ionicons name={value ? "checkmark" : "close"} size={12} color={value ? theme.colors.white : theme.colors.textMuted} />
+        <Text style={[styles.prefBadgeText, value ? styles.prefBadgeTextActive : styles.prefBadgeTextInactive]}>
+          {value ? 'Activé' : 'Désactivé'}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   if (!user) {
@@ -350,9 +360,15 @@ export default function ProfileScreen() {
     ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
     : '?';
 
-  const fullNameParts = (user.full_name || '').split(' ');
-  const firstName = fullNameParts[0] || '';
-  const lastName = fullNameParts.slice(1).join(' ') || '';
+  const calculateProgress = () => {
+    let score = 0;
+    if (user.full_name) score += 25;
+    if (user.email) score += 25;
+    if (user.phone) score += 25;
+    if (user.avatar) score += 25;
+    return score;
+  };
+  const progressScore = calculateProgress();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -366,7 +382,7 @@ export default function ProfileScreen() {
       >
         {/* Profile Header Card */}
         <LinearGradient
-          colors={['#FFFFFF', '#F8FAFC']}
+          colors={[theme.colors.white, theme.colors.background]}
           style={styles.profileHeaderCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -387,11 +403,25 @@ export default function ProfileScreen() {
 
             <View style={styles.profileText}>
               <Text style={styles.profileName}>{user.full_name || 'Profil incomplet'}</Text>
-              <Text style={styles.profilePhone}>{user.phone || 'Numéro non renseigné'}</Text>
-              <View style={[styles.verifiedBadge, { backgroundColor: user.is_verified ? '#10B981' : theme.colors.warning }]}>
-                <Ionicons name={user.is_verified ? "checkmark-circle" : "time"} size={12} color={theme.colors.white} />
-                <Text style={styles.verifiedText}>{user.is_verified ? "Identité vérifiée" : "Non vérifié"}</Text>
+              
+              <View style={styles.premiumTags}>
+                <View style={styles.ratingBadge}>
+                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Text style={styles.ratingText}>{user.rating?.toFixed(1) || '4.8'}</Text>
+                </View>
+                <View style={styles.roleBadge}>
+                  <Ionicons name="car" size={12} color={theme.colors.primary} />
+                  <Text style={styles.roleText}>Conducteur</Text>
+                </View>
+                {user.is_verified && (
+                  <View style={styles.verifiedBadgePremium}>
+                    <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                    <Text style={styles.verifiedTextPremium}>Vérifié</Text>
+                  </View>
+                )}
               </View>
+
+              <Text style={styles.profilePhone}>{user.phone || 'Numéro non renseigné'}</Text>
             </View>
           </View>
 
@@ -403,11 +433,8 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
-              <Text style={styles.statNumber}>{user.rating?.toFixed(1) || '0.0'}</Text>
-              <View style={styles.ratingInline}>
-                <Ionicons name="star" size={12} color={theme.colors.warning} />
-                <Text style={styles.statLabel}> Note</Text>
-              </View>
+              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statLabel}>Avis</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
@@ -415,26 +442,17 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>FCFA Économisés</Text>
             </View>
           </View>
+
+          <Text style={styles.memberSinceText}>Membre depuis Mai 2026</Text>
         </LinearGradient>
 
-        {/* Profile completeness banner */}
-        {(!user.full_name || !user.phone) && (
-          <TouchableOpacity
-            style={styles.completionBanner}
-            onPress={() => {
-              setEditFirstName(firstName);
-              setEditLastName(lastName);
-              setEditEmail(user.email || '');
-              setEditPhone(user.phone || '');
-              setInfoModalVisible(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="alert-circle" size={20} color={theme.colors.white} />
-            <Text style={styles.completionText}>Complétez votre profil pour publier un trajet</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.white} />
-          </TouchableOpacity>
-        )}
+        {/* Profile completeness progress bar */}
+        <View style={styles.progressContainer}>
+          <Text style={styles.progressLabel}>Profil complété à {progressScore}%</Text>
+          <View style={styles.progressBar}>
+             <View style={[styles.progressFill, { width: `${progressScore}%` }]} />
+          </View>
+        </View>
 
         {/* Paramètres du compte */}
         <View style={styles.section}>
@@ -444,54 +462,54 @@ export default function ProfileScreen() {
               icon="person-outline"
               title="Informations personnelles"
               subtitle={user.full_name || '⚠️ À remplir'}
-              onPress={() => {
-                setEditFirstName(firstName);
-                setEditLastName(lastName);
-                setEditEmail(user.email || '');
-                setEditPhone(user.phone || '');
-                setInfoModalVisible(true);
-              }}
+              onPress={() => setInfoModalVisible(true)}
             />
             <View style={styles.menuDivider} />
             <MenuItem
               icon="car-outline"
               title="Mon véhicule"
-              subtitle={vehicleId ? `${brandModel} - ${plate}` : 'Ajouter un véhicule'}
+              subtitle={vehicleId ? `${brand} ${model} - ${plate}` : 'Ajouter un véhicule'}
               onPress={() => setVehicleModalVisible(true)}
             />
             <View style={styles.menuDivider} />
-            <MenuItem
-              icon="shield-checkmark-outline"
-              title="Vérification d'identité"
-              subtitle={user.is_verified ? "Identité vérifiée ✅" : "Non vérifié — À compléter"}
-              onPress={() => Alert.alert('Vérification', 'Fonctionnalité disponible prochainement.')}
-            />
-          </View>
-        </View>
-
-        {/* Préférences & Sécurité */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Préférences & Sécurité</Text>
-          <View style={styles.menuCard}>
             <MenuItem
               icon="options-outline"
               title="Préférences de voyage"
               subtitle="Musique, discussions, bagages..."
               onPress={() => setPrefsModalVisible(true)}
             />
-            <View style={styles.menuDivider} />
+          </View>
+        </View>
+
+        {/* Sécurité */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sécurité</Text>
+          <View style={styles.menuCard}>
             <MenuItem
-              icon="notifications-outline"
-              title="Notifications"
-              subtitle="Gérez vos alertes"
-              onPress={() => Alert.alert('Notifications', 'Fonctionnalité disponible prochainement.')}
+              icon="key-outline"
+              title="Changer le mot de passe"
+              onPress={() => CustomAlert.alert('Sécurité', 'Fonctionnalité disponible prochainement.')}
             />
             <View style={styles.menuDivider} />
             <MenuItem
-              icon="lock-closed-outline"
-              title="Confidentialité"
-              subtitle="Gérez vos données personnelles"
-              onPress={() => Alert.alert('Confidentialité', 'Fonctionnalité disponible prochainement.')}
+              icon="phone-portrait-outline"
+              title="Vérifier le téléphone"
+              subtitle={user.phone ? "Téléphone vérifié" : "Non vérifié"}
+              onPress={() => CustomAlert.alert('Sécurité', 'Fonctionnalité disponible prochainement.')}
+            />
+            <View style={styles.menuDivider} />
+            <MenuItem
+              icon="mail-outline"
+              title="Vérifier l'email"
+              subtitle={user.email ? "Email vérifié" : "Non vérifié"}
+              onPress={() => CustomAlert.alert('Sécurité', 'Fonctionnalité disponible prochainement.')}
+            />
+            <View style={styles.menuDivider} />
+            <MenuItem
+              icon="shield-checkmark-outline"
+              title="Vérification d'identité"
+              subtitle={user.is_verified ? "Identité vérifiée ✅" : "Non vérifié — À compléter"}
+              onPress={() => CustomAlert.alert('Vérification', 'Fonctionnalité disponible prochainement.')}
             />
           </View>
         </View>
@@ -504,20 +522,20 @@ export default function ProfileScreen() {
               icon="help-circle-outline"
               title="Centre d'aide"
               subtitle="FAQ et assistance"
-              onPress={() => Alert.alert('Centre d\'aide', 'Fonctionnalité disponible prochainement.')}
+              onPress={() => CustomAlert.alert('Centre d\'aide', 'Fonctionnalité disponible prochainement.')}
             />
             <View style={styles.menuDivider} />
             <MenuItem
               icon="document-text-outline"
               title="Conditions d'utilisation"
-              onPress={() => Alert.alert('Conditions', 'Fonctionnalité disponible prochainement.')}
+              onPress={() => CustomAlert.alert('Conditions', 'Fonctionnalité disponible prochainement.')}
             />
             <View style={styles.menuDivider} />
             <MenuItem
               icon="mail-outline"
               title="Nous contacter"
-              subtitle="support@covoiturage.bj"
-              onPress={() => Alert.alert('Contact', 'support@covoiturage.bj')}
+              subtitle="support@zemy.bj"
+              onPress={() => CustomAlert.alert('Contact', 'support@zemy.bj')}
             />
           </View>
         </View>
@@ -528,7 +546,6 @@ export default function ProfileScreen() {
           <Text style={styles.logoutBtnText}>Se déconnecter</Text>
         </TouchableOpacity>
 
-        {/* Version */}
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </Animated.ScrollView>
 
@@ -560,51 +577,55 @@ export default function ProfileScreen() {
                 )}
               </TouchableOpacity>
 
-              <Text style={styles.modalLabel}>Prénom *</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editFirstName}
-                onChangeText={setEditFirstName}
-                placeholder="Votre prénom"
-                placeholderTextColor={theme.colors.textMuted}
-              />
+              <View style={styles.inputWrapper}>
+                <Ionicons name="person-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={editFullName}
+                  onChangeText={setEditFullName}
+                  placeholder="Nom complet"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
 
-              <Text style={styles.modalLabel}>Nom *</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editLastName}
-                onChangeText={setEditLastName}
-                placeholder="Votre nom"
-                placeholderTextColor={theme.colors.textMuted}
-              />
-
-              <Text style={styles.modalLabel}>Email *</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editEmail}
-                onChangeText={setEditEmail}
-                placeholder="votre@email.com"
-                placeholderTextColor={theme.colors.textMuted}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                onBlur={handleEmailBlur}
-              />
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={editEmail}
+                  onChangeText={setEditEmail}
+                  placeholder="Votre email"
+                  placeholderTextColor={theme.colors.textMuted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  onBlur={handleEmailBlur}
+                />
+              </View>
               {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-              <Text style={styles.modalLabel}>Téléphone *</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editPhone}
-                onChangeText={setEditPhone}
-                placeholder="+229 XX XX XX XX"
-                placeholderTextColor={theme.colors.textMuted}
-                keyboardType="phone-pad"
-                onBlur={handlePhoneBlur}
-              />
+              <View style={styles.inputWrapper}>
+                <Ionicons name="phone-portrait-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  placeholder="+229 XX XX XX XX"
+                  placeholderTextColor={theme.colors.textMuted}
+                  keyboardType="phone-pad"
+                  onBlur={handlePhoneBlur}
+                />
+              </View>
               {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
 
-              <TouchableOpacity style={styles.modalBtnSave} onPress={handleSavePersonalInfo} disabled={isSaving}>
-                {isSaving ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnSaveText}>Enregistrer</Text>}
+              <TouchableOpacity onPress={handleSavePersonalInfo} disabled={isSaving} activeOpacity={0.8}>
+                <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                  {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                      <Text style={styles.modalBtnSaveText}>Sauvegarder les modifications</Text>
+                    </>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -625,40 +646,64 @@ export default function ProfileScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.vehicleIconContainer}>
                 <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
-                  <Ionicons name="car-outline" size={48} color={theme.colors.white} />
+                  <Ionicons name="car-sport" size={48} color={theme.colors.white} />
                 </LinearGradient>
               </View>
 
-              <Text style={styles.modalLabel}>Marque et modèle *</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={brandModel}
-                onChangeText={setBrandModel}
-                placeholder="Ex: Toyota Corolla"
-                placeholderTextColor={theme.colors.textMuted}
-              />
+              <View style={styles.inputWrapper}>
+                <Ionicons name="car-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={brand}
+                  onChangeText={setBrand}
+                  placeholder="Marque (ex: Toyota)"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
 
-              <Text style={styles.modalLabel}>Couleur *</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={color}
-                onChangeText={setColor}
-                placeholder="Ex: Blanc, Noir, Rouge"
-                placeholderTextColor={theme.colors.textMuted}
-              />
+              <View style={styles.inputWrapper}>
+                <Ionicons name="car-sport-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={model}
+                  onChangeText={setModel}
+                  placeholder="Modèle (ex: Corolla)"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
 
-              <Text style={styles.modalLabel}>Plaque d'immatriculation *</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={plate}
-                onChangeText={setPlate}
-                placeholder="Ex: AB-1234-CD"
-                placeholderTextColor={theme.colors.textMuted}
-                autoCapitalize="characters"
-              />
+              <View style={styles.inputWrapper}>
+                <Ionicons name="color-palette-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={color}
+                  onChangeText={setColor}
+                  placeholder="Couleur (ex: Blanc)"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
 
-              <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveVehicle} disabled={isSaving}>
-                {isSaving ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnSaveText}>{vehicleId ? 'Mettre à jour' : 'Ajouter le véhicule'}</Text>}
+              <View style={styles.inputWrapper}>
+                <Ionicons name="pricetag-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={plate}
+                  onChangeText={setPlate}
+                  placeholder="Immatriculation (ex: BJ-1234)"
+                  placeholderTextColor={theme.colors.textMuted}
+                  autoCapitalize="characters"
+                />
+              </View>
+
+              <TouchableOpacity onPress={handleSaveVehicle} disabled={isSaving} activeOpacity={0.8}>
+                <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                  {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                      <Text style={styles.modalBtnSaveText}>{vehicleId ? 'Mettre à jour' : 'Ajouter le véhicule'}</Text>
+                    </>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -677,16 +722,23 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <PrefRow label="🎵 Musique" value={music} onToggle={() => setMusic(!music)} />
-              <View style={styles.prefDivider} />
-              <PrefRow label="🚬 Fumeurs acceptés" value={smoking} onToggle={() => setSmoking(!smoking)} />
-              <View style={styles.prefDivider} />
-              <PrefRow label="💬 Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
-              <View style={styles.prefDivider} />
-              <PrefRow label="❄️ Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
+              
+              <View style={styles.prefCardsContainer}>
+                <PrefCard icon="musical-notes" label="Musique" value={music} onToggle={() => setMusic(!music)} />
+                <PrefCard icon="chatbubbles" label="Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
+                <PrefCard icon="logo-no-smoking" label="Fumeurs" value={smoking} onToggle={() => setSmoking(!smoking)} />
+                <PrefCard icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
+              </View>
 
-              <TouchableOpacity style={[styles.modalBtnSave, { marginTop: 24 }]} onPress={handleSavePreferences} disabled={isSaving}>
-                {isSaving ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnSaveText}>Sauvegarder</Text>}
+              <TouchableOpacity style={{ marginTop: 24 }} onPress={handleSavePreferences} disabled={isSaving} activeOpacity={0.8}>
+                <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                  {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                      <Text style={styles.modalBtnSaveText}>Sauvegarder</Text>
+                    </>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -706,6 +758,7 @@ const styles = StyleSheet.create({
   profileHeaderCard: {
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
+    paddingBottom: theme.spacing.md,
     marginBottom: theme.spacing.md,
     shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 4 },
@@ -743,34 +796,72 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.white,
   },
   profileText: { flex: 1 },
-  profileName: { fontSize: 20, fontWeight: '800', color: theme.colors.text, marginBottom: 2 },
-  profilePhone: { fontSize: 13, color: theme.colors.textLight, marginBottom: 6 },
-  verifiedBadge: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 12,
-    alignSelf: 'flex-start', gap: 4,
+  profileName: { fontSize: 20, fontWeight: '800', color: theme.colors.text, marginBottom: 4 },
+  premiumTags: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+    flexWrap: 'wrap'
   },
-  verifiedText: { color: theme.colors.white, fontSize: 10, fontWeight: '700' },
+  ratingBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 8, gap: 4,
+  },
+  ratingText: { fontSize: 11, fontWeight: '700', color: '#B45309' },
+  roleBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: `${theme.colors.primary}15`,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 8, gap: 4,
+  },
+  roleText: { fontSize: 11, fontWeight: '700', color: theme.colors.primary },
+  verifiedBadgePremium: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 8, gap: 4,
+  },
+  verifiedTextPremium: { fontSize: 11, fontWeight: '700', color: '#047857' },
+  profilePhone: { fontSize: 13, color: theme.colors.textLight },
   statsRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.md,
+    marginBottom: theme.spacing.md,
   },
   statCol: { alignItems: 'center', flex: 1 },
   statNumber: { fontSize: 20, fontWeight: '800', color: theme.colors.text },
   statLabel: { fontSize: 11, color: theme.colors.textLight, fontWeight: '500', marginTop: 2 },
-  ratingInline: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   statDivider: { width: 1, height: 30, backgroundColor: theme.colors.border },
-  completionBanner: {
-    backgroundColor: theme.colors.warning,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    gap: 8,
+  memberSinceText: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
-  completionText: { flex: 1, color: theme.colors.white, fontWeight: '600', fontSize: 13 },
+  progressContainer: {
+    marginBottom: theme.spacing.lg,
+    paddingHorizontal: 4,
+  },
+  progressLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 4,
+  },
   section: { marginBottom: theme.spacing.lg },
   sectionTitle: {
     fontSize: 16,
@@ -805,7 +896,7 @@ const styles = StyleSheet.create({
   menuDivider: { height: 1, backgroundColor: theme.colors.border, marginHorizontal: theme.spacing.md },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#FEE2E2', height: 52,
+    gap: 8, backgroundColor: theme.colors.errorLight, height: 52,
     borderRadius: theme.borderRadius.lg, marginTop: theme.spacing.sm,
   },
   logoutBtnText: { fontSize: 15, fontWeight: '700', color: theme.colors.error },
@@ -833,7 +924,7 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -911,28 +1002,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.textLight,
-    marginBottom: 8,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: 14,
-    fontSize: 15,
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+    borderRadius: 16,
+    height: 56,
+    paddingHorizontal: 16,
     marginBottom: theme.spacing.md,
-    color: theme.colors.text,
   },
-  modalBtnSave: {
-    backgroundColor: theme.colors.primary,
-    height: 52,
-    borderRadius: theme.borderRadius.lg,
+  inputIcon: {
+    marginRight: 12,
+  },
+  modalInputModern: {
+    flex: 1,
+    fontSize: 15,
+    color: theme.colors.text,
+    height: '100%',
+  },
+  modalBtnGradient: {
+    flexDirection: 'row',
+    height: 56,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: theme.spacing.sm,
+    gap: 8,
   },
   modalBtnSaveText: {
     fontSize: 16,
@@ -942,21 +1037,61 @@ const styles = StyleSheet.create({
   errorText: {
     color: theme.colors.error,
     fontSize: 12,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
     marginTop: -8,
+    marginLeft: 4,
   },
-  prefRow: {
+  // Preferences Cards
+  prefCardsContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
   },
-  prefLabel: {
-    fontSize: 15,
+  prefCard: {
+    width: '48%',
+    backgroundColor: '#F7F8FA',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  prefCardActive: {
+    backgroundColor: `${theme.colors.primary}10`,
+    borderColor: `${theme.colors.primary}30`,
+  },
+  prefCardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
     color: theme.colors.text,
+    marginBottom: 8,
   },
-  prefDivider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
+  prefCardLabelActive: {
+    color: theme.colors.primary,
+  },
+  prefBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  prefBadgeInactive: {
+    backgroundColor: '#E5E7EB',
+  },
+  prefBadgeActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  prefBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  prefBadgeTextInactive: {
+    color: theme.colors.textMuted,
+  },
+  prefBadgeTextActive: {
+    color: theme.colors.white,
   },
 });

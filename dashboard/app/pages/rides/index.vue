@@ -11,11 +11,12 @@
     <div class="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
       <div class="p-4 border-b border-border flex justify-between items-center">
         <div class="flex space-x-2">
-          <select class="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-            <option>Tous les statuts</option>
-            <option>Actif</option>
-            <option>Terminé</option>
-            <option>Annulé</option>
+          <select v-model="statusFilter" class="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <option value="all">Tous les statuts</option>
+            <option value="active">Actif</option>
+            <option value="archived">Archivé</option>
+            <option value="completed">Terminé</option>
+            <option value="cancelled">Annulé</option>
           </select>
         </div>
         <div class="relative w-64">
@@ -44,10 +45,10 @@
             <tr v-if="pending" class="text-center py-10">
               <td colspan="6" class="py-10 text-textMuted">Chargement...</td>
             </tr>
-            <tr v-else-if="rides.length === 0" class="text-center py-10">
+            <tr v-else-if="filteredRides.length === 0" class="text-center py-10">
               <td colspan="6" class="py-10 text-textMuted">Aucun trajet trouvé.</td>
             </tr>
-            <tr v-for="ride in rides" :key="ride.id" class="hover:bg-background/30 transition-colors">
+            <tr v-for="ride in filteredRides" :key="ride.id" class="hover:bg-background/30 transition-colors">
               <td class="px-6 py-4">
                 <div class="flex items-center space-x-2">
                   <div class="flex flex-col items-center mr-2">
@@ -78,12 +79,13 @@
                 <span 
                   class="px-2.5 py-1 text-xs font-medium rounded-full"
                   :class="{
-                    'bg-success/10 text-success': ride.status === 'active',
-                    'bg-textLight/10 text-textLight': ride.status === 'completed',
-                    'bg-error/10 text-error': ride.status === 'cancelled'
+                    'bg-success/10 text-success': getDisplayStatus(ride) === 'Actif',
+                    'bg-warning/10 text-warningDark': getDisplayStatus(ride) === 'Archivé',
+                    'bg-textLight/10 text-textLight': getDisplayStatus(ride) === 'Terminé',
+                    'bg-error/10 text-error': getDisplayStatus(ride) === 'Annulé'
                   }"
                 >
-                  {{ ride.status === 'active' ? 'Actif' : ride.status === 'completed' ? 'Terminé' : 'Annulé' }}
+                  {{ getDisplayStatus(ride) }}
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
@@ -109,7 +111,7 @@
       </div>
       
       <div class="p-4 border-t border-border flex items-center justify-between text-sm text-textLight">
-        <span>Affichage de {{ rides.length }} résultats</span>
+        <span>Affichage de {{ filteredRides.length }} résultats</span>
         <div class="flex space-x-1">
           <button class="px-3 py-1 rounded-md border border-border hover:bg-background disabled:opacity-50" disabled>Précédent</button>
           <button class="px-3 py-1 rounded-md border border-border hover:bg-background">Suivant</button>
@@ -120,11 +122,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 
 const { fetchApi } = useApi()
 const rides = ref<any[]>([])
 const pending = ref(true)
+const statusFilter = ref('all')
+
+const getDisplayStatus = (ride: any) => {
+  if (ride.status === 'cancelled') return 'Annulé'
+  if (ride.status === 'completed') return 'Terminé'
+  const today = new Date()
+  today.setHours(0,0,0,0)
+  const rideDate = new Date(ride.departure_date)
+  rideDate.setHours(0,0,0,0)
+  if (rideDate < today) return 'Archivé'
+  return 'Actif'
+}
+
+const filteredRides = computed(() => {
+  if (statusFilter.value === 'all') return rides.value
+  
+  return rides.value.filter(ride => {
+    const status = getDisplayStatus(ride)
+    if (statusFilter.value === 'active') return status === 'Actif'
+    if (statusFilter.value === 'archived') return status === 'Archivé'
+    if (statusFilter.value === 'completed') return status === 'Terminé'
+    if (statusFilter.value === 'cancelled') return status === 'Annulé'
+    return true
+  })
+})
 
 onMounted(async () => {
   try {
