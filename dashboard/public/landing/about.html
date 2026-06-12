@@ -29,9 +29,21 @@
       --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x: hidden; background-color: white; }
-    html { scroll-behavior: smooth; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+      background-color: white;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
 
     /* ===== NAVBAR ENHANCED ===== */
     .navbar {
@@ -42,22 +54,88 @@
       padding: 0.75rem 0;
       z-index: 1030;
     }
-    .navbar.scrolled { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); padding: 0.5rem 0; }
-    .navbar-brand { font-weight: 800; font-size: 1.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--dark-bg); transition: var(--transition-smooth); }
-    .navbar-brand:hover { transform: scale(1.02); color: var(--primary-color); }
-    .brand-icon { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); border-radius: 12px; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; }
-    .brand-icon i { font-size: 1.75rem; color: white; }
-    .nav-link { font-weight: 500; margin: 0 0.25rem; transition: var(--transition-smooth); position: relative; }
-    .nav-link::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 2px; background: var(--primary-color); transition: all 0.3s ease; transform: translateX(-50%); }
-    .nav-link:hover::after, .nav-link.active::after { width: 80%; }
-    .nav-link:hover { color: var(--primary-color) !important; transform: translateY(-1px); }
+
+    .navbar.scrolled {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      padding: 0.5rem 0;
+    }
+
+    .navbar-brand {
+      font-weight: 800;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--dark-bg);
+      transition: var(--transition-smooth);
+    }
+
+    .navbar-brand:hover {
+      transform: scale(1.02);
+      color: var(--primary-color);
+    }
+
+    .brand-icon {
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+      border-radius: 12px;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-icon i {
+      font-size: 1.75rem;
+      color: white;
+    }
+
+    .nav-link {
+      font-weight: 500;
+      margin: 0 0.25rem;
+      transition: var(--transition-smooth);
+      position: relative;
+    }
+
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: var(--primary-color);
+      transition: all 0.3s ease;
+      transform: translateX(-50%);
+    }
+
+    .nav-link:hover::after,
+    .nav-link.active::after {
+      width: 80%;
+    }
+
+    .nav-link:hover {
+      color: var(--primary-color) !important;
+      transform: translateY(-1px);
+    }
 
     /* ===== BUTTONS ===== */
     .btn-primary {
       background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-      border: none; padding: 0.6rem 1.5rem; font-weight: 600; border-radius: 12px; transition: var(--transition-smooth); box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+      border: none;
+      padding: 0.6rem 1.5rem;
+      font-weight: 600;
+      border-radius: 12px;
+      transition: var(--transition-smooth);
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3); background: linear-gradient(135deg, var(--primary-dark), var(--primary-color)); color: white; }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+      color: white;
+    }
 
     /* ===== PAGE HEADER ===== */
     .page-header {
@@ -65,21 +143,55 @@
       background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
       text-align: center;
     }
-    .page-title { font-size: 3rem; font-weight: 800; margin-bottom: 1rem; color: var(--dark-bg); }
+
+    .page-title {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: var(--dark-bg);
+    }
 
     /* ===== CONTENT ===== */
     .about-card {
-      background: white; border-radius: 20px; padding: 3rem; box-shadow: var(--shadow-md); margin-bottom: 3rem;
+      background: white;
+      border-radius: 20px;
+      padding: 3rem;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 3rem;
     }
-    .mission-icon { font-size: 3rem; color: var(--primary-color); margin-bottom: 1.5rem; }
+
+    .mission-icon {
+      font-size: 3rem;
+      color: var(--primary-color);
+      margin-bottom: 1.5rem;
+    }
 
     /* ===== FOOTER ===== */
-    footer { background: var(--dark-bg); padding: 3rem 0 2rem; margin-top: 5rem; }
-    .footer-link { color: #94a3b8; text-decoration: none; transition: var(--transition-smooth); display: inline-block; }
-    .footer-link:hover { color: white; transform: translateX(5px); }
+    footer {
+      background: var(--dark-bg);
+      padding: 3rem 0 2rem;
+      margin-top: 5rem;
+    }
 
-    [data-aos] { pointer-events: none; }
-    [data-aos].aos-animate { pointer-events: auto; }
+    .footer-link {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: var(--transition-smooth);
+      display: inline-block;
+    }
+
+    .footer-link:hover {
+      color: white;
+      transform: translateX(5px);
+    }
+
+    [data-aos] {
+      pointer-events: none;
+    }
+
+    [data-aos].aos-animate {
+      pointer-events: auto;
+    }
   </style>
 </head>
 
@@ -89,7 +201,9 @@
   <nav class="navbar navbar-expand-lg bg-white fixed-top" id="mainNav">
     <div class="container">
       <a class="navbar-brand" href="index.html">
-        <img src="/images/logozemy.png" alt="Zemy Logo" height="40" style="object-fit: contain;">
+        <div class="brand-icon"><i class="ph-fill ph-car-profile"></i></div>
+        <span
+          style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); -webkit-background-clip: text; background-clip: text; color: transparent;">Zemy</span>
       </a>
       <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
@@ -112,7 +226,8 @@
   <section class="page-header">
     <div class="container" data-aos="fade-up">
       <h1 class="page-title">Notre Histoire</h1>
-      <p class="lead text-muted max-w-2xl mx-auto">Découvrez la mission de Zemy et l'équipe passionnée derrière la plateforme de covoiturage nouvelle génération.</p>
+      <p class="lead text-muted max-w-2xl mx-auto">Découvrez la mission de Zemy et l'équipe passionnée derrière la
+        plateforme de covoiturage nouvelle génération.</p>
     </div>
   </section>
 
@@ -121,17 +236,21 @@
     <div class="container">
       <div class="row justify-content-center">
         <div class="col-lg-10">
-          
+
           <div class="about-card" data-aos="fade-up" data-aos-delay="100">
             <div class="row align-items-center g-5">
               <div class="col-md-6">
                 <i class="ph-fill ph-rocket-launch mission-icon"></i>
                 <h3 class="fw-bold mb-4">Notre Mission</h3>
-                <p class="text-muted mb-3">Né d'un constat simple sur la difficulté de se déplacer efficacement tout en maîtrisant son budget, Zemy a été conçu pour connecter les conducteurs ayant des places libres avec des passagers allant dans la même direction.</p>
-                <p class="text-muted">Nous croyons fermement que la mobilité ne devrait pas être un luxe, mais un droit accessible à tous, tout en respectant notre environnement.</p>
+                <p class="text-muted mb-3">Né d'un constat simple sur la difficulté de se déplacer efficacement tout en
+                  maîtrisant son budget, Zemy a été conçu pour connecter les conducteurs ayant des places libres avec
+                  des passagers allant dans la même direction.</p>
+                <p class="text-muted">Nous croyons fermement que la mobilité ne devrait pas être un luxe, mais un droit
+                  accessible à tous, tout en respectant notre environnement.</p>
               </div>
               <div class="col-md-6">
-                <img src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&q=80" alt="Notre équipe" class="img-fluid rounded-4 shadow-sm">
+                <img src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&q=80" alt="Notre équipe"
+                  class="img-fluid rounded-4 shadow-sm">
               </div>
             </div>
           </div>
@@ -141,11 +260,14 @@
               <div class="col-md-6">
                 <i class="ph-fill ph-users-three mission-icon" style="color: var(--secondary-color);"></i>
                 <h3 class="fw-bold mb-4">La Communauté Zemy</h3>
-                <p class="text-muted mb-3">Aujourd'hui, nous construisons bien plus qu'une simple application. Nous bâtissons une communauté basée sur la confiance, le partage et l'entraide.</p>
-                <p class="text-muted">Chaque jour, des milliers de personnes se rencontrent, partagent leurs expériences et créent des liens uniques le temps d'un trajet.</p>
+                <p class="text-muted mb-3">Aujourd'hui, nous construisons bien plus qu'une simple application. Nous
+                  bâtissons une communauté basée sur la confiance, le partage et l'entraide.</p>
+                <p class="text-muted">Chaque jour, des milliers de personnes se rencontrent, partagent leurs expériences
+                  et créent des liens uniques le temps d'un trajet.</p>
               </div>
               <div class="col-md-6">
-                <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80" alt="Communauté" class="img-fluid rounded-4 shadow-sm">
+                <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80" alt="Communauté"
+                  class="img-fluid rounded-4 shadow-sm">
               </div>
             </div>
           </div>
@@ -169,28 +291,29 @@
       <div class="row gy-4 align-items-center">
         <div class="col-lg-4">
           <div class="d-flex align-items-center gap-2 mb-3">
-            <img src="/images/logozemy.png" alt="Zemy Logo" height="40" style="object-fit: contain; filter: brightness(0) invert(1);">
+            <img src="/images/logozemy.png" alt="Zemy Logo" height="40"
+              style="object-fit: contain; filter: brightness(0) invert(1);">
           </div>
-          <p class="text-muted small">La plateforme de covoiturage qui révolutionne vos déplacements quotidiens.</p>
+          <p class="text-white small">La plateforme de covoiturage qui révolutionne vos déplacements quotidiens.</p>
           <div class="d-flex gap-3 mt-3">
-            <a href="#" class="text-muted small"><i class="ph-twitter-logo-fill"></i></a>
-            <a href="#" class="text-muted small"><i class="ph-instagram-logo-fill"></i></a>
-            <a href="#" class="text-muted small"><i class="ph-facebook-logo-fill"></i></a>
+            <a href="#" class="text-white small"><i class="ph-twitter-logo-fill"></i></a>
+            <a href="#" class="text-white small"><i class="ph-instagram-logo-fill"></i></a>
+            <a href="#" class="text-white small"><i class="ph-facebook-logo-fill"></i></a>
           </div>
         </div>
         <div class="col-lg-2 offset-lg-2">
           <h5 class="text-white mb-3 fs-6 fw-bold">Explorer</h5>
           <ul class="list-unstyled">
-            <li class="mb-2"><a href="about.html" class="footer-link small">À propos</a></li>
-            <li class="mb-2"><a href="download.html" class="footer-link small">Application</a></li>
-            <li class="mb-2"><a href="contact.html" class="footer-link small">Contact</a></li>
+            <li class="mb-2"><a href="about.html" class="footer-link small text-white">À propos</a></li>
+            <li class="mb-2"><a href="download.html" class="footer-link small text-white">Application</a></li>
+            <li class="mb-2"><a href="contact.html" class="footer-link small text-white">Contact</a></li>
           </ul>
         </div>
         <div class="col-lg-4">
-          <h5 class="text-white mb-3 fs-6 fw-bold">Contact & Support</h5>
-          <p class="text-muted small mb-1"><i class="ph-envelope-simple"></i> contact@zemy.com</p>
-          <p class="text-muted small"><i class="ph-phone"></i> +33 1 23 45 67 89</p>
-          <p class="text-muted small mt-3">&copy; 2026 Zemy Covoiturage. Tous droits réservés.</p>
+          <h5 class="text-white mb-3 fs-6 fw-bold">Contact &amp; Support</h5>
+          <p class="text-white small mb-1"><i class="ph-envelope-simple"></i> contact@zemy.com</p>
+          <p class="text-white small"><i class="ph-phone"></i> (+229) 0154143275</p>
+          <p class="text-white small mt-3">&copy; 2026 Zemy Covoiturage. Tous droits réservés.</p>
         </div>
       </div>
     </div>
@@ -203,9 +326,10 @@
     AOS.init({ duration: 800, once: true, offset: 50 });
     window.addEventListener('scroll', function () {
       const navbar = document.getElementById('mainNav');
-      if (window.scrollY > 50) { navbar.classList.add('scrolled'); } 
+      if (window.scrollY > 50) { navbar.classList.add('scrolled'); }
       else { navbar.classList.remove('scrolled'); }
     });
   </script>
 </body>
+
 </html>

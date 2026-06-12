@@ -29,9 +29,21 @@
       --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x: hidden; background-color: white; }
-    html { scroll-behavior: smooth; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+      background-color: white;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
 
     /* ===== NAVBAR ENHANCED ===== */
     .navbar {
@@ -42,22 +54,89 @@
       padding: 0.75rem 0;
       z-index: 1030;
     }
-    .navbar.scrolled { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); padding: 0.5rem 0; }
-    .navbar-brand { font-weight: 800; font-size: 1.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--dark-bg); transition: var(--transition-smooth); }
-    .navbar-brand:hover { transform: scale(1.02); color: var(--primary-color); }
-    .brand-icon { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); border-radius: 12px; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; }
-    .brand-icon i { font-size: 1.75rem; color: white; }
-    .nav-link { font-weight: 500; margin: 0 0.25rem; transition: var(--transition-smooth); position: relative; }
-    .nav-link::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 2px; background: var(--primary-color); transition: all 0.3s ease; transform: translateX(-50%); }
-    .nav-link:hover::after, .nav-link.active::after { width: 80%; }
-    .nav-link:hover { color: var(--primary-color) !important; transform: translateY(-1px); }
+
+    .navbar.scrolled {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      padding: 0.5rem 0;
+    }
+
+    .navbar-brand {
+      font-weight: 800;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--dark-bg);
+      transition: var(--transition-smooth);
+    }
+
+    .navbar-brand:hover {
+      transform: scale(1.02);
+      color: var(--primary-color);
+    }
+
+    .brand-icon {
+      background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+      border-radius: 12px;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-icon i {
+      font-size: 1.75rem;
+      color: white;
+    }
+
+    .nav-link {
+      font-weight: 500;
+      margin: 0 0.25rem;
+      transition: var(--transition-smooth);
+      position: relative;
+    }
+
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: var(--primary-color);
+      transition: all 0.3s ease;
+      transform: translateX(-50%);
+    }
+
+    .nav-link:hover::after,
+    .nav-link.active::after {
+      width: 80%;
+    }
+
+    .nav-link:hover {
+      color: var(--primary-color) !important;
+      transform: translateY(-1px);
+    }
 
     /* ===== BUTTONS ===== */
     .btn-primary {
       background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-      border: none; padding: 0.6rem 1.5rem; font-weight: 600; border-radius: 12px; transition: var(--transition-smooth); box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); color: white;
+      border: none;
+      padding: 0.6rem 1.5rem;
+      font-weight: 600;
+      border-radius: 12px;
+      transition: var(--transition-smooth);
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+      color: white;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3); background: linear-gradient(135deg, var(--primary-dark), var(--primary-color)); color: white; }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+      color: white;
+    }
 
     .btn-store {
       display: inline-flex;
@@ -68,17 +147,38 @@
       border-radius: 16px;
       text-decoration: none;
       transition: var(--transition-smooth);
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
+
     .btn-store:hover {
       transform: translateY(-3px);
       box-shadow: var(--shadow-md);
       background: black;
     }
-    .btn-store i { font-size: 2rem; margin-right: 0.8rem; }
-    .btn-store .store-text { display: flex; flex-direction: column; text-align: left; }
-    .btn-store .store-text small { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; }
-    .btn-store .store-text strong { font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
+
+    .btn-store i {
+      font-size: 2rem;
+      margin-right: 0.8rem;
+    }
+
+    .btn-store .store-text {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+
+    .btn-store .store-text small {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.8;
+    }
+
+    .btn-store .store-text strong {
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
 
     /* ===== CONTENT ===== */
     .app-section {
@@ -95,37 +195,80 @@
       align-items: flex-start;
       margin-bottom: 2rem;
     }
+
     .feature-icon-circle {
-      width: 50px; height: 50px; border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
       background: rgba(37, 99, 235, 0.1);
       color: var(--primary-color);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem; margin-right: 1.2rem; flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-right: 1.2rem;
+      flex-shrink: 0;
     }
 
     .phone-mockup {
-      background: white; border: 12px solid var(--dark-bg);
-      border-radius: 40px; height: 650px; width: 320px;
+      background: white;
+      border: 12px solid var(--dark-bg);
+      border-radius: 40px;
+      height: 650px;
+      width: 320px;
       box-shadow: var(--shadow-lg);
-      margin: 0 auto; position: relative; overflow: hidden;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
     }
+
     .phone-notch {
-      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-      width: 120px; height: 25px; background: var(--dark-bg);
-      border-bottom-left-radius: 15px; border-bottom-right-radius: 15px; z-index: 10;
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 25px;
+      background: var(--dark-bg);
+      border-bottom-left-radius: 15px;
+      border-bottom-right-radius: 15px;
+      z-index: 10;
     }
+
     .phone-screen {
-      background: var(--gray-bg); height: 100%; width: 100%; padding-top: 30px;
+      background: var(--gray-bg);
+      height: 100%;
+      width: 100%;
+      padding-top: 30px;
       position: relative;
     }
 
     /* ===== FOOTER ===== */
-    footer { background: var(--dark-bg); padding: 3rem 0 2rem; margin-top: 0; }
-    .footer-link { color: #94a3b8; text-decoration: none; transition: var(--transition-smooth); display: inline-block; }
-    .footer-link:hover { color: white; transform: translateX(5px); }
+    footer {
+      background: var(--dark-bg);
+      padding: 3rem 0 2rem;
+      margin-top: 0;
+    }
 
-    [data-aos] { pointer-events: none; }
-    [data-aos].aos-animate { pointer-events: auto; }
+    .footer-link {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: var(--transition-smooth);
+      display: inline-block;
+    }
+
+    .footer-link:hover {
+      color: white;
+      transform: translateX(5px);
+    }
+
+    [data-aos] {
+      pointer-events: none;
+    }
+
+    [data-aos].aos-animate {
+      pointer-events: auto;
+    }
   </style>
 </head>
 
@@ -159,10 +302,12 @@
     <div class="container">
       <div class="row align-items-center g-5">
         <div class="col-lg-6" data-aos="fade-right">
-          <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill mb-3">Téléchargez l'application</span>
+          <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill mb-3">Téléchargez
+            l'application</span>
           <h1 class="display-4 fw-bold mb-4" style="color: var(--dark-bg);">Emportez Zemy partout avec vous</h1>
-          <p class="lead text-muted mb-5">Retrouvez toutes les fonctionnalités de Zemy directement dans votre poche. L'application est gratuite, rapide et conçue pour vous simplifier la vie.</p>
-          
+          <p class="lead text-muted mb-5">Retrouvez toutes les fonctionnalités de Zemy directement dans votre poche.
+            L'application est gratuite, rapide et conçue pour vous simplifier la vie.</p>
+
           <div class="feature-item">
             <div class="feature-icon-circle"><i class="ph-fill ph-bell-ringing"></i></div>
             <div>
@@ -170,9 +315,11 @@
               <p class="text-muted mb-0">Soyez alerté instantanément des nouvelles réservations et des messages.</p>
             </div>
           </div>
-          
+
           <div class="feature-item">
-            <div class="feature-icon-circle" style="background: rgba(16, 185, 129, 0.1); color: var(--secondary-color);"><i class="ph-fill ph-map-pin"></i></div>
+            <div class="feature-icon-circle"
+              style="background: rgba(16, 185, 129, 0.1); color: var(--secondary-color);"><i
+                class="ph-fill ph-map-pin"></i></div>
             <div>
               <h5 class="fw-bold">Suivi GPS interactif</h5>
               <p class="text-muted mb-0">Retrouvez facilement votre point de rendez-vous grâce à la carte intégrée.</p>
@@ -200,18 +347,23 @@
         <div class="col-lg-6 text-center" data-aos="fade-left" data-aos-delay="200">
           <div class="position-relative">
             <!-- Decorative blobs -->
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; height: 400px; background: rgba(37, 99, 235, 0.15); border-radius: 50%; filter: blur(40px); z-index: 0;"></div>
-            
+            <div
+              style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; height: 400px; background: rgba(37, 99, 235, 0.15); border-radius: 50%; filter: blur(40px); z-index: 0;">
+            </div>
+
             <div class="phone-mockup">
               <div class="phone-notch"></div>
               <div class="phone-screen">
                 <!-- Faux contenu d'application -->
-                <div style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); height: 160px; border-bottom-left-radius: 25px; border-bottom-right-radius: 25px; padding: 40px 20px 20px;">
+                <div
+                  style="background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); height: 160px; border-bottom-left-radius: 25px; border-bottom-right-radius: 25px; padding: 40px 20px 20px;">
                   <h4 class="text-white fw-bold mb-0">Où allez-vous ?</h4>
                 </div>
                 <div style="padding: 20px; margin-top: -30px;">
-                  <div style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                    <div style="display: flex; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+                  <div
+                    style="background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                    <div
+                      style="display: flex; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
                       <i class="ph-fill ph-map-pin text-primary" style="font-size: 1.5rem; margin-right: 15px;"></i>
                       <div>
                         <div style="font-size: 0.8rem; color: #888;">Départ</div>
@@ -229,9 +381,11 @@
                   </div>
 
                   <h6 class="mt-4 fw-bold">Trajets récents</h6>
-                  <div style="background: white; border-radius: 15px; padding: 15px; margin-top: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+                  <div
+                    style="background: white; border-radius: 15px; padding: 15px; margin-top: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                      <div style="font-weight: bold; font-size: 0.9rem;">Cotonou <i class="ph-arrow-right"></i> Ouidah</div>
+                      <div style="font-weight: bold; font-size: 0.9rem;">Cotonou <i class="ph-arrow-right"></i> Ouidah
+                      </div>
                       <div style="font-size: 0.8rem; color: #888;">Aujourd'hui, 14:00</div>
                     </div>
                     <div style="font-weight: bold; color: var(--primary-color);">1500F</div>
@@ -251,28 +405,29 @@
       <div class="row gy-4 align-items-center">
         <div class="col-lg-4">
           <div class="d-flex align-items-center gap-2 mb-3">
-            <img src="/images/logozemy.png" alt="Zemy Logo" height="40" style="object-fit: contain; filter: brightness(0) invert(1);">
+            <img src="/images/logozemy.png" alt="Zemy Logo" height="40"
+              style="object-fit: contain; filter: brightness(0) invert(1);">
           </div>
-          <p class="text-muted small">La plateforme de covoiturage qui révolutionne vos déplacements quotidiens.</p>
+          <p class="text-white small">La plateforme de covoiturage qui révolutionne vos déplacements quotidiens.</p>
           <div class="d-flex gap-3 mt-3">
-            <a href="#" class="text-muted small"><i class="ph-twitter-logo-fill"></i></a>
-            <a href="#" class="text-muted small"><i class="ph-instagram-logo-fill"></i></a>
-            <a href="#" class="text-muted small"><i class="ph-facebook-logo-fill"></i></a>
+            <a href="#" class="text-white small"><i class="ph-twitter-logo-fill"></i></a>
+            <a href="#" class="text-white small"><i class="ph-instagram-logo-fill"></i></a>
+            <a href="#" class="text-white small"><i class="ph-facebook-logo-fill"></i></a>
           </div>
         </div>
         <div class="col-lg-2 offset-lg-2">
           <h5 class="text-white mb-3 fs-6 fw-bold">Explorer</h5>
           <ul class="list-unstyled">
-            <li class="mb-2"><a href="about.html" class="footer-link small">À propos</a></li>
-            <li class="mb-2"><a href="download.html" class="footer-link small">Application</a></li>
-            <li class="mb-2"><a href="contact.html" class="footer-link small">Contact</a></li>
+            <li class="mb-2"><a href="about.html" class="footer-link small text-white">À propos</a></li>
+            <li class="mb-2"><a href="download.html" class="footer-link small text-white">Application</a></li>
+            <li class="mb-2"><a href="contact.html" class="footer-link small text-white">Contact</a></li>
           </ul>
         </div>
         <div class="col-lg-4">
-          <h5 class="text-white mb-3 fs-6 fw-bold">Contact & Support</h5>
-          <p class="text-muted small mb-1"><i class="ph-envelope-simple"></i> contact@zemy.com</p>
-          <p class="text-muted small"><i class="ph-phone"></i> +33 1 23 45 67 89</p>
-          <p class="text-muted small mt-3">&copy; 2026 Zemy Covoiturage. Tous droits réservés.</p>
+          <h5 class="text-white mb-3 fs-6 fw-bold">Contact &amp; Support</h5>
+          <p class="text-white small mb-1"><i class="ph-envelope-simple"></i> contact@zemy.com</p>
+          <p class="text-white small"><i class="ph-phone"></i> (+229) 0154143275</p>
+          <p class="text-white small mt-3">&copy; 2026 Zemy Covoiturage. Tous droits réservés.</p>
         </div>
       </div>
     </div>
@@ -285,9 +440,10 @@
     AOS.init({ duration: 800, once: true, offset: 50 });
     window.addEventListener('scroll', function () {
       const navbar = document.getElementById('mainNav');
-      if (window.scrollY > 50) { navbar.classList.add('scrolled'); } 
+      if (window.scrollY > 50) { navbar.classList.add('scrolled'); }
       else { navbar.classList.remove('scrolled'); }
     });
   </script>
 </body>
+
 </html>

@@ -82,8 +82,8 @@
             <label class="block text-sm font-medium text-text mb-1">Destinataire</label>
             <select v-model="form.user" class="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-background text-text">
               <option :value="null">Tous les utilisateurs (Global)</option>
-              <!-- En situation réelle, on chargerait la liste des utilisateurs -->
-              <!-- <option v-for="u in users" :value="u.id">{{ u.full_name }}</option> -->
+              <!-- Chargement de la liste des utilisateurs -->
+              <option v-for="u in users" :key="u.id" :value="u.id">{{ u.full_name || u.phone }}</option>
             </select>
           </div>
           <div>
@@ -115,6 +115,7 @@ import { ref, onMounted } from 'vue'
 
 const { fetchApi } = useApi()
 const notifications = ref<any[]>([])
+const users = ref<any[]>([])
 const pending = ref(true)
 
 const isModalOpen = ref(false)
@@ -137,8 +138,12 @@ const closeModal = () => {
 const fetchNotifications = async () => {
   pending.value = true
   try {
-    const data = await fetchApi<any[]>('/notifications/')
-    notifications.value = data
+    const [notifData, userData] = await Promise.all([
+      fetchApi<any[]>('/notifications/'),
+      fetchApi<any[]>('/users/')
+    ])
+    notifications.value = Array.isArray(notifData) ? notifData : (notifData as any).results || []
+    users.value = Array.isArray(userData) ? userData : (userData as any).results || []
   } catch (err) {
     console.error('Erreur', err)
   } finally {
