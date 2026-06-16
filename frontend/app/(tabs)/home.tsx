@@ -22,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useAuth } from '../../src/context/AuthContext';
 import LocationPicker from '../../src/components/LocationPicker';
+import VerificationModal from '../../src/components/VerificationModal';
 import { Ride } from '../../src/types';
 
 // ─── Weather helpers ───────────────────────────────────────────────────────────
@@ -218,7 +219,7 @@ const RideCard: React.FC<RideCardProps> = ({ ride, onPress, index }) => {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, authFetch } = useAuth();
+  const { user, authFetch, refreshUser } = useAuth();
 
   const [departure, setDeparture] = useState('');
   const [destination, setDestination] = useState('');
@@ -229,6 +230,70 @@ export default function HomeScreen() {
   const [selectedFilter, setSelectedFilter] = useState('recommended');
   const [searchFocused, setSearchFocused] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // ── Vérification utilisateur ───────────────────────────────────────────────
+  const SNOOZE_KEY = '@zemy_verify_snoozed_until';
+  const [showVerifModal, setShowVerifModal] = useState(false);
+
+  useEffect(() => {
+    // Ne se lance qu'une fois au montage (ou quand l'utilisateur change de compte)
+    checkVerificationStatus();
+    const interval = setInterval(() => {
+      checkVerificationStatus();
+    }, 30000); // 30s au lieu de 10s pour alléger le réseau
+    return () => clearInterval(interval);
+  }, [user?.id]); // Seulement si l'ID change
+
+  const checkVerificationStatus = async () => {
+    if (!user) return;
+    if (user.is_verified) {
+      setShowVerifModal(false);
+      return;
+    }
+    // Vérifier si une demande est déjà en cours (pending)
+    try {
+      const verif = await authFetch('/auth/verification-status/');
+      if (verif.status === 'pending' || verif.status === 'approved' || verif.is_verified) {
+        setShowVerifModal(false);
+        return;
+      }
+    } catch (e) {
+      // Si l'API échoue, on continue avec la logique de snooze
+    }
+    // Vérifier si l'utilisateur a snoozé récemment
+    try {
+      const snoozedUntil = await AsyncStorage.getItem(SNOOZE_KEY);
+      if (snoozedUntil) {
+        const until = parseInt(snoozedUntil, 10);
+        if (Date.now() < until) {
+          setShowVerifModal(false);
+          return;
+        }
+      }
+    } catch (e) {}
+    // Afficher le modal
+    setShowVerifModal(true);
+  };
+
+  const handleVerifDismiss = async () => {
+    // Snooze 10 seconds
+    const until = Date.now() + 10 * 1000;
+    try {
+      await AsyncStorage.setItem(SNOOZE_KEY, String(until));
+    } catch (e) {}
+    setShowVerifModal(false);
+    
+    // Automatically re-check after 10 seconds
+    setTimeout(() => {
+      checkVerificationStatus();
+    }, 10000);
+  };
+
+  const handleVerifGo = () => {
+    setShowVerifModal(false);
+    router.push('/verify-identity');
+  };
+  // ──────────────────────────────────────────────────────────────────────────
 
   const carouselRef = useRef<FlatList>(null);
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
@@ -398,6 +463,24 @@ export default function HomeScreen() {
     extrapolate: 'clamp',
   });
 
+  // ── Mini widget météo : disparaît au scroll et laisse place à l'icône ──
+  const WEATHER_WIDGET_SCROLL = 60;
+  const weatherWidgetOpacity = scrollY.interpolate({
+    inputRange: [0, WEATHER_WIDGET_SCROLL],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const weatherWidgetTranslate = scrollY.interpolate({
+    inputRange: [0, WEATHER_WIDGET_SCROLL],
+    outputRange: [0, -20],
+    extrapolate: 'clamp',
+  });
+  const weatherIconOpacity = scrollY.interpolate({
+    inputRange: [WEATHER_WIDGET_SCROLL * 0.6, WEATHER_WIDGET_SCROLL],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   useEffect(() => {
     fetchRides();
   }, []);
@@ -485,7 +568,7 @@ export default function HomeScreen() {
         />
         <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
           <View style={styles.headerContent}>
-            <Animated.View style={{ transform: [{ scale: titleScale }], alignItems: 'flex-start' }}>
+            <Animated.View style={{ transform: [{ scale: titleScale }], alignItems: 'flex-start', flex: 1 }}>
               {logoUrl ? (
                 <Image source={{ uri: logoUrl }} style={styles.headerLogo} resizeMode="contain" />
               ) : (
@@ -494,8 +577,48 @@ export default function HomeScreen() {
               <Text style={styles.greeting}>
                 Bonjour, <Text style={styles.userName}>{userName}</Text> 👋
               </Text>
+
+              {/* ── Mini widget météo sous Bonjour ── */}
+              {weather && (() => {
+                const wmo = getWmo(weather.code);
+                return (
+                  <Animated.View
+                    style={[
+                      styles.weatherMiniWidget,
+                      {
+                        opacity: weatherWidgetOpacity,
+                        transform: [{ translateY: weatherWidgetTranslate }],
+                      },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      style={styles.weatherMiniInner}
+                      onPress={() => router.push('/weather')}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.weatherMiniIcon}>{wmo.icon}</Text>
+                      <Text style={styles.weatherMiniTemp}>{weather.temp}°C</Text>
+                      <Text style={styles.weatherMiniCity} numberOfLines={1}>{weather.city}</Text>
+                      <View style={styles.weatherMiniSep} />
+                      <Text style={styles.weatherMiniConsult}>Consulter →</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })()}
             </Animated.View>
+
             <View style={styles.headerActions}>
+              {/* Icône météo qui apparaît au scroll */}
+              {weather && (
+                <Animated.View style={{ opacity: weatherIconOpacity }}>
+                  <TouchableOpacity
+                    style={styles.headerIcon}
+                    onPress={() => router.push('/weather')}
+                  >
+                    <Text style={{ fontSize: 18 }}>{getWmo(weather.code).icon}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
               <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/notifications')}>
                 <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
                 <View style={styles.notificationDot} />
@@ -576,104 +699,7 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* ─── Carte Météo ─── */}
-            <Animated.View style={[{ transform: [{ scale: weatherPulse }] }, styles.weatherSection]}>
-              {weatherLoading ? (
-                <View style={styles.weatherSkeleton}>
-                  <ActivityIndicator color={PRIMARY_COLOR} />
-                  <Text style={styles.weatherSkeletonText}>Chargement météo…</Text>
-                </View>
-              ) : weather ? (() => {
-                const wmo = getWmo(weather.code);
-                return (
-                  <LinearGradient
-                    colors={wmo.gradient as any}
-                    style={styles.weatherCard}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    {/* Header */}
-                    <View style={styles.weatherHeader}>
-                      <View>
-                        <View style={styles.weatherCityRow}>
-                          <Ionicons name="location" size={14} color="#374151" />
-                          <Text style={styles.weatherCity}>{weather.city}</Text>
-                        </View>
-                        <Text style={styles.weatherCondition}>{wmo.label}</Text>
-                      </View>
-                      <TouchableOpacity onPress={fetchWeather} style={styles.weatherRefreshBtn} disabled={weatherStale}>
-                        {weatherStale
-                          ? <ActivityIndicator size="small" color="#6B7280" />
-                          : <Ionicons name="refresh" size={16} color="#6B7280" />}
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Temp + icon */}
-                    <View style={styles.weatherMain}>
-                      <Text style={styles.weatherIcon}>{wmo.icon}</Text>
-                      <View>
-                        <Text style={styles.weatherTemp}>{weather.temp}°C</Text>
-                        <Text style={styles.weatherFeels}>Ressenti {weather.feelsLike}°C</Text>
-                      </View>
-                    </View>
-
-                    {/* Details row */}
-                    <View style={styles.weatherDetails}>
-                      <View style={styles.weatherDetailItem}>
-                        <Text style={styles.weatherDetailIcon}>💧</Text>
-                        <Text style={styles.weatherDetailVal}>{weather.humidity}%</Text>
-                        <Text style={styles.weatherDetailLabel}>Humidité</Text>
-                      </View>
-                      <View style={styles.weatherDetailSep} />
-                      <View style={styles.weatherDetailItem}>
-                        <Text style={styles.weatherDetailIcon}>🌬</Text>
-                        <Text style={styles.weatherDetailVal}>{weather.windSpeed} km/h</Text>
-                        <Text style={styles.weatherDetailLabel}>Vent</Text>
-                      </View>
-                      <View style={styles.weatherDetailSep} />
-                      <View style={styles.weatherDetailItem}>
-                        <Text style={styles.weatherDetailIcon}>☁️</Text>
-                        <Text style={styles.weatherDetailVal}>{getWmo(weather.code).icon}</Text>
-                        <Text style={styles.weatherDetailLabel}>État</Text>
-                      </View>
-                    </View>
-
-                    {/* 4-day forecast */}
-                    <View style={styles.forecastRow}>
-                      {weather.forecast.map((day, i) => (
-                        <View key={i} style={styles.forecastDay}>
-                          <Text style={styles.forecastDayName}>{day.date}</Text>
-                          <Text style={styles.forecastIcon}>{getWmo(day.code).icon}</Text>
-                          <Text style={styles.forecastMax}>{day.tempMax}°</Text>
-                          <Text style={styles.forecastMin}>{day.tempMin}°</Text>
-                          {day.rain > 0 && (
-                            <Text style={styles.forecastRain}>💧{day.rain}mm</Text>
-                          )}
-                        </View>
-                      ))}
-                    </View>
-
-                    {/* Travel tip */}
-                    {weather.code >= 61 && (
-                      <View style={styles.weatherAlert}>
-                        <Ionicons name="warning" size={14} color="#B45309" />
-                        <Text style={styles.weatherAlertText}>
-                          Pluie prévue — prévoyez un imperméable pour les longs trajets
-                        </Text>
-                      </View>
-                    )}
-                    {weather.code >= 95 && (
-                      <View style={[styles.weatherAlert, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]}>
-                        <Ionicons name="thunderstorm" size={14} color="#DC2626" />
-                        <Text style={[styles.weatherAlertText, { color: '#DC2626' }]}>
-                          Orage — prudence sur la route !
-                        </Text>
-                      </View>
-                    )}
-                  </LinearGradient>
-                );
-              })() : null}
-            </Animated.View>
+            {/* ─── Carte Météo supprimée → mini widget dans header ─── */}
 
             {/* Promotions */}
             <View style={styles.promoSection}>
@@ -766,6 +792,14 @@ export default function HomeScreen() {
           onCancel={() => setPickingLocationFor(null)}
         />
       </Modal>
+
+      {/* ── Modal de vérification obligatoire ── */}
+      <VerificationModal
+        visible={showVerifModal}
+        onDismiss={handleVerifDismiss}
+        onVerify={handleVerifGo}
+        userName={user?.full_name?.split(' ')[0]}
+      />
     </View>
   );
 }
@@ -1220,170 +1254,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Weather styles ────────────────────────────────────────────────────────
-  weatherSection: {
-    marginBottom: 24,
+  // ── Mini Weather Widget styles ─────────────────────────────────────────────
+  weatherMiniWidget: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
   },
-  weatherSkeleton: {
-    height: 80,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    justifyContent: 'center',
+  weatherMiniInner: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  weatherSkeletonText: {
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
-  weatherCard: {
-    borderRadius: 20,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  weatherHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  weatherCityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  weatherCity: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#374151',
-  },
-  weatherCondition: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  weatherRefreshBtn: {
-    padding: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  weatherMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-  },
-  weatherIcon: {
-    fontSize: 52,
-  },
-  weatherTemp: {
-    fontSize: 44,
-    fontWeight: '900',
-    color: '#111827',
-    lineHeight: 48,
-  },
-  weatherFeels: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  weatherDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  weatherDetailItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  weatherDetailSep: {
-    width: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  weatherDetailIcon: {
-    fontSize: 16,
-    marginBottom: 2,
-  },
-  weatherDetailVal: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  weatherDetailLabel: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 1,
-  },
-  forecastRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    marginBottom: 10,
-  },
-  forecastDay: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  forecastDayName: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  forecastIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-  },
-  forecastMax: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  forecastMin: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontWeight: '500',
-  },
-  forecastRain: {
-    fontSize: 10,
-    color: '#3B82F6',
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  weatherAlert: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 10,
-    padding: 8,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 30,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderWidth: 1,
-    borderColor: '#FDE68A',
-    marginTop: 4,
+    borderColor: 'rgba(255,255,255,0.35)',
   },
-  weatherAlertText: {
-    flex: 1,
+  weatherMiniIcon: {
+    fontSize: 18,
+  },
+  weatherMiniTemp: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  weatherMiniCity: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#B45309',
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
+    maxWidth: 90,
+  },
+  weatherMiniSep: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  weatherMiniConsult: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });

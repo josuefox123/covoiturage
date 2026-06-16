@@ -221,12 +221,13 @@ export default function PublishScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
+      mediaTypes: ['images'],
+      allowsEditing: false,
       quality: 0.8,
     });
-    if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri);
+    }
   };
 
   const handleSavePersonal = async () => {
@@ -339,6 +340,11 @@ export default function PublishScreen() {
         <Ionicons name="shield-checkmark-outline" size={80} color={theme.colors.textMuted} />
         <Text style={styles.notLoggedTitle}>Compte non vérifié</Text>
         <Text style={styles.notLoggedText}>Votre compte doit être vérifié pour proposer un trajet.</Text>
+        <TouchableOpacity style={styles.notLoggedButton} onPress={() => router.push('/verify-identity')}>
+          <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.notLoggedGradient}>
+            <Text style={styles.notLoggedButtonText}>Se faire vérifier</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }

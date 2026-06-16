@@ -144,3 +144,11 @@ class AppBrandingSerializer(serializers.ModelSerializer):
         from .models import AppBranding
         model = AppBranding
         fields = '__all__'
+
+class VerificationRequestSerializer(serializers.ModelSerializer):
+    user_details = UserSerializer(source='user', read_only=True)
+    
+    class Meta:
+        from .models import VerificationRequest
+        model = VerificationRequest
+        fields = '__all__'

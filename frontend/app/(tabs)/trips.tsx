@@ -119,6 +119,24 @@ export default function TripsScreen() {
   const filteredPassengerTrips = getFilteredTrips(passengerTrips, 'passenger');
   const filteredDriverTrips = getFilteredTrips(driverTrips, 'driver');
 
+  if (!user.is_verified) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }]}>
+        <Ionicons name="shield-checkmark-outline" size={80} color={theme.colors.textMuted} />
+        <Text style={[styles.headerTitle, { color: theme.colors.text, marginTop: 16 }]}>Compte non vérifié</Text>
+        <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted, textAlign: 'center', marginBottom: 24, marginTop: 8 }]}>
+          Votre compte doit être vérifié pour accéder à vos trajets.
+        </Text>
+        <TouchableOpacity 
+          style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 }} 
+          onPress={() => router.push('/verify-identity')}
+        >
+          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Se faire vérifier</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>

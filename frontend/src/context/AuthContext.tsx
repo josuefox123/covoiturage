@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchApi } from '../services/api';
 
@@ -21,6 +21,7 @@ interface AuthContextData {
   logout: () => void;
   authFetch: (endpoint: string, options?: RequestInit) => Promise<any>;
   updateUser: (updates: Partial<User>) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const defaultContext: AuthContextData = {
@@ -32,6 +33,7 @@ const defaultContext: AuthContextData = {
   logout: () => {},
   authFetch: async () => ({}),
   updateUser: () => {},
+  refreshUser: async () => {},
 };
 
 const AuthContext = createContext<AuthContextData>(defaultContext);
@@ -131,13 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const authFetch = async (endpoint: string, options: RequestInit = {}) => {
-    const headers = new Headers(options.headers || {});
-    const isFormData = options.body && (options.body instanceof FormData || (options.body as any).append !== undefined);
-    if (!isFormData) {
-      headers.set('Content-Type', 'application/json');
-    }
+    const headers: any = { ...(options.headers || {}) };
     if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
+      headers['Authorization'] = `Bearer ${token}`;
     }
     return fetchApi(endpoint, { ...options, headers });
   };
@@ -146,6 +144,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(prev => {
       if (!prev) return prev;
       const newUser = { ...prev, ...updates };
+      // Éviter de re-rendre toute l'application si aucune donnée n'a changé
+      if (JSON.stringify(prev) === JSON.stringify(newUser)) return prev;
+      
       AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser)).catch(e => 
         console.log('Failed to save updated user:', e)
       );
@@ -153,8 +154,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const refreshUser = async () => {
+    if (!user || !user.id || !token) return;
+    try {
+      const data = await authFetch(`/users/${user.id}/`);
+      updateUser(data);
+    } catch (e) {
+      console.log('Failed to refresh user:', e);
+    }
+  };
+
+  const contextValue = useMemo(() => ({
+    user,
+    token,
+    isLoading,
+    loginWithPassword,
+    registerWithPassword,
+    logout,
+    authFetch,
+    updateUser,
+    refreshUser
+  }), [user, token, isLoading]);
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, loginWithPassword, registerWithPassword, logout, authFetch, updateUser }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

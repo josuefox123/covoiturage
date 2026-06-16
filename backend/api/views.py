@@ -8,10 +8,11 @@ from django.db.models import Q
 from django.db import models
 import random
 
-from .models import Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, AppBranding
+from .models import Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, AppBranding, VerificationRequest
 from .serializers import (
     UserSerializer, AdminUserSerializer, VehicleSerializer, UserPreferenceSerializer, 
-    RideSerializer, BookingSerializer, ConversationSerializer, MessageSerializer, NotificationSerializer, AppBrandingSerializer
+    RideSerializer, BookingSerializer, ConversationSerializer, MessageSerializer, NotificationSerializer, AppBrandingSerializer,
+    VerificationRequestSerializer
 )
 
 User = get_user_model()
@@ -117,6 +118,59 @@ def login_user(request):
             'user': user_data
         })
     return Response({'error': 'Identifiants invalides.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def request_verification(request):
+    """
+    Le passager soumet une demande de vérification d'identité avec images.
+    """
+    user = request.user
+    if user.is_verified:
+        return Response({'message': 'Votre compte est déjà vérifié.'}, status=status.HTTP_200_OK)
+
+    # Vérifier s'il y a déjà une demande en attente
+    existing = VerificationRequest.objects.filter(user=user).first()
+    if existing and existing.status == 'pending':
+        return Response({'error': 'Une demande est déjà en cours de traitement.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    selfie = request.FILES.get('selfie')
+    id_front = request.FILES.get('id_front')
+    id_back = request.FILES.get('id_back')
+
+    if not all([selfie, id_front, id_back]):
+        return Response({'error': 'Tous les documents (selfie, recto, verso) sont requis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Créer ou mettre à jour la demande de vérification
+    VerificationRequest.objects.update_or_create(
+        user=user,
+        defaults={
+            'selfie': selfie,
+            'id_front': id_front,
+            'id_back': id_back,
+            'status': 'pending'
+        }
+    )
+
+    return Response({
+        'message': 'Votre demande de vérification a été envoyée avec succès.'
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def verification_status(request):
+    """
+    Retourne le statut de la demande de vérification de l'utilisateur connecté.
+    """
+    user = request.user
+    if user.is_verified:
+        return Response({'status': 'approved', 'is_verified': True})
+    existing = VerificationRequest.objects.filter(user=user).first()
+    if existing:
+        return Response({'status': existing.status, 'is_verified': False})
+    return Response({'status': 'none', 'is_verified': False})
+
 
 @api_view(['GET'])
 def dashboard_stats(request):
@@ -492,10 +546,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return Notification.objects.none()
-        if user.is_staff and getattr(self, 'action', '') == 'list':
+        if user.is_staff:
+            # Admins voient toutes les notifications
             return Notification.objects.all().order_by('-created_at')
-        # Return user specific notifications and global ones (user=None)
-        return Notification.objects.filter(Q(user=user) | Q(user__isnull=True)).order_by('-created_at')
+        # Clients voient uniquement leurs propres notifications (pas les globales user=None)
+        return Notification.objects.filter(user=user).order_by('-created_at')
 
     @action(detail=False, methods=['post'], url_path='mark-read')
     def mark_all_read(self, request):
@@ -545,3 +600,52 @@ class AppBrandingView(APIView):
             serializer.save(is_active=True)
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+class VerificationRequestViewSet(viewsets.ModelViewSet):
+    queryset = VerificationRequest.objects.all().order_by('-created_at')
+    serializer_class = VerificationRequestSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        req = self.get_object()
+        motif = request.data.get('motif', '').strip()
+        req.status = 'approved'
+        req.save()
+
+        # Mettre à jour l'utilisateur directement en base
+        req.user.is_verified = True
+        req.user.save(update_fields=['is_verified'])
+
+        # Notifier l'utilisateur avec le motif
+        msg = "Votre demande de vérification d'identité a été approuvée. Vous pouvez maintenant utiliser toutes les fonctionnalités de l'application !"
+        if motif:
+            msg += f"\n\nMotif : {motif}"
+        Notification.objects.create(
+            user=req.user,
+            title="Identité vérifiée ✅",
+            message=msg,
+            is_read=False,
+        )
+        return Response({'status': 'approved'})
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        req = self.get_object()
+        motif = request.data.get('motif', '').strip()
+        req.status = 'rejected'
+        req.save()
+
+        # Notifier l'utilisateur avec le motif obligatoire
+        msg = "Votre demande de vérification d'identité a été rejetée."
+        if motif:
+            msg += f"\n\nMotif : {motif}"
+        else:
+            msg += " Veuillez vérifier que vos documents sont lisibles et soumettre à nouveau."
+        Notification.objects.create(
+            user=req.user,
+            title="Vérification rejetée ❌",
+            message=msg,
+            is_read=False,
+        )
+        return Response({'status': 'rejected'})

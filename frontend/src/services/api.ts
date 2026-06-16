@@ -19,18 +19,18 @@ const getBaseUrl = () => {
 
 export const API_URL = getBaseUrl();
 
-// A simple fetch wrapper to handle token injection
 export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
-  const token = undefined; // We will handle this in AuthContext or AsyncStorage later. But for simplicity, we pass token from context.
-  
-  const headers = new Headers(options.headers || {});
   const isFormData = options.body && (options.body instanceof FormData || (options.body as any).append !== undefined);
-  if (!headers.has('Content-Type') && !isFormData) {
-    headers.set('Content-Type', 'application/json');
+  
+  const headers: any = { ...options.headers };
+  
+  if (!headers['Content-Type'] && !headers['content-type'] && !isFormData) {
+    headers['Content-Type'] = 'application/json';
   }
   
-  if (options.headers && (options.headers as any).Authorization) {
-    // Token is already set in options
+  if (isFormData) {
+    delete headers['Content-Type'];
+    delete headers['content-type'];
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {

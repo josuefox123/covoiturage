@@ -14,6 +14,10 @@
         <Icon name="ph:users" class="w-5 h-5" />
         <span>Utilisateurs</span>
       </NuxtLink>
+      <NuxtLink to="/verifications" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" active-class="bg-primary/10 text-primary font-medium">
+        <Icon name="ph:shield-check" class="w-5 h-5" />
+        <span>Vérifications</span>
+      </NuxtLink>
       <NuxtLink to="/rides" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" active-class="bg-primary/10 text-primary font-medium">
         <Icon name="ph:car" class="w-5 h-5" />
         <span>Trajets</span>

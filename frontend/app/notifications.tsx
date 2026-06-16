@@ -36,23 +36,33 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: any }) => (
-    <View style={[styles.notificationCard, !item.is_read && styles.unreadCard]}>
-      <View style={styles.iconContainer}>
-        <Ionicons name="megaphone" size={24} color={theme.colors.primary} />
-      </View>
-      <View style={styles.contentContainer}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-          <Text style={styles.date}>
-            {new Date(item.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-          </Text>
+  const getNotifStyle = (title: string) => {
+    if (title?.includes('vérifié') || title?.includes('✅')) return { icon: 'shield-checkmark', color: '#10B981' };
+    if (title?.includes('rejet') || title?.includes('❌')) return { icon: 'shield-outline', color: '#EF4444' };
+    if (title?.includes('réservation') || title?.includes('trajet')) return { icon: 'car', color: theme.colors.primary };
+    return { icon: 'megaphone', color: theme.colors.primary };
+  };
+
+  const renderItem = ({ item }: { item: any }) => {
+    const { icon, color } = getNotifStyle(item.title);
+    return (
+      <View style={[styles.notificationCard, !item.is_read && styles.unreadCard]}>
+        <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+          <Ionicons name={icon as any} size={24} color={color} />
         </View>
-        <Text style={styles.message}>{item.message}</Text>
+        <View style={styles.contentContainer}>
+          <View style={styles.headerRow}>
+            <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.date}>
+              {new Date(item.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+            </Text>
+          </View>
+          <Text style={styles.message}>{item.message}</Text>
+        </View>
+        {!item.is_read && <View style={styles.unreadDot} />}
       </View>
-      {!item.is_read && <View style={styles.unreadDot} />}
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>

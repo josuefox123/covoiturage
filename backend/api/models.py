@@ -44,9 +44,18 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Vehicle(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vehicles')
+    
+    VEHICLE_TYPE_CHOICES = [
+        ('moto', 'Moto'),
+        ('tricycle', 'Tricycle'),
+        ('voiture', 'Voiture'),
+    ]
+    vehicle_type = models.CharField(max_length=20, choices=VEHICLE_TYPE_CHOICES, default='voiture')
     brand_model = models.CharField(max_length=255)
     color = models.CharField(max_length=50)
     license_plate = models.CharField(max_length=50)
+    driver_license_number = models.CharField(max_length=100, blank=True, null=True)
+    license_expiration = models.DateField(blank=True, null=True)
 
     class Meta:
         verbose_name = "Véhicule"
@@ -204,3 +213,26 @@ class AppBranding(models.Model):
 
     def __str__(self):
         return f"App Branding ({'Active' if self.is_active else 'Inactive'})"
+
+class VerificationRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('approved', 'Approuvée'),
+        ('rejected', 'Rejetée'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='verification_request')
+    selfie = models.ImageField(upload_to='verifications/selfies/')
+    id_front = models.ImageField(upload_to='verifications/id_fronts/')
+    id_back = models.ImageField(upload_to='verifications/id_backs/')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Demande de vérification"
+        verbose_name_plural = "Demandes de vérification"
+
+    def __str__(self):
+        return f"Vérification pour {self.user.full_name or self.user.phone} ({self.get_status_display()})"
