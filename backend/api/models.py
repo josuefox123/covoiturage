@@ -24,7 +24,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     rating = models.FloatField(default=0.0)
     is_verified = models.BooleanField(default=False)
+    fcm_token = models.CharField(max_length=500, blank=True, null=True, verbose_name="FCM Token")
     created_at = models.DateTimeField(auto_now_add=True)
+
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -71,6 +73,7 @@ class UserPreference(models.Model):
     smoking = models.BooleanField(default=False)
     chatty = models.BooleanField(default=True)
     air_conditioner = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, null=True, help_text="Préférences personnalisées du voyageur")
 
     class Meta:
         verbose_name = "Préférence Utilisateur"
@@ -78,6 +81,7 @@ class UserPreference(models.Model):
 
     def __str__(self):
         return f"Preferences de {self.user.phone}"
+
 
 class Ride(models.Model):
     STATUS_CHOICES = [
@@ -236,3 +240,44 @@ class VerificationRequest(models.Model):
 
     def __str__(self):
         return f"Vérification pour {self.user.full_name or self.user.phone} ({self.get_status_display()})"
+
+class Promotion(models.Model):
+    title = models.CharField(max_length=255)
+    subtitle = models.CharField(max_length=255, blank=True, null=True)
+    image = models.ImageField(upload_to='promotions/')
+    color = models.CharField(max_length=20, default='#2563EB')
+    icon = models.CharField(max_length=50, blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+    position = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['position']
+        verbose_name = "Promotion"
+        verbose_name_plural = "Promotions"
+
+    def __str__(self):
+        return self.title
+
+class MobileSettings(models.Model):
+    show_promotions = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Paramètres Mobile"
+        verbose_name_plural = "Paramètres Mobile"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super(MobileSettings, self).save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Paramètres Mobile"

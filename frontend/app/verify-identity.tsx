@@ -39,7 +39,7 @@ const STEPS: Step[] = [
 
 export default function VerifyIdentityScreen() {
   const router = useRouter();
-  const { authFetch } = useAuth();
+  const { authFetch, updateUser } = useAuth();
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [selfieUri,   setSelfieUri]   = useState<string | null>(null);
@@ -142,6 +142,8 @@ export default function VerifyIdentityScreen() {
         method: 'POST',
         body: formData,
       });
+      // Mettre à jour le statut localement → le modal disparaît immédiatement
+      updateUser({ verification_status: 'pending' });
       setSubmitted(true);
     } catch (e: any) {
       CustomAlert.alert('Erreur', e?.message || 'Impossible d\'envoyer la demande.');

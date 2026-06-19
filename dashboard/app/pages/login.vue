@@ -153,8 +153,9 @@ async function handleLogin() {
   loading.value = true
 
   try {
-    const res = await $fetch<{ access: string; refresh: string; user: any }>(
-      'http://localhost:8000/api/auth/login/',
+    const { fetchApi } = useApi()
+    const res = await fetchApi<any>(
+      '/auth/login/',
       {
         method: 'POST',
         body: { identifier: form.identifier, password: form.password },

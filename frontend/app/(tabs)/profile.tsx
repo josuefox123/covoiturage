@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Modal,
   TextInput,
   Image,
   RefreshControl,
@@ -14,7 +13,8 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
-  Pressable
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '../../src/styles/theme';
@@ -65,6 +65,7 @@ export default function ProfileScreen() {
   const [smoking, setSmoking] = useState(false);
   const [chatty, setChatty] = useState(true);
   const [airCond, setAirCond] = useState(true);
+  const [notes, setNotes] = useState('');
   const [vehicleId, setVehicleId] = useState<string | null>(null);
 
   // Animations
@@ -106,6 +107,7 @@ export default function ProfileScreen() {
         setSmoking(pref.smoking ?? false);
         setChatty(pref.chatty ?? true);
         setAirCond(pref.air_conditioner ?? true);
+        setNotes(pref.notes || '');
       }
     } catch (e) {
       console.log('Erreur fetch preferences:', e);
@@ -337,7 +339,8 @@ export default function ProfileScreen() {
           music,
           smoking,
           chatty,
-          air_conditioner: airCond
+          air_conditioner: airCond,
+          notes: notes.trim(),
         }),
       });
       CustomAlert.alert('Succès ✅', 'Préférences sauvegardées !');
@@ -558,7 +561,18 @@ export default function ProfileScreen() {
               icon="shield-checkmark-outline"
               title="Vérification d'identité"
               subtitle={user.is_verified ? "Identité vérifiée ✅" : "Non vérifié — À compléter"}
-              onPress={() => router.push('/verify-identity')}
+              iconColor={user.is_verified ? '#10B981' : theme.colors.primary}
+              onPress={() => {
+                if (user.is_verified) {
+                  CustomAlert.alert(
+                    '✅ Compte vérifié',
+                    'Votre identité a été vérifiée avec succès. Vous pouvez utiliser toutes les fonctionnalités de l\'application, notamment publier des trajets.',
+                    [{ text: 'Super !' }]
+                  );
+                } else {
+                  router.push('/verify-identity');
+                }
+              }}
             />
           </View>
         </View>
@@ -588,7 +602,6 @@ export default function ProfileScreen() {
             />
           </View>
         </View>
-
         {/* Déconnexion */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
@@ -838,7 +851,24 @@ export default function ProfileScreen() {
                   <PrefCard icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
                 </View>
 
-                <TouchableOpacity style={{ marginTop: 24 }} onPress={handleSavePreferences} disabled={isSaving} activeOpacity={0.8}>
+                <View style={{ marginTop: 24 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginBottom: 12 }}>
+                    Détails supplémentaires
+                  </Text>
+                  <View style={[styles.inputWrapper, { height: 100, alignItems: 'flex-start', paddingTop: 16 }]}>
+                    <Ionicons name="document-text-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.modalInputModern, { textAlignVertical: 'top', paddingTop: 0 }]}
+                      placeholder="Ex: Je voyage avec mon chat, j'aime faire des pauses régulières..."
+                      value={notes}
+                      onChangeText={setNotes}
+                      multiline
+                      placeholderTextColor={theme.colors.textMuted}
+                    />
+                  </View>
+                </View>
+
+                <TouchableOpacity style={{ marginTop: 16 }} onPress={handleSavePreferences} disabled={isSaving} activeOpacity={0.8}>
                   <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
                     {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
                       <>

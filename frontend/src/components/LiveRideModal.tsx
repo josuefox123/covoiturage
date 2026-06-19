@@ -1,17 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  Alert,
-  Dimensions,
-  ActivityIndicator,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  Linking,
+  View, Text, StyleSheet, Modal, TouchableOpacity, Alert,
+  Dimensions, ActivityIndicator, TextInput, KeyboardAvoidingView,
+  Platform, Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,14 +13,12 @@ import { Ride } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Centre du Bénin - Cotonou
 const DEFAULT_LAT = 6.3703;
 const DEFAULT_LON = 2.3764;
 const DEFAULT_ZOOM = 13;
 
 interface Coords { lat: number; lon: number; }
 
-// Geocode un nom de lieu avec Nominatim, centré sur le Bénin
 async function geocodeBenin(place: string): Promise<Coords | null> {
   try {
     const query = encodeURIComponent(`${place}, Bénin`);
@@ -41,7 +30,6 @@ async function geocodeBenin(place: string): Promise<Coords | null> {
     if (data && data.length > 0) {
       return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
     }
-    // Fallback sans restriction de pays
     const resp2 = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
       { headers: { 'User-Agent': 'CovoitBeninApp/1.0' } }
@@ -51,12 +39,12 @@ async function geocodeBenin(place: string): Promise<Coords | null> {
       return { lat: parseFloat(data2[0].lat), lon: parseFloat(data2[0].lon) };
     }
     return null;
-  } catch {
+  } catch (err) {
+    console.log(err);
     return null;
   }
 }
 
-// Route via OSRM (Open Source, 100% gratuit)
 async function getRoute(from: Coords, to: Coords): Promise<[number, number][] | null> {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson`;
@@ -69,12 +57,12 @@ async function getRoute(from: Coords, to: Coords): Promise<[number, number][] | 
       return coords;
     }
     return null;
-  } catch {
+  } catch (err) {
+    console.log(err);
     return null;
   }
 }
 
-// Helper to determine if it is currently time for the ride to be active (within 15 minutes of departure time or later on the same day)
 const isItTimeForRide = (dateStr: string, timeStr: string) => {
   if (!dateStr || !timeStr) return false;
   const rideDate = new Date(dateStr);
@@ -91,6 +79,9 @@ const isItTimeForRide = (dateStr: string, timeStr: string) => {
 export default function LiveRideModal() {
   const { user, authFetch } = useAuth();
   const webviewRef = useRef<WebView>(null);
+  const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const isMountedRef = useRef(true);
+
   const [visible, setVisible] = useState(false);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [location, setLocation] = useState<Coords | null>(null);
@@ -104,10 +95,17 @@ export default function LiveRideModal() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const watchRef = useRef<Location.LocationSubscription | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
+    let mounted = true;
 
     const checkActiveRides = async () => {
       try {
@@ -115,6 +113,8 @@ export default function LiveRideModal() {
           authFetch(`/rides/?driver=${user.id}`),
           authFetch(`/bookings/?passenger=${user.id}`),
         ]);
+
+        if (!mounted || !isMountedRef.current) return;
 
         const ridesData = ridesResp.results || ridesResp || [];
         const bookingsData = bookingsResp.results || bookingsResp || [];
@@ -135,7 +135,6 @@ export default function LiveRideModal() {
           asDriver = true;
         } else if (passengerRides.length > 0) {
           currentRide = passengerRides[0];
-          // Récupérer l'ID de la réservation correspondante
           const matchingBooking = bookingsData.find(
             (b: any) => b.ride_details && b.ride_details.id === currentRide!.id
           );
@@ -146,10 +145,9 @@ export default function LiveRideModal() {
           setActiveRide(currentRide);
           setIsDriver(asDriver);
           setActiveBookingId(bookingId);
-          // Only show automatically if we just started tracking
-          if (!activeRide) setVisible(true); 
-          startTracking();
-          geocodeRide(currentRide);
+          setVisible(true);
+          await startTracking();
+          await geocodeRide(currentRide);
         } else {
           setVisible(false);
           setIsMinimized(false);
@@ -162,28 +160,44 @@ export default function LiveRideModal() {
 
     checkActiveRides();
     const interval = setInterval(checkActiveRides, 60000);
-    return () => { clearInterval(interval); stopTracking(); };
-  }, [user]);
+    
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      stopTracking();
+    };
+  }, [user, authFetch]);
 
   const geocodeRide = async (ride: Ride) => {
-    const [dep, dest] = await Promise.all([
-      geocodeBenin(ride.departure_location),
-      geocodeBenin(ride.arrival_location),
-    ]);
-    if (dep) setDepartCoords(dep);
-    if (dest) setDestCoords(dest);
+    try {
+      const [dep, dest] = await Promise.all([
+        geocodeBenin(ride.departure_location),
+        geocodeBenin(ride.arrival_location),
+      ]);
+      if (!isMountedRef.current) return;
+      if (dep) setDepartCoords(dep);
+      if (dest) setDestCoords(dest);
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const startTracking = async () => {
+    if (watchRef.current) return;
+
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return;
+
     const loc = await Location.getCurrentPositionAsync({});
+    if (!isMountedRef.current) return;
+
     const pos = { lat: loc.coords.latitude, lon: loc.coords.longitude };
     setLocation(pos);
 
     watchRef.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 10 },
       (newLoc) => {
+        if (!isMountedRef.current) return;
         const newPos = { lat: newLoc.coords.latitude, lon: newLoc.coords.longitude };
         setLocation(newPos);
         sendToMap({ type: 'updateUserPosition', lat: newPos.lat, lon: newPos.lon });
@@ -191,7 +205,12 @@ export default function LiveRideModal() {
     );
   };
 
-  const stopTracking = () => { watchRef.current?.remove(); watchRef.current = null; };
+  const stopTracking = () => {
+    if (watchRef.current) {
+      watchRef.current.remove();
+      watchRef.current = null;
+    }
+  };
 
   const sendToMap = (message: object) => {
     webviewRef.current?.injectJavaScript(
@@ -199,42 +218,63 @@ export default function LiveRideModal() {
     );
   };
 
-  // Quand la carte ET les coordonnées sont prêtes → charger la route
   useEffect(() => {
-    if (!mapReady) return;
-    if (location) sendToMap({ type: 'updateUserPosition', lat: location.lat, lon: location.lon });
-    if (departCoords) sendToMap({ type: 'setDepartMarker', lat: departCoords.lat, lon: departCoords.lon });
-    if (destCoords) sendToMap({ type: 'setDestMarker', lat: destCoords.lat, lon: destCoords.lon });
+    if (!mapReady || !location) return;
+    sendToMap({ type: 'updateUserPosition', lat: location.lat, lon: location.lon });
+  }, [location, mapReady]);
 
-    if (departCoords && destCoords) {
-      loadRoute(departCoords, destCoords);
-      // Ajuster la vue pour inclure les deux points
-      sendToMap({ type: 'fitBounds', points: [
-        [departCoords.lat, departCoords.lon],
-        [destCoords.lat, destCoords.lon],
-      ]});
-    } else if (location) {
-      sendToMap({ type: 'setView', lat: location.lat, lon: location.lon, zoom: 14 });
-    }
-  }, [mapReady, location, departCoords, destCoords]);
+  useEffect(() => {
+    if (!mapReady || !departCoords) return;
+    sendToMap({ type: 'setDepartMarker', lat: departCoords.lat, lon: departCoords.lon });
+  }, [departCoords, mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !destCoords) return;
+    sendToMap({ type: 'setDestMarker', lat: destCoords.lat, lon: destCoords.lon });
+  }, [destCoords, mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !departCoords || !destCoords) return;
+    loadRoute(departCoords, destCoords);
+  }, [departCoords, destCoords, mapReady]);
 
   const loadRoute = async (from: Coords, to: Coords) => {
     setRouteLoading(true);
     try {
       const routeCoords = await getRoute(from, to);
+      if (!isMountedRef.current) return;
+
       if (routeCoords) {
         sendToMap({ type: 'drawRoute', coords: routeCoords });
+        sendToMap({ type: 'fitBounds', points: [
+          [from.lat, from.lon],
+          [to.lat, to.lon],
+        ]});
+      } else {
+        sendToMap({
+          type: 'fitBounds',
+          points: [
+            [from.lat, from.lon],
+            [to.lat, to.lon],
+          ]
+        });
       }
     } finally {
-      setRouteLoading(false);
+      if (isMountedRef.current) {
+        setRouteLoading(false);
+      }
     }
   };
 
   const onMapMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'ready') setMapReady(true);
-    } catch (e) {}
+      if (data.type === 'ready' && isMountedRef.current) {
+        setMapReady(true);
+      }
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const openGoogleMaps = () => {
@@ -242,12 +282,24 @@ export default function LiveRideModal() {
       Alert.alert('Erreur', "L'adresse d'arrivée n'a pas pu être géolocalisée.");
       return;
     }
-    const origin = location ? `${location.lat},${location.lon}` : `${DEFAULT_LAT},${DEFAULT_LON}`;
     const dest = `${destCoords.lat},${destCoords.lon}`;
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
-    Linking.openURL(url).catch(() => {
-      Linking.openURL(`geo:${dest}?q=${dest}`);
+    
+    const url = Platform.select({
+      android: `google.navigation:q=${dest}`,
+      ios: `comgooglemaps://?daddr=${dest}&directionsmode=driving`,
     });
+
+    Linking.canOpenURL(url!).then(supported => {
+      if (supported) {
+        return Linking.openURL(url!);
+      } else {
+        const fallbackUrl = Platform.select({
+          ios: `http://maps.apple.com/?daddr=${dest}`,
+          android: `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`
+        });
+        return Linking.openURL(fallbackUrl!);
+      }
+    }).catch(err => console.log(err));
   };
 
   const handleCompleteRide = () => {
@@ -258,6 +310,7 @@ export default function LiveRideModal() {
         onPress: async () => {
           try {
             await authFetch(`/rides/${activeRide?.id}/complete/`, { method: 'POST' });
+            if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
             Alert.alert('✅ Trajet terminé', 'Merci pour ce trajet !');
@@ -279,6 +332,7 @@ export default function LiveRideModal() {
             if (activeBookingId) {
               await authFetch(`/bookings/${activeBookingId}/complete/`, { method: 'POST' });
             }
+            if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
             Alert.alert('✅ Arrivé(e) !', 'Votre trajet est terminé. Merci d\'avoir voyagé avec nous !');
@@ -298,20 +352,18 @@ export default function LiveRideModal() {
         method: 'POST',
         body: JSON.stringify({ ride_id: activeRide?.id, problem: problemText.trim() }),
       });
+      if (!isMountedRef.current) return;
       setShowReportModal(false);
       setProblemText('');
       Alert.alert('✅ Envoyé', "Votre problème a été signalé. L'administration vous contactera.");
     } catch (error: any) {
       Alert.alert('Erreur', error.message || 'Impossible de signaler le problème.');
     } finally {
-      setSendingReport(false);
+      if (isMountedRef.current) setSendingReport(false);
     }
   };
 
-  const lat = location?.lat ?? DEFAULT_LAT;
-  const lon = location?.lon ?? DEFAULT_LON;
-
-  const leafletHtml = `
+  const leafletHtml = useMemo(() => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -319,6 +371,7 @@ export default function LiveRideModal() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.marker.slideto@0.2.0/Leaflet.Marker.SlideTo.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html, #map { width: 100%; height: 100%; }
@@ -349,7 +402,11 @@ export default function LiveRideModal() {
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: true }).setView([${DEFAULT_LAT}, ${DEFAULT_LON}], ${DEFAULT_ZOOM});
+    var map = L.map('map', { 
+      zoomControl: true,
+      preferCanvas: true 
+    }).setView([${DEFAULT_LAT}, ${DEFAULT_LON}], ${DEFAULT_ZOOM});
+    
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, detectRetina: true
     }).addTo(map);
@@ -370,8 +427,15 @@ export default function LiveRideModal() {
       if (msg.type === 'setView') {
         map.setView([msg.lat, msg.lon], msg.zoom || 14, { animate: true });
       } else if (msg.type === 'updateUserPosition') {
-        if (!userMarker) userMarker = L.marker([msg.lat, msg.lon], { icon: makeUserIcon(), zIndexOffset: 1000 }).addTo(map);
-        else userMarker.setLatLng([msg.lat, msg.lon]);
+        if (!userMarker) {
+          userMarker = L.marker([msg.lat, msg.lon], { icon: makeUserIcon(), zIndexOffset: 1000 }).addTo(map);
+        } else {
+          if (userMarker.slideTo) {
+            userMarker.slideTo([msg.lat, msg.lon], { duration: 1500 });
+          } else {
+            userMarker.setLatLng([msg.lat, msg.lon]);
+          }
+        }
       } else if (msg.type === 'setDepartMarker') {
         if (!departMarker) {
           departMarker = L.marker([msg.lat, msg.lon], { icon: makeIcon('depart-marker') })
@@ -388,7 +452,9 @@ export default function LiveRideModal() {
           color: '#3B82F6',
           weight: 5,
           opacity: 0.85,
-          lineJoin: 'round'
+          lineJoin: 'round',
+          smoothFactor: 2,
+          renderer: L.canvas()
         }).addTo(map);
       } else if (msg.type === 'fitBounds') {
         map.fitBounds(msg.points, { padding: [40, 40] });
@@ -400,7 +466,7 @@ export default function LiveRideModal() {
     });
   </script>
 </body>
-</html>`;
+</html>`, []);
 
   if (!activeRide) return null;
 
@@ -454,6 +520,8 @@ export default function LiveRideModal() {
               onMessage={onMapMessage}
               javaScriptEnabled
               domStorageEnabled
+              cacheEnabled={false}
+              androidLayerType="hardware"
               style={styles.map}
               scrollEnabled={false}
             />
@@ -464,10 +532,8 @@ export default function LiveRideModal() {
               </View>
             )}
 
-            {/* Boutons superposés sur la carte */}
             {mapReady && (
               <View style={styles.mapControls}>
-                {/* Recentrer sur ma position */}
                 <TouchableOpacity
                   style={styles.controlBtn}
                   onPress={() => location && sendToMap({ type: 'setView', lat: location.lat, lon: location.lon, zoom: 15 })}
@@ -475,7 +541,6 @@ export default function LiveRideModal() {
                   <Ionicons name="locate" size={20} color={theme.colors.primary} />
                 </TouchableOpacity>
 
-                {/* Ouvrir Google Maps */}
                 <TouchableOpacity style={styles.controlBtn} onPress={openGoogleMaps}>
                   <Ionicons name="navigate" size={20} color="#4285F4" />
                 </TouchableOpacity>
@@ -568,57 +633,10 @@ export default function LiveRideModal() {
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: theme.colors.white,
-    marginTop: 40,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 20,
-  },
-  floatingBubble: {
-    position: 'absolute',
-    bottom: 160, // Au-dessus de la bulle de messagerie (qui est à 90)
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
-    zIndex: 9999,
-  },
-  liveIndicatorBubble: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: theme.colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.background,
-  },
+  overlay: { flex: 1, backgroundColor: theme.colors.white, marginTop: 40, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 20 },
+  floatingBubble: { position: 'absolute', bottom: 160, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10, zIndex: 9999 },
+  liveIndicatorBubble: { position: 'absolute', top: 4, right: 4, width: 14, height: 14, borderRadius: 7, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: theme.colors.white, borderBottomWidth: 1, borderBottomColor: theme.colors.background },
   headerLeft: { flex: 1, marginRight: 12 },
   liveIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.success },
@@ -629,77 +647,25 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   mapLoader: { position: 'absolute', inset: 0, backgroundColor: theme.colors.background, justifyContent: 'center', alignItems: 'center' },
   mapLoaderText: { marginTop: 12, fontSize: 14, color: theme.colors.textLight },
-  mapControls: {
-    position: 'absolute',
-    right: 12,
-    bottom: 16,
-    gap: 8,
-  },
-  controlBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-    marginBottom: 8,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: theme.colors.background,
-    gap: 16,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
+  mapControls: { position: 'absolute', right: 12, bottom: 16, gap: 8 },
+  controlBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 4, marginBottom: 8 },
+  legendRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: theme.colors.background, gap: 16, borderTopWidth: 1, borderTopColor: theme.colors.border },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 12, color: theme.colors.text, fontWeight: '500', flex: 1 },
-  footer: {
-    padding: 16,
-    backgroundColor: theme.colors.white,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.background,
-    gap: 10,
-  },
-  googleMapsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    padding: 12,
-    borderRadius: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
+  footer: { padding: 16, backgroundColor: theme.colors.white, borderTopWidth: 1, borderTopColor: theme.colors.background, gap: 10 },
+  googleMapsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', padding: 12, borderRadius: 12, gap: 8, borderWidth: 1, borderColor: '#BFDBFE' },
   googleMapsBtnText: { fontSize: 14, color: '#4285F4', fontWeight: '600', flex: 1 },
   actionRow: { flexDirection: 'row', gap: 12 },
-  completeBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: theme.colors.success, padding: 14, borderRadius: 12, gap: 8,
-  },
+  completeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.success, padding: 14, borderRadius: 12, gap: 8 },
   completeBtnText: { color: theme.colors.white, fontSize: 15, fontWeight: 'bold' },
-  reportBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: theme.colors.error, padding: 14, borderRadius: 12, gap: 8,
-  },
+  reportBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.error, padding: 14, borderRadius: 12, gap: 8 },
   reportBtnText: { color: theme.colors.white, fontSize: 15, fontWeight: 'bold' },
-  // Report Modal
   reportOverlay: { flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'flex-end' },
   reportCard: { backgroundColor: theme.colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   reportTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text, marginBottom: 8 },
   reportSubtitle: { fontSize: 14, color: theme.colors.textLight, marginBottom: 16, lineHeight: 20 },
-  reportInput: {
-    borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 14,
-    fontSize: 14, color: theme.colors.text, minHeight: 100, backgroundColor: theme.colors.background, marginBottom: 16,
-  },
+  reportInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 14, fontSize: 14, color: theme.colors.text, minHeight: 100, backgroundColor: theme.colors.background, marginBottom: 16 },
   reportActions: { flexDirection: 'row', gap: 12 },
   reportCancelBtn: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' },
   reportCancelText: { fontSize: 15, color: theme.colors.textLight, fontWeight: '600' },

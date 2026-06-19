@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message
+from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Promotion, MobileSettings
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -75,3 +75,24 @@ class MessageAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
     list_per_page = 25
     readonly_fields = ('id', 'created_at')
+
+@admin.register(Promotion)
+class PromotionAdmin(admin.ModelAdmin):
+    list_display = ('title', 'position', 'is_active', 'color', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'subtitle')
+    ordering = ('position',)
+    list_editable = ('position', 'is_active')
+
+@admin.register(MobileSettings)
+class MobileSettingsAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'show_promotions', 'updated_at')
+    list_editable = ('show_promotions',)
+
+    def has_add_permission(self, request):
+        if self.model.objects.count() >= 1:
+            return False
+        return super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return False

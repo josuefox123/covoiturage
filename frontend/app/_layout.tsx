@@ -7,6 +7,17 @@ import { AuthProvider } from '../src/context/AuthContext';
 import { theme } from '../src/styles/theme';
 import LiveRideModal from '../src/components/LiveRideModal';
 import { CustomAlertProvider } from '../src/utils/CustomAlert';
+import { useNotifications } from '../src/hooks/useNotifications';
+
+/**
+ * Composant interne qui initialise les notifications push.
+ * Doit être un enfant de <AuthProvider> pour accéder au token JWT.
+ */
+function NotificationInitializer() {
+  // Le hook gère tout : permission, token FCM, envoi au backend, deep links
+  useNotifications();
+  return null;
+}
 
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
@@ -15,6 +26,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <StatusBar style="dark" />
+
+        {/* Initialisation silencieuse des notifications push */}
+        <NotificationInitializer />
 
         {/* Show the animated splash until animation completes */}
         {!splashDone && <AnimatedSplash onFinish={() => setSplashDone(true)} />}
@@ -36,6 +50,6 @@ export default function RootLayout() {
         <LiveRideModal />
         <CustomAlertProvider />
       </AuthProvider>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
   );
 }

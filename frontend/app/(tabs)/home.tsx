@@ -15,6 +15,7 @@ import {
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -74,13 +75,6 @@ const { width, height } = Dimensions.get('window');
 const PRIMARY_COLOR = '#2563EB';
 const HEADER_MAX_HEIGHT = 280;
 const HEADER_MIN_HEIGHT = 150;
-
-// Données des offres promotionnelles
-const PROMO_DATA = [
-  { id: '1', title: '-50% sur le 1er trajet', subtitle: 'Utilisez le code BIENVENUE', color: PRIMARY_COLOR, icon: 'gift-outline', image: require('../../assets/images/promo_car.png') },
-  { id: '2', title: 'Voyagez confortablement', subtitle: 'Découvrez de nouveaux horizons', color: '#10B981', icon: 'star-outline', image: require('../../assets/images/promo_passengers.png') },
-  { id: '3', title: 'Parrainage Zemy', subtitle: 'Gagnez 2000 FCFA', color: '#F59E0B', icon: 'people-outline', image: require('../../assets/images/promo_gift.png') },
-];
 
 const formatFullDate = (dateString: string | undefined) => {
   if (!dateString) return 'Date inconnue';
@@ -230,63 +224,31 @@ export default function HomeScreen() {
   const [selectedFilter, setSelectedFilter] = useState('recommended');
   const [searchFocused, setSearchFocused] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  
+  const [promotions, setPromotions] = useState<any[]>([]);
+  const [showPromotions, setShowPromotions] = useState(true);
 
   // ── Vérification utilisateur ───────────────────────────────────────────────
-  const SNOOZE_KEY = '@zemy_verify_snoozed_until';
+  // Le modal s'affiche uniquement si verification_status === 'not_verified'.
+  // Dès que l'utilisateur soumet sa demande, le statut passe à 'pending'
+  // et le modal disparaît définitivement (plus besoin de snooze).
+  const shouldShowVerificationModal =
+    !!user &&
+    !user.is_verified &&
+    (user.verification_status === 'not_verified' || user.verification_status === undefined);
+
   const [showVerifModal, setShowVerifModal] = useState(false);
 
   useEffect(() => {
-    // Ne se lance qu'une fois au montage (ou quand l'utilisateur change de compte)
-    checkVerificationStatus();
-    const interval = setInterval(() => {
-      checkVerificationStatus();
-    }, 30000); // 30s au lieu de 10s pour alléger le réseau
-    return () => clearInterval(interval);
-  }, [user?.id]); // Seulement si l'ID change
+    setShowVerifModal(shouldShowVerificationModal);
+  }, [shouldShowVerificationModal]);
 
-  const checkVerificationStatus = async () => {
-    if (!user) return;
-    if (user.is_verified) {
-      setShowVerifModal(false);
-      return;
-    }
-    // Vérifier si une demande est déjà en cours (pending)
-    try {
-      const verif = await authFetch('/auth/verification-status/');
-      if (verif.status === 'pending' || verif.status === 'approved' || verif.is_verified) {
-        setShowVerifModal(false);
-        return;
-      }
-    } catch (e) {
-      // Si l'API échoue, on continue avec la logique de snooze
-    }
-    // Vérifier si l'utilisateur a snoozé récemment
-    try {
-      const snoozedUntil = await AsyncStorage.getItem(SNOOZE_KEY);
-      if (snoozedUntil) {
-        const until = parseInt(snoozedUntil, 10);
-        if (Date.now() < until) {
-          setShowVerifModal(false);
-          return;
-        }
-      }
-    } catch (e) {}
-    // Afficher le modal
-    setShowVerifModal(true);
-  };
-
-  const handleVerifDismiss = async () => {
-    // Snooze 10 seconds
-    const until = Date.now() + 10 * 1000;
-    try {
-      await AsyncStorage.setItem(SNOOZE_KEY, String(until));
-    } catch (e) {}
+  const handleVerifDismiss = () => {
     setShowVerifModal(false);
-    
-    // Automatically re-check after 10 seconds
+    // On re-affiche seulement si le statut n'a pas changé (toujours not_verified)
     setTimeout(() => {
-      checkVerificationStatus();
-    }, 10000);
+      setShowVerifModal(shouldShowVerificationModal);
+    }, 30000);
   };
 
   const handleVerifGo = () => {
@@ -422,6 +384,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchRides();
+    fetchPromotionsAndSettings();
 
     // Fetch branding pour le logo
     authFetch('/branding/')
@@ -433,10 +396,28 @@ export default function HomeScreen() {
       .catch(err => console.log("Erreur branding:", err));
   }, []);
 
+  const fetchPromotionsAndSettings = async () => {
+    try {
+      const [promoRes, settingsRes] = await Promise.all([
+        authFetch('/promotions/').catch(() => []),
+        authFetch('/mobile-settings/').catch(() => null)
+      ]);
+      const promoList = Array.isArray(promoRes) ? promoRes : promoRes?.results || [];
+      setPromotions(promoList);
+      
+      if (settingsRes && settingsRes.show_promotions !== undefined) {
+        setShowPromotions(settingsRes.show_promotions);
+      }
+    } catch (e) {
+      console.log('Error fetching promotions:', e);
+    }
+  };
+
   useEffect(() => {
+    if (promotions.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentPromoIndex((prev) => {
-        const nextIndex = (prev + 1) % PROMO_DATA.length;
+        const nextIndex = (prev + 1) % promotions.length;
         if (carouselRef.current) {
           carouselRef.current.scrollToIndex({ index: nextIndex, animated: true });
         }
@@ -444,7 +425,7 @@ export default function HomeScreen() {
       });
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [promotions.length]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerHeight = scrollY.interpolate({
@@ -485,6 +466,13 @@ export default function HomeScreen() {
     fetchRides();
   }, []);
 
+  // Re-fetch rides whenever the screen comes into focus (e.g. after publishing)
+  useFocusEffect(
+    useCallback(() => {
+      fetchRides();
+    }, [])
+  );
+
   const fetchRides = async () => {
     try {
       setLoading(true);
@@ -499,17 +487,16 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchRides();
+    await Promise.all([
+      fetchRides(),
+      fetchPromotionsAndSettings()
+    ]);
     setRefreshing(false);
   };
 
   const handleRidePress = useCallback((ride: Ride) => {
-    if (user && ride.driver === user.id) {
-      router.push(`/ride-management/${ride.id}`);
-    } else {
-      router.push(`/ride/${ride.id}`);
-    }
-  }, [router, user]);
+    router.push(`/ride/${ride.id}`);
+  }, [router]);
 
   const filteredRides = useMemo(() => {
     let filtered = [...rides];
@@ -702,38 +689,40 @@ export default function HomeScreen() {
             {/* ─── Carte Météo supprimée → mini widget dans header ─── */}
 
             {/* Promotions */}
-            <View style={styles.promoSection}>
-              <Text style={styles.sectionLabel}>Offres spéciales</Text>
-              <FlatList
-                ref={carouselRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.promoScroll}
-                data={PROMO_DATA}
-                keyExtractor={(item) => item.id}
-                snapToInterval={280 + 12}
-                decelerationRate="fast"
-                getItemLayout={(data, index) => ({ length: 280 + 12, offset: (280 + 12) * index, index })}
-                renderItem={({ item }) => (
-                  <TouchableOpacity activeOpacity={0.9}>
-                    <View style={styles.promoCardContainer}>
-                      <Image source={item.image} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                      <LinearGradient
-                        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                      <View style={styles.promoCardContent}>
-                        <Ionicons name={item.icon as any} size={24} color="#FFFFFF" style={styles.promoIcon} />
-                        <View>
-                          <Text style={styles.promoTitle}>{item.title}</Text>
-                          <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
+            {showPromotions && promotions.length > 0 && (
+              <View style={styles.promoSection}>
+                <Text style={styles.sectionLabel}>Offres spéciales</Text>
+                <FlatList
+                  ref={carouselRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.promoScroll}
+                  data={promotions}
+                  keyExtractor={(item) => item.id.toString()}
+                  snapToInterval={280 + 12}
+                  decelerationRate="fast"
+                  getItemLayout={(data, index) => ({ length: 280 + 12, offset: (280 + 12) * index, index })}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity activeOpacity={0.9}>
+                      <View style={styles.promoCardContainer}>
+                        <Image source={{ uri: item.image }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                        <LinearGradient
+                          colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']}
+                          style={StyleSheet.absoluteFillObject}
+                        />
+                        <View style={styles.promoCardContent}>
+                          <Ionicons name={(item.icon || 'star') as any} size={24} color={item.color || '#FFFFFF'} style={styles.promoIcon} />
+                          <View>
+                            <Text style={styles.promoTitle}>{item.title}</Text>
+                            <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            )}
 
             {/* Filtres */}
             <View style={styles.filtersSection}>

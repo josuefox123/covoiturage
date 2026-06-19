@@ -119,6 +119,14 @@ export default function TripsScreen() {
   const filteredPassengerTrips = getFilteredTrips(passengerTrips, 'passenger');
   const filteredDriverTrips = getFilteredTrips(driverTrips, 'driver');
 
+  if (!user) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
   if (!user.is_verified) {
     return (
       <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }]}>
@@ -317,7 +325,7 @@ export default function TripsScreen() {
                       <View style={styles.cardActions}>
                         <TouchableOpacity
                           style={styles.primaryButton}
-                          onPress={() => router.push(`/ride/${ride.id}` as any)}
+                          onPress={() => router.push(`/ride-management/${ride.id}` as any)}
                         >
                           <Text style={styles.primaryButtonText}>Gérer</Text>
                         </TouchableOpacity>

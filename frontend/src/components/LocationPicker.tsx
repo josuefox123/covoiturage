@@ -1,18 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  StatusBar,
-  Platform,
-  Keyboard,
-  Dimensions,
-  Animated,
-  Modal,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList,
+  ActivityIndicator, StatusBar, Platform, Keyboard, Dimensions,
+  Animated, Modal,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -53,10 +43,10 @@ export default function LocationPicker({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(initialLocation || null);
-  const [currentLat, setCurrentLat] = useState(initialLocation?.latitude ?? DEFAULT_LAT);
-  const [currentLon, setCurrentLon] = useState(initialLocation?.longitude ?? DEFAULT_LON);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+  
   const [mapReady, setMapReady] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -64,16 +54,25 @@ export default function LocationPicker({
   const [hasInitialized, setHasInitialized] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   const bottomSheetAnim = useRef(new Animated.Value(0)).current;
-  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const mapInitializedRef = useRef(false);
+  
+  // Abort controllers for network requests
+  const abortRef = useRef<AbortController | null>(null);
+  const searchAbort = useRef<AbortController | null>(null);
+
+  // Prevent duplicate reverse geocoding
+  const lastReverseRef = useRef({ lat: 0, lon: 0 });
 
   useEffect(() => {
     initializeLocation();
     animateBottomSheet();
 
     return () => {
+      searchAbort.current?.abort();
+      abortRef.current?.abort();
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
     };
@@ -102,27 +101,11 @@ export default function LocationPicker({
         accuracy: Location.Accuracy.High,
       });
 
-      const location = {
-        lat: loc.coords.latitude,
-        lon: loc.coords.longitude,
-      };
-
+      const location = { lat: loc.coords.latitude, lon: loc.coords.longitude };
       setUserLocation(location);
 
       if (!initialLocation) {
-        setCurrentLat(location.lat);
-        setCurrentLon(location.lon);
-
-        if (mapReady) {
-          sendToMap({ type: 'setView', lat: location.lat, lon: location.lon, zoom: 14 });
-          sendToMap({ type: 'setUserMarker', lat: location.lat, lon: location.lon });
-          await reverseGeocode(location.lat, location.lon);
-        }
-      } else {
-        if (mapReady) {
-          sendToMap({ type: 'setView', lat: initialLocation.latitude, lon: initialLocation.longitude, zoom: 15 });
-          setSelectedLocation(initialLocation);
-        }
+        setSelectedLocation({ latitude: location.lat, longitude: location.lon, name: 'Position actuelle' });
       }
 
       setHasInitialized(true);
@@ -138,12 +121,38 @@ export default function LocationPicker({
     );
   }, []);
 
+  // Handle map ready explicitly via useEffect instead of inside event directly
+  useEffect(() => {
+    if (!mapReady) return;
+
+    if (initialLocation) {
+      sendToMap({ type: 'setView', lat: initialLocation.latitude, lon: initialLocation.longitude, zoom: 15 });
+    } else if (userLocation) {
+      sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 14 });
+      sendToMap({ type: 'setUserMarker', lat: userLocation.lat, lon: userLocation.lon });
+      reverseGeocode(userLocation.lat, userLocation.lon);
+    }
+  }, [mapReady, initialLocation, userLocation, sendToMap]);
+
   const reverseGeocode = async (lat: number, lon: number) => {
+    if (
+      Math.abs(lastReverseRef.current.lat - lat) < 0.00005 &&
+      Math.abs(lastReverseRef.current.lon - lon) < 0.00005
+    ) {
+      return; // Already reversed this location
+    }
+
+    lastReverseRef.current = { lat, lon };
     setIsLoadingAddress(true);
+
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=fr`,
         {
+          signal: abortRef.current.signal,
           headers: { 'User-Agent': 'CovoitBeninApp/1.0' },
         }
       );
@@ -152,7 +161,6 @@ export default function LocationPicker({
 
       if (data?.address) {
         const address = data.address;
-
         let name = '';
         if (address.road) name = address.road;
         else if (address.pedestrian) name = address.pedestrian;
@@ -185,8 +193,10 @@ export default function LocationPicker({
           country: parts[parts.length - 1]?.trim(),
         });
       }
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Reverse geocoding error:', error);
+      }
     } finally {
       setIsLoadingAddress(false);
     }
@@ -200,10 +210,14 @@ export default function LocationPicker({
     }
 
     setIsSearching(true);
+    searchAbort.current?.abort();
+    searchAbort.current = new AbortController();
+
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1&accept-language=fr`,
         {
+          signal: searchAbort.current.signal,
           headers: { 'User-Agent': 'CovoitBeninApp/1.0' },
         }
       );
@@ -211,14 +225,16 @@ export default function LocationPicker({
       const data = await response.json();
       setSearchResults(data);
       setShowResults(data.length > 0);
-    } catch (error) {
-      console.error('Search error:', error);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Search error:', error);
+      }
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleSearch = (text: string) => {
+  const handleSearch = useCallback((text: string) => {
     setSearchQuery(text);
 
     if (searchTimeoutRef.current) {
@@ -228,14 +244,12 @@ export default function LocationPicker({
     searchTimeoutRef.current = setTimeout(() => {
       searchPlaces(text);
     }, 400);
-  };
+  }, []);
 
-  const handleSelectResult = (item: any) => {
+  const handleSelectResult = useCallback((item: any) => {
     const lat = parseFloat(item.lat);
     const lon = parseFloat(item.lon);
 
-    setCurrentLat(lat);
-    setCurrentLon(lon);
     setSearchQuery('');
     setShowResults(false);
     Keyboard.dismiss();
@@ -256,56 +270,52 @@ export default function LocationPicker({
     });
 
     sendToMap({ type: 'setView', lat, lon, zoom: 16 });
-  };
+  }, [sendToMap]);
 
-  const goToMyLocation = () => {
+  const goToMyLocation = useCallback(() => {
     if (userLocation) {
-      setCurrentLat(userLocation.lat);
-      setCurrentLon(userLocation.lon);
       sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 15 });
       reverseGeocode(userLocation.lat, userLocation.lon);
     }
-  };
+  }, [userLocation, sendToMap]);
 
   const handleConfirmPress = () => {
     setShowConfirmModal(true);
   };
 
-  const confirmLocation = async () => {
-    if (!selectedLocation) {
-      await reverseGeocode(currentLat, currentLon);
-    }
-
+  const confirmLocation = useCallback(() => {
     setIsConfirming(true);
     setShowConfirmModal(false);
 
-    setTimeout(() => {
-      if (selectedLocation) {
-        onLocationSelected(selectedLocation);
-      } else {
-        onLocationSelected({
-          latitude: currentLat,
-          longitude: currentLon,
-          name: 'Position choisie',
-        });
-      }
-      setIsConfirming(false);
-    }, 300);
-  };
+    if (selectedLocation) {
+      onLocationSelected(selectedLocation);
+    } else {
+      onLocationSelected({
+        latitude: DEFAULT_LAT,
+        longitude: DEFAULT_LON,
+        name: 'Position choisie',
+      });
+    }
+    
+    setIsConfirming(false);
+  }, [selectedLocation, onLocationSelected]);
 
-  const zoomIn = () => {
+  const zoomIn = useCallback(() => {
     sendToMap({ type: 'zoomIn' });
-  };
+  }, [sendToMap]);
 
-  const zoomOut = () => {
+  const zoomOut = useCallback(() => {
     sendToMap({ type: 'zoomOut' });
-  };
+  }, [sendToMap]);
 
   const onMapMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
 
       if (data.type === 'centerChanged') {
+        const currentLat = selectedLocation?.latitude ?? DEFAULT_LAT;
+        const currentLon = selectedLocation?.longitude ?? DEFAULT_LON;
+        
         const latDiff = Math.abs(data.lat - currentLat);
         const lonDiff = Math.abs(data.lon - currentLon);
 
@@ -313,8 +323,14 @@ export default function LocationPicker({
           return;
         }
 
-        setCurrentLat(data.lat);
-        setCurrentLon(data.lon);
+        // Optimistically update location coordinates while dragging
+        setSelectedLocation(prev => ({
+          ...(prev || {}),
+          latitude: data.lat,
+          longitude: data.lon,
+          name: prev?.name || 'Recherche en cours...',
+        }));
+        
         setIsDragging(true);
 
         if (dragTimeoutRef.current) {
@@ -328,27 +344,13 @@ export default function LocationPicker({
 
       } else if (data.type === 'ready') {
         setMapReady(true);
-
-        if (!mapInitializedRef.current) {
-          mapInitializedRef.current = true;
-
-          if (userLocation && !initialLocation) {
-            sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 14 });
-            sendToMap({ type: 'setUserMarker', lat: userLocation.lat, lon: userLocation.lon });
-            if (!selectedLocation) {
-              reverseGeocode(userLocation.lat, userLocation.lon);
-            }
-          } else if (initialLocation) {
-            sendToMap({ type: 'setView', lat: initialLocation.latitude, lon: initialLocation.longitude, zoom: 15 });
-          }
-        }
       }
     } catch (error) {
       console.error('Map message error:', error);
     }
   };
 
-  const leafletHtml = `
+  const leafletHtml = useMemo(() => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -444,9 +446,8 @@ export default function LocationPicker({
   <script>
     var map = L.map('map', { 
       zoomControl: false
-    }).setView([${currentLat}, ${currentLon}], ${initialLocation ? 15 : 13});
+    }).setView([${DEFAULT_LAT}, ${DEFAULT_LON}], 13);
     
-    // Utilisation d'OpenStreetMap standard pour un meilleur rendu
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors',
@@ -485,7 +486,7 @@ export default function LocationPicker({
     
     window.handleMessage = function(msg) {
       if (msg.type === 'setView') {
-        map.setView([msg.lat, msg.lon], msg.zoom || 15, { animate: true, duration: 0.5 });
+        map.flyTo([msg.lat, msg.lon], msg.zoom || 15, { animate: true, duration: 0.6 });
       } else if (msg.type === 'setUserMarker') {
         var userIcon = L.divIcon({
           className: '',
@@ -507,7 +508,9 @@ export default function LocationPicker({
     };
   </script>
 </body>
-</html>`;
+</html>`, []);
+
+  const htmlRef = useRef(leafletHtml);
 
   const bottomSheetTransform = {
     transform: [{
@@ -579,7 +582,7 @@ export default function LocationPicker({
       <WebView
         ref={webviewRef}
         originWhitelist={['*']}
-        source={{ html: leafletHtml }}
+        source={{ html: htmlRef.current }}
         onMessage={onMapMessage}
         javaScriptEnabled
         domStorageEnabled
@@ -638,8 +641,10 @@ export default function LocationPicker({
         <View style={styles.resultsContainer}>
           <FlatList
             data={searchResults}
-            keyExtractor={(item) => item.place_id?.toString() || item.lat + item.lon}
+            initialNumToRender={8}
+            removeClippedSubviews={true}
             keyboardShouldPersistTaps="handled"
+            keyExtractor={(item) => item.place_id?.toString() || item.lat + item.lon}
             renderItem={({ item, index }) => (
               <TouchableOpacity
                 style={[
@@ -726,343 +731,52 @@ export default function LocationPicker({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.white,
-  },
-  map: {
-    flex: 1,
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: theme.colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: theme.colors.textMuted,
-  },
-  header: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 40,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    zIndex: 10,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  searchContainer: {
-    flex: 1,
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.white,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: theme.colors.text,
-  },
-  zoomControls: {
-    position: 'absolute',
-    right: 16,
-    bottom: SCREEN_HEIGHT * 0.35,
-    backgroundColor: theme.colors.white,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-    zIndex: 10,
-  },
-  zoomButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.white,
-  },
-  zoomDivider: {
-    height: 1,
-    backgroundColor: theme.colors.background,
-  },
-  resultsContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 110 : 100,
-    left: 16,
-    right: 16,
-    backgroundColor: theme.colors.white,
-    borderRadius: 12,
-    maxHeight: SCREEN_HEIGHT * 0.5,
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 10,
-  },
-  resultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.background,
-  },
-  resultItemLast: {
-    borderBottomWidth: 0,
-  },
-  resultIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  resultContent: {
-    flex: 1,
-  },
-  resultTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: 2,
-  },
-  resultSubtitle: {
-    fontSize: 13,
-    color: theme.colors.textMuted,
-  },
-  myLocationButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: SCREEN_HEIGHT * 0.45,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-    zIndex: 10,
-  },
-  bottomSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: theme.colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-    paddingHorizontal: 20,
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  bottomSheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  locationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
-  },
-  locationIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  locationDetails: {
-    flex: 1,
-  },
-  locationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: 2,
-  },
-  locationAddress: {
-    fontSize: 13,
-    color: theme.colors.textLight,
-    marginBottom: 2,
-  },
-  locationCity: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-  },
-  skeletonText: {
-    height: 20,
-    backgroundColor: theme.colors.background,
-    borderRadius: 4,
-    marginBottom: 8,
-    width: '80%',
-  },
-  skeletonTextSmall: {
-    height: 16,
-    width: '60%',
-    marginBottom: 0,
-  },
-  confirmButton: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 12,
-    height: 52,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  confirmButtonDisabled: {
-    opacity: 0.7,
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.white,
-    marginRight: 8,
-  },
-  confirmButtonIcon: {
-    marginLeft: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: theme.colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: theme.colors.white,
-    borderRadius: 24,
-    padding: 24,
-    width: SCREEN_WIDTH - 48,
-    alignItems: 'center',
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: theme.colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginBottom: 20,
-  },
-  modalLocationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-    backgroundColor: theme.colors.background,
-    padding: 12,
-    borderRadius: 12,
-    width: '100%',
-  },
-  modalLocationName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  modalLocationAddress: {
-    fontSize: 13,
-    color: theme.colors.textLight,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalLocationCity: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    marginBottom: 20,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  modalButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: '#f5f5f5',
-  },
-  modalButtonCancelText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.textLight,
-  },
-  modalButtonConfirm: {
-    backgroundColor: theme.colors.primary,
-  },
-  modalButtonConfirmText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.white,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.white },
+  map: { flex: 1 },
+  loadingContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, color: theme.colors.textMuted },
+  header: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 40, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 10 },
+  backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  searchContainer: { flex: 1, height: 44, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.white, borderRadius: 12, paddingHorizontal: 12, shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 16, color: theme.colors.text },
+  zoomControls: { position: 'absolute', right: 16, bottom: SCREEN_HEIGHT * 0.35, backgroundColor: theme.colors.white, borderRadius: 12, overflow: 'hidden', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4, zIndex: 10 },
+  zoomButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.white },
+  zoomDivider: { height: 1, backgroundColor: theme.colors.background },
+  resultsContainer: { position: 'absolute', top: Platform.OS === 'ios' ? 110 : 100, left: 16, right: 16, backgroundColor: theme.colors.white, borderRadius: 12, maxHeight: SCREEN_HEIGHT * 0.5, shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, zIndex: 10 },
+  resultItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.background },
+  resultItemLast: { borderBottomWidth: 0 },
+  resultIconContainer: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  resultContent: { flex: 1 },
+  resultTitle: { fontSize: 15, fontWeight: '600', color: theme.colors.text, marginBottom: 2 },
+  resultSubtitle: { fontSize: 13, color: theme.colors.textMuted },
+  myLocationButton: { position: 'absolute', right: 16, bottom: SCREEN_HEIGHT * 0.45, width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.white, justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4, zIndex: 10 },
+  bottomSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: theme.colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 20, paddingHorizontal: 20, shadowColor: theme.colors.black, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
+  bottomSheetHandle: { width: 40, height: 4, backgroundColor: theme.colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  locationInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
+  locationIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.primaryLight, justifyContent: 'center', alignItems: 'center' },
+  locationDetails: { flex: 1 },
+  locationName: { fontSize: 16, fontWeight: '600', color: theme.colors.text, marginBottom: 2 },
+  locationAddress: { fontSize: 13, color: theme.colors.textLight, marginBottom: 2 },
+  locationCity: { fontSize: 12, color: theme.colors.textMuted },
+  skeletonText: { height: 20, backgroundColor: theme.colors.background, borderRadius: 4, marginBottom: 8, width: '80%' },
+  skeletonTextSmall: { height: 16, width: '60%', marginBottom: 0 },
+  confirmButton: { backgroundColor: theme.colors.primary, borderRadius: 12, height: 52, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  confirmButtonDisabled: { opacity: 0.7 },
+  confirmButtonText: { fontSize: 16, fontWeight: '700', color: theme.colors.white, marginRight: 8 },
+  confirmButtonIcon: { marginLeft: 4 },
+  modalOverlay: { flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'center', alignItems: 'center' },
+  modalContainer: { backgroundColor: theme.colors.white, borderRadius: 24, padding: 24, width: SCREEN_WIDTH - 48, alignItems: 'center', shadowColor: theme.colors.black, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20, elevation: 10 },
+  modalIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: theme.colors.text, marginBottom: 20 },
+  modalLocationInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, backgroundColor: theme.colors.background, padding: 12, borderRadius: 12, width: '100%' },
+  modalLocationName: { flex: 1, fontSize: 15, fontWeight: '600', color: theme.colors.text },
+  modalLocationAddress: { fontSize: 13, color: theme.colors.textLight, marginBottom: 8, textAlign: 'center' },
+  modalLocationCity: { fontSize: 12, color: theme.colors.textMuted, marginBottom: 20 },
+  modalButtons: { flexDirection: 'row', gap: 12, width: '100%' },
+  modalButton: { flex: 1, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  modalButtonCancel: { backgroundColor: '#f5f5f5' },
+  modalButtonCancelText: { fontSize: 15, fontWeight: '600', color: theme.colors.textLight },
+  modalButtonConfirm: { backgroundColor: theme.colors.primary },
+  modalButtonConfirmText: { fontSize: 15, fontWeight: '600', color: theme.colors.white },
 });

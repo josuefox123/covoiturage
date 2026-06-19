@@ -10,17 +10,6 @@ export default defineNuxtConfig({
     },
   },
 
-  // Proxy API calls in dev to avoid CORS issues
-  nitro: {
-    devProxy: {
-      '/api': {
-        target: 'http://localhost:8000/api',
-        changeOrigin: true,
-        prependPath: false,
-      },
-    },
-  },
-
   icon: {
     serverBundle: {
       collections: ['ph']

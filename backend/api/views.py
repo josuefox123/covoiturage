@@ -6,14 +6,16 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.db import models
+from django.views.decorators.csrf import csrf_exempt
 import random
 
-from .models import Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, AppBranding, VerificationRequest
+from .models import Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, AppBranding, VerificationRequest, Promotion, MobileSettings
 from .serializers import (
     UserSerializer, AdminUserSerializer, VehicleSerializer, UserPreferenceSerializer, 
     RideSerializer, BookingSerializer, ConversationSerializer, MessageSerializer, NotificationSerializer, AppBrandingSerializer,
-    VerificationRequestSerializer
+    VerificationRequestSerializer, PromotionSerializer, MobileSettingsSerializer
 )
+from .fcm import send_fcm_to_user, send_fcm_to_all_users
 
 User = get_user_model()
 
@@ -78,7 +80,22 @@ def verify_code(request):
         return Response({'error': 'Code invalide ou expiré.'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def save_fcm_token(request):
+    """
+    Enregistre le token FCM de l'appareil de l'utilisateur connecté.
+    Appelé par le mobile après la connexion ou au lancement de l'app.
+    """
+    token = request.data.get('fcm_token', '').strip()
+    if not token:
+        return Response({'error': 'fcm_token requis.'}, status=status.HTTP_400_BAD_REQUEST)
+    request.user.fcm_token = token
+    request.user.save(update_fields=['fcm_token'])
+    return Response({'status': 'FCM token enregistré avec succès.'})
+
+@api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@csrf_exempt
 def register_user(request):
     from .serializers import RegisterSerializer
     serializer = RegisterSerializer(data=request.data)
@@ -94,6 +111,7 @@ def register_user(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@csrf_exempt
 def login_user(request):
     identifier = request.data.get('identifier')
     password = request.data.get('password')
@@ -627,6 +645,13 @@ class VerificationRequestViewSet(viewsets.ModelViewSet):
             message=msg,
             is_read=False,
         )
+        # Envoyer notification FCM
+        send_fcm_to_user(
+            req.user,
+            title="Identité vérifiée ✅",
+            body="Votre demande de vérification a été approuvée !",
+            data={'type': 'verification_approved', 'screen': 'notifications'},
+        )
         return Response({'status': 'approved'})
 
     @action(detail=True, methods=['post'], url_path='reject')
@@ -648,4 +673,66 @@ class VerificationRequestViewSet(viewsets.ModelViewSet):
             message=msg,
             is_read=False,
         )
+        # Envoyer notification FCM
+        send_fcm_to_user(
+            req.user,
+            title="Vérification rejetée ❌",
+            body="Votre demande de vérification a été rejetée. Vérifiez vos documents.",
+            data={'type': 'verification_rejected', 'screen': 'notifications'},
+        )
         return Response({'status': 'rejected'})
+
+class PromotionViewSet(viewsets.ModelViewSet):
+    queryset = Promotion.objects.all()
+    serializer_class = PromotionSerializer
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAdminUser()]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated and getattr(user, 'is_staff', False):
+            return Promotion.objects.all()
+        return Promotion.objects.filter(is_active=True)
+
+    def perform_create(self, serializer):
+        promotion = serializer.save()
+        # Notifier tous les utilisateurs de la nouvelle promotion
+        send_fcm_to_all_users(
+            title="🎉 Nouvelle promotion disponible !",
+            body=promotion.title,
+            data={'type': 'new_promotion', 'screen': 'home'},
+        )
+
+    def perform_update(self, serializer):
+        promotion = serializer.save()
+        if promotion.is_active:
+            send_fcm_to_all_users(
+                title="🔄 Promotion mise à jour",
+                body=promotion.title,
+                data={'type': 'promotion_updated', 'screen': 'home'},
+            )
+
+class MobileSettingsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        settings = MobileSettings.load()
+        serializer = MobileSettingsSerializer(settings)
+        return Response(serializer.data)
+
+    def put(self, request):
+        if not request.user.is_authenticated or not getattr(request.user, 'is_staff', False):
+            return Response({'error': 'Admin required'}, status=403)
+        
+        settings = MobileSettings.load()
+        serializer = MobileSettingsSerializer(settings, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+    
+    def patch(self, request):
+        return self.put(request)

@@ -10,6 +10,7 @@ export interface User {
   avatar: string | null;
   rating?: number;
   is_verified?: boolean;
+  verification_status?: 'not_verified' | 'pending' | 'verified';
 }
 
 interface AuthContextData {

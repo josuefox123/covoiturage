@@ -34,6 +34,10 @@
         <Icon name="ph:megaphone" class="w-5 h-5" />
         <span>Notifications</span>
       </NuxtLink>
+      <NuxtLink to="/promotions" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" active-class="bg-primary/10 text-primary font-medium">
+        <Icon name="ph:star" class="w-5 h-5" />
+        <span>Promotions</span>
+      </NuxtLink>
 
       <div class="text-xs font-semibold text-textMuted uppercase tracking-wider mb-2 mt-4 px-2">Support</div>
       <NuxtLink to="/support" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
@@ -44,6 +48,11 @@
       <NuxtLink to="/branding" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
         <Icon name="ph:paint-brush-broad" class="w-5 h-5" />
         <span>Marque / Logo</span>
+      </NuxtLink>
+
+      <NuxtLink to="/mobile-settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
+        <Icon name="ph:device-mobile" class="w-5 h-5" />
+        <span>Paramètres Mobile</span>
       </NuxtLink>
     </nav>
   </aside>

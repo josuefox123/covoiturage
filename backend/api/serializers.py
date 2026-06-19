@@ -152,3 +152,15 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         from .models import VerificationRequest
         model = VerificationRequest
         fields = '__all__'
+
+class PromotionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import Promotion
+        model = Promotion
+        fields = '__all__'
+
+class MobileSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import MobileSettings
+        model = MobileSettings
+        fields = '__all__'

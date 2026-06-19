@@ -1,5 +1,14 @@
 <template>
   <div>
+    <!-- Toast Notification -->
+    <ToastNotification
+      :show="toast.show"
+      :type="toast.type"
+      :title="toast.title"
+      :message="toast.message"
+      @close="toast.show = false"
+    />
+
     <div class="flex items-center gap-4 mb-6">
       <NuxtLink to="/verifications" class="p-2 text-textLight hover:text-primary hover:bg-primary/10 rounded-lg transition-colors">
         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
@@ -211,13 +220,25 @@
           </div>
         </div>
       </div>
+      <ToastNotification v-model="toast.show" :type="toast.type" :title="toast.title" :message="toast.message" />
     </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue'
+
 const route = useRoute()
 const { fetchApi } = useApi()
+
+const toast = reactive({ show: false, type: 'success' as any, title: '', message: '' })
+
+function showToast(type: string, title: string, msg = '') {
+  toast.type = type
+  toast.title = title
+  toast.message = msg
+  toast.show = true
+}
 
 const req = ref<any>(null)
 const pending = ref(true)
@@ -229,6 +250,23 @@ const showRejectModal = ref(false)
 const approveMotif = ref('')
 const rejectMotif = ref('')
 const rejectError = ref('')
+
+const downloadImage = async (url: string, filename: string) => {
+  try {
+    const response = await fetch(url)
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(blobUrl)
+  } catch (error) {
+    showToast('error', 'Erreur', 'Erreur lors du téléchargement de l\'image.')
+  }
+}
 
 const fetchDetail = async () => {
   pending.value = true
@@ -251,9 +289,11 @@ const approve = async () => {
     })
     showApproveModal.value = false
     approveMotif.value = ''
+    showToast('success', 'Succès', 'Demande approuvée avec succès.')
     await fetchDetail()
   } catch (error) {
     console.error(error)
+    showToast('error', 'Erreur', 'Une erreur est survenue lors de l\'approbation.')
   } finally {
     actionPending.value = false
   }
@@ -273,9 +313,11 @@ const reject = async () => {
     })
     showRejectModal.value = false
     rejectMotif.value = ''
+    showToast('success', 'Succès', 'Demande rejetée.')
     await fetchDetail()
   } catch (error) {
     console.error(error)
+    showToast('error', 'Erreur', 'Une erreur est survenue lors du rejet.')
   } finally {
     actionPending.value = false
   }
