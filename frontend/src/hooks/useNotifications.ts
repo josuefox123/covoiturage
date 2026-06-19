@@ -26,7 +26,7 @@ if (!isExpoGo && Platform.OS !== 'web') {
     Notifications = require('expo-notifications');
     Device = require('expo-device');
   } catch (e) {
-    console.log('[Notifications] expo-notifications non disponible (erreur de chargement binaire) :', e.message || e);
+    console.log('[Notifications] expo-notifications non disponible (erreur de chargement binaire) :', e instanceof Error ? e.message : String(e));
   }
 } else {
   console.log('[Notifications] expo-notifications ignoré (mode Expo Go ou Web actif)');
