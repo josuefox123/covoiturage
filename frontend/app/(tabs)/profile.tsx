@@ -380,7 +380,7 @@ export default function ProfileScreen() {
       onPress={onToggle}
       activeOpacity={0.8}
     >
-      <Ionicons name={icon} size={28} color={value ? theme.colors.primary : theme.colors.textMuted} style={{ marginBottom: 12 }} />
+      <Ionicons name={icon as any} size={28} color={value ? theme.colors.primary : theme.colors.textMuted} style={{ marginBottom: 12 }} />
       <Text style={[styles.prefCardLabel, value && styles.prefCardLabelActive]}>{label}</Text>
       <View style={[styles.prefBadge, value ? styles.prefBadgeActive : styles.prefBadgeInactive]}>
         <Ionicons name={value ? "checkmark" : "close"} size={12} color={value ? theme.colors.white : theme.colors.textMuted} />
