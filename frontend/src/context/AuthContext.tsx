@@ -154,9 +154,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const authFetch = useCallback(async (endpoint: string, options: RequestInit = {}) => {
+    let currentToken = token;
+    
+    // Si le token n'est pas encore dans l'état (ex: au démarrage), on vérifie le stockage
+    if (!currentToken) {
+      currentToken = await SecureStore.getItemAsync(STORAGE_TOKEN_KEY);
+    }
+
     const headers: any = { ...(options.headers || {}) };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    if (currentToken) {
+      headers['Authorization'] = `Bearer ${currentToken}`;
     }
     return fetchApi(endpoint, { ...options, headers });
   }, [token]);

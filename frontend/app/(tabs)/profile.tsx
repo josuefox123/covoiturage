@@ -38,6 +38,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CustomAlert } from '../../src/utils/CustomAlert';
+import { AppBottomSheet } from '../../src/components/AppBottomSheet';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 const { width } = Dimensions.get('window');
@@ -696,22 +697,17 @@ export default function ProfileScreen() {
       </Animated.ScrollView>
 
       {/* ========== MODAL: Informations personnelles ========== */}
-      <Modal visible={infoModalVisible} animationType="slide" transparent onRequestClose={() => setInfoModalVisible(false)}>
-          <Pressable style={styles.modalOverlay} onPress={() => setInfoModalVisible(false)}>
-            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+      <AppBottomSheet
+        visible={infoModalVisible}
+        onClose={() => setInfoModalVisible(false)}
+        snapPoints={['75%', '95%']}
+        initialIndex={0}
+      >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Informations personnelles</Text>
-                <TouchableOpacity onPress={() => setInfoModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={theme.colors.textMuted} />
-                </TouchableOpacity>
               </View>
 
-              <KeyboardAwareScrollView 
-                showsVerticalScrollIndicator={false}
-                enableOnAndroid={true}
-                extraScrollHeight={Platform.OS === 'ios' ? 20 : 60}
-                keyboardOpeningTime={0}
-              >
+              <View>
                 <TouchableOpacity style={styles.modernAvatarPicker} onPress={pickAvatar} activeOpacity={0.8}>
                   {avatarUri ? (
                     <View style={styles.avatarWrapper}>
@@ -778,28 +774,21 @@ export default function ProfileScreen() {
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
-              </KeyboardAwareScrollView>
-            </Pressable>
-          </Pressable>
-      </Modal>
+              </View>
+      </AppBottomSheet>
 
       {/* ========== MODAL: Mon Véhicule ========== */}
-      <Modal visible={vehicleModalVisible} animationType="slide" transparent onRequestClose={() => setVehicleModalVisible(false)}>
-          <Pressable style={styles.modalOverlay} onPress={() => setVehicleModalVisible(false)}>
-            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+      <AppBottomSheet
+        visible={vehicleModalVisible}
+        onClose={() => setVehicleModalVisible(false)}
+        snapPoints={['75%', '95%']}
+        initialIndex={0}
+      >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Mon véhicule</Text>
-                <TouchableOpacity onPress={() => setVehicleModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={theme.colors.textMuted} />
-                </TouchableOpacity>
               </View>
 
-              <KeyboardAwareScrollView 
-                showsVerticalScrollIndicator={false}
-                enableOnAndroid={true}
-                extraScrollHeight={Platform.OS === 'ios' ? 20 : 60}
-                keyboardOpeningTime={0}
-              >
+              <View>
                 <View style={styles.vehicleIconContainer}>
                   <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
                     <Ionicons name="car-sport" size={48} color={theme.colors.white} />
@@ -948,28 +937,21 @@ export default function ProfileScreen() {
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
-              </KeyboardAwareScrollView>
-            </Pressable>
-          </Pressable>
-      </Modal>
+              </View>
+      </AppBottomSheet>
 
       {/* ========== MODAL: Préférences ========== */}
-      <Modal visible={prefsModalVisible} animationType="slide" transparent onRequestClose={() => setPrefsModalVisible(false)}>
-          <Pressable style={styles.modalOverlay} onPress={() => setPrefsModalVisible(false)}>
-            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+      <AppBottomSheet
+        visible={prefsModalVisible}
+        onClose={() => setPrefsModalVisible(false)}
+        snapPoints={['75%', '95%']}
+        initialIndex={0}
+      >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Préférences de voyage</Text>
-                <TouchableOpacity onPress={() => setPrefsModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={theme.colors.textMuted} />
-                </TouchableOpacity>
               </View>
 
-              <KeyboardAwareScrollView 
-                showsVerticalScrollIndicator={false}
-                enableOnAndroid={true}
-                extraScrollHeight={Platform.OS === 'ios' ? 20 : 60}
-                keyboardOpeningTime={0}
-              >
+              <View>
 
                 <View style={styles.prefCardsContainer}>
                   <PrefCard icon="musical-notes" label="Musique" value={music} onToggle={() => setMusic(!music)} />
@@ -1008,10 +990,8 @@ export default function ProfileScreen() {
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
-              </KeyboardAwareScrollView>
-            </Pressable>
-          </Pressable>
-      </Modal>
+              </View>
+      </AppBottomSheet>
     </SafeAreaView>
   );
 }
@@ -1200,16 +1180,25 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay: {
     flex: 1,
-    backgroundColor: theme.colors.overlay,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: theme.colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: theme.spacing.xl,
-    paddingBottom: 36,
-    maxHeight: '90%',
+    paddingBottom: 40,
+    minHeight: '75%',
+    maxHeight: '95%',
+  },
+  modalDragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.border,
+    alignSelf: 'center',
+    marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',

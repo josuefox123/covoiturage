@@ -31,7 +31,7 @@ export const apiEventEmitter = {
   }
 };
 
-const LOCAL_IP = '192.168.100.4';
+const LOCAL_IP = '192.168.100.22';
 const getBaseUrl = () => {
   if (Platform.OS === 'android') return `http://${LOCAL_IP}:8000/api`;
   if (Platform.OS === 'ios') return `http://${LOCAL_IP}:8000/api`;

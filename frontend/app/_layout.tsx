@@ -11,6 +11,7 @@
  * ==============================================================
  */
 import React, { useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -40,11 +41,13 @@ function NotificationInitializer() {
  */
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
+  const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <AuthProvider>
         <StatusBar style="dark" />
 
         {/* Initialisation silencieuse des notifications push */}
@@ -68,9 +71,10 @@ export default function RootLayout() {
           <Stack.Screen name="weather" options={{ presentation: 'card', headerShown: false, animation: 'slide_from_right' }} />
         </Stack>
         <LiveRideModal />
-        <CustomAlertProvider />
-      </AuthProvider>
-      </SafeAreaProvider>
+          <CustomAlertProvider />
+        </AuthProvider>
+        </SafeAreaProvider>
     </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }

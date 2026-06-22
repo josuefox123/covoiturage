@@ -96,22 +96,31 @@ export default function TripsScreen() {
   // Logic removed since it's now in RideCard
 
   const getFilteredTrips = (trips: any[], role: 'passenger' | 'driver') => {
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      
-      return trips.filter(item => {
-          const ride = role === 'passenger' ? item.ride_details : item;
-          if (!ride) return false;
-          
-          const rideDate = new Date(ride.departure_date);
-          rideDate.setHours(0,0,0,0);
-          
-          if (filterTab === 'active') {
-              return rideDate >= today;
-          } else {
-              return rideDate < today;
-          }
-      });
+    const now = new Date();
+
+    return trips.filter(item => {
+      const ride = role === 'passenger' ? item.ride_details : item;
+      if (!ride) return false;
+
+      // Construire le datetime exact de départ (date + heure)
+      let departureDateTime: Date;
+      if (ride.departure_date && ride.departure_time) {
+        const [h, m] = (ride.departure_time as string).split(':').map(Number);
+        departureDateTime = new Date(ride.departure_date);
+        departureDateTime.setHours(h, m, 0, 0);
+      } else {
+        departureDateTime = new Date(ride.departure_date);
+        departureDateTime.setHours(23, 59, 59, 999);
+      }
+
+      if (filterTab === 'active') {
+        // Actif = départ dans le futur ET statut non terminé
+        return departureDateTime > now && ride.status !== 'completed' && ride.status !== 'cancelled';
+      } else {
+        // Archivé = départ passé OU statut terminé/annulé
+        return departureDateTime <= now || ride.status === 'completed' || ride.status === 'cancelled';
+      }
+    });
   };
 
   const filteredPassengerTrips = getFilteredTrips(passengerTrips, 'passenger');

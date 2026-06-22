@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import LocationPicker from '../../src/components/LocationPicker';
+import { AppBottomSheet } from '../../src/components/AppBottomSheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CustomAlert } from '../../src/utils/CustomAlert';
 
@@ -1002,9 +1003,12 @@ export default function PublishScreen() {
       </KeyboardAvoidingView>
 
       {/* Profile Completion Modal */}
-      <Modal visible={profileModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+      <AppBottomSheet
+        visible={profileModalVisible}
+        onClose={() => setProfileModalVisible(false)}
+        snapPoints={['75%', '95%']}
+        initialIndex={0}
+      >
 
             <View style={styles.modalHeaderModern}>
               <Text style={styles.modalTitle}>Complétion du profil</Text>
@@ -1140,38 +1144,42 @@ export default function PublishScreen() {
                 </View>
               </>
             )}
-          </View>
-        </View>
-      </Modal>
+      </AppBottomSheet>
 
       {/* Location Picker Modal */}
-      <Modal visible={pickingLocationFor !== null} animationType="slide">
-        <LocationPicker
-          title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
-          onLocationSelected={(loc) => {
-            const cords = { lat: loc.latitude, lon: loc.longitude };
-            if (pickingLocationFor === 'departure') {
-              setDeparture(loc.name);
-              setDepartureCords(cords);
-              if (arrivalCords) computeEstimation(cords, arrivalCords);
-            } else {
-              setArrival(loc.name);
-              setArrivalCords(cords);
-              if (departureCords) computeEstimation(departureCords, cords);
-            }
-            setPickingLocationFor(null);
-          }}
-          onCancel={() => setPickingLocationFor(null)}
-        />
-      </Modal>
+      <AppBottomSheet
+        visible={pickingLocationFor !== null}
+        onClose={() => setPickingLocationFor(null)}
+        snapPoints={['75%', '95%']}
+        initialIndex={0}
+        useScrollView={false}
+      >
+            <LocationPicker
+              title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
+              onLocationSelected={(loc) => {
+                const cords = { lat: loc.latitude, lon: loc.longitude };
+                if (pickingLocationFor === 'departure') {
+                  setDeparture(loc.name);
+                  setDepartureCords(cords);
+                  if (arrivalCords) computeEstimation(cords, arrivalCords);
+                } else {
+                  setArrival(loc.name);
+                  setArrivalCords(cords);
+                  if (departureCords) computeEstimation(departureCords, cords);
+                }
+                setPickingLocationFor(null);
+              }}
+              onCancel={() => setPickingLocationFor(null)}
+            />
+      </AppBottomSheet>
 
       {/* Vehicle Warning Modal */}
-      <Modal visible={showVehicleWarning} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity style={{ alignSelf: 'flex-end', padding: 8 }} onPress={() => setShowVehicleWarning(false)}>
-              <Ionicons name="close" size={24} color={theme.colors.textMuted} />
-            </TouchableOpacity>
+      <AppBottomSheet
+        visible={showVehicleWarning}
+        onClose={() => setShowVehicleWarning(false)}
+        snapPoints={['40%', '60%']}
+        initialIndex={0}
+      >
 
             <View style={{ alignItems: 'center', padding: 16 }}>
               <Ionicons name="car-outline" size={60} color={theme.colors.primary} style={{ marginBottom: 16 }} />
@@ -1189,17 +1197,15 @@ export default function PublishScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </Modal>
+      </AppBottomSheet>
 
       {/* Expired License Warning Modal */}
-      <Modal visible={showExpiredLicenseWarning} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity style={{ alignSelf: 'flex-end', padding: 8 }} onPress={() => setShowExpiredLicenseWarning(false)}>
-              <Ionicons name="close" size={24} color={theme.colors.textMuted} />
-            </TouchableOpacity>
+      <AppBottomSheet
+        visible={showExpiredLicenseWarning}
+        onClose={() => setShowExpiredLicenseWarning(false)}
+        snapPoints={['40%', '60%']}
+        initialIndex={0}
+      >
 
             <View style={{ alignItems: 'center', padding: 16 }}>
               <Ionicons name="warning-outline" size={60} color={theme.colors.error} style={{ marginBottom: 16 }} />
@@ -1217,9 +1223,7 @@ export default function PublishScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </Modal>
+      </AppBottomSheet>
     </SafeAreaView>
   );
 }
@@ -1318,8 +1322,12 @@ const styles = StyleSheet.create({
   notLoggedButtonText: { color: theme.colors.white, fontWeight: 'bold', fontSize: 16 },
 
   // Modal styles
-  modalOverlay: { flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: theme.colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 36, maxHeight: '90%' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: theme.colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, minHeight: '75%', maxHeight: '95%' },
+  modalDragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, alignSelf: 'center', marginBottom: 16 },
+  locationPickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  locationPickerSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, minHeight: '75%', maxHeight: '95%', paddingBottom: 20 },
+  locationPickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginTop: 12, marginBottom: 4 },
   modalHeaderModern: { marginBottom: 20 },
   progressContainer: { marginBottom: 24 },
   progressLabel: { fontSize: 13, fontWeight: '700', color: theme.colors.textLight, marginBottom: 8, textAlign: 'right' },

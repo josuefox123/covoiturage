@@ -36,6 +36,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useAuth } from '../../src/context/AuthContext';
 import LocationPicker from '../../src/components/LocationPicker';
+import { AppBottomSheet } from '../../src/components/AppBottomSheet';
 import VerificationModal from '../../src/components/VerificationModal';
 import { Ride } from '../../src/types';
 import RideSearchCard from '../../src/components/common/RideSearchCard';
@@ -400,7 +401,27 @@ export default function HomeScreen() {
   }, [router]);
 
   const filteredRides = useMemo(() => {
-    let filtered = [...rides];
+    const now = new Date();
+
+    let filtered = rides.filter(r => {
+      // Masquer les trajets sans places disponibles
+      if ((r.seats_available ?? 1) <= 0) return false;
+
+      // Masquer les trajets dont la date/heure de départ est déjà passée
+      if (r.departure_date && r.departure_time) {
+        const [h, m] = (r.departure_time as string).split(':').map(Number);
+        const dep = new Date(r.departure_date);
+        dep.setHours(h, m, 0, 0);
+        if (dep < now) return false;
+      } else if (r.departure_date) {
+        // Pas d'heure connue : on masque si la date est strictement dans le passé
+        const dep = new Date(r.departure_date);
+        dep.setHours(23, 59, 59, 999);
+        if (dep < now) return false;
+      }
+
+      return true;
+    });
 
     if (departure) {
       filtered = filtered.filter(r =>
@@ -686,7 +707,13 @@ export default function HomeScreen() {
         }
       />
 
-      <Modal visible={pickingLocationFor !== null} animationType="slide" transparent={false}>
+      <AppBottomSheet
+        visible={pickingLocationFor !== null}
+        onClose={() => setPickingLocationFor(null)}
+        snapPoints={['75%', '95%']}
+        initialIndex={0}
+        useScrollView={false}
+      >
         <LocationPicker
           title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
           onLocationSelected={(loc) => {
@@ -696,7 +723,7 @@ export default function HomeScreen() {
           }}
           onCancel={() => setPickingLocationFor(null)}
         />
-      </Modal>
+      </AppBottomSheet>
 
       {/* ── Modal de vérification obligatoire ── */}
       <VerificationModal
@@ -713,6 +740,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
+  },
+  locationPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  locationPickerSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    minHeight: '75%',
+    maxHeight: '95%',
+    paddingBottom: 20,
+  },
+  locationPickerHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
   header: {
     position: 'absolute',

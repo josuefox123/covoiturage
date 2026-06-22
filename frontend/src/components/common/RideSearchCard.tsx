@@ -96,7 +96,7 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
           {/* En-tête avec conducteur et prix */}
           <View style={styles.rideHeader}>
             <View style={styles.driverSection}>
-              <ProfileAvatar name={driverName} url={ride.driver_details?.photo} size={48} showBorder={false} />
+              <ProfileAvatar name={driverName} url={ride.driver_details?.avatar} size={48} showBorder={false} />
               <View style={{ marginLeft: 12 }}>
                 <Text style={styles.driverName}>{driverName}</Text>
                 <View style={styles.ratingContainer}>
