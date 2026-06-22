@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+SupportChatBox.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div class="flex flex-col h-full bg-background border-l border-border">
     <!-- Chat Header -->

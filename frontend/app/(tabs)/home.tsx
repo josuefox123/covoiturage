@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * home.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   StyleSheet,
@@ -13,6 +25,7 @@ import {
   TextInput,
   ScrollView,
   Modal,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,6 +38,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import LocationPicker from '../../src/components/LocationPicker';
 import VerificationModal from '../../src/components/VerificationModal';
 import { Ride } from '../../src/types';
+import RideSearchCard from '../../src/components/common/RideSearchCard';
 
 // ─── Weather helpers ───────────────────────────────────────────────────────────
 interface WeatherDay {
@@ -94,123 +108,12 @@ const formatFullDate = (dateString: string | undefined) => {
 
 // Menu principal retiré comme demandé
 
-interface RideCardProps {
-  ride: Ride;
-  onPress: () => void;
-  index: number;
-}
-
-const RideCard: React.FC<RideCardProps> = ({ ride, onPress, index }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        delay: index * 100,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateY, {
-        toValue: 0,
-        delay: index * 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  const driverName = ride.driver_details?.full_name || 'Conducteur';
-  const avatarInitials = driverName.charAt(0).toUpperCase();
-  const price = ride.price_per_seat?.toLocaleString() || '0';
-  const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
-  const seatsLeft = ride.seats_available || 0;
-
-  return (
-    <Animated.View
-      style={[
-        styles.rideCardWrapper,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY }],
-        },
-      ]}
-    >
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-        <LinearGradient
-          colors={['#FFFFFF', '#F9FAFB']}
-          style={styles.rideCard}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {/* En-tête avec conducteur et prix */}
-          <View style={styles.rideHeader}>
-            <View style={styles.driverSection}>
-              <LinearGradient
-                colors={[PRIMARY_COLOR, '#1E40AF']}
-                style={styles.driverAvatar}
-              >
-                <Text style={styles.driverInitial}>{avatarInitials}</Text>
-              </LinearGradient>
-              <View>
-                <Text style={styles.driverName}>{driverName}</Text>
-                <View style={styles.ratingContainer}>
-                  <Ionicons name="star" size={12} color="#F59E0B" />
-                  <Text style={styles.ratingText}>{ride.driver_details?.rating || '4.9'}</Text>
-                  <Text style={styles.reviewCount}>(12 avis)</Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.priceSection}>
-              <Text style={styles.priceValue}>{price}</Text>
-              <Text style={styles.priceUnit}>FCFA</Text>
-            </View>
-          </View>
-
-          {/* Trajet */}
-          <View style={styles.routeSection}>
-            <View style={styles.timeline}>
-              <View style={[styles.timelineDot, { backgroundColor: PRIMARY_COLOR }]} />
-              <View style={styles.timelineLine} />
-              <View style={[styles.timelineDot, { backgroundColor: '#10B981' }]} />
-            </View>
-            <View style={styles.routeDetails}>
-              <View style={styles.routePoint}>
-                <Text style={styles.locationName} numberOfLines={1}>
-                  {ride.departure_location || 'Départ'}
-                </Text>
-                <Text style={styles.routeTime}>{departureTime}</Text>
-              </View>
-              <View style={styles.routePoint}>
-                <Text style={styles.locationName} numberOfLines={1}>
-                  {ride.arrival_location || 'Arrivée'}
-                </Text>
-                <Text style={styles.routeDate}>
-                  {formatFullDate(ride.departure_date)}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Footer avec places dispo */}
-          <View style={styles.rideFooter}>
-            <View style={styles.seatsContainer}>
-              <Ionicons name="people-outline" size={14} color={PRIMARY_COLOR} />
-              <Text style={styles.seatsText}>
-                {seatsLeft} place{seatsLeft > 1 ? 's' : ''} disponible{seatsLeft > 1 ? 's' : ''}
-              </Text>
-            </View>
-            <View style={styles.viewButton}>
-              <Text style={styles.viewButtonText}>Voir détail</Text>
-              <Ionicons name="arrow-forward" size={14} color={PRIMARY_COLOR} />
-            </View>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
-
+/**
+ * Composant HomeScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à HomeScreen.
+ */
 export default function HomeScreen() {
   const router = useRouter();
   const { user, authFetch, refreshUser } = useAuth();
@@ -224,7 +127,8 @@ export default function HomeScreen() {
   const [selectedFilter, setSelectedFilter] = useState('recommended');
   const [searchFocused, setSearchFocused] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  
+  const [searchType, setSearchType] = useState<'passenger' | 'parcel'>('passenger');
+
   const [promotions, setPromotions] = useState<any[]>([]);
   const [showPromotions, setShowPromotions] = useState(true);
 
@@ -382,19 +286,7 @@ export default function HomeScreen() {
   };
   // ─────────────────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    fetchRides();
-    fetchPromotionsAndSettings();
-
-    // Fetch branding pour le logo
-    authFetch('/branding/')
-      .then(data => {
-        if (data && data.logo) {
-          setLogoUrl(data.logo);
-        }
-      })
-      .catch(err => console.log("Erreur branding:", err));
-  }, []);
+  // Les chargements initiaux ont été déplacés dans useFocusEffect pour éviter les appels redondants
 
   const fetchPromotionsAndSettings = async () => {
     try {
@@ -409,7 +301,6 @@ export default function HomeScreen() {
         setShowPromotions(settingsRes.show_promotions);
       }
     } catch (e) {
-      console.log('Error fetching promotions:', e);
     }
   };
 
@@ -462,21 +353,27 @@ export default function HomeScreen() {
     extrapolate: 'clamp',
   });
 
-  useEffect(() => {
-    fetchRides();
-  }, []);
-
-  // Re-fetch rides whenever the screen comes into focus (e.g. after publishing)
+  // Charge et rafraîchit toutes les données lorsque l'écran d'accueil gagne le focus
   useFocusEffect(
     useCallback(() => {
       fetchRides();
+      fetchPromotionsAndSettings();
+      refreshUser();
+
+      authFetch('/branding/')
+        .then(data => {
+          if (data && data.logo) {
+            setLogoUrl(data.logo);
+          }
+        })
+        .catch(err => console.log("Erreur branding:", err));
     }, [])
   );
 
   const fetchRides = async () => {
     try {
       setLoading(true);
-      const data = await authFetch('/rides/');
+      const data = await authFetch(`/rides/?type=${searchType}`);
       setRides(Array.isArray(data) ? data : data?.results || []);
     } catch (error) {
       console.error('Erreur:', error);
@@ -484,6 +381,10 @@ export default function HomeScreen() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRides();
+  }, [searchType]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -528,7 +429,7 @@ export default function HomeScreen() {
   }, [rides, departure, destination, selectedFilter]);
 
   const renderRideItem = useCallback(({ item, index }: { item: Ride; index: number }) => (
-    <RideCard ride={item} onPress={() => handleRidePress(item)} index={index} />
+    <RideSearchCard ride={item} onPress={() => handleRidePress(item)} index={index} />
   ), [handleRidePress]);
 
   const filters = [
@@ -629,6 +530,10 @@ export default function HomeScreen() {
           { useNativeDriver: false }
         )}
         scrollEventThrottle={16}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -639,6 +544,28 @@ export default function HomeScreen() {
         }
         ListHeaderComponent={
           <>
+            {/* Toggle Recherche */}
+            <View style={{ flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 12, marginHorizontal: 16, marginTop: -20, marginBottom: 16, padding: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, zIndex: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: searchType === 'passenger' ? PRIMARY_COLOR : 'transparent', borderRadius: 8 }}
+                onPress={() => setSearchType('passenger')}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="people-outline" size={16} color={searchType === 'passenger' ? '#FFFFFF' : '#6B7280'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontWeight: '600', color: searchType === 'passenger' ? '#FFFFFF' : '#6B7280' }}>Passager</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: searchType === 'parcel' ? PRIMARY_COLOR : 'transparent', borderRadius: 8 }}
+                onPress={() => setSearchType('parcel')}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="cube-outline" size={16} color={searchType === 'parcel' ? '#FFFFFF' : '#6B7280'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontWeight: '600', color: searchType === 'parcel' ? '#FFFFFF' : '#6B7280' }}>Colis</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
             {/* Barre de recherche */}
             <View style={styles.searchSection}>
               <View style={[styles.searchCard, searchFocused && styles.searchCardFocused]}>
@@ -706,17 +633,6 @@ export default function HomeScreen() {
                     <TouchableOpacity activeOpacity={0.9}>
                       <View style={styles.promoCardContainer}>
                         <Image source={{ uri: item.image }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-                        <LinearGradient
-                          colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']}
-                          style={StyleSheet.absoluteFillObject}
-                        />
-                        <View style={styles.promoCardContent}>
-                          <Ionicons name={(item.icon || 'star') as any} size={24} color={item.color || '#FFFFFF'} style={styles.promoIcon} />
-                          <View>
-                            <Text style={styles.promoTitle}>{item.title}</Text>
-                            <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
-                          </View>
-                        </View>
                       </View>
                     </TouchableOpacity>
                   )}

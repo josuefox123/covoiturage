@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * useApi.ts
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 export const useApi = () => {
   const config = useRuntimeConfig()
   const baseURL: string = (config.public.apiBase as string) || 'http://localhost:8000/api'

@@ -1,19 +1,57 @@
+"""
+========================================================
+
+Fichier :
+serializers.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification
+from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, FinancialSettings, RefundRequest, Transaction, Parcel
 
 class UserPreferenceSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les préférences utilisateur (musique, bagages, animaux).
+    """
     class Meta:
         model = UserPreference
         fields = '__all__'
 
 class UserSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour le modèle User.
+    Gère l'affichage des informations utilisateur et inclut des champs calculés
+    tels que le nombre de trajets et les véhicules possédés.
+    """
     preference = UserPreferenceSerializer(read_only=True)
+    vehicles = serializers.SerializerMethodField()
+    rides_count = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'avatar', 'rating', 'is_verified', 'is_active', 'created_at', 'preference']
+        fields = ['id', 'full_name', 'email', 'phone', 'avatar', 'rating', 'parcels_completed', 'parcel_rating', 'is_verified', 'is_active', 'created_at', 'preference', 'vehicles', 'rides_count']
+
+    @extend_schema_field(dict)
+    def get_vehicles(self, obj):
+        return VehicleSerializer(obj.vehicles.all(), many=True).data
+
+    @extend_schema_field(int)
+    def get_rides_count(self, obj):
+        return obj.rides_driven.filter(status='completed').count()
 
 class AdminUserSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur complet du modèle User pour le tableau de bord administrateur.
+    Inclut des champs sensibles et toutes les informations.
+    """
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
@@ -41,6 +79,10 @@ class AdminUserSerializer(serializers.ModelSerializer):
         return instance
 
 class VehicleSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour le modèle Vehicle.
+    Gère la création et mise à jour des véhicules d'un conducteur.
+    """
     class Meta:
         model = Vehicle
         fields = '__all__'
@@ -48,15 +90,24 @@ class VehicleSerializer(serializers.ModelSerializer):
 
 
 class RideSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour le modèle Ride (Trajet).
+    Valide les lieux de départ/arrivée, les prix et les options de colis.
+    Inclus les relations imbriquées (conducteur, véhicule) en lecture.
+    """
     driver_details = UserSerializer(source='driver', read_only=True)
     vehicle_details = VehicleSerializer(source='vehicle', read_only=True)
 
     class Meta:
         model = Ride
         fields = '__all__'
-        read_only_fields = ['driver']
+        read_only_fields = ['driver', 'price_per_seat', 'zemy_commission']
 
 class BookingSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour le modèle Booking (Réservation).
+    Valide le nombre de places et expose les informations du passager.
+    """
     passenger_details = UserSerializer(source='passenger', read_only=True)
     ride_details = RideSerializer(source='ride', read_only=True)
 
@@ -65,7 +116,23 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['passenger']
 
+class ParcelSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour la gestion de l'envoi de colis.
+    """
+    sender_user_details = UserSerializer(source='sender_user', read_only=True)
+    ride_details = RideSerializer(source='ride', read_only=True)
+
+    class Meta:
+        model = Parcel
+        fields = '__all__'
+        read_only_fields = ['qr_code_data', 'zemy_commission', 'driver_payout']
+
+
 class MessageSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les messages (Textes, Images, Audio).
+    """
     sender_details = UserSerializer(source='sender', read_only=True)
     attachment_url = serializers.SerializerMethodField()
 
@@ -76,6 +143,7 @@ class MessageSerializer(serializers.ModelSerializer):
                   'location_lat', 'location_lng', 'is_read', 'is_urgent', 'created_at']
         read_only_fields = ['sender', 'is_read']
 
+    @extend_schema_field(str)
     def get_attachment_url(self, obj):
         request = self.context.get('request')
         if obj.attachment and hasattr(obj.attachment, 'url'):
@@ -85,6 +153,10 @@ class MessageSerializer(serializers.ModelSerializer):
         return None
 
 class ConversationSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les conversations (Messagerie et Support).
+    Expose le dernier message, le nombre de non-lus et l'urgence.
+    """
     participant_1_details = UserSerializer(source='participant_1', read_only=True)
     participant_2_details = UserSerializer(source='participant_2', read_only=True)
     ride_details = RideSerializer(source='ride', read_only=True)
@@ -96,18 +168,21 @@ class ConversationSerializer(serializers.ModelSerializer):
         model = Conversation
         fields = '__all__'
 
+    @extend_schema_field(dict)
     def get_last_message(self, obj):
         last_msg = obj.messages.order_by('-created_at').first()
         if last_msg:
             return MessageSerializer(last_msg, context=self.context).data
         return None
 
+    @extend_schema_field(int)
     def get_unread_count(self, obj):
         request = self.context.get('request')
         if request and hasattr(request, 'user') and request.user.is_authenticated:
             return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
         return 0
 
+    @extend_schema_field(bool)
     def get_has_urgent_unread(self, obj):
         request = self.context.get('request')
         if request and hasattr(request, 'user') and request.user.is_authenticated:
@@ -135,6 +210,9 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
 class NotificationSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les notifications (Alertes push FCM ou in-app).
+    """
     class Meta:
         model = Notification
         fields = '__all__'
@@ -146,6 +224,10 @@ class AppBrandingSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class VerificationRequestSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les demandes de vérification d'identité.
+    Gère l'upload de photos (Selfie, CNI).
+    """
     user_details = UserSerializer(source='user', read_only=True)
     
     class Meta:
@@ -154,13 +236,49 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PromotionSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les bannières promotionnelles (Dashboard Admin).
+    """
     class Meta:
         from .models import Promotion
         model = Promotion
         fields = '__all__'
 
 class MobileSettingsSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les paramètres mobiles globaux.
+    """
     class Meta:
         from .models import MobileSettings
         model = MobileSettings
+        fields = '__all__'
+
+class FinancialSettingsSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les paramètres financiers (Commissions).
+    """
+    class Meta:
+        model = FinancialSettings
+        fields = '__all__'
+
+class RefundRequestSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les demandes de remboursement.
+    """
+    passenger_details = UserSerializer(source='passenger', read_only=True)
+    driver_details = UserSerializer(source='driver', read_only=True)
+    booking_details = BookingSerializer(source='booking', read_only=True)
+
+    class Meta:
+        model = RefundRequest
+        fields = '__all__'
+
+class TransactionSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour les transactions financières.
+    """
+    ride_details = RideSerializer(source='ride', read_only=True)
+
+    class Meta:
+        model = Transaction
         fields = '__all__'

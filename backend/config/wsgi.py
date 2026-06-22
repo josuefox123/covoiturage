@@ -1,4 +1,19 @@
 """
+========================================================
+
+Fichier :
+wsgi.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
+"""
 WSGI config for config project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.

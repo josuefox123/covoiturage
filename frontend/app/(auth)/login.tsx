@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * login.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
@@ -25,6 +37,12 @@ import CustomAlert from '../../src/components/CustomAlert';
 
 const { width, height } = Dimensions.get('window');
 
+/**
+ * Composant LoginScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à LoginScreen.
+ */
 export default function LoginScreen() {
   const router = useRouter();
   const { loginWithPassword } = useAuth();

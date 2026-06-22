@@ -1,19 +1,40 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * api.ts
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import { Platform } from 'react-native';
 
-// ⚠️  Mettez ici l'IP de votre PC sur le réseau local (visible dans "npx expo start")
-// Exemple : si Expo affiche exp://192.168.100.22:8081, l'IP est 192.168.100.22
-const LOCAL_IP = '192.168.100.4';
+// Simple event emitter to handle global events like 401 Unauthorized
+export const apiEventEmitter = {
+  events: {} as Record<string, Function[]>,
+  on(event: string, callback: Function) {
+    if (!this.events[event]) this.events[event] = [];
+    this.events[event].push(callback);
+  },
+  emit(event: string, data?: any) {
+    if (this.events[event]) {
+      this.events[event].forEach(cb => cb(data));
+    }
+  },
+  off(event: string, callback: Function) {
+    if (this.events[event]) {
+      this.events[event] = this.events[event].filter(cb => cb !== callback);
+    }
+  }
+};
 
+const LOCAL_IP = '192.168.100.4';
 const getBaseUrl = () => {
-  // En dev sur Android physique/émulateur via Expo Go
-  if (Platform.OS === 'android') {
-    return `http://${LOCAL_IP}:8000/api`;
-  }
-  // Sur iOS physique via Expo Go
-  if (Platform.OS === 'ios') {
-    return `http://${LOCAL_IP}:8000/api`;
-  }
-  // Sur web (localhost)
+  if (Platform.OS === 'android') return `http://${LOCAL_IP}:8000/api`;
+  if (Platform.OS === 'ios') return `http://${LOCAL_IP}:8000/api`;
   return 'http://localhost:8000/api';
 };
 
@@ -38,7 +59,11 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
     headers,
   });
 
-  // Check if it's JSON
+  if (response.status === 401) {
+    // Émettre un événement pour déconnecter l'utilisateur via le contexte Auth
+    apiEventEmitter.emit('unauthorized');
+  }
+
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.indexOf('application/json') !== -1) {
     const data = await response.json();

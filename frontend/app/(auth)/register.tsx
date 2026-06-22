@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * register.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -7,6 +19,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import CustomAlert from '../../src/components/CustomAlert';
 
+/**
+ * Composant RegisterScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à RegisterScreen.
+ */
 export default function RegisterScreen() {
   const router = useRouter();
   const { registerWithPassword } = useAuth();
@@ -47,7 +65,6 @@ export default function RegisterScreen() {
       });
       router.replace('/(tabs)/home');
     } catch (error: any) {
-      console.log("Erreur d'inscription:", error?.message || error);
       setAlertConfig({ visible: true, title: "Erreur", message: "Impossible de créer le compte. Vérifiez si ce numéro ou cet email n'est pas déjà utilisé.", type: 'error' });
     } finally {
       setLoading(false);

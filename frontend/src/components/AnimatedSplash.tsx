@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * AnimatedSplash.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated, StyleSheet, Image, Dimensions } from 'react-native';
 import { theme } from '../styles/theme';
@@ -8,6 +20,12 @@ type Props = {
   onFinish: () => void;
 };
 
+/**
+ * Composant AnimatedSplash.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à AnimatedSplash.
+ */
 export default function AnimatedSplash({ onFinish }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
   const logoAnimScale = useRef(new Animated.Value(0.8)).current;
@@ -38,7 +56,6 @@ export default function AnimatedSplash({ onFinish }: Props) {
         }
       })
       .catch((err) => {
-        console.log('Error fetching branding:', err);
       })
       .finally(() => {
         // 2. Start animation based on the selected type

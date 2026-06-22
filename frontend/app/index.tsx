@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * index.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -22,6 +34,12 @@ import { theme } from '../src/styles/theme';
 const { width, height } = Dimensions.get('window');
 const PRIMARY_COLOR = theme.colors.primary;
 
+/**
+ * Composant OnboardingScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à OnboardingScreen.
+ */
 export default function OnboardingScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();

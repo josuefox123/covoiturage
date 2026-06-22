@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * help-center.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,6 +17,12 @@ import { theme } from '../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+/**
+ * Composant HelpCenterScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à HelpCenterScreen.
+ */
 export default function HelpCenterScreen() {
   const router = useRouter();
 

@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+index.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div class="flex h-[calc(100vh-4rem)]">
     <!-- Conversations list -->
@@ -198,7 +210,6 @@ const playAlarm = () => {
     osc.start()
     osc.stop(ctx.currentTime + 0.4)
   } catch (e) {
-    console.log('Audio pas supporté ou bloqué par le navigateur')
   }
 }
 

@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * useNotifications.ts
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import { ref } from 'vue'
 
 export const useNotifications = () => {

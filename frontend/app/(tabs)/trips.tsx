@@ -1,28 +1,47 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * ==============================================================
+ * Fichier :
+ * trips.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/styles/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
+import { useTrips } from '../../src/hooks/useTrips';
 import { CustomAlert } from '../../src/utils/CustomAlert';
+import RideCard from '../../src/components/common/RideCard';
 
-const isItTimeForRide = (dateStr: string, timeStr: string) => {
+const isItTimeForLiveRide = (dateStr: string, timeStr: string) => {
   if (!dateStr || !timeStr) return false;
-  const rideDate = new Date(dateStr);
-  const now = new Date();
-  if (rideDate.toDateString() !== now.toDateString()) return false;
-  
+  const [year, month, day] = dateStr.split('-').map(Number);
   const [hours, minutes] = timeStr.split(':').map(Number);
-  const rideTimeInMinutes = hours * 60 + minutes;
-  const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-  
-  return currentTimeInMinutes >= rideTimeInMinutes - 15;
+  const departureDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  const now = new Date();
+  const tenMinutesBefore = new Date(departureDate.getTime() - 10 * 60 * 1000);
+  return now.getTime() >= tenMinutesBefore.getTime();
 };
 
+/**
+ * Composant TripsScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à TripsScreen.
+ */
 export default function TripsScreen() {
   const router = useRouter();
   const { user, authFetch } = useAuth();
+  const { fetchPassengerBookings, fetchDriverRides, loading: tripsLoading } = useTrips();
   const [activeTab, setActiveTab] = useState<'passenger' | 'driver'>('passenger');
   const [filterTab, setFilterTab] = useState<'active' | 'archived'>('active');
   
@@ -31,9 +50,11 @@ export default function TripsScreen() {
   const [loading, setLoading] = useState(true);
   const [contactingId, setContactingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTrips();
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchTrips();
+    }, [user, fetchPassengerBookings, fetchDriverRides])
+  );
 
   const contactDriver = async (rideId: string) => {
     setContactingId(rideId);
@@ -58,13 +79,12 @@ export default function TripsScreen() {
     
     setLoading(true);
     try {
-      // Fetch passenger trips (Bookings)
-      const bookingsResponse = await authFetch(`/bookings/?passenger=${user.id}`);
-      setPassengerTrips(bookingsResponse.results || bookingsResponse || []);
-      
-      // Fetch driver trips (Rides)
-      const ridesResponse = await authFetch(`/rides/?driver=${user.id}`);
-      setDriverTrips(ridesResponse.results || ridesResponse || []);
+      const [bookings, rides] = await Promise.all([
+        fetchPassengerBookings(),
+        fetchDriverRides(),
+      ]);
+      setPassengerTrips(bookings);
+      setDriverTrips(rides);
     } catch (error) {
       console.error('Error fetching trips:', error);
       CustomAlert.alert('Erreur', 'Impossible de charger vos trajets.');
@@ -73,29 +93,7 @@ export default function TripsScreen() {
     }
   };
 
-  const getStatusBadge = (status: string, rideData?: any) => {
-    let effectiveStatus = status.toLowerCase();
-    
-    if (effectiveStatus === 'active' && rideData) {
-      if (!isItTimeForRide(rideData.departure_date, rideData.departure_time)) {
-        return { bg: theme.colors.warningLight, text: theme.colors.warningDark, label: 'En attente' };
-      }
-    }
-    
-    switch(effectiveStatus) {
-      case 'confirmed':
-      case 'active':
-        return { bg: theme.colors.successLight, text: theme.colors.success, label: effectiveStatus === 'active' ? 'En cours' : 'Confirmé' };
-      case 'pending':
-        return { bg: theme.colors.warningLight, text: theme.colors.warningDark, label: 'En attente' };
-      case 'completed':
-        return { bg: theme.colors.primaryLight, text: theme.colors.primary, label: 'Terminé' };
-      case 'cancelled':
-        return { bg: theme.colors.errorLight, text: theme.colors.error, label: 'Annulé' };
-      default:
-        return { bg: theme.colors.grayLight, text: theme.colors.textLight, label: status };
-    }
-  };
+  // Logic removed since it's now in RideCard
 
   const getFilteredTrips = (trips: any[], role: 'passenger' | 'driver') => {
       const today = new Date();
@@ -204,71 +202,23 @@ export default function TripsScreen() {
                 filteredPassengerTrips.map((booking: any) => {
                   const ride = booking.ride_details;
                   if (!ride) return null;
-                  const driver = ride.driver_details;
-                  const badge = getStatusBadge(booking.status, ride);
-                  const isActiveRightNow = ride.status === 'active' && isItTimeForRide(ride.departure_date, ride.departure_time);
+                  const isActiveRightNow = (ride.status === 'active' || ride.status === 'started') &&
+                                           isItTimeForLiveRide(ride.departure_date, ride.departure_time) &&
+                                           booking.status === 'confirmed';
                   
                   return (
-                    <View key={booking.id} style={[styles.card, isActiveRightNow && styles.activeCard]}>
-                      <View style={styles.cardHeader}>
-                        <View style={styles.driverInfo}>
-                          <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{driver?.full_name ? driver.full_name.charAt(0).toUpperCase() : '?'}</Text>
-                          </View>
-                          <View>
-                            <Text style={styles.driverName}>{driver?.full_name || driver?.phone || 'Inconnu'}</Text>
-                            <View style={styles.ratingContainer}>
-                              <Ionicons name="star" size={14} color={theme.colors.warning} />
-                              <Text style={styles.ratingText}>{driver?.rating || '4.0'}</Text>
-                            </View>
-                          </View>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: isActiveRightNow ? theme.colors.success : badge.bg }]}>
-                          <Text style={[styles.statusText, { color: isActiveRightNow ? theme.colors.white : badge.text }]}>
-                            {isActiveRightNow ? 'EN COURS' : badge.label}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.tripDetails}>
-                        <View style={styles.detailRow}>
-                          <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
-                          <Text style={styles.detailText}>
-                            {ride.departure_location} → {ride.arrival_location}
-                          </Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Ionicons name="calendar-outline" size={20} color={theme.colors.textMuted} />
-                          <Text style={styles.detailText}>
-                            {new Date(ride.departure_date).toLocaleDateString("fr-FR", {
-                              weekday: "long",
-                              day: "numeric",
-                              month: "long",
-                            })} à {ride.departure_time}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.cardActions}>
-                        <TouchableOpacity
-                          style={[styles.primaryButton, contactingId === ride.id && { opacity: 0.6 }]}
-                          onPress={() => contactDriver(ride.id)}
-                          disabled={contactingId === ride.id}
-                        >
-                          {contactingId === ride.id ? (
-                            <ActivityIndicator size="small" color={theme.colors.white} />
-                          ) : (
-                            <Text style={styles.primaryButtonText}>Contacter</Text>
-                          )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.secondaryButton}
-                          onPress={() => router.push(`/ride/${ride.id}` as any)}
-                        >
-                          <Text style={styles.secondaryButtonText}>Détails</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+                    <RideCard
+                      key={booking.id}
+                      ride={ride}
+                      role="passenger"
+                      bookingStatus={booking.status}
+                      isActiveRightNow={isActiveRightNow}
+                      primaryActionLabel="Contacter"
+                      onPressPrimary={() => contactDriver(ride.id)}
+                      isPrimaryLoading={contactingId === ride.id}
+                      secondaryActionLabel="Détails"
+                      onPressSecondary={() => router.push(`/ride/${ride.id}` as any)}
+                    />
                   );
                 })
               )}
@@ -279,61 +229,19 @@ export default function TripsScreen() {
                 <Text style={styles.emptyText}>Aucun trajet {filterTab === 'active' ? 'actif' : 'archivé'} en tant que conducteur.</Text>
               ) : (
                 filteredDriverTrips.map((ride: any) => {
-                  const badge = getStatusBadge(ride.status, ride);
-                  const passengersCount = ride.total_seats - ride.seats_available;
-                  const isActiveRightNow = ride.status === 'active' && isItTimeForRide(ride.departure_date, ride.departure_time);
-                  
+                  const isActiveRightNow = (ride.status === 'active' || ride.status === 'started') &&
+                                           isItTimeForLiveRide(ride.departure_date, ride.departure_time);
                   return (
-                    <View key={ride.id} style={[styles.card, isActiveRightNow && styles.activeCard]}>
-                      <View style={styles.cardHeader}>
-                        <View style={styles.driverInfo}>
-                          <Ionicons name="people" size={24} color={theme.colors.primary} />
-                          <Text style={styles.driverName}>
-                            {passengersCount} passager{passengersCount > 1 ? "s" : ""}
-                          </Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: isActiveRightNow ? theme.colors.success : badge.bg }]}>
-                          <Text style={[styles.statusText, { color: isActiveRightNow ? theme.colors.white : badge.text }]}>
-                            {isActiveRightNow ? 'EN COURS' : badge.label}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.tripDetails}>
-                        <View style={styles.detailRow}>
-                          <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
-                          <Text style={styles.detailText}>
-                            {ride.departure_location} → {ride.arrival_location}
-                          </Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Ionicons name="calendar-outline" size={20} color={theme.colors.textMuted} />
-                          <Text style={styles.detailText}>
-                            {new Date(ride.departure_date).toLocaleDateString("fr-FR", {
-                              weekday: "long",
-                              day: "numeric",
-                              month: "long",
-                            })} à {ride.departure_time}
-                          </Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Ionicons name="people-outline" size={20} color={theme.colors.textMuted} />
-                          <Text style={styles.detailText}>{ride.seats_available} places restantes</Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.cardActions}>
-                        <TouchableOpacity
-                          style={styles.primaryButton}
-                          onPress={() => router.push(`/ride-management/${ride.id}` as any)}
-                        >
-                          <Text style={styles.primaryButtonText}>Gérer</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: theme.colors.errorLight }]}>
-                          <Text style={[styles.secondaryButtonText, { color: theme.colors.error }]}>Annuler</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+                    <RideCard
+                      key={ride.id}
+                      ride={ride}
+                      role="driver"
+                      isActiveRightNow={isActiveRightNow}
+                      primaryActionLabel="Gérer"
+                      onPressPrimary={() => router.push(`/ride-management/${ride.id}` as any)}
+                      secondaryActionLabel="Annuler"
+                      onPressSecondary={() => {}}
+                    />
                   );
                 })
               )}

@@ -1,4 +1,19 @@
 """
+========================================================
+
+Fichier :
+asgi.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
+"""
 ASGI config for config project — Django Channels WebSocket.
 
 Routes:

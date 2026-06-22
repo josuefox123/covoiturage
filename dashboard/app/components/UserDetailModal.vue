@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+UserDetailModal.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <Transition name="modal">
     <div

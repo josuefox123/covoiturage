@@ -1,9 +1,27 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * _layout.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import { Tabs } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
 import SupportBubble from '../../src/components/SupportBubble';
 
+/**
+ * Composant TabsLayout.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à TabsLayout.
+ */
 export default function TabsLayout() {
   return (
     <View style={{ flex: 1 }}>

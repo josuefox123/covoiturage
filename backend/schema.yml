@@ -1,0 +1,5056 @@
+openapi: 3.0.3
+info:
+  title: Zemy API
+  version: 1.0.0
+  description: |-
+    Documentation officielle de l'API Zemy.
+
+    Cette API permet de gérer :
+
+    • Authentification
+    • Utilisateurs
+    • Conducteurs
+    • Passagers
+    • Trajets
+    • Réservations
+    • Paiements
+    • Colis
+    • Vérification des comptes
+    • Notifications
+    • Messagerie
+    • Dashboard Administrateur
+  contact:
+    name: Support Zemy
+    email: support@zemy.app
+  license:
+    name: Propriétaire
+paths:
+  /api/auth/fcm-token/:
+    post:
+      operationId: auth_fcm_token_create
+      description: |-
+        Enregistre le token FCM de l'appareil de l'utilisateur connecté.
+        Appelé par le mobile après la connexion ou au lancement de l'app.
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      tags:
+      - Authentification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/register/:
+    post:
+      operationId: auth_register_create
+      tags:
+      - Authentification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/request-verification/:
+    post:
+      operationId: auth_request_verification_create
+      description: Le passager soumet une demande de vérification d'identité avec
+        images.
+      tags:
+      - Vérification des comptes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/verification-status/:
+    get:
+      operationId: auth_verification_status_retrieve
+      description: Retourne le statut de la demande de vérification de l'utilisateur
+        connecté.
+      tags:
+      - Vérification des comptes
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/verify-code/:
+    post:
+      operationId: auth_verify_code_create
+      tags:
+      - Vérification des comptes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/bookings/:
+    get:
+      operationId: bookings_list
+      tags:
+      - Réservations
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+          description: ''
+    post:
+      operationId: bookings_create
+      tags:
+      - Réservations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/bookings/{id}/:
+    get:
+      operationId: bookings_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+    put:
+      operationId: bookings_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+    patch:
+      operationId: bookings_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+    delete:
+      operationId: bookings_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/bookings/{id}/cancel/:
+    post:
+      operationId: bookings_cancel_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/bookings/{id}/complete/:
+    post:
+      operationId: bookings_complete_create
+      description: Permet au passager de marquer sa réservation comme terminée.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/bookings/{id}/pay/:
+    post:
+      operationId: bookings_pay_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/bookings/{id}/verify-payment/:
+    post:
+      operationId: bookings_verify_payment_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Réservation.
+        required: true
+      tags:
+      - Réservations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/branding/:
+    get:
+      operationId: branding_retrieve
+      tags:
+      - Administration
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: branding_update
+      tags:
+      - Administration
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/conversations/:
+    get:
+      operationId: conversations_list
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Conversation'
+          description: ''
+    post:
+      operationId: conversations_create
+      tags:
+      - Messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+  /api/conversations/{id}/:
+    get:
+      operationId: conversations_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Conversation.
+        required: true
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+    put:
+      operationId: conversations_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Conversation.
+        required: true
+      tags:
+      - Messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+    patch:
+      operationId: conversations_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Conversation.
+        required: true
+      tags:
+      - Messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedConversationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedConversationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedConversationRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+    delete:
+      operationId: conversations_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Conversation.
+        required: true
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/conversations/report-problem/:
+    post:
+      operationId: conversations_report_problem_create
+      tags:
+      - Messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+  /api/conversations/ride-chat/:
+    post:
+      operationId: conversations_ride_chat_create
+      description: Get or create a ride conversation between the current user and
+        the driver.
+      tags:
+      - Trajets
+      - Messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+  /api/conversations/support-chat/:
+    get:
+      operationId: conversations_support_chat_retrieve
+      description: Get or create the support conversation for the current user.
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+    post:
+      operationId: conversations_support_chat_create
+      description: Get or create the support conversation for the current user.
+      tags:
+      - Messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConversationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+  /api/conversations/unread_count/:
+    get:
+      operationId: conversations_unread_count_retrieve
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+          description: ''
+  /api/dashboard/stats/:
+    get:
+      operationId: dashboard_stats_retrieve
+      tags:
+      - Statistiques
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/financial-settings/:
+    get:
+      operationId: financial_settings_list
+      tags:
+      - financial-settings
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FinancialSettings'
+          description: ''
+    post:
+      operationId: financial_settings_create
+      tags:
+      - financial-settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialSettingsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FinancialSettingsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FinancialSettingsRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialSettings'
+          description: ''
+  /api/financial-settings/{id}/:
+    get:
+      operationId: financial_settings_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Paramètres
+          Financiers.
+        required: true
+      tags:
+      - financial-settings
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialSettings'
+          description: ''
+    put:
+      operationId: financial_settings_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Paramètres
+          Financiers.
+        required: true
+      tags:
+      - financial-settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialSettingsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FinancialSettingsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FinancialSettingsRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialSettings'
+          description: ''
+    patch:
+      operationId: financial_settings_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Paramètres
+          Financiers.
+        required: true
+      tags:
+      - financial-settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFinancialSettingsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFinancialSettingsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFinancialSettingsRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialSettings'
+          description: ''
+    delete:
+      operationId: financial_settings_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Paramètres
+          Financiers.
+        required: true
+      tags:
+      - financial-settings
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/messages/:
+    get:
+      operationId: messages_list
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+          description: ''
+    post:
+      operationId: messages_create
+      tags:
+      - Messages
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+  /api/messages/{id}/:
+    get:
+      operationId: messages_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Message.
+        required: true
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+    put:
+      operationId: messages_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Message.
+        required: true
+      tags:
+      - Messages
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+    patch:
+      operationId: messages_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Message.
+        required: true
+      tags:
+      - Messages
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMessageRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMessageRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+    delete:
+      operationId: messages_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Message.
+        required: true
+      tags:
+      - Messages
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/messages/{id}/mark-read/:
+    post:
+      operationId: messages_mark_read_create
+      description: Mark all messages in a conversation as read for the current user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Message.
+        required: true
+      tags:
+      - Messages
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+  /api/mobile-settings/:
+    get:
+      operationId: mobile_settings_retrieve
+      tags:
+      - Administration
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: mobile_settings_update
+      tags:
+      - Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: mobile_settings_partial_update
+      tags:
+      - Administration
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/notifications/:
+    get:
+      operationId: notifications_list
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+          description: ''
+    post:
+      operationId: notifications_create
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/{id}/:
+    get:
+      operationId: notifications_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) notification.
+        required: true
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    put:
+      operationId: notifications_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) notification.
+        required: true
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    patch:
+      operationId: notifications_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) notification.
+        required: true
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+    delete:
+      operationId: notifications_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) notification.
+        required: true
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/notifications/{id}/read/:
+    post:
+      operationId: notifications_read_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) notification.
+        required: true
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/mark-read/:
+    post:
+      operationId: notifications_mark_read_create
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/parcels/:
+    get:
+      operationId: parcels_list
+      tags:
+      - Colis
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Parcel'
+          description: ''
+    post:
+      operationId: parcels_create
+      tags:
+      - Colis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcel'
+          description: ''
+  /api/parcels/{id}/:
+    get:
+      operationId: parcels_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Colis.
+        required: true
+      tags:
+      - Colis
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcel'
+          description: ''
+    put:
+      operationId: parcels_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Colis.
+        required: true
+      tags:
+      - Colis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcel'
+          description: ''
+    patch:
+      operationId: parcels_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Colis.
+        required: true
+      tags:
+      - Colis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedParcelRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedParcelRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedParcelRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcel'
+          description: ''
+    delete:
+      operationId: parcels_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Colis.
+        required: true
+      tags:
+      - Colis
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/parcels/{id}/scan_qr/:
+    post:
+      operationId: parcels_scan_qr_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Colis.
+        required: true
+      tags:
+      - Colis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ParcelRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parcel'
+          description: ''
+  /api/preferences/:
+    get:
+      operationId: preferences_list
+      tags:
+      - preferences
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserPreference'
+          description: ''
+    post:
+      operationId: preferences_create
+      tags:
+      - preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreference'
+          description: ''
+  /api/preferences/{id}/:
+    get:
+      operationId: preferences_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Préférence Utilisateur.
+        required: true
+      tags:
+      - preferences
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreference'
+          description: ''
+    put:
+      operationId: preferences_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Préférence Utilisateur.
+        required: true
+      tags:
+      - preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreference'
+          description: ''
+    patch:
+      operationId: preferences_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Préférence Utilisateur.
+        required: true
+      tags:
+      - preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserPreferenceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserPreferenceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserPreferenceRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreference'
+          description: ''
+    delete:
+      operationId: preferences_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Préférence Utilisateur.
+        required: true
+      tags:
+      - preferences
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/promotions/:
+    get:
+      operationId: promotions_list
+      tags:
+      - Administration
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Promotion'
+          description: ''
+    post:
+      operationId: promotions_create
+      tags:
+      - Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromotionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PromotionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PromotionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promotion'
+          description: ''
+  /api/promotions/{id}/:
+    get:
+      operationId: promotions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Promotion.
+        required: true
+      tags:
+      - Administration
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promotion'
+          description: ''
+    put:
+      operationId: promotions_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Promotion.
+        required: true
+      tags:
+      - Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromotionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PromotionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PromotionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promotion'
+          description: ''
+    patch:
+      operationId: promotions_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Promotion.
+        required: true
+      tags:
+      - Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPromotionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPromotionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPromotionRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promotion'
+          description: ''
+    delete:
+      operationId: promotions_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Promotion.
+        required: true
+      tags:
+      - Administration
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/refund-requests/:
+    get:
+      operationId: refund_requests_list
+      tags:
+      - refund-requests
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RefundRequest'
+          description: ''
+    post:
+      operationId: refund_requests_create
+      tags:
+      - refund-requests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundRequest'
+          description: ''
+  /api/refund-requests/{id}/:
+    get:
+      operationId: refund_requests_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de Remboursement.
+        required: true
+      tags:
+      - refund-requests
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundRequest'
+          description: ''
+    put:
+      operationId: refund_requests_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de Remboursement.
+        required: true
+      tags:
+      - refund-requests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundRequest'
+          description: ''
+    patch:
+      operationId: refund_requests_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de Remboursement.
+        required: true
+      tags:
+      - refund-requests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRefundRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRefundRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRefundRequestRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundRequest'
+          description: ''
+    delete:
+      operationId: refund_requests_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de Remboursement.
+        required: true
+      tags:
+      - refund-requests
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/refund-requests/{id}/approve/:
+    post:
+      operationId: refund_requests_approve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de Remboursement.
+        required: true
+      tags:
+      - refund-requests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundRequest'
+          description: ''
+  /api/refund-requests/{id}/reject/:
+    post:
+      operationId: refund_requests_reject_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de Remboursement.
+        required: true
+      tags:
+      - refund-requests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundRequest'
+          description: ''
+  /api/rides/:
+    get:
+      operationId: rides_list
+      tags:
+      - Trajets
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ride'
+          description: ''
+    post:
+      operationId: rides_create
+      tags:
+      - Trajets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+          description: ''
+  /api/rides/{id}/:
+    get:
+      operationId: rides_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Trajet.
+        required: true
+      tags:
+      - Trajets
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+          description: ''
+    put:
+      operationId: rides_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Trajet.
+        required: true
+      tags:
+      - Trajets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+          description: ''
+    patch:
+      operationId: rides_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Trajet.
+        required: true
+      tags:
+      - Trajets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRideRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRideRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRideRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+          description: ''
+    delete:
+      operationId: rides_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Trajet.
+        required: true
+      tags:
+      - Trajets
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/rides/{id}/cancel/:
+    post:
+      operationId: rides_cancel_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Trajet.
+        required: true
+      tags:
+      - Trajets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+          description: ''
+  /api/rides/{id}/complete/:
+    post:
+      operationId: rides_complete_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Trajet.
+        required: true
+      tags:
+      - Trajets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+          description: ''
+  /api/rides/{id}/start/:
+    post:
+      operationId: rides_start_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Trajet.
+        required: true
+      tags:
+      - Trajets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RideRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ride'
+          description: ''
+  /api/transactions/:
+    get:
+      operationId: transactions_list
+      tags:
+      - Paiements
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+          description: ''
+    post:
+      operationId: transactions_create
+      tags:
+      - Paiements
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+  /api/transactions/{id}/:
+    get:
+      operationId: transactions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Transaction.
+        required: true
+      tags:
+      - Paiements
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+    put:
+      operationId: transactions_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Transaction.
+        required: true
+      tags:
+      - Paiements
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+    patch:
+      operationId: transactions_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Transaction.
+        required: true
+      tags:
+      - Paiements
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTransactionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTransactionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTransactionRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: ''
+    delete:
+      operationId: transactions_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Transaction.
+        required: true
+      tags:
+      - Paiements
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/users/:
+    get:
+      operationId: users_list
+      tags:
+      - Utilisateurs
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminUser'
+          description: ''
+    post:
+      operationId: users_create
+      tags:
+      - Utilisateurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+  /api/users/{id}/:
+    get:
+      operationId: users_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Utilisateur.
+        required: true
+      tags:
+      - Utilisateurs
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+    put:
+      operationId: users_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Utilisateur.
+        required: true
+      tags:
+      - Utilisateurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Utilisateur.
+        required: true
+      tags:
+      - Utilisateurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+    delete:
+      operationId: users_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Utilisateur.
+        required: true
+      tags:
+      - Utilisateurs
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/users/{id}/rate/:
+    post:
+      operationId: users_rate_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Utilisateur.
+        required: true
+      tags:
+      - Utilisateurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+  /api/vehicles/:
+    get:
+      operationId: vehicles_list
+      tags:
+      - Conducteurs
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vehicle'
+          description: ''
+    post:
+      operationId: vehicles_create
+      tags:
+      - Conducteurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+  /api/vehicles/{id}/:
+    get:
+      operationId: vehicles_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Véhicule.
+        required: true
+      tags:
+      - Conducteurs
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+    put:
+      operationId: vehicles_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Véhicule.
+        required: true
+      tags:
+      - Conducteurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VehicleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+    patch:
+      operationId: vehicles_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Véhicule.
+        required: true
+      tags:
+      - Conducteurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVehicleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVehicleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVehicleRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+          description: ''
+    delete:
+      operationId: vehicles_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Véhicule.
+        required: true
+      tags:
+      - Conducteurs
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/verifications/:
+    get:
+      operationId: verifications_list
+      tags:
+      - verifications
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VerificationRequest'
+          description: ''
+    post:
+      operationId: verifications_create
+      tags:
+      - verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+          description: ''
+  /api/verifications/{id}/:
+    get:
+      operationId: verifications_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de vérification.
+        required: true
+      tags:
+      - verifications
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+          description: ''
+    put:
+      operationId: verifications_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de vérification.
+        required: true
+      tags:
+      - verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+          description: ''
+    patch:
+      operationId: verifications_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de vérification.
+        required: true
+      tags:
+      - verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVerificationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVerificationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVerificationRequestRequest'
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+          description: ''
+    delete:
+      operationId: verifications_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de vérification.
+        required: true
+      tags:
+      - verifications
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/verifications/{id}/approve/:
+    post:
+      operationId: verifications_approve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de vérification.
+        required: true
+      tags:
+      - verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+          description: ''
+  /api/verifications/{id}/reject/:
+    post:
+      operationId: verifications_reject_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Un(une) Chaîne UUID identifiant ce(cette) Demande de vérification.
+        required: true
+      tags:
+      - verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerificationRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequest'
+          description: ''
+components:
+  schemas:
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        full_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        phone:
+          type: string
+          title: Email, Téléphone ou Nom
+          maxLength: 20
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        rating:
+          type: number
+          format: double
+          readOnly: true
+        is_verified:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - phone
+      - rating
+    AdminUserRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        phone:
+          type: string
+          minLength: 1
+          title: Email, Téléphone ou Nom
+          maxLength: 20
+        avatar:
+          type: string
+          format: binary
+          nullable: true
+        is_verified:
+          type: boolean
+        is_active:
+          type: boolean
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - phone
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        passenger_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        ride_details:
+          allOf:
+          - $ref: '#/components/schemas/Ride'
+          readOnly: true
+        seats_booked:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/BookingStatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        ride:
+          type: string
+          format: uuid
+        passenger:
+          type: string
+          format: uuid
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - passenger
+      - passenger_details
+      - ride
+      - ride_details
+    BookingRequest:
+      type: object
+      properties:
+        seats_booked:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/BookingStatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        ride:
+          type: string
+          format: uuid
+      required:
+      - ride
+    BookingStatusEnum:
+      enum:
+      - pending
+      - confirmed
+      - cancelled
+      - completed
+      type: string
+      description: |-
+        * `pending` - En attente
+        * `confirmed` - Confirmée
+        * `cancelled` - Annulée
+        * `completed` - Terminée
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant_1_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        participant_2_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        ride_details:
+          allOf:
+          - $ref: '#/components/schemas/Ride'
+          readOnly: true
+        last_message:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        unread_count:
+          type: integer
+          readOnly: true
+        has_urgent_unread:
+          type: boolean
+          readOnly: true
+        conversation_type:
+          $ref: '#/components/schemas/ConversationTypeEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        ride:
+          type: string
+          format: uuid
+          nullable: true
+        participant_1:
+          type: string
+          format: uuid
+        participant_2:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - created_at
+      - has_urgent_unread
+      - id
+      - last_message
+      - participant_1
+      - participant_1_details
+      - participant_2_details
+      - ride_details
+      - unread_count
+      - updated_at
+    ConversationRequest:
+      type: object
+      properties:
+        conversation_type:
+          $ref: '#/components/schemas/ConversationTypeEnum'
+        ride:
+          type: string
+          format: uuid
+          nullable: true
+        participant_1:
+          type: string
+          format: uuid
+        participant_2:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - participant_1
+    ConversationTypeEnum:
+      enum:
+      - ride
+      - support
+      type: string
+      description: |-
+        * `ride` - Ride
+        * `support` - Support
+    FinancialSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        commission_percentage:
+          type: number
+          format: double
+        min_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        is_commission_active:
+          type: boolean
+        parcel_commission_percentage:
+          type: number
+          format: double
+        min_parcel_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_parcel_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        is_parcel_commission_active:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - updated_at
+    FinancialSettingsRequest:
+      type: object
+      properties:
+        commission_percentage:
+          type: number
+          format: double
+        min_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        is_commission_active:
+          type: boolean
+        parcel_commission_percentage:
+          type: number
+          format: double
+        min_parcel_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_parcel_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        is_parcel_commission_active:
+          type: boolean
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        conversation:
+          type: string
+          format: uuid
+        sender:
+          type: string
+          format: uuid
+          readOnly: true
+        sender_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        content:
+          type: string
+        message_type:
+          $ref: '#/components/schemas/MessageTypeEnum'
+        attachment:
+          type: string
+          format: uri
+          nullable: true
+        attachment_url:
+          type: string
+          readOnly: true
+        location_lat:
+          type: number
+          format: double
+          nullable: true
+        location_lng:
+          type: number
+          format: double
+          nullable: true
+        is_read:
+          type: boolean
+          readOnly: true
+        is_urgent:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - attachment_url
+      - conversation
+      - created_at
+      - id
+      - is_read
+      - sender
+      - sender_details
+    MessageRequest:
+      type: object
+      properties:
+        conversation:
+          type: string
+          format: uuid
+        content:
+          type: string
+        message_type:
+          $ref: '#/components/schemas/MessageTypeEnum'
+        attachment:
+          type: string
+          format: binary
+          nullable: true
+        location_lat:
+          type: number
+          format: double
+          nullable: true
+        location_lng:
+          type: number
+          format: double
+          nullable: true
+        is_urgent:
+          type: boolean
+      required:
+      - conversation
+    MessageTypeEnum:
+      enum:
+      - text
+      - image
+      - audio
+      - file
+      - location
+      type: string
+      description: |-
+        * `text` - Text
+        * `image` - Image
+        * `audio` - Audio
+        * `file` - File
+        * `location` - Location
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        message:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - created_at
+      - id
+      - message
+      - title
+    NotificationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        message:
+          type: string
+          minLength: 1
+        is_read:
+          type: boolean
+        user:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - message
+      - title
+    Parcel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        sender_user_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        ride_details:
+          allOf:
+          - $ref: '#/components/schemas/Ride'
+          readOnly: true
+        sender_name:
+          type: string
+          maxLength: 255
+        sender_phone:
+          type: string
+          maxLength: 20
+        receiver_name:
+          type: string
+          maxLength: 255
+        receiver_phone:
+          type: string
+          maxLength: 20
+        pickup_location:
+          type: string
+          maxLength: 255
+        dropoff_location:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        weight:
+          type: number
+          format: double
+        dimensions:
+          type: string
+          maxLength: 50
+        estimated_value:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        photo:
+          type: string
+          format: uri
+          nullable: true
+        special_instructions:
+          type: string
+          nullable: true
+        price:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        zemy_commission:
+          type: integer
+          readOnly: true
+        driver_payout:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/ParcelStatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        qr_code_data:
+          type: string
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        ride:
+          type: string
+          format: uuid
+        sender_user:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - created_at
+      - description
+      - dimensions
+      - driver_payout
+      - dropoff_location
+      - id
+      - pickup_location
+      - price
+      - qr_code_data
+      - receiver_name
+      - receiver_phone
+      - ride
+      - ride_details
+      - sender_name
+      - sender_phone
+      - sender_user_details
+      - updated_at
+      - weight
+      - zemy_commission
+    ParcelRequest:
+      type: object
+      properties:
+        sender_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        sender_phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        receiver_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        receiver_phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        pickup_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        dropoff_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        weight:
+          type: number
+          format: double
+        dimensions:
+          type: string
+          minLength: 1
+          maxLength: 50
+        estimated_value:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        photo:
+          type: string
+          format: binary
+          nullable: true
+        special_instructions:
+          type: string
+          nullable: true
+        price:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/ParcelStatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        ride:
+          type: string
+          format: uuid
+        sender_user:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - description
+      - dimensions
+      - dropoff_location
+      - pickup_location
+      - price
+      - receiver_name
+      - receiver_phone
+      - ride
+      - sender_name
+      - sender_phone
+      - weight
+    ParcelStatusEnum:
+      enum:
+      - pending
+      - accepted
+      - picked_up
+      - in_transit
+      - delivered
+      - cancelled
+      type: string
+      description: |-
+        * `pending` - En attente
+        * `accepted` - Accepté
+        * `picked_up` - Récupéré
+        * `in_transit` - En cours
+        * `delivered` - Livré
+        * `cancelled` - Annulé
+    PatchedAdminUserRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        phone:
+          type: string
+          minLength: 1
+          title: Email, Téléphone ou Nom
+          maxLength: 20
+        avatar:
+          type: string
+          format: binary
+          nullable: true
+        is_verified:
+          type: boolean
+        is_active:
+          type: boolean
+        password:
+          type: string
+          writeOnly: true
+    PatchedBookingRequest:
+      type: object
+      properties:
+        seats_booked:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/BookingStatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        ride:
+          type: string
+          format: uuid
+    PatchedConversationRequest:
+      type: object
+      properties:
+        conversation_type:
+          $ref: '#/components/schemas/ConversationTypeEnum'
+        ride:
+          type: string
+          format: uuid
+          nullable: true
+        participant_1:
+          type: string
+          format: uuid
+        participant_2:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedFinancialSettingsRequest:
+      type: object
+      properties:
+        commission_percentage:
+          type: number
+          format: double
+        min_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        is_commission_active:
+          type: boolean
+        parcel_commission_percentage:
+          type: number
+          format: double
+        min_parcel_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_parcel_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        is_parcel_commission_active:
+          type: boolean
+    PatchedMessageRequest:
+      type: object
+      properties:
+        conversation:
+          type: string
+          format: uuid
+        content:
+          type: string
+        message_type:
+          $ref: '#/components/schemas/MessageTypeEnum'
+        attachment:
+          type: string
+          format: binary
+          nullable: true
+        location_lat:
+          type: number
+          format: double
+          nullable: true
+        location_lng:
+          type: number
+          format: double
+          nullable: true
+        is_urgent:
+          type: boolean
+    PatchedNotificationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        message:
+          type: string
+          minLength: 1
+        is_read:
+          type: boolean
+        user:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedParcelRequest:
+      type: object
+      properties:
+        sender_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        sender_phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        receiver_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        receiver_phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        pickup_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        dropoff_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        weight:
+          type: number
+          format: double
+        dimensions:
+          type: string
+          minLength: 1
+          maxLength: 50
+        estimated_value:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        photo:
+          type: string
+          format: binary
+          nullable: true
+        special_instructions:
+          type: string
+          nullable: true
+        price:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/ParcelStatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        ride:
+          type: string
+          format: uuid
+        sender_user:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedPromotionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        subtitle:
+          type: string
+          nullable: true
+          maxLength: 255
+        image:
+          type: string
+          format: binary
+        color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        icon:
+          type: string
+          nullable: true
+          maxLength: 50
+        is_active:
+          type: boolean
+        position:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+    PatchedRefundRequestRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        reason:
+          type: string
+          minLength: 1
+        status:
+          $ref: '#/components/schemas/Status516Enum'
+        booking:
+          type: string
+          format: uuid
+        passenger:
+          type: string
+          format: uuid
+        driver:
+          type: string
+          format: uuid
+    PatchedRideRequest:
+      type: object
+      properties:
+        departure_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        arrival_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        departure_date:
+          type: string
+          format: date
+        departure_time:
+          type: string
+          format: time
+        driver_payout:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_seats:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        seats_available:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        driver_latitude:
+          type: number
+          format: double
+          nullable: true
+        driver_longitude:
+          type: number
+          format: double
+          nullable: true
+        accepts_parcels:
+          type: boolean
+        max_parcels:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        parcels_available:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_weight_per_parcel:
+          type: number
+          format: double
+        max_dimensions:
+          type: string
+          nullable: true
+          maxLength: 50
+        price_per_parcel:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        allowed_parcel_types:
+          nullable: true
+        series:
+          type: string
+          format: uuid
+          nullable: true
+        vehicle:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedTransactionRequest:
+      type: object
+      properties:
+        transaction_type:
+          $ref: '#/components/schemas/TransactionTypeEnum'
+        amount:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        driver_payout:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        zemy_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_price:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/TransactionStatusEnum'
+        user:
+          type: string
+          format: uuid
+        ride:
+          type: string
+          format: uuid
+          nullable: true
+        parcel:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedUserPreferenceRequest:
+      type: object
+      properties:
+        music:
+          type: boolean
+        smoking:
+          type: boolean
+        chatty:
+          type: boolean
+        air_conditioner:
+          type: boolean
+        pets_allowed:
+          type: boolean
+        luggage_allowed:
+          type: boolean
+        stops_allowed:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+          description: Préférences personnalisées du voyageur
+        user:
+          type: string
+          format: uuid
+    PatchedVehicleRequest:
+      type: object
+      properties:
+        vehicle_type:
+          $ref: '#/components/schemas/VehicleTypeEnum'
+        brand_model:
+          type: string
+          minLength: 1
+          maxLength: 255
+        color:
+          type: string
+          minLength: 1
+          maxLength: 50
+        license_plate:
+          type: string
+          minLength: 1
+          maxLength: 50
+        driver_license_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        license_expiration:
+          type: string
+          format: date
+          nullable: true
+        driver_license_photo:
+          type: string
+          format: binary
+          nullable: true
+        owner:
+          type: string
+          format: uuid
+    PatchedVerificationRequestRequest:
+      type: object
+      properties:
+        selfie:
+          type: string
+          format: binary
+        id_front:
+          type: string
+          format: binary
+        id_back:
+          type: string
+          format: binary
+        status:
+          $ref: '#/components/schemas/Status516Enum'
+        user:
+          type: string
+          format: uuid
+    PaymentStatusEnum:
+      enum:
+      - pending
+      - escrow
+      - paid
+      - refunded
+      type: string
+      description: |-
+        * `pending` - En attente
+        * `escrow` - Retenu par Zemy
+        * `paid` - Payé au conducteur
+        * `refunded` - Remboursé
+    Promotion:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        subtitle:
+          type: string
+          nullable: true
+          maxLength: 255
+        image:
+          type: string
+          format: uri
+        color:
+          type: string
+          maxLength: 20
+        icon:
+          type: string
+          nullable: true
+          maxLength: 50
+        is_active:
+          type: boolean
+        position:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - image
+      - title
+      - updated_at
+    PromotionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        subtitle:
+          type: string
+          nullable: true
+          maxLength: 255
+        image:
+          type: string
+          format: binary
+        color:
+          type: string
+          minLength: 1
+          maxLength: 20
+        icon:
+          type: string
+          nullable: true
+          maxLength: 50
+        is_active:
+          type: boolean
+        position:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+      required:
+      - image
+      - title
+    RefundRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        passenger_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        driver_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        booking_details:
+          allOf:
+          - $ref: '#/components/schemas/Booking'
+          readOnly: true
+        amount:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        reason:
+          type: string
+        status:
+          $ref: '#/components/schemas/Status516Enum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        booking:
+          type: string
+          format: uuid
+        passenger:
+          type: string
+          format: uuid
+        driver:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - booking
+      - booking_details
+      - created_at
+      - driver
+      - driver_details
+      - id
+      - passenger
+      - passenger_details
+      - reason
+      - updated_at
+    RefundRequestRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        reason:
+          type: string
+          minLength: 1
+        status:
+          $ref: '#/components/schemas/Status516Enum'
+        booking:
+          type: string
+          format: uuid
+        passenger:
+          type: string
+          format: uuid
+        driver:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - booking
+      - driver
+      - passenger
+      - reason
+    Ride:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        driver_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        vehicle_details:
+          allOf:
+          - $ref: '#/components/schemas/Vehicle'
+          readOnly: true
+        departure_location:
+          type: string
+          maxLength: 255
+        arrival_location:
+          type: string
+          maxLength: 255
+        departure_date:
+          type: string
+          format: date
+        departure_time:
+          type: string
+          format: time
+        price_per_seat:
+          type: integer
+          readOnly: true
+        driver_payout:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        zemy_commission:
+          type: integer
+          readOnly: true
+        total_seats:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        seats_available:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        driver_latitude:
+          type: number
+          format: double
+          nullable: true
+        driver_longitude:
+          type: number
+          format: double
+          nullable: true
+        accepts_parcels:
+          type: boolean
+        max_parcels:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        parcels_available:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_weight_per_parcel:
+          type: number
+          format: double
+        max_dimensions:
+          type: string
+          nullable: true
+          maxLength: 50
+        price_per_parcel:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        allowed_parcel_types:
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        series:
+          type: string
+          format: uuid
+          nullable: true
+        driver:
+          type: string
+          format: uuid
+          readOnly: true
+        vehicle:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - arrival_location
+      - created_at
+      - departure_date
+      - departure_location
+      - departure_time
+      - driver
+      - driver_details
+      - id
+      - price_per_seat
+      - seats_available
+      - total_seats
+      - updated_at
+      - vehicle_details
+      - zemy_commission
+    RideRequest:
+      type: object
+      properties:
+        departure_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        arrival_location:
+          type: string
+          minLength: 1
+          maxLength: 255
+        departure_date:
+          type: string
+          format: date
+        departure_time:
+          type: string
+          format: time
+        driver_payout:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_seats:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        seats_available:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        driver_latitude:
+          type: number
+          format: double
+          nullable: true
+        driver_longitude:
+          type: number
+          format: double
+          nullable: true
+        accepts_parcels:
+          type: boolean
+        max_parcels:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        parcels_available:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        max_weight_per_parcel:
+          type: number
+          format: double
+        max_dimensions:
+          type: string
+          nullable: true
+          maxLength: 50
+        price_per_parcel:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        allowed_parcel_types:
+          nullable: true
+        series:
+          type: string
+          format: uuid
+          nullable: true
+        vehicle:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - arrival_location
+      - departure_date
+      - departure_location
+      - departure_time
+      - seats_available
+      - total_seats
+    Status516Enum:
+      enum:
+      - pending
+      - approved
+      - rejected
+      type: string
+      description: |-
+        * `pending` - En attente
+        * `approved` - Approuvée
+        * `rejected` - Rejetée
+    StatusEnum:
+      enum:
+      - active
+      - started
+      - completed
+      - cancelled
+      type: string
+      description: |-
+        * `active` - Active
+        * `started` - Started
+        * `completed` - Completed
+        * `cancelled` - Cancelled
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        ride_details:
+          allOf:
+          - $ref: '#/components/schemas/Ride'
+          readOnly: true
+        transaction_type:
+          $ref: '#/components/schemas/TransactionTypeEnum'
+        amount:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        driver_payout:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        zemy_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_price:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/TransactionStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+        ride:
+          type: string
+          format: uuid
+          nullable: true
+        parcel:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - created_at
+      - id
+      - ride_details
+      - updated_at
+      - user
+    TransactionRequest:
+      type: object
+      properties:
+        transaction_type:
+          $ref: '#/components/schemas/TransactionTypeEnum'
+        amount:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        driver_payout:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        zemy_commission:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        total_price:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        status:
+          $ref: '#/components/schemas/TransactionStatusEnum'
+        user:
+          type: string
+          format: uuid
+        ride:
+          type: string
+          format: uuid
+          nullable: true
+        parcel:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - user
+    TransactionStatusEnum:
+      enum:
+      - pending
+      - completed
+      type: string
+      description: |-
+        * `pending` - En attente
+        * `completed` - Effectué
+    TransactionTypeEnum:
+      enum:
+      - ride
+      - parcel
+      - withdrawal
+      - refund
+      type: string
+      description: |-
+        * `ride` - Trajet
+        * `parcel` - Colis
+        * `withdrawal` - Retrait
+        * `refund` - Remboursement
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        full_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        phone:
+          type: string
+          title: Email, Téléphone ou Nom
+          maxLength: 20
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        rating:
+          type: number
+          format: double
+        parcels_completed:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        parcel_rating:
+          type: number
+          format: double
+        is_verified:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        preference:
+          allOf:
+          - $ref: '#/components/schemas/UserPreference'
+          readOnly: true
+        vehicles:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        rides_count:
+          type: integer
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - phone
+      - preference
+      - rides_count
+      - vehicles
+    UserPreference:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        music:
+          type: boolean
+        smoking:
+          type: boolean
+        chatty:
+          type: boolean
+        air_conditioner:
+          type: boolean
+        pets_allowed:
+          type: boolean
+        luggage_allowed:
+          type: boolean
+        stops_allowed:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+          description: Préférences personnalisées du voyageur
+        user:
+          type: string
+          format: uuid
+      required:
+      - id
+      - user
+    UserPreferenceRequest:
+      type: object
+      properties:
+        music:
+          type: boolean
+        smoking:
+          type: boolean
+        chatty:
+          type: boolean
+        air_conditioner:
+          type: boolean
+        pets_allowed:
+          type: boolean
+        luggage_allowed:
+          type: boolean
+        stops_allowed:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+          description: Préférences personnalisées du voyageur
+        user:
+          type: string
+          format: uuid
+      required:
+      - user
+    UserRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        phone:
+          type: string
+          minLength: 1
+          title: Email, Téléphone ou Nom
+          maxLength: 20
+        avatar:
+          type: string
+          format: binary
+          nullable: true
+        rating:
+          type: number
+          format: double
+        parcels_completed:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        parcel_rating:
+          type: number
+          format: double
+        is_verified:
+          type: boolean
+        is_active:
+          type: boolean
+      required:
+      - phone
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        vehicle_type:
+          $ref: '#/components/schemas/VehicleTypeEnum'
+        brand_model:
+          type: string
+          maxLength: 255
+        color:
+          type: string
+          maxLength: 50
+        license_plate:
+          type: string
+          maxLength: 50
+        driver_license_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        license_expiration:
+          type: string
+          format: date
+          nullable: true
+        driver_license_photo:
+          type: string
+          format: uri
+          nullable: true
+        owner:
+          type: string
+          format: uuid
+      required:
+      - brand_model
+      - color
+      - id
+      - license_plate
+      - owner
+    VehicleRequest:
+      type: object
+      properties:
+        vehicle_type:
+          $ref: '#/components/schemas/VehicleTypeEnum'
+        brand_model:
+          type: string
+          minLength: 1
+          maxLength: 255
+        color:
+          type: string
+          minLength: 1
+          maxLength: 50
+        license_plate:
+          type: string
+          minLength: 1
+          maxLength: 50
+        driver_license_number:
+          type: string
+          nullable: true
+          maxLength: 100
+        license_expiration:
+          type: string
+          format: date
+          nullable: true
+        driver_license_photo:
+          type: string
+          format: binary
+          nullable: true
+        owner:
+          type: string
+          format: uuid
+      required:
+      - brand_model
+      - color
+      - license_plate
+      - owner
+    VehicleTypeEnum:
+      enum:
+      - moto
+      - tricycle
+      - voiture
+      type: string
+      description: |-
+        * `moto` - Moto
+        * `tricycle` - Tricycle
+        * `voiture` - Voiture
+    VerificationRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user_details:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        selfie:
+          type: string
+          format: uri
+        id_front:
+          type: string
+          format: uri
+        id_back:
+          type: string
+          format: uri
+        status:
+          $ref: '#/components/schemas/Status516Enum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+      required:
+      - created_at
+      - id
+      - id_back
+      - id_front
+      - selfie
+      - updated_at
+      - user
+      - user_details
+    VerificationRequestRequest:
+      type: object
+      properties:
+        selfie:
+          type: string
+          format: binary
+        id_front:
+          type: string
+          format: binary
+        id_back:
+          type: string
+          format: binary
+        status:
+          $ref: '#/components/schemas/Status516Enum'
+        user:
+          type: string
+          format: uuid
+      required:
+      - id_back
+      - id_front
+      - selfie
+      - user
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

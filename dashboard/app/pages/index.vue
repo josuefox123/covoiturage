@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+index.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div class="flex items-center justify-center min-h-screen">
     <p>Redirection vers le site principal...</p>

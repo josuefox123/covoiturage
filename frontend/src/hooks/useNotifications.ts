@@ -1,4 +1,16 @@
 /**
+ * ==============================================================
+ * Fichier :
+ * useNotifications.ts
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
+/**
  * Hook pour la gestion des notifications push (FCM via Expo Notifications).
  *
  * Usage dans _layout.tsx :
@@ -26,10 +38,8 @@ if (!isExpoGo && Platform.OS !== 'web') {
     Notifications = require('expo-notifications');
     Device = require('expo-device');
   } catch (e) {
-    console.log('[Notifications] expo-notifications non disponible (erreur de chargement binaire) :', e instanceof Error ? e.message : String(e));
   }
 } else {
-  console.log('[Notifications] expo-notifications ignoré (mode Expo Go ou Web actif)');
 }
 
 // Configuration de l'affichage des notifications en premier plan
@@ -45,6 +55,11 @@ if (Notifications) {
   });
 }
 
+/**
+ * Hook useNotifications.
+ *
+ * Gère la logique métier et l'état local.
+ */
 export function useNotifications() {
   const { token, authFetch } = useAuth();
   const router = useRouter();
@@ -123,7 +138,6 @@ export function useNotifications() {
         method: 'POST',
         body: JSON.stringify({ fcm_token: pushToken }),
       });
-      console.log('[Notifications] FCM token enregistré sur le serveur');
     } catch (e) {
       console.error('[Notifications] Erreur enregistrement FCM token:', e);
     }
@@ -152,7 +166,6 @@ export function useNotifications() {
     // Notification reçue en premier plan (affichée)
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (notification: any) => {
-        console.log('[Notifications] Notification reçue:', notification.request.content.title);
       }
     );
 
@@ -160,7 +173,6 @@ export function useNotifications() {
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response: any) => {
         const data = response.notification.request.content.data;
-        console.log('[Notifications] Notification cliquée, data:', data);
 
         // Deep linking vers la bonne page
         if (data?.screen === 'chat' && data?.conversation_id) {

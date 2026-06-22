@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * notifications.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, StyleSheet, SectionList, TouchableOpacity, 
@@ -174,6 +186,12 @@ const SkeletonLoader = () => (
   </View>
 );
 
+/**
+ * Composant NotificationsScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à NotificationsScreen.
+ */
 export default function NotificationsScreen() {
   const router = useRouter();
   const { authFetch, user } = useAuth();

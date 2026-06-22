@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * contact.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -7,6 +19,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { CustomAlert } from '../src/utils/CustomAlert';
 
+/**
+ * Composant ContactScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à ContactScreen.
+ */
 export default function ContactScreen() {
   const router = useRouter();
   const [subject, setSubject] = useState('');

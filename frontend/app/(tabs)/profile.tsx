@@ -1,4 +1,17 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * profile.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   StyleSheet,
   Text,
@@ -23,11 +36,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { CustomAlert } from '../../src/utils/CustomAlert';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 const { width } = Dimensions.get('window');
 
+/**
+ * Composant ProfileScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à ProfileScreen.
+ */
 export default function ProfileScreen() {
   const router = useRouter();
   const authCtx = useAuth();
@@ -35,6 +55,7 @@ export default function ProfileScreen() {
   const authFetch = authCtx?.authFetch ?? (async () => ({}));
   const logout = authCtx?.logout ?? (() => { });
   const updateUser = authCtx?.updateUser ?? (() => { });
+  const refreshUser = authCtx?.refreshUser ?? (async () => {});
 
   // Modals visibility
   const [infoModalVisible, setInfoModalVisible] = useState(false);
@@ -59,12 +80,18 @@ export default function ProfileScreen() {
   const [vehicleType, setVehicleType] = useState('voiture');
   const [driverLicense, setDriverLicense] = useState('');
   const [licenseExpiration, setLicenseExpiration] = useState('');
+  const [licenseExpirationError, setLicenseExpirationError] = useState('');
+  const [driverLicensePhoto, setDriverLicensePhoto] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Preferences state
   const [music, setMusic] = useState(true);
   const [smoking, setSmoking] = useState(false);
   const [chatty, setChatty] = useState(true);
   const [airCond, setAirCond] = useState(true);
+  const [petsAllowed, setPetsAllowed] = useState(false);
+  const [luggageAllowed, setLuggageAllowed] = useState(true);
+  const [stopsAllowed, setStopsAllowed] = useState(true);
   const [notes, setNotes] = useState('');
   const [vehicleId, setVehicleId] = useState<string | null>(null);
 
@@ -87,16 +114,19 @@ export default function ProfileScreen() {
     ]).start();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      setEditFullName(user.full_name || '');
-      setEditPhone(user.phone || '');
-      setEditEmail(user.email || '');
-      setAvatarUri(user.avatar || null);
-      fetchPreferences();
-      fetchVehicle();
-    }
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        setEditFullName(user.full_name || '');
+        setEditPhone(user.phone || '');
+        setEditEmail(user.email || '');
+        setAvatarUri(user.avatar || null);
+        fetchPreferences();
+        fetchVehicle();
+        refreshUser();
+      }
+    }, [user])
+  );
 
   const fetchPreferences = async () => {
     try {
@@ -107,10 +137,12 @@ export default function ProfileScreen() {
         setSmoking(pref.smoking ?? false);
         setChatty(pref.chatty ?? true);
         setAirCond(pref.air_conditioner ?? true);
+        setPetsAllowed(pref.pets_allowed ?? false);
+        setLuggageAllowed(pref.luggage_allowed ?? true);
+        setStopsAllowed(pref.stops_allowed ?? true);
         setNotes(pref.notes || '');
       }
     } catch (e) {
-      console.log('Erreur fetch preferences:', e);
     }
   };
 
@@ -128,13 +160,11 @@ export default function ProfileScreen() {
         setVehicleType(vehicle.vehicle_type || 'voiture');
         setDriverLicense(vehicle.driver_license_number || '');
         setLicenseExpiration(vehicle.license_expiration || '');
+        setDriverLicensePhoto(vehicle.driver_license_photo || null);
       }
     } catch (e) {
-      console.log('Erreur fetch vehicule:', e);
     }
   };
-
-  const refreshUser = authCtx?.refreshUser ?? (async () => { });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -284,39 +314,83 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickLicensePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      CustomAlert.alert('Permission refusée', 'Vous devez autoriser l\'accès à vos photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setDriverLicensePhoto(result.assets[0].uri);
+    }
+  };
+
   const handleSaveVehicle = async () => {
     if (!brand.trim() || !model.trim() || !color.trim() || !plate.trim()) {
       CustomAlert.alert('Erreur', 'Veuillez remplir tous les champs du véhicule.');
       return;
     }
 
-    if (vehicleType === 'voiture' && !licenseExpiration.trim()) {
-      CustomAlert.alert('Erreur', 'La date d\'expiration du permis est obligatoire pour les voitures.');
-      return;
+    if (vehicleType === 'voiture') {
+      if (!driverLicense.trim() || !licenseExpiration.trim() || !driverLicensePhoto) {
+        CustomAlert.alert('Erreur', 'Les informations du permis de conduire (numéro, date d\'expiration et photo) sont obligatoires pour les voitures.');
+        return;
+      }
+      
+      const expDate = new Date(licenseExpiration);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (expDate < today) {
+        setLicenseExpirationError('La date de votre permis est déjà expirée.');
+        return;
+      } else {
+        setLicenseExpirationError('');
+      }
     }
 
     setIsSaving(true);
     const brand_model = `${brand.trim()} ${model.trim()}`;
-    const payload = {
-      brand_model,
-      color,
-      license_plate: plate,
-      vehicle_type: vehicleType,
-      driver_license_number: driverLicense || null,
-      license_expiration: licenseExpiration || null
-    };
+    
+    const formData = new FormData();
+    formData.append('owner', user!.id);
+    formData.append('brand_model', brand_model);
+    formData.append('color', color);
+    formData.append('license_plate', plate);
+    formData.append('vehicle_type', vehicleType);
+    
+    if (vehicleType === 'voiture') {
+      formData.append('driver_license_number', driverLicense);
+      formData.append('license_expiration', licenseExpiration);
+    }
+
+    // Si on a une image locale (non serveur)
+    if (vehicleType === 'voiture' && driverLicensePhoto && !driverLicensePhoto.startsWith('http')) {
+      const filename = driverLicensePhoto.split('/').pop() || 'license.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      formData.append('driver_license_photo', {
+        uri: driverLicensePhoto,
+        name: filename,
+        type
+      } as any);
+    }
 
     try {
       if (vehicleId) {
         await authFetch(`/vehicles/${vehicleId}/`, {
           method: 'PATCH',
-          body: JSON.stringify(payload),
+          body: formData,
         });
         CustomAlert.alert('Succès ✅', 'Véhicule mis à jour !');
       } else {
         const res = await authFetch('/vehicles/', {
           method: 'POST',
-          body: JSON.stringify({ ...payload, owner: user!.id }),
+          body: formData,
         });
         if (res && res.id) setVehicleId(res.id);
         CustomAlert.alert('Succès ✅', 'Véhicule ajouté !');
@@ -340,6 +414,9 @@ export default function ProfileScreen() {
           smoking,
           chatty,
           air_conditioner: airCond,
+          pets_allowed: petsAllowed,
+          luggage_allowed: luggageAllowed,
+          stops_allowed: stopsAllowed,
           notes: notes.trim(),
         }),
       });
@@ -529,6 +606,13 @@ export default function ProfileScreen() {
               title="Préférences de voyage"
               subtitle="Musique, discussions, bagages..."
               onPress={() => setPrefsModalVisible(true)}
+            />
+            <View style={styles.menuDivider} />
+            <MenuItem
+              icon="wallet-outline"
+              title="Portefeuille & Transactions"
+              subtitle="Historique de vos paiements"
+              onPress={() => router.push('/transactions')}
             />
           </View>
         </View>
@@ -786,8 +870,11 @@ export default function ProfileScreen() {
                   ))}
                 </View>
 
+                {/* Section Permis de conduire (Obligatoire pour Voiture) */}
                 {vehicleType === 'voiture' && (
                   <>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginTop: 12, marginBottom: 8 }}>Permis de conduire</Text>
+                    
                     <View style={styles.inputWrapper}>
                       <Ionicons name="id-card-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
                       <TextInput
@@ -798,16 +885,56 @@ export default function ProfileScreen() {
                         placeholderTextColor={theme.colors.textMuted}
                       />
                     </View>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="calendar-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.modalInputModern}
-                        value={licenseExpiration}
-                        onChangeText={setLicenseExpiration}
-                        placeholder="Date d'expiration (YYYY-MM-DD)"
-                        placeholderTextColor={theme.colors.textMuted}
+
+                    <TouchableOpacity style={[styles.inputWrapper, licenseExpirationError ? { borderColor: theme.colors.error } : null]} onPress={() => setShowDatePicker(true)}>
+                      <Ionicons name="calendar-outline" size={20} color={licenseExpirationError ? theme.colors.error : theme.colors.textMuted} style={styles.inputIcon} />
+                      <Text style={[styles.modalInputModern, { paddingTop: Platform.OS === 'ios' ? 16 : 14, color: licenseExpiration ? theme.colors.text : theme.colors.textMuted }]}>
+                        {licenseExpiration || "Date d'expiration (Obligatoire)"}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    {licenseExpirationError ? (
+                      <Text style={{ color: theme.colors.error, fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
+                        {licenseExpirationError}
+                      </Text>
+                    ) : null}
+
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={licenseExpiration ? new Date(licenseExpiration) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event, selectedDate) => {
+                          setShowDatePicker(Platform.OS === 'ios');
+                          if (selectedDate) {
+                            const formattedDate = selectedDate.toISOString().split('T')[0];
+                            setLicenseExpiration(formattedDate);
+                            
+                            const expDate = new Date(selectedDate);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            expDate.setHours(0, 0, 0, 0);
+                            
+                            if (expDate < today) {
+                              setLicenseExpirationError('La date de votre permis est déjà expirée.');
+                            } else {
+                              setLicenseExpirationError('');
+                            }
+                          }
+                        }}
                       />
-                    </View>
+                    )}
+
+                    <TouchableOpacity 
+                      style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 24, gap: 12 }}
+                      onPress={pickLicensePhoto}
+                    >
+                      <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
+                      <Text style={{ flex: 1, color: theme.colors.text, fontSize: 14 }}>
+                        {driverLicensePhoto ? 'Photo sélectionnée' : 'Ajouter une photo du permis'}
+                      </Text>
+                      {driverLicensePhoto && <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />}
+                    </TouchableOpacity>
                   </>
                 )}
 
@@ -849,6 +976,9 @@ export default function ProfileScreen() {
                   <PrefCard icon="chatbubbles" label="Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
                   <PrefCard icon="logo-no-smoking" label="Fumeurs" value={smoking} onToggle={() => setSmoking(!smoking)} />
                   <PrefCard icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
+                  <PrefCard icon="paw" label="Animaux" value={petsAllowed} onToggle={() => setPetsAllowed(!petsAllowed)} />
+                  <PrefCard icon="briefcase" label="Bagages" value={luggageAllowed} onToggle={() => setLuggageAllowed(!luggageAllowed)} />
+                  <PrefCard icon="flag" label="Arrêts" value={stopsAllowed} onToggle={() => setStopsAllowed(!stopsAllowed)} />
                 </View>
 
                 <View style={{ marginTop: 24 }}>

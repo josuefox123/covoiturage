@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+login.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div class="min-h-screen bg-background flex">
     <!-- Left panel - decorative -->

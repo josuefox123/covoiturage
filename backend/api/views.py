@@ -1,3 +1,19 @@
+"""
+========================================================
+
+Fichier :
+views.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -5,17 +21,22 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from django.db import models
+from django.db import models, transaction
 from django.views.decorators.csrf import csrf_exempt
 import random
 
-from .models import Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, AppBranding, VerificationRequest, Promotion, MobileSettings
+from .models import (
+    Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, 
+    AppBranding, VerificationRequest, Promotion, MobileSettings,
+    FinancialSettings, RefundRequest, Transaction, Parcel
+)
 from .serializers import (
     UserSerializer, AdminUserSerializer, VehicleSerializer, UserPreferenceSerializer, 
     RideSerializer, BookingSerializer, ConversationSerializer, MessageSerializer, NotificationSerializer, AppBrandingSerializer,
-    VerificationRequestSerializer, PromotionSerializer, MobileSettingsSerializer
+    VerificationRequestSerializer, PromotionSerializer, MobileSettingsSerializer,
+    FinancialSettingsSerializer, RefundRequestSerializer, TransactionSerializer, ParcelSerializer
 )
-from .fcm import send_fcm_to_user, send_fcm_to_all_users
+from .fcm import send_fcm_to_user, send_fcm_to_all_users, create_and_send_notification
 
 User = get_user_model()
 
@@ -32,13 +53,16 @@ try:
             cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred)
         else:
-            print("WARNING: firebase-adminsdk.json not found! Placer le fichier dans le dossier backend.")
+            pass
 except Exception as e:
-    print(f"Error initializing Firebase Admin: {e}")
-
+    pass
+@extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Vérification des comptes'])
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def verify_code(request):
+    """
+    Vérifie le code OTP saisi par l'utilisateur.
+    """
     firebase_token = request.data.get('firebase_token')
     full_name = request.data.get('full_name', '') # For registration
     phone = request.data.get('phone', '') # Sent by frontend in dev mode
@@ -76,9 +100,9 @@ def verify_code(request):
             'is_new_user': created
         })
     except Exception as e:
-        print(f"Erreur de vérification Firebase: {e}")
         return Response({'error': 'Code invalide ou expiré.'}, status=status.HTTP_400_BAD_REQUEST)
 
+@extend_schema(request=dict, responses={200: dict}, tags=['Notifications'])
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def save_fcm_token(request):
@@ -93,10 +117,21 @@ def save_fcm_token(request):
     request.user.save(update_fields=['fcm_token'])
     return Response({'status': 'FCM token enregistré avec succès.'})
 
+@extend_schema(request=dict, responses={201: dict, 400: dict}, tags=['Authentification'])
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @csrf_exempt
 def register_user(request):
+    """
+    Enregistre un nouvel utilisateur.
+    
+    Args:
+        request: Requête contenant le téléphone et les données de base.
+    
+    Returns:
+        Response: 201 (Créé) avec un token JWT et les informations de l'utilisateur,
+                  ou 400 (Erreur) si le numéro existe déjà.
+    """
     from .serializers import RegisterSerializer
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
@@ -109,10 +144,20 @@ def register_user(request):
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Authentification'])
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @csrf_exempt
 def login_user(request):
+    """
+    Connecte un utilisateur existant.
+    
+    Args:
+        request: Requête contenant le téléphone (ou email) et le mot de passe.
+    
+    Returns:
+        Response: 200 avec token JWT si succès, ou 400 si identifiants invalides.
+    """
     identifier = request.data.get('identifier')
     password = request.data.get('password')
 
@@ -137,6 +182,7 @@ def login_user(request):
         })
     return Response({'error': 'Identifiants invalides.'}, status=status.HTTP_401_UNAUTHORIZED)
 
+@extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Vérification des comptes'])
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def request_verification(request):
@@ -175,6 +221,7 @@ def request_verification(request):
     }, status=status.HTTP_200_OK)
 
 
+@extend_schema(responses={200: dict}, tags=['Vérification des comptes'])
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def verification_status(request):
@@ -190,33 +237,238 @@ def verification_status(request):
     return Response({'status': 'none', 'is_verified': False})
 
 
+@extend_schema(responses={200: dict}, tags=['Statistiques'])
+@extend_schema(responses={200: dict}, tags=['Statistiques'])
 @api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
 def dashboard_stats(request):
-    total_users = User.objects.count()
-    total_rides = Ride.objects.count()
-    total_bookings = Booking.objects.count()
+    """
+    Renvoie les statistiques agrégées pour le tableau de bord Administrateur.
     
-    # Just basic statistics for the dashboard
+    Returns:
+        Response: Dictionnaire contenant les KPI (chiffre d'affaires, utilisateurs, trajets actifs...).
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Sum, Count
+
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Users
+    total_users = User.objects.count()
+    verified_users = User.objects.filter(is_verified=True).count()
+    unverified_users = total_users - verified_users
+    # Rough estimate of passengers vs drivers: drivers have vehicles
+    drivers = Vehicle.objects.values('owner').distinct().count()
+    passengers = total_users - drivers
+    pending_verifications = VerificationRequest.objects.filter(status='pending').count()
+
+    # Rides
+    active_rides = Ride.objects.filter(status__in=['active', 'started']).count()
+    today_rides = Ride.objects.filter(created_at__gte=today_start).count()
+    completed_rides = Ride.objects.filter(status='completed').count()
+    cancelled_rides = Ride.objects.filter(status='cancelled').count()
+
+    # Bookings
+    today_bookings = Booking.objects.filter(created_at__gte=today_start).count()
+    monthly_bookings = Booking.objects.filter(created_at__gte=month_start).count()
+    confirmed_bookings = Booking.objects.filter(status='confirmed').count()
+    cancelled_bookings = Booking.objects.filter(status='cancelled').count()
+
+    # Parcels
+    sent_parcels = Parcel.objects.count()
+    delivered_parcels = Parcel.objects.filter(status='delivered').count()
+
+    # Financials
+    transactions = Transaction.objects.filter(status='completed')
+    total_revenue = transactions.aggregate(Sum('amount'))['amount__sum'] or 0
+    monthly_revenue = transactions.filter(created_at__gte=month_start).aggregate(Sum('amount'))['amount__sum'] or 0
+    total_commission = transactions.aggregate(Sum('commission'))['commission__sum'] or 0
+    
+    refunds = RefundRequest.objects.filter(status='approved')
+    total_refunded = refunds.aggregate(Sum('amount'))['amount__sum'] or 0
+    pending_refunds = RefundRequest.objects.filter(status='pending').count()
+
+    # Time series (last 7 days revenue)
+    revenue_chart = []
+    rides_chart = []
+    # French days
+    days_fr = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+    for i in range(6, -1, -1):
+        d_start = today_start - timedelta(days=i)
+        d_end = d_start + timedelta(days=1)
+        day_rev = transactions.filter(created_at__gte=d_start, created_at__lt=d_end).aggregate(Sum('amount'))['amount__sum'] or 0
+        day_rides = Ride.objects.filter(created_at__gte=d_start, created_at__lt=d_end).count()
+        label = days_fr[d_start.weekday()]
+        revenue_chart.append({'x': label, 'y': float(day_rev)})
+        rides_chart.append({'x': label, 'y': day_rides})
+
+    # Recent activity
+    recent_bookings = Booking.objects.select_related('passenger').order_by('-created_at')[:5]
+    recent_rides = Ride.objects.select_related('driver').order_by('-created_at')[:5]
+    
+    activities = []
+    for b in recent_bookings:
+        activities.append({
+            'id': f'b_{b.id}',
+            'type': 'Nouvelle réservation',
+            'user': b.passenger.full_name if b.passenger.full_name else b.passenger.phone,
+            'time': b.created_at,
+            'icon': 'ph:ticket-fill',
+            'color': 'bg-primary/20 text-primary'
+        })
+    for r in recent_rides:
+        activities.append({
+            'id': f'r_{r.id}',
+            'type': 'Nouveau trajet',
+            'user': r.driver.full_name if r.driver.full_name else r.driver.phone,
+            'time': r.created_at,
+            'icon': 'ph:car-fill',
+            'color': 'bg-secondary/20 text-secondary'
+        })
+    
+    activities.sort(key=lambda x: x['time'], reverse=True)
+    for a in activities:
+        a['time'] = a['time'].isoformat()
+    activities = activities[:6]
+
+    # Map Data: active rides coordinates (mock fallback since some rides might lack lat/lng)
+    active_rides_qs = Ride.objects.filter(status__in=['active', 'started'])[:20]
+    map_data = []
+    for r in active_rides_qs:
+        lat = r.departure_lat
+        lng = r.departure_lng
+        # Si pas de coordonnées, on génère un point au pif proche du centre (Cotonou, Bénin)
+        if not lat or not lng:
+            import random
+            lat = 6.36536 + random.uniform(-0.05, 0.05)
+            lng = 2.41833 + random.uniform(-0.05, 0.05)
+        map_data.append({
+            'id': r.id,
+            'lat': float(lat),
+            'lng': float(lng),
+            'driver': r.driver.full_name if r.driver.full_name else r.driver.phone,
+            'status': r.status
+        })
+
     return Response({
-        'total_users': total_users,
-        'active_rides': total_rides,
-        'monthly_bookings': total_bookings,
-        'estimated_revenue': total_bookings * 500  # just a placeholder metric
+        'users': {
+            'total': total_users,
+            'verified': verified_users,
+            'unverified': unverified_users,
+            'drivers': drivers,
+            'passengers': passengers,
+            'pending_verifications': pending_verifications
+        },
+        'rides': {
+            'active': active_rides,
+            'today': today_rides,
+            'completed': completed_rides,
+            'cancelled': cancelled_rides
+        },
+        'bookings': {
+            'today': today_bookings,
+            'monthly': monthly_bookings,
+            'confirmed': confirmed_bookings,
+            'cancelled': cancelled_bookings
+        },
+        'parcels': {
+            'sent': sent_parcels,
+            'delivered': delivered_parcels
+        },
+        'financials': {
+            'total_revenue': float(total_revenue),
+            'monthly_revenue': float(monthly_revenue),
+            'total_commission': float(total_commission),
+            'total_refunded': float(total_refunded),
+            'pending_refunds': pending_refunds
+        },
+        'charts': {
+            'revenue_7d': revenue_chart,
+            'rides_7d': rides_chart
+        },
+        'activities': activities,
+        'map_data': map_data
     })
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all().order_by('-created_at')
+    """
+    ViewSet permettant de gérer les utilisateurs (CRUD).
+    
+    Endpoints :
+        - GET /api/users/ : Liste des utilisateurs
+        - POST /api/users/ : Création (Administrateur uniquement)
+        - GET /api/users/{id}/ : Détails d'un utilisateur
+        - PATCH /api/users/{id}/ : Mise à jour partielle
+    
+    Permissions :
+        IsAuthenticated (Lecture), IsAdminUser (Création/Suppression)
+    """
     serializer_class = AdminUserSerializer
-    permission_classes = [permissions.AllowAny]  # Dashboard admin access
-
-class VehicleViewSet(viewsets.ModelViewSet):
-    queryset = Vehicle.objects.all()
-    serializer_class = VehicleSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Vehicle.objects.filter(owner=self.request.user)
+        user = self.request.user
+        if user.is_staff:
+            return User.objects.all().order_by('-created_at')
+        # Si c'est un utilisateur normal, il ne peut voir que lui-même
+        return User.objects.filter(id=user.id)
+
+    @action(detail=True, methods=['post'], url_path='rate')
+    def rate_user(self, request, pk=None):
+        user_to_rate = self.get_object()
+        rating = request.data.get('rating')
+        if rating is None:
+            return Response({"error": "Note requise."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            rating = float(rating)
+            if rating < 1 or rating > 5:
+                raise ValueError()
+        except ValueError:
+            return Response({"error": "Note invalide (doit être entre 1 et 5)."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if user_to_rate.rating == 0.0:
+            user_to_rate.rating = rating
+        else:
+            user_to_rate.rating = (user_to_rate.rating + rating) / 2.0
+            
+        user_to_rate.save(update_fields=['rating'])
+        
+        # Trigger "Avis reçu" notification
+        create_and_send_notification(
+            user=user_to_rate,
+            title="Avis reçu ⭐",
+            message=f"Vous avez reçu une nouvelle note de {rating}/5 de la part d'un utilisateur.",
+            data={'type': 'rating_received', 'screen': 'profile'}
+        )
+        
+        return Response({"status": "Note enregistrée avec succès.", "new_rating": user_to_rate.rating})
+
+class VehicleViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour la gestion des véhicules des conducteurs.
+    
+    Endpoints :
+        - GET /api/vehicles/ : Liste des véhicules appartenant à l'utilisateur
+        - POST /api/vehicles/ : Ajouter un véhicule
+    """
+    serializer_class = VehicleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Vehicle.objects.none()
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return Vehicle.objects.all()
+        return Vehicle.objects.filter(owner=user)
 
 class UserPreferenceViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet gérant les préférences de trajet (musique, discussion, etc.).
+    """
     queryset = UserPreference.objects.all()
     serializer_class = UserPreferenceSerializer
 
@@ -235,34 +487,203 @@ class UserPreferenceViewSet(viewsets.ModelViewSet):
                 'smoking': request.data.get('smoking', False),
                 'chatty': request.data.get('chatty', True),
                 'air_conditioner': request.data.get('air_conditioner', True),
+                'pets_allowed': request.data.get('pets_allowed', False),
+                'luggage_allowed': request.data.get('luggage_allowed', True),
+                'stops_allowed': request.data.get('stops_allowed', True),
             }
         )
         serializer = self.get_serializer(pref)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 class RideViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet principal pour la gestion des trajets.
+    
+    Endpoints supplémentaires :
+        - GET /api/rides/search/ : Recherche avancée de trajets
+        - POST /api/rides/{id}/cancel/ : Annulation par le conducteur
+        - POST /api/rides/{id}/start/ : Démarrer un trajet
+        - POST /api/rides/{id}/complete/ : Terminer un trajet
+        - POST /api/rides/{id}/update_location/ : Mettre à jour la position GPS
+    """
     queryset = Ride.objects.all().order_by('-created_at')
     serializer_class = RideSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related('driver', 'vehicle').prefetch_related('driver__vehicles', 'driver__rides_driven')
         driver_id = self.request.query_params.get('driver')
+        ride_type = self.request.query_params.get('type')
         if driver_id:
             queryset = queryset.filter(driver_id=driver_id)
         elif getattr(self, 'action', '') == 'list' and not self.request.user.is_staff:
-            from datetime import date
-            queryset = queryset.filter(departure_date__gte=date.today())
+            from datetime import date, timedelta
+            from django.utils.timezone import now
+            one_hour_ago = now() - timedelta(hours=1)
+            queryset = queryset.filter(departure_date__gte=date.today()).exclude(status='cancelled').exclude(status='completed', updated_at__lt=one_hour_ago)
+        
+        if ride_type == 'parcel':
+            queryset = queryset.filter(accepts_parcels=True)
+            
         return queryset
+
+    def create(self, request, *args, **kwargs):
+        from rest_framework.exceptions import ValidationError
+        from datetime import datetime, timedelta
+        from django.db import transaction
+        
+        is_recurrent = request.data.get('is_recurrent', False)
+        
+        if is_recurrent:
+            if not request.user.is_verified:
+                raise ValidationError({"error": "Votre compte doit être vérifié pour publier un trajet."})
+                
+            start_date_str = request.data.get('start_date')
+            end_date_str = request.data.get('end_date')
+            repeat_type = request.data.get('repeat_type', 'daily')
+            week_days = request.data.get('week_days', [])
+            
+            if not start_date_str or not end_date_str:
+                raise ValidationError({"error": "Date de début et date de fin requises pour un trajet récurrent."})
+                
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            
+            if end_date < start_date:
+                raise ValidationError({"error": "La date de fin ne peut pas être antérieure à la date de début."})
+                
+            if repeat_type == 'weekly' and not week_days:
+                raise ValidationError({"error": "Veuillez sélectionner au moins un jour pour la récurrence."})
+            
+            departure_location = request.data.get('departure_location')
+            arrival_location = request.data.get('arrival_location')
+            departure_time = request.data.get('departure_time')
+            departure_time = request.data.get('departure_time')
+            driver_payout = int(request.data.get('driver_payout', 0))
+            
+            from .models import FinancialSettings
+            settings = FinancialSettings.load()
+            if settings.is_commission_active:
+                zemy_commission = int(driver_payout * (settings.commission_percentage / 100.0))
+                if zemy_commission < settings.min_commission:
+                    zemy_commission = settings.min_commission
+                if settings.max_commission and zemy_commission > settings.max_commission:
+                    zemy_commission = settings.max_commission
+            else:
+                zemy_commission = 0
+            
+            price_per_seat = driver_payout + zemy_commission
+            total_seats = request.data.get('total_seats')
+            vehicle_id = request.data.get('vehicle')
+            
+            accepts_parcels = request.data.get('accepts_parcels', False)
+            max_parcels = int(request.data.get('max_parcels', 0)) if request.data.get('max_parcels') else 0
+            max_weight_per_parcel = float(request.data.get('max_weight_per_parcel', 0.0)) if request.data.get('max_weight_per_parcel') else 0.0
+            max_dimensions = request.data.get('max_dimensions', '')
+            price_per_parcel = int(request.data.get('price_per_parcel', 0)) if request.data.get('price_per_parcel') else 0
+            allowed_parcel_types = request.data.get('allowed_parcel_types', [])
+            
+            with transaction.atomic():
+                from .models import RideSeries, Ride, Vehicle
+                vehicle_obj = None
+                if vehicle_id:
+                    vehicle_obj = Vehicle.objects.filter(id=vehicle_id).first()
+                
+                series = RideSeries.objects.create(
+                    driver=request.user,
+                    start_date=start_date,
+                    end_date=end_date,
+                    repeat_type=repeat_type,
+                    week_days=week_days,
+                    departure_time=departure_time,
+                    departure_location=departure_location,
+                    arrival_location=arrival_location,
+                    price_per_seat=price_per_seat,
+                    driver_payout=driver_payout,
+                    zemy_commission=zemy_commission,
+                    total_seats=total_seats,
+                    vehicle=vehicle_obj,
+                    accepts_parcels=accepts_parcels,
+                    max_parcels=max_parcels,
+                    max_weight_per_parcel=max_weight_per_parcel,
+                    max_dimensions=max_dimensions,
+                    price_per_parcel=price_per_parcel,
+                    allowed_parcel_types=allowed_parcel_types
+                )
+                
+                current_date = start_date
+                created_count = 0
+                while current_date <= end_date:
+                    create_this_day = False
+                    if repeat_type == 'daily':
+                        create_this_day = True
+                    elif repeat_type == 'weekly':
+                        if current_date.weekday() in week_days:
+                            create_this_day = True
+                    
+                    if create_this_day:
+                        Ride.objects.create(
+                            series=series,
+                            driver=request.user,
+                            vehicle=vehicle_obj,
+                            departure_location=departure_location,
+                            arrival_location=arrival_location,
+                            departure_date=current_date,
+                            departure_time=departure_time,
+                            price_per_seat=price_per_seat,
+                            driver_payout=driver_payout,
+                            zemy_commission=zemy_commission,
+                            total_seats=total_seats,
+                            seats_available=total_seats,
+                            accepts_parcels=accepts_parcels,
+                            max_parcels=max_parcels,
+                            parcels_available=max_parcels,
+                            max_weight_per_parcel=max_weight_per_parcel,
+                            max_dimensions=max_dimensions,
+                            price_per_parcel=price_per_parcel,
+                            allowed_parcel_types=allowed_parcel_types
+                        )
+                        created_count += 1
+                        
+                    current_date += timedelta(days=1)
+            
+            return Response({"message": f"{created_count} trajets générés avec succès."}, status=status.HTTP_201_CREATED)
+            
+        else:
+            return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         from rest_framework.exceptions import ValidationError
+        from .models import FinancialSettings
         if not self.request.user.is_verified:
             raise ValidationError({"error": "Votre compte doit être vérifié pour publier un trajet."})
-        serializer.save(driver=self.request.user)
+            
+        driver_payout = serializer.validated_data.get('driver_payout', 0)
+        settings = FinancialSettings.load()
+        if settings.is_commission_active:
+            zemy_commission = int(driver_payout * (settings.commission_percentage / 100.0))
+            if zemy_commission < settings.min_commission:
+                zemy_commission = settings.min_commission
+            if settings.max_commission and zemy_commission > settings.max_commission:
+                zemy_commission = settings.max_commission
+        else:
+            zemy_commission = 0
+            
+        price_per_seat = driver_payout + zemy_commission
+        
+        max_parcels = serializer.validated_data.get('max_parcels', 0)
+        
+        serializer.save(
+            driver=self.request.user,
+            zemy_commission=zemy_commission,
+            price_per_seat=price_per_seat,
+            parcels_available=max_parcels
+        )
 
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel_ride(self, request, pk=None):
+        from .models import RefundRequest
+        
         ride = self.get_object()
         if ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
@@ -276,8 +697,43 @@ class RideViewSet(viewsets.ModelViewSet):
         bookings = ride.bookings.filter(status__in=['pending', 'confirmed'])
         for booking in bookings:
             booking.status = 'cancelled'
+            booking.payment_status = 'refunded'
             booking.save()
             ride.seats_available += booking.seats_booked
+            
+            # Create a RefundRequest for each passenger automatically approved
+            price_paid = ride.price_per_seat * booking.seats_booked
+            RefundRequest.objects.create(
+                booking=booking,
+                passenger=booking.passenger,
+                driver=ride.driver,
+                amount=price_paid,
+                reason="Annulation globale du trajet par le conducteur",
+                status='approved'
+            )
+            
+            # Passager: Réservation annulée (du fait de l'annulation du trajet entier par le conducteur)
+            create_and_send_notification(
+                user=booking.passenger,
+                title="Réservation annulée ❌",
+                message=f"Le conducteur a annulé le trajet de {ride.departure_location} vers {ride.arrival_location}. Remboursement garanti.",
+                data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
+            )
+            
+        parcels = ride.parcels.filter(status__in=['pending', 'accepted'])
+        for parcel in parcels:
+            parcel.status = 'cancelled'
+            parcel.payment_status = 'refunded'
+            parcel.save()
+            ride.parcels_available += 1
+            
+            if parcel.sender_user:
+                create_and_send_notification(
+                    user=parcel.sender_user,
+                    title="Envoi de colis annulé ❌",
+                    message=f"Le conducteur a annulé le trajet de {ride.departure_location} vers {ride.arrival_location}. Remboursement garanti.",
+                    data={'type': 'parcel_cancelled', 'parcel_id': str(parcel.id), 'screen': 'trips'}
+                )
             
         ride.save()
         return Response({"status": "Trajet annulé avec succès."})
@@ -288,16 +744,105 @@ class RideViewSet(viewsets.ModelViewSet):
         if ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
         
+        if ride.status == 'completed':
+            return Response({"status": "Trajet déjà terminé."})
+            
         ride.status = 'completed'
         ride.save()
+        
+        bookings = ride.bookings.filter(status__in=['pending', 'confirmed'])
+        for booking in bookings:
+            booking.status = 'completed'
+            booking.save()
+            
+            # Create Transaction for Wallet
+            from .models import Transaction
+            if booking.payment_status in ['paid', 'escrow']:
+                Transaction.objects.create(
+                    user=ride.driver,
+                    ride=ride,
+                    transaction_type='ride',
+                    amount=booking.amount_due_to_driver,
+                    status='completed'
+                )
+
+            # Passager: Trajet terminé
+            create_and_send_notification(
+                user=booking.passenger,
+                title="Trajet terminé 🏁",
+                message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} est terminé. Merci d'avoir voyagé avec nous !",
+                data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
+            )
+            # Conducteur: Passager arrivé
+            create_and_send_notification(
+                user=ride.driver,
+                title="Passager arrivé 🏁",
+                message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} est bien arrivé à destination.",
+                data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
+            )
+            
         return Response({"status": "Trajet terminé avec succès."})
 
+    @action(detail=True, methods=['post'], url_path='start')
+    def start_ride(self, request, pk=None):
+        ride = self.get_object()
+        if ride.driver != request.user and not request.user.is_staff:
+            is_passenger = ride.bookings.filter(passenger=request.user, status__in=['pending', 'confirmed', 'active']).exists()
+            if not is_passenger:
+                return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+            
+        ride.status = 'started'
+        ride.save()
+            
+        # Send notifications
+        # 1. Driver: Trajet commencé
+        create_and_send_notification(
+            user=ride.driver,
+            title="Trajet commencé 🚗",
+            message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} a commencé. Bonne route !",
+            data={'type': 'ride_started_driver', 'ride_id': str(ride.id), 'screen': 'trips'}
+        )
+        
+        # 2. Passengers: Conducteur en route & Trajet commencé
+        bookings = ride.bookings.filter(status__in=['pending', 'confirmed'])
+        for booking in bookings:
+            # Conducteur en route
+            create_and_send_notification(
+                user=booking.passenger,
+                title="Conducteur en route 🚗",
+                message=f"Le conducteur {ride.driver.full_name or ride.driver.phone} est en route pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                data={'type': 'driver_en_route', 'booking_id': str(booking.id), 'screen': 'trips'}
+            )
+            # Trajet commencé
+            create_and_send_notification(
+                user=booking.passenger,
+                title="Trajet commencé 🚀",
+                message=f"Le trajet {ride.departure_location} -> {ride.arrival_location} a commencé. Voyagez en toute sécurité !",
+                data={'type': 'ride_started_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+            )
+            
+        return Response({"status": "Trajet commencé."})
+
 class BookingViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet gérant les réservations de places dans un trajet.
+    
+    Endpoints supplémentaires :
+        - POST /api/bookings/{id}/accept/ : Le conducteur accepte la réservation
+        - POST /api/bookings/{id}/reject/ : Le conducteur refuse
+        - POST /api/bookings/{id}/cancel/ : Le passager annule
+    """
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = super().get_queryset().select_related('passenger', 'ride', 'ride__driver', 'ride__vehicle').prefetch_related('passenger__vehicles', 'ride__driver__vehicles', 'passenger__rides_driven', 'ride__driver__rides_driven')
+        
+        if not user.is_staff:
+            from django.db.models import Q
+            queryset = queryset.filter(Q(passenger=user) | Q(ride__driver=user))
+            
         passenger_id = self.request.query_params.get('passenger')
         ride_driver_id = self.request.query_params.get('ride_driver')
         ride_id = self.request.query_params.get('ride')
@@ -312,6 +857,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         from rest_framework.exceptions import ValidationError
         from datetime import date
+        from django.db import transaction
         
         if not request.user.is_verified:
             raise ValidationError({"error": "Votre compte doit être vérifié pour réserver."})
@@ -319,22 +865,58 @@ class BookingViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        ride = serializer.validated_data.get('ride')
-        if ride.driver == request.user:
-            raise ValidationError({"error": "Vous ne pouvez pas réserver votre propre trajet."})
-            
-        if ride.departure_date < date.today():
-            raise ValidationError({"error": "Ce trajet est déjà passé (archivé)."})
-            
+        ride_id = request.data.get('ride')
         seats_to_book = serializer.validated_data.get('seats_booked', 1)
-        if ride.seats_available < seats_to_book:
-            raise ValidationError({"error": "Pas assez de places disponibles."})
 
-        # Decrement seats
-        ride.seats_available -= seats_to_book
-        ride.save()
+        with transaction.atomic():
+            # VERROUILLAGE DE LA LIGNE EN BASE DE DONNÉES POUR EMPÊCHER LES RACE CONDITIONS
+            try:
+                ride = Ride.objects.select_for_update().get(id=ride_id)
+            except Ride.DoesNotExist:
+                raise ValidationError({"error": "Trajet introuvable."})
+
+            if ride.driver == request.user:
+                raise ValidationError({"error": "Vous ne pouvez pas réserver votre propre trajet."})
+                
+            if ride.departure_date < date.today():
+                raise ValidationError({"error": "Ce trajet est déjà passé (archivé)."})
+                
+            if ride.status in ['started', 'completed', 'cancelled']:
+                raise ValidationError({"error": "Ce trajet n'est plus disponible pour la réservation."})
+                
+            # Empêcher les doublons
+            existing_booking = Booking.objects.filter(ride=ride, passenger=request.user).exclude(status='cancelled').first()
+            if existing_booking:
+                if existing_booking.payment_status == 'pending':
+                    existing_booking.delete() # Nettoie l'ancienne réservation non payée
+                    # Note: L'ancienne réservation libère potentiellement des places (géré par un signal ou on l'ignore ici si c'était pending et qu'elle n'avait pas encore décrémenté, ou si elle a décrémenté, delete() doit re-incrémenter via le signal)
+                else:
+                    raise ValidationError({"error": "Vous avez déjà une réservation pour ce trajet."})
+                
+            if ride.seats_available < seats_to_book:
+                raise ValidationError({"error": "Pas assez de places disponibles pour cette réservation."})
+
+            # Decrement seats securely
+            ride.seats_available -= seats_to_book
+            ride.save()
+            
+            # Save the new booking
+            booking = serializer.save(passenger=request.user)
         
-        booking = serializer.save(passenger=request.user)
+        # 1. Passager: Réservation envoyée
+        create_and_send_notification(
+            user=booking.passenger,
+            title="Réservation envoyée 🚗",
+            message=f"Votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location} a été envoyée.",
+            data={'type': 'booking_sent', 'booking_id': str(booking.id), 'screen': 'trips'}
+        )
+        # 2. Conducteur: Nouvelle réservation
+        create_and_send_notification(
+            user=ride.driver,
+            title="Nouvelle réservation 👥",
+            message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} a réservé {booking.seats_booked} place(s) sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+            data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'trips'}
+        )
         
         # Auto-create a conversation between the passenger and the driver for this ride
         passenger = request.user
@@ -361,18 +943,470 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+    def perform_update(self, serializer):
+        old_instance = self.get_object()
+        old_status = old_instance.status
+        booking = serializer.save()
+        new_status = booking.status
+        
+        if old_status != new_status:
+            ride = booking.ride
+            passenger = booking.passenger
+            driver = ride.driver
+            
+            if new_status == 'cancelled' and old_status != 'cancelled':
+                # Restore seats securely
+                with transaction.atomic():
+                    locked_ride = Ride.objects.select_for_update().get(id=ride.id)
+                    locked_ride.seats_available += booking.seats_booked
+                    locked_ride.save()
+                
+                request_user = self.request.user
+                if request_user == driver:
+                    # Cancelled by driver
+                    create_and_send_notification(
+                        user=passenger,
+                        title="Réservation annulée ❌",
+                        message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                        data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    )
+                else:
+                    # Cancelled by passenger
+                    create_and_send_notification(
+                        user=driver,
+                        title="Réservation annulée ❌",
+                        message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+                        data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    )
+            
+            elif new_status == 'confirmed':
+                # Conducteur: Réservation acceptée
+                create_and_send_notification(
+                    user=driver,
+                    title="Réservation acceptée ✅",
+                    message=f"Vous avez accepté la réservation du passager {passenger.full_name or passenger.phone} ({booking.seats_booked} place(s)) sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+                    data={'type': 'booking_accepted_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+                # Passager: Réservation acceptée
+                create_and_send_notification(
+                    user=passenger,
+                    title="Réservation acceptée ✅",
+                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {ride.departure_location} -> {ride.arrival_location} a été acceptée par le conducteur !",
+                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+                # Passager: Paiement confirmé
+                create_and_send_notification(
+                    user=passenger,
+                    title="Paiement confirmé 💳",
+                    message=f"Le paiement pour votre réservation sur le trajet {ride.departure_location} -> {ride.arrival_location} a été validé avec succès.",
+                    data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+            
+            elif new_status == 'completed':
+                # Conducteur: Passager arrivé
+                create_and_send_notification(
+                    user=driver,
+                    title="Passager arrivé 🏁",
+                    message=f"Le passager {passenger.full_name or passenger.phone} est bien arrivé à destination.",
+                    data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+                # Passager: Trajet terminé
+                create_and_send_notification(
+                    user=passenger,
+                    title="Trajet terminé 🏁",
+                    message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} est terminé. Merci d'avoir voyagé avec nous !",
+                    data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel_booking(self, request, pk=None):
+        from datetime import datetime, timedelta
+        from django.utils.timezone import make_aware, now
+        from .models import RefundRequest
+        
+        booking = self.get_object()
+        if booking.passenger != request.user and booking.ride.driver != request.user and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.status == 'cancelled':
+            return Response({"status": "Réservation déjà annulée."})
+            
+        old_status = booking.status
+        booking.status = 'cancelled'
+        booking.save()
+        
+        # Restore seats if it was confirmed/pending
+        if old_status != 'cancelled':
+            with transaction.atomic():
+                locked_ride = Ride.objects.select_for_update().get(id=booking.ride.id)
+                locked_ride.seats_available += booking.seats_booked
+                locked_ride.save()
+                
+            ride = booking.ride
+            passenger = booking.passenger
+            driver = ride.driver
+            
+            # --- Financial Refund Logic ---
+            price_paid = ride.price_per_seat * booking.seats_booked
+            
+            if request.user == driver:
+                # Driver cancels -> 100% Refund automatically approved
+                booking.payment_status = 'refunded'
+                booking.save()
+                RefundRequest.objects.create(
+                    booking=booking,
+                    passenger=passenger,
+                    driver=driver,
+                    amount=price_paid,
+                    reason="Annulation par le conducteur",
+                    status='approved'
+                )
+            else:
+                # Passenger cancels
+                ride_dt = datetime.combine(ride.departure_date, ride.departure_time)
+                if not ride_dt.tzinfo:
+                    try:
+                        ride_dt = make_aware(ride_dt)
+                    except ValueError:
+                        pass
+                
+                time_diff = ride_dt - now()
+                
+                if price_paid >= 1000 and time_diff > timedelta(hours=5):
+                    # Eligible for refund -> pending
+                    RefundRequest.objects.create(
+                        booking=booking,
+                        passenger=passenger,
+                        driver=driver,
+                        amount=price_paid,
+                        reason="Annulation par le passager à plus de 5h du départ",
+                        status='pending'
+                    )
+                else:
+                    # No refund
+                    pass
+            
+            # Send notifications
+            if request.user == driver:
+                create_and_send_notification(
+                    user=passenger,
+                    title="Réservation annulée ❌",
+                    message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}. Remboursement intégral garanti.",
+                    data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+                
+                conversation, _ = Conversation.objects.get_or_create(
+                    conversation_type='ride',
+                    ride=ride,
+                    participant_1=passenger if passenger.id < driver.id else driver,
+                    participant_2=driver if passenger.id < driver.id else passenger
+                )
+                Message.objects.create(
+                    conversation=conversation,
+                    sender=driver,
+                    content=f"Bonjour, j'ai malheureusement dû annuler votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                    message_type='text'
+                )
+            else:
+                create_and_send_notification(
+                    user=driver,
+                    title="Réservation annulée ❌",
+                    message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+                    data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+                
+                conversation, _ = Conversation.objects.get_or_create(
+                    conversation_type='ride',
+                    ride=ride,
+                    participant_1=passenger if passenger.id < driver.id else driver,
+                    participant_2=driver if passenger.id < driver.id else passenger
+                )
+                Message.objects.create(
+                    conversation=conversation,
+                    sender=passenger,
+                    content=f"Bonjour, j'ai annulé ma réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}. Bonne route !",
+                    message_type='text'
+                )
+                
+        return Response({"status": "Réservation annulée avec succès."})
+
     @action(detail=True, methods=['post'], url_path='complete')
     def complete_booking(self, request, pk=None):
         """Permet au passager de marquer sa réservation comme terminée."""
         booking = self.get_object()
         if booking.passenger != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.status == 'completed':
+            return Response({"status": "Réservation déjà terminée."})
+            
         booking.status = 'completed'
         booking.save()
+        
+        # Trigger notifications
+        ride = booking.ride
+        passenger = booking.passenger
+        driver = ride.driver
+        
+        # Conducteur: Passager arrivé
+        create_and_send_notification(
+            user=driver,
+            title="Passager arrivé 🏁",
+            message=f"Le passager {passenger.full_name or passenger.phone} est bien arrivé à destination.",
+            data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
+        )
+        # Passager: Trajet terminé
+        create_and_send_notification(
+            user=passenger,
+            title="Trajet terminé 🏁",
+            message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} est terminé. Merci d'avoir voyagé avec nous !",
+            data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
+        )
+        
         return Response({"status": "Réservation terminée avec succès."})
+
+    @action(detail=True, methods=['post'], url_path='pay')
+    def pay_booking(self, request, pk=None):
+        import requests
+        from django.conf import settings
+        
+        booking = self.get_object()
+        if booking.passenger != request.user and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.payment_status != 'pending':
+            return Response({"error": "Cette réservation est déjà payée ou en cours."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            api_key = settings.FEDAPAY_SECRET_KEY
+            is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
+            
+            # Si la clé fournie est une clé live, on force l'environnement en live pour éviter l'erreur d'authentification
+            if api_key.startswith('sk_live_'):
+                is_sandbox = False
+                
+            base_url = "https://sandbox-api.fedapay.com/v1" if is_sandbox else "https://api.fedapay.com/v1"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            amount_to_pay = int(booking.amount_paid_online)
+
+            # 1. Create Transaction
+            payload = {
+                "description": f"Commission Zemy pour trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}",
+                "amount": amount_to_pay,
+                "currency": {"iso": "XOF"},
+                "customer": {
+                    "firstname": booking.passenger.full_name or "Passager",
+                    "lastname": "Zemy",
+                    "email": booking.passenger.email or "client@zemy.bj",
+                    "phone_number": {
+                        "number": booking.passenger.phone or "+22900000000",
+                        "country": "bj"
+                    }
+                }
+            }
+            
+            tx_res = requests.post(f"{base_url}/transactions", json=payload, headers=headers)
+            if tx_res.status_code not in [200, 201]:
+                return Response({"error": "Erreur FedaPay: " + tx_res.text}, status=status.HTTP_400_BAD_REQUEST)
+                
+            tx_json = tx_res.json()
+            transaction_data = tx_json.get('v1/transaction') or tx_json.get('transaction') or {}
+            transaction_id = transaction_data.get('id')
+            
+            if not transaction_id:
+                return Response({"error": "Impossible de créer la transaction FedaPay. Réponse: " + str(tx_json)}, status=status.HTTP_400_BAD_REQUEST)
+                
+            # 2. Generate Token
+            token_res = requests.post(f"{base_url}/transactions/{transaction_id}/token", headers=headers)
+            if token_res.status_code not in [200, 201]:
+                return Response({"error": "Erreur Token FedaPay: " + token_res.text}, status=status.HTTP_400_BAD_REQUEST)
+                
+            token_json = token_res.json()
+            url = token_json.get('url')
+            
+            # Si l'URL n'est pas à la racine du JSON, chercher dans le noeud 'v1/token' ou 'token'
+            if not url:
+                node = token_json.get('v1/token') or token_json.get('token')
+                if isinstance(node, dict):
+                    url = node.get('url')
+                elif isinstance(node, str) and node.startswith('tok_'):
+                    checkout_base = "https://checkout.fedapay.com/pay/" if not is_sandbox else "https://sandbox-checkout.fedapay.com/pay/"
+                    url = checkout_base + node
+                    
+            if not url:
+                return Response({"error": "Impossible d'obtenir l'URL de paiement."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            return Response({"url": url, "transaction_id": transaction_id})
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='verify-payment')
+    def verify_payment(self, request, pk=None):
+        import requests
+        from django.conf import settings
+        
+        booking = self.get_object()
+        transaction_id = request.data.get('transaction_id')
+        
+        if not transaction_id:
+            return Response({"error": "transaction_id requis."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            api_key = settings.FEDAPAY_SECRET_KEY
+            is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
+            
+            if api_key.startswith('sk_live_'):
+                is_sandbox = False
+                
+            base_url = "https://sandbox-api.fedapay.com/v1" if is_sandbox else "https://api.fedapay.com/v1"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # Retrieve transaction
+            res = requests.get(f"{base_url}/transactions/{transaction_id}", headers=headers)
+            if res.status_code != 200:
+                return Response({"error": "Impossible de récupérer la transaction: " + res.text}, status=status.HTTP_400_BAD_REQUEST)
+                
+            transaction_data = res.json().get('v1/transaction', {})
+            tx_status = transaction_data.get('status')
+            
+            if tx_status == 'approved':
+                if booking.payment_status != 'escrow':
+                    booking.payment_status = 'escrow' # On garde 'escrow' pour dire que la commission est payée, ou on met 'paid'. Pour la compatibilité, on garde escrow ou on peut mettre une valeur plus claire. Gardons escrow.
+                    booking.status = 'confirmed'
+                    booking.save()
+                    
+                    amount_due = int(booking.amount_due_to_driver)
+                    commission = int(booking.amount_paid_online)
+                    
+                    # Notify Passenger
+                    from .models import create_and_send_notification
+                    create_and_send_notification(
+                        user=booking.passenger,
+                        title="Réservation confirmée ✅",
+                        message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+                        data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    )
+                    
+                    # Notify Driver
+                    if booking.ride.driver_details:
+                        create_and_send_notification(
+                            user=booking.ride.driver_details,
+                            title="Nouvelle Réservation 🚗",
+                            message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                            data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
+                        )
+                        
+                return Response({"status": "Paiement validé avec succès."})
+            else:
+                return Response({"error": f"Statut de la transaction : {tx_status}"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class FinancialSettingsViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour configurer les taux de commission globaux de Zemy.
+    """
+    from .models import FinancialSettings
+    queryset = FinancialSettings.objects.all()
+    serializer_class = FinancialSettingsSerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAdminUser()]
+
+    def get_queryset(self):
+        return self.queryset.filter(pk=1)
+
+class RefundRequestViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour la gestion des litiges et demandes de remboursement.
+    """
+    from .models import RefundRequest
+    queryset = RefundRequest.objects.all().order_by('-created_at')
+    serializer_class = RefundRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return self.queryset
+        return self.queryset.filter(Q(passenger=user) | Q(driver=user))
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        if not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+        
+        refund = self.get_object()
+        if refund.status != 'pending':
+            return Response({"error": "La demande n'est plus en attente."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        refund.status = 'approved'
+        refund.booking.payment_status = 'refunded'
+        refund.booking.save()
+        refund.save()
+        
+        create_and_send_notification(
+            user=refund.passenger,
+            title="Remboursement approuvé 💸",
+            message=f"Votre demande de remboursement de {refund.amount} FCFA a été approuvée.",
+            data={'type': 'refund_approved', 'refund_id': str(refund.id)}
+        )
+        return Response({"status": "Remboursement approuvé."})
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        if not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+        
+        refund = self.get_object()
+        if refund.status != 'pending':
+            return Response({"error": "La demande n'est plus en attente."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        refund.status = 'rejected'
+        # The money will go to the driver
+        refund.booking.payment_status = 'paid'
+        refund.booking.save()
+        refund.save()
+        
+        create_and_send_notification(
+            user=refund.passenger,
+            title="Remboursement refusé ❌",
+            message=f"Votre demande de remboursement de {refund.amount} FCFA a été refusée par l'administration.",
+            data={'type': 'refund_rejected', 'refund_id': str(refund.id)}
+        )
+        return Response({"status": "Remboursement refusé."})
+
+class TransactionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet gérant l'historique financier des utilisateurs (Portefeuille).
+    """
+    from .models import Transaction
+    queryset = Transaction.objects.all().order_by('-created_at')
+    serializer_class = TransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return self.queryset
+        return self.queryset.filter(user=user)
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet gérant les conversations (Messagerie).
+    """
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
 
@@ -380,11 +1414,13 @@ class ConversationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return Conversation.objects.none()
+        
+        qs = Conversation.objects.select_related('participant_1', 'participant_2', 'ride', 'ride__driver', 'ride__vehicle').prefetch_related('messages')
+        
         # Admin sees all support conversations
         if user.is_staff and self.request.query_params.get('type') == 'support':
-            return Conversation.objects.filter(conversation_type='support').order_by('-updated_at')
-        return (Conversation.objects.filter(participant_1=user) |
-                Conversation.objects.filter(participant_2=user)).order_by('-updated_at')
+            return qs.filter(conversation_type='support').order_by('-updated_at')
+        return (qs.filter(participant_1=user) | qs.filter(participant_2=user)).order_by('-updated_at')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -420,6 +1456,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
             
         ride_id = request.data.get('ride_id')
         problem_desc = request.data.get('problem', 'Problème signalé.')
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+        
+        role = "Utilisateur"
+        if ride_id:
+            try:
+                ride = Ride.objects.get(pk=ride_id)
+                if ride.driver == request.user:
+                    role = "Conducteur"
+                else:
+                    role = "Passager"
+            except Exception:
+                pass
         
         conversation = Conversation.objects.filter(
             participant_1=request.user,
@@ -432,7 +1481,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 conversation_type='support'
             )
             
-        msg_content = f"🚨 PROBLÈME SIGNALÉ 🚨\nTrajet ID: {ride_id}\n\nDescription: {problem_desc}"
+        msg_content = f"🚨 PROBLÈME SIGNALÉ 🚨\nTrajet ID: {ride_id}\nRôle: {role}\n\nDescription: {problem_desc}"
         
         Message.objects.create(
             conversation=conversation,
@@ -441,6 +1490,17 @@ class ConversationViewSet(viewsets.ModelViewSet):
             message_type='text',
             is_urgent=True,
         )
+        
+        if latitude is not None and longitude is not None:
+            Message.objects.create(
+                conversation=conversation,
+                sender=request.user,
+                content="📍 Position du signalement",
+                message_type='location',
+                location_lat=latitude,
+                location_lng=longitude,
+                is_urgent=True,
+            )
         
         return Response({"status": "Problème signalé à l'administration avec succès."})
 
@@ -525,12 +1585,22 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Response({'count': unread_count})
 
 class MessageViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet gérant les messages envoyés dans une conversation.
+    Gère également l'upload de médias (audio, images).
+    """
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = super().get_queryset().select_related('sender', 'conversation')
+        
+        if not user.is_staff:
+            from django.db.models import Q
+            queryset = queryset.filter(Q(conversation__participant_1=user) | Q(conversation__participant_2=user))
+            
         conversation_id = self.request.query_params.get('conversation')
         if conversation_id:
             queryset = queryset.filter(conversation_id=conversation_id)
@@ -557,6 +1627,9 @@ class MessageViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Conversation not found'}, status=status.HTTP_404_NOT_FOUND)
 
 class NotificationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour l'historique des notifications de l'utilisateur.
+    """
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
 
@@ -589,10 +1662,16 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
 from rest_framework.views import APIView
 
+@extend_schema(responses={200: dict}, tags=['Administration'])
 class AppBrandingView(APIView):
+    """
+    Vue permettant de récupérer ou de modifier l'apparence (Branding) de l'application.
+    """
     permission_classes = [permissions.AllowAny]
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
+    @extend_schema(responses={200: dict})
+    @extend_schema(responses={200: dict})
     def get(self, request):
         branding = AppBranding.objects.filter(is_active=True).first()
         if not branding:
@@ -600,6 +1679,9 @@ class AppBrandingView(APIView):
         serializer = AppBrandingSerializer(branding, context={'request': request})
         return Response(serializer.data)
 
+    @extend_schema(request=dict, responses={200: dict})
+    @extend_schema(request=dict, responses={200: dict})
+    @extend_schema(request=dict, responses={200: dict})
     def put(self, request):
         if not request.user.is_authenticated or not getattr(request.user, 'is_staff', False):
             return Response({'error': 'Admin required'}, status=403)
@@ -620,6 +1702,10 @@ class AppBrandingView(APIView):
         return Response(serializer.errors, status=400)
 
 class VerificationRequestViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour soumettre et gérer les demandes de vérification d'identité (CNI, Selfie).
+    L'administration peut approuver ou rejeter les requêtes.
+    """
     queryset = VerificationRequest.objects.all().order_by('-created_at')
     serializer_class = VerificationRequestSerializer
     permission_classes = [permissions.IsAdminUser]
@@ -683,6 +1769,9 @@ class VerificationRequestViewSet(viewsets.ModelViewSet):
         return Response({'status': 'rejected'})
 
 class PromotionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet gérant les bannières promotionnelles sur l'accueil mobile.
+    """
     queryset = Promotion.objects.all()
     serializer_class = PromotionSerializer
     
@@ -715,14 +1804,22 @@ class PromotionViewSet(viewsets.ModelViewSet):
                 data={'type': 'promotion_updated', 'screen': 'home'},
             )
 
+@extend_schema(responses={200: dict}, tags=['Administration'])
 class MobileSettingsView(APIView):
+    """
+    Vue gérant les paramètres d'affichage de l'application mobile.
+    """
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         settings = MobileSettings.load()
         serializer = MobileSettingsSerializer(settings)
         return Response(serializer.data)
 
+    @extend_schema(request=dict, responses={200: dict})
+    @extend_schema(request=dict, responses={200: dict})
+    @extend_schema(request=dict, responses={200: dict})
     def put(self, request):
         if not request.user.is_authenticated or not getattr(request.user, 'is_staff', False):
             return Response({'error': 'Admin required'}, status=403)
@@ -736,3 +1833,133 @@ class MobileSettingsView(APIView):
     
     def patch(self, request):
         return self.put(request)
+
+class ParcelViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour l'envoi et la gestion des colis.
+    Gère la création, la tarification et le suivi (QR Code) des expéditions.
+    """
+    queryset = Parcel.objects.all().order_by('-created_at')
+    serializer_class = ParcelSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if not user.is_staff:
+            queryset = queryset.filter(Q(sender_user=user) | Q(ride__driver=user))
+            
+        ride_id = self.request.query_params.get('ride')
+        if ride_id:
+            queryset = queryset.filter(ride_id=ride_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
+        from .models import FinancialSettings
+        import uuid
+        
+        if not self.request.user.is_verified:
+            raise ValidationError({"error": "Votre compte doit être vérifié pour envoyer un colis."})
+            
+        ride = serializer.validated_data.get('ride')
+        if not ride.accepts_parcels:
+            raise ValidationError({"error": "Ce trajet n'accepte pas les colis."})
+        if ride.parcels_available < 1:
+            raise ValidationError({"error": "Il n'y a plus de place pour les colis dans ce trajet."})
+            
+        # Finance
+        driver_payout = ride.price_per_parcel
+        settings = FinancialSettings.load()
+        if settings.is_parcel_commission_active:
+            zemy_commission = int(driver_payout * (settings.parcel_commission_percentage / 100.0))
+            if zemy_commission < settings.min_parcel_commission:
+                zemy_commission = settings.min_parcel_commission
+            if settings.max_parcel_commission and zemy_commission > settings.max_parcel_commission:
+                zemy_commission = settings.max_parcel_commission
+        else:
+            zemy_commission = 0
+            
+        total_price = driver_payout + zemy_commission
+        qr_data = str(uuid.uuid4())
+        
+        # Lock ride
+        with transaction.atomic():
+            locked_ride = Ride.objects.select_for_update().get(id=ride.id)
+            if locked_ride.parcels_available < 1:
+                raise ValidationError({"error": "Il n'y a plus de place pour les colis dans ce trajet."})
+            locked_ride.parcels_available -= 1
+            locked_ride.save()
+            
+            parcel = serializer.save(
+                sender_user=self.request.user,
+                price=total_price,
+                zemy_commission=zemy_commission,
+                driver_payout=driver_payout,
+                qr_code_data=qr_data
+            )
+            
+        # Notifications
+        create_and_send_notification(
+            user=ride.driver,
+            title="Nouveau colis 📦",
+            message=f"Une nouvelle demande de colis a été effectuée sur votre trajet.",
+            data={'type': 'new_parcel', 'parcel_id': str(parcel.id), 'screen': 'trips'}
+        )
+
+    @action(detail=True, methods=['post'], url_path='scan_qr')
+    def scan_qr(self, request, pk=None):
+        parcel = self.get_object()
+        qr_data = request.data.get('qr_code_data')
+        action_type = request.data.get('action') # 'pickup' or 'dropoff'
+        
+        if not qr_data or qr_data != parcel.qr_code_data:
+            return Response({"error": "QR Code invalide."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if request.user != parcel.ride.driver and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if action_type == 'pickup':
+            if parcel.status != 'accepted' and parcel.status != 'pending':
+                return Response({"error": "Statut invalide pour la récupération."}, status=status.HTTP_400_BAD_REQUEST)
+            parcel.status = 'picked_up'
+            parcel.save()
+            if parcel.sender_user:
+                create_and_send_notification(
+                    user=parcel.sender_user,
+                    title="Colis récupéré 📦",
+                    message=f"Le conducteur a récupéré votre colis.",
+                    data={'type': 'parcel_picked_up', 'parcel_id': str(parcel.id), 'screen': 'trips'}
+                )
+            
+        elif action_type == 'dropoff':
+            if parcel.status not in ['picked_up', 'in_transit']:
+                return Response({"error": "Statut invalide pour la livraison."}, status=status.HTTP_400_BAD_REQUEST)
+            parcel.status = 'delivered'
+            parcel.payment_status = 'paid'
+            parcel.save()
+            
+            # Create Transaction for Wallet
+            from .models import Transaction
+            Transaction.objects.create(
+                user=parcel.ride.driver,
+                parcel=parcel,
+                transaction_type='parcel',
+                amount=parcel.driver_payout,
+                status='completed'
+            )
+            
+            # Update user stats
+            driver = parcel.ride.driver
+            driver.parcels_completed += 1
+            driver.save(update_fields=['parcels_completed'])
+            
+            if parcel.sender_user:
+                create_and_send_notification(
+                    user=parcel.sender_user,
+                    title="Colis livré ✅",
+                    message=f"Votre colis a été livré avec succès.",
+                    data={'type': 'parcel_delivered', 'parcel_id': str(parcel.id), 'screen': 'trips'}
+                )
+            
+        return Response({"status": f"Colis mis à jour : {parcel.status}"})

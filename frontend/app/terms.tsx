@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * terms.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,6 +17,12 @@ import { theme } from '../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+/**
+ * Composant TermsScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à TermsScreen.
+ */
 export default function TermsScreen() {
   const router = useRouter();
 

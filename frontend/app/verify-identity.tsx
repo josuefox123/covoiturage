@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * verify-identity.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -37,6 +49,12 @@ const STEPS: Step[] = [
   { id: 'submit',   label: 'Confirmer',     icon: 'checkmark-done' },
 ];
 
+/**
+ * Composant VerifyIdentityScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à VerifyIdentityScreen.
+ */
 export default function VerifyIdentityScreen() {
   const router = useRouter();
   const { authFetch, updateUser } = useAuth();

@@ -1,86 +1,178 @@
+<!--
+==========================================================
+Fichier :
+index.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
-  <div>
-    <h1 class="text-2xl font-bold text-text mb-6">Vue d'ensemble</h1>
+  <div class="space-y-8 pb-12">
+    <div class="flex justify-between items-end">
+      <div>
+        <h1 class="text-3xl font-bold text-text mb-1 tracking-tight">Vue d'ensemble</h1>
+        <p class="text-textMuted font-medium">Bienvenue sur votre tableau de bord administrateur Zemy</p>
+      </div>
+      <div class="flex space-x-3">
+        <button class="flex items-center space-x-2 bg-white border border-border px-4 py-2 rounded-xl text-sm font-bold text-text hover:bg-background transition-colors shadow-sm">
+          <Icon name="ph:export" class="w-4 h-4" />
+          <span>Exporter</span>
+        </button>
+        <button @click="refreshData" :disabled="loading" class="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20 disabled:opacity-70">
+          <Icon name="ph:arrows-clockwise" class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          <span>Actualiser</span>
+        </button>
+      </div>
+    </div>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <StatsCard 
+    <!-- Carte Large au Sommet -->
+    <div class="w-full">
+      <LiveMap :mapData="stats?.map_data || []" :loading="initialLoading" />
+    </div>
+    
+    <!-- 1. Cartes Rapides (Stats) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <StatCard 
         title="Total Utilisateurs" 
-        :value="stats?.total_users || 0" 
+        :value="stats?.users?.total || 0" 
         icon="ph:users-fill" 
-        :trend="12.5" 
+        :trend="5.2" 
         colorClass="bg-primary/10 text-primary" 
+        :loading="initialLoading"
       />
-      <StatsCard 
+      <StatCard 
         title="Trajets Actifs" 
-        :value="stats?.active_rides || 0" 
+        :value="stats?.rides?.active || 0" 
         icon="ph:car-fill" 
-        :trend="8.2" 
+        :trend="12.4" 
         colorClass="bg-secondary/10 text-secondary" 
+        :loading="initialLoading"
       />
-      <StatsCard 
-        title="Réservations du mois" 
-        :value="stats?.monthly_bookings || 0" 
+      <StatCard 
+        title="Réservations (Aujourd'hui)" 
+        :value="stats?.bookings?.today || 0" 
         icon="ph:ticket-fill" 
-        :trend="-2.4" 
+        :trend="-2.1" 
         colorClass="bg-warning/10 text-warning" 
+        :loading="initialLoading"
       />
-      <StatsCard 
-        title="Revenus estimés (FCFA)" 
-        :value="stats?.estimated_revenue || 0" 
+      <StatCard 
+        title="Revenus Mensuels" 
+        :value="stats?.financials?.monthly_revenue || 0" 
         icon="ph:money-fill" 
-        :trend="15.3" 
+        unit="FCFA"
+        :trend="18.5" 
         colorClass="bg-success/10 text-success" 
+        :loading="initialLoading"
       />
     </div>
 
+    <!-- 2. Graphiques Principaux -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 bg-card rounded-xl border border-border p-6 shadow-sm">
-        <h3 class="text-lg font-bold text-text mb-4">Évolution des trajets</h3>
-        <!-- Placeholder for Chart -->
-        <div class="h-64 flex items-end justify-between space-x-2">
-          <div v-for="h in [40, 70, 45, 90, 65, 85, 100]" :key="h" class="w-full bg-primary/20 rounded-t-sm relative group">
-            <div class="absolute bottom-0 w-full bg-primary rounded-t-sm transition-all duration-500" :style="{ height: h + '%' }"></div>
-          </div>
-        </div>
-        <div class="flex justify-between mt-2 text-xs text-textMuted font-medium">
-          <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
-        </div>
+      <div class="lg:col-span-2">
+        <RevenueChart :data="stats?.charts?.revenue_7d || []" :loading="initialLoading" />
       </div>
+      <div>
+        <DistributionChart 
+          title="Répartition Utilisateurs" 
+          :labels="['Passagers', 'Conducteurs', 'En attente']"
+          :series="[stats?.users?.passengers || 0, stats?.users?.drivers || 0, stats?.users?.pending_verifications || 0]"
+          :colors="['#4F46E5', '#10B981', '#F59E0B']"
+          :loading="initialLoading"
+        />
+      </div>
+    </div>
 
-      <div class="bg-card rounded-xl border border-border p-6 shadow-sm">
-        <h3 class="text-lg font-bold text-text mb-4">Répartition</h3>
-        <div class="flex items-center justify-center h-48">
-          <div class="relative w-40 h-40 rounded-full border-[16px] border-primary flex items-center justify-center">
-            <div class="absolute w-full h-full rounded-full border-[16px] border-secondary" style="clip-path: polygon(50% 50%, 100% 0, 100% 100%, 50% 100%);"></div>
-            <span class="text-xl font-bold text-text">64%</span>
-          </div>
-        </div>
-        <div class="mt-6 space-y-3">
-          <div class="flex items-center justify-between text-sm">
-            <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-primary mr-2"></span> Conducteurs</div>
-            <span class="font-bold">64%</span>
-          </div>
-          <div class="flex items-center justify-between text-sm">
-            <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-secondary mr-2"></span> Passagers</div>
-            <span class="font-bold">36%</span>
-          </div>
-        </div>
+    <!-- 3. Activités -->
+    <div class="grid grid-cols-1 gap-6">
+      <div>
+        <RecentActivity :activities="stats?.activities || []" :loading="initialLoading" />
       </div>
+    </div>
+    
+    <!-- 4. Tableaux -->
+    <div class="grid grid-cols-1 gap-6">
+      <DataTable 
+        title="Dernières réservations" 
+        :columns="[
+          { key: 'id', label: 'ID' },
+          { key: 'user', label: 'Utilisateur' },
+          { key: 'type', label: 'Action' },
+          { key: 'time', label: 'Date' }
+        ]"
+        :data="recentBookingsTableData"
+        :loading="initialLoading"
+      >
+        <template #cell-time="{ row }">
+          {{ formatDate(row.time) }}
+        </template>
+        <template #cell-id="{ row }">
+          <span class="font-mono text-xs bg-background px-2 py-1 rounded border border-border">{{ row.id }}</span>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import StatCard from '../../components/dashboard/StatCard.vue'
+import RevenueChart from '../../components/dashboard/RevenueChart.vue'
+import DistributionChart from '../../components/dashboard/DistributionChart.vue'
+import RecentActivity from '../../components/dashboard/RecentActivity.vue'
+import LiveMap from '../../components/dashboard/LiveMap.vue'
+import DataTable from '../../components/dashboard/DataTable.vue'
 
 const { fetchApi } = useApi()
 const stats = ref<any>(null)
+const loading = ref(false)
+const initialLoading = ref(true)
+let pollingInterval: any = null
 
-onMounted(async () => {
+const recentBookingsTableData = computed(() => {
+  if (!stats.value?.activities) return []
+  return stats.value.activities.filter((a: any) => a.type.includes('réservation'))
+})
+
+const formatDate = (timeStr: string) => {
+  if (!timeStr) return ''
+  return new Intl.DateTimeFormat('fr-FR', { 
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  }).format(new Date(timeStr))
+}
+
+const loadData = async (isInitial = false) => {
+  if (isInitial) initialLoading.value = true
+  else loading.value = true
+  
   try {
     stats.value = await fetchApi('/dashboard/stats/')
   } catch (e) {
     console.error('Failed to load stats', e)
+  } finally {
+    initialLoading.value = false
+    loading.value = false
   }
+}
+
+const refreshData = () => loadData(false)
+
+onMounted(() => {
+  loadData(true)
+  // Polling intelligent toutes les 30 secondes
+  pollingInterval = setInterval(() => {
+    // On ne poll que si l'onglet est actif
+    if (document.visibilityState === 'visible') {
+      loadData(false)
+    }
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (pollingInterval) clearInterval(pollingInterval)
 })
 </script>

@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * LocationPicker.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList,
@@ -30,6 +42,12 @@ interface LocationPickerProps {
 const DEFAULT_LAT = 6.3703;
 const DEFAULT_LON = 2.3764;
 
+/**
+ * Composant LocationPicker.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à LocationPicker.
+ */
 export default function LocationPicker({
   onLocationSelected,
   onCancel,

@@ -1,4 +1,19 @@
 """
+========================================================
+
+Fichier :
+fcm.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
+"""
 Utilitaire Firebase Cloud Messaging (FCM).
 Utilise firebase_admin (déjà initialisé dans views.py).
 """
@@ -129,3 +144,30 @@ def send_fcm_to_all_users(title: str, body: str, data: dict = None, exclude_ids:
             )
         except Exception as e:
             logger.error(f"Erreur FCM broadcast lot {i}: {e}")
+
+
+def create_and_send_notification(user, title: str, message: str, data: dict = None):
+    """
+    Enregistre une notification en base de données et l'envoie sur le mobile de l'utilisateur via FCM.
+    """
+    try:
+        from .models import Notification
+        Notification.objects.create(
+            user=user,
+            title=title,
+            message=message,
+            is_read=False
+        )
+    except Exception as e:
+        logger.error(f"Erreur création Notification en BD: {e}")
+        
+    try:
+        send_fcm_to_user(
+            user=user,
+            title=title,
+            body=message,
+            data=data or {'screen': 'notifications'}
+        )
+    except Exception as e:
+        logger.error(f"Erreur envoi notification FCM: {e}")
+

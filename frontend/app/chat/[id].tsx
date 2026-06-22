@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * [id].tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TextInput,
@@ -11,6 +23,12 @@ import { useAuth } from '../../src/context/AuthContext';
 import { WebSocketService, buildWsUrl, WSMessage } from '../../src/services/websocketService';
 import { API_URL } from '../../src/services/api';
 
+/**
+ * Composant ChatScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à ChatScreen.
+ */
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -69,12 +87,10 @@ export default function ChatScreen() {
 
       ws.onOpen = () => {
         setWsConnected(true);
-        console.log('[Chat] WebSocket connecté');
       };
 
       ws.onClose = () => {
         setWsConnected(false);
-        console.log('[Chat] WebSocket déconnecté');
       };
 
       ws.onError = () => {
@@ -83,7 +99,6 @@ export default function ChatScreen() {
       };
 
       ws.onReconnecting = (attempt) => {
-        console.log(`[Chat] Reconnexion WS tentative ${attempt}...`);
       };
 
       ws.onMessage = (msg: WSMessage) => {
@@ -182,7 +197,14 @@ export default function ChatScreen() {
   // ── Rendu des messages ────────────────────────────────────────────────
   const isSystemMessage = (item: any) => item.content?.startsWith('🤝');
 
-  const renderMessage = ({ item }: { item: any }) => {
+  const otherUser = conversation?.participant_1_details?.id === user?.id
+    ? conversation?.participant_2_details
+    : conversation?.participant_1_details;
+  const partnerName = otherUser?.full_name || 'Utilisateur';
+  const partnerInitials = partnerName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+  const rideInfo = conversation?.ride_details || null;
+
+  const renderMessage = useCallback(({ item }: { item: any }) => {
     if (isSystemMessage(item)) {
       return (
         <View style={styles.systemMsgContainer}>
@@ -214,7 +236,7 @@ export default function ChatScreen() {
         </View>
       </View>
     );
-  };
+  }, [user, partnerInitials]);
 
   if (loading || !conversation) {
     return (
@@ -224,13 +246,6 @@ export default function ChatScreen() {
     );
   }
 
-  const otherUser = conversation.participant_1_details?.id === user?.id
-    ? conversation.participant_2_details
-    : conversation.participant_1_details;
-
-  const partnerName = otherUser?.full_name || 'Utilisateur';
-  const partnerInitials = partnerName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
-  const rideInfo = conversation.ride_details || null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -286,6 +301,10 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
           ListEmptyComponent={
             <View style={styles.emptyChat}>
               <Ionicons name="chatbubbles-outline" size={40} color={theme.colors.textMuted} />

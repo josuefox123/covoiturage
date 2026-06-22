@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * LiveRideModal.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, Alert,
@@ -40,7 +52,6 @@ async function geocodeBenin(place: string): Promise<Coords | null> {
     }
     return null;
   } catch (err) {
-    console.log(err);
     return null;
   }
 }
@@ -58,24 +69,26 @@ async function getRoute(from: Coords, to: Coords): Promise<[number, number][] | 
     }
     return null;
   } catch (err) {
-    console.log(err);
     return null;
   }
 }
 
-const isItTimeForRide = (dateStr: string, timeStr: string) => {
+const isItTimeForLiveRide = (dateStr: string, timeStr: string) => {
   if (!dateStr || !timeStr) return false;
-  const rideDate = new Date(dateStr);
-  const now = new Date();
-  if (rideDate.toDateString() !== now.toDateString()) return false;
-  
+  const [year, month, day] = dateStr.split('-').map(Number);
   const [hours, minutes] = timeStr.split(':').map(Number);
-  const rideTimeInMinutes = hours * 60 + minutes;
-  const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-  
-  return currentTimeInMinutes >= rideTimeInMinutes - 15;
+  const departureDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  const now = new Date();
+  const tenMinutesBefore = new Date(departureDate.getTime() - 10 * 60 * 1000);
+  return now.getTime() >= tenMinutesBefore.getTime();
 };
 
+/**
+ * Composant LiveRideModal.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à LiveRideModal.
+ */
 export default function LiveRideModal() {
   const { user, authFetch } = useAuth();
   const webviewRef = useRef<WebView>(null);
@@ -95,6 +108,17 @@ export default function LiveRideModal() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  const activeRideRef = useRef<Ride | null>(null);
+  const isDriverRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    activeRideRef.current = activeRide;
+  }, [activeRide]);
+
+  useEffect(() => {
+    isDriverRef.current = isDriver;
+  }, [isDriver]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -120,11 +144,12 @@ export default function LiveRideModal() {
         const bookingsData = bookingsResp.results || bookingsResp || [];
 
         const driverRides: Ride[] = ridesData.filter(
-          (r: Ride) => r.status === 'active' && isItTimeForRide(r.departure_date, r.departure_time)
+          (r: Ride) => (r.status === 'active' || r.status === 'started') && isItTimeForLiveRide(r.departure_date, r.departure_time)
         );
         const passengerRides: Ride[] = bookingsData
+          .filter((b: any) => b.status === 'confirmed' && b.payment_status !== 'pending')
           .map((b: any) => b.ride_details)
-          .filter((r: Ride) => r && r.status === 'active' && isItTimeForRide(r.departure_date, r.departure_time));
+          .filter((r: Ride) => r && (r.status === 'active' || r.status === 'started') && isItTimeForLiveRide(r.departure_date, r.departure_time));
 
         let currentRide: Ride | null = null;
         let asDriver = false;
@@ -146,8 +171,12 @@ export default function LiveRideModal() {
           setIsDriver(asDriver);
           setActiveBookingId(bookingId);
           setVisible(true);
-          await startTracking();
           await geocodeRide(currentRide);
+          if (currentRide.status === 'started') {
+            await startTracking();
+          } else {
+            stopTracking();
+          }
         } else {
           setVisible(false);
           setIsMinimized(false);
@@ -159,14 +188,14 @@ export default function LiveRideModal() {
     };
 
     checkActiveRides();
-    const interval = setInterval(checkActiveRides, 60000);
+    const delay = visible ? 10000 : 60000;
+    const interval = setInterval(checkActiveRides, delay);
     
     return () => {
       mounted = false;
       clearInterval(interval);
-      stopTracking();
     };
-  }, [user, authFetch]);
+  }, [user, authFetch, visible]);
 
   const geocodeRide = async (ride: Ride) => {
     try {
@@ -178,7 +207,6 @@ export default function LiveRideModal() {
       if (dep) setDepartCoords(dep);
       if (dest) setDestCoords(dest);
     } catch (err) {
-      console.log(err);
     }
   };
 
@@ -194,6 +222,20 @@ export default function LiveRideModal() {
     const pos = { lat: loc.coords.latitude, lon: loc.coords.longitude };
     setLocation(pos);
 
+    // Initial position upload if driver is already started
+    const currentActiveRide = activeRideRef.current;
+    const currentIsDriver = isDriverRef.current;
+    if (currentIsDriver && currentActiveRide && currentActiveRide.status === 'started') {
+      authFetch(`/rides/${currentActiveRide.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driver_latitude: pos.lat,
+          driver_longitude: pos.lon
+        })
+      }).catch(err => console.log('Error updating driver initial location:', err));
+    }
+
     watchRef.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 10 },
       (newLoc) => {
@@ -201,6 +243,19 @@ export default function LiveRideModal() {
         const newPos = { lat: newLoc.coords.latitude, lon: newLoc.coords.longitude };
         setLocation(newPos);
         sendToMap({ type: 'updateUserPosition', lat: newPos.lat, lon: newPos.lon });
+
+        const latestActiveRide = activeRideRef.current;
+        const latestIsDriver = isDriverRef.current;
+        if (latestIsDriver && latestActiveRide && latestActiveRide.status === 'started') {
+          authFetch(`/rides/${latestActiveRide.id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              driver_latitude: newPos.lat,
+              driver_longitude: newPos.lon
+            })
+          }).catch(err => console.log('Error updating driver location:', err));
+        }
       }
     );
   };
@@ -222,6 +277,18 @@ export default function LiveRideModal() {
     if (!mapReady || !location) return;
     sendToMap({ type: 'updateUserPosition', lat: location.lat, lon: location.lon });
   }, [location, mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !activeRide || isDriver) return;
+    if (activeRide.driver_latitude !== null && activeRide.driver_latitude !== undefined &&
+        activeRide.driver_longitude !== null && activeRide.driver_longitude !== undefined) {
+      sendToMap({
+        type: 'updateDriverPosition',
+        lat: activeRide.driver_latitude,
+        lon: activeRide.driver_longitude
+      });
+    }
+  }, [activeRide, mapReady, isDriver]);
 
   useEffect(() => {
     if (!mapReady || !departCoords) return;
@@ -273,7 +340,6 @@ export default function LiveRideModal() {
         setMapReady(true);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 
@@ -300,6 +366,29 @@ export default function LiveRideModal() {
         return Linking.openURL(fallbackUrl!);
       }
     }).catch(err => console.log(err));
+  };
+
+  const handleStartRide = () => {
+    Alert.alert('Démarrer le trajet', 'Voulez-vous démarrer ce trajet ? Le suivi GPS sera activé.', [
+      { text: 'Non', style: 'cancel' },
+      {
+        text: 'Oui, démarrer',
+        onPress: async () => {
+          try {
+            await authFetch(`/rides/${activeRide?.id}/start/`, { method: 'POST' });
+            // Fetch updated ride details
+            const resp = await authFetch(`/rides/${activeRide?.id}/`);
+            if (!isMountedRef.current) return;
+            const updatedRide = resp.results || resp;
+            setActiveRide(updatedRide);
+            await startTracking();
+            Alert.alert('✅ Trajet démarré', 'Le trajet a commencé. Bonne route !');
+          } catch (error: any) {
+            Alert.alert('Erreur', error.message || 'Impossible de démarrer le trajet.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleCompleteRide = () => {
@@ -348,9 +437,17 @@ export default function LiveRideModal() {
     if (!problemText.trim()) return;
     setSendingReport(true);
     try {
+      const bodyPayload: any = {
+        ride_id: activeRide?.id,
+        problem: problemText.trim(),
+      };
+      if (location) {
+        bodyPayload.latitude = location.lat;
+        bodyPayload.longitude = location.lon;
+      }
       await authFetch('/conversations/report-problem/', {
         method: 'POST',
-        body: JSON.stringify({ ride_id: activeRide?.id, problem: problemText.trim() }),
+        body: JSON.stringify(bodyPayload),
       });
       if (!isMountedRef.current) return;
       setShowReportModal(false);
@@ -396,6 +493,21 @@ export default function LiveRideModal() {
     }
     .depart-marker { background: #22C55E; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
     .dest-marker { background: #EF4444; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
+    .driver-dot {
+      width: 18px; height: 18px;
+      background: #10B981;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 6px rgba(16,185,129,0.5);
+    }
+    .driver-pulse-ring {
+      width: 40px; height: 40px;
+      background: rgba(16,185,129,0.25);
+      border-radius: 50%;
+      position: absolute;
+      top: -11px; left: -11px;
+      animation: pulse 2s infinite;
+    }
     .leaflet-control-attribution { display: none !important; }
   </style>
 </head>
@@ -412,6 +524,7 @@ export default function LiveRideModal() {
     }).addTo(map);
 
     var userMarker = null;
+    var driverMarker = null;
     var departMarker = null;
     var destMarker = null;
     var routeLine = null;
@@ -421,6 +534,9 @@ export default function LiveRideModal() {
     }
     function makeUserIcon() {
       return L.divIcon({ className: '', html: '<div style="position:relative"><div class="pulse-ring"></div><div class="user-dot"></div></div>', iconSize: [18,18], iconAnchor: [9,9] });
+    }
+    function makeDriverIcon() {
+      return L.divIcon({ className: '', html: '<div style="position:relative"><div class="driver-pulse-ring"></div><div class="driver-dot"></div></div>', iconSize: [18,18], iconAnchor: [9,9] });
     }
 
     window.handleMessage = function(msg) {
@@ -434,6 +550,17 @@ export default function LiveRideModal() {
             userMarker.slideTo([msg.lat, msg.lon], { duration: 1500 });
           } else {
             userMarker.setLatLng([msg.lat, msg.lon]);
+          }
+        }
+      } else if (msg.type === 'updateDriverPosition') {
+        if (!driverMarker) {
+          driverMarker = L.marker([msg.lat, msg.lon], { icon: makeDriverIcon(), zIndexOffset: 1100 })
+            .bindTooltip('Conducteur', { permanent: false, direction: 'top' }).addTo(map);
+        } else {
+          if (driverMarker.slideTo) {
+            driverMarker.slideTo([msg.lat, msg.lon], { duration: 1500 });
+          } else {
+            driverMarker.setLatLng([msg.lat, msg.lon]);
           }
         }
       } else if (msg.type === 'setDepartMarker') {
@@ -498,8 +625,16 @@ export default function LiveRideModal() {
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.liveIndicator}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>EN COURS</Text>
+                <View style={[
+                  styles.liveDot,
+                  { backgroundColor: activeRide.status === 'started' ? theme.colors.success : '#F59E0B' }
+                ]} />
+                <Text style={[
+                  styles.liveText,
+                  { color: activeRide.status === 'started' ? theme.colors.success : '#F59E0B' }
+                ]}>
+                  {activeRide.status === 'started' ? 'EN COURS' : 'PRÊT À DÉMARRER'}
+                </Text>
                 {routeLoading && <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginLeft: 8 }} />}
               </View>
               <Text style={styles.headerTitle} numberOfLines={1}>
@@ -511,90 +646,94 @@ export default function LiveRideModal() {
             </TouchableOpacity>
           </View>
 
-          {/* Map */}
-          <View style={styles.mapContainer}>
-            <WebView
-              ref={webviewRef}
-              originWhitelist={['*']}
-              source={{ html: leafletHtml }}
-              onMessage={onMapMessage}
-              javaScriptEnabled
-              domStorageEnabled
-              cacheEnabled={false}
-              androidLayerType="hardware"
-              style={styles.map}
-              scrollEnabled={false}
-            />
-            {!mapReady && (
-              <View style={styles.mapLoader}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={styles.mapLoaderText}>Chargement de la carte...</Text>
+          {/* Main Content */}
+          <>
+            {/* Map */}
+              <View style={styles.mapContainer}>
+                <WebView
+                  ref={webviewRef}
+                  originWhitelist={['*']}
+                  source={{ html: leafletHtml }}
+                  onMessage={onMapMessage}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  cacheEnabled={false}
+                  androidLayerType="hardware"
+                  style={styles.map}
+                  scrollEnabled={false}
+                />
+                {!mapReady && (
+                  <View style={styles.mapLoader}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={styles.mapLoaderText}>Chargement de la carte...</Text>
+                  </View>
+                )}
+
+                {mapReady && (
+                  <View style={styles.mapControls}>
+                    <TouchableOpacity
+                      style={styles.controlBtn}
+                      onPress={() => location && sendToMap({ type: 'setView', lat: location.lat, lon: location.lon, zoom: 15 })}
+                    >
+                      <Ionicons name="locate" size={20} color={theme.colors.primary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlBtn} onPress={openGoogleMaps}>
+                      <Ionicons name="navigate" size={20} color="#4285F4" />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-            )}
 
-            {mapReady && (
-              <View style={styles.mapControls}>
-                <TouchableOpacity
-                  style={styles.controlBtn}
-                  onPress={() => location && sendToMap({ type: 'setView', lat: location.lat, lon: location.lon, zoom: 15 })}
-                >
-                  <Ionicons name="locate" size={20} color={theme.colors.primary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.controlBtn} onPress={openGoogleMaps}>
-                  <Ionicons name="navigate" size={20} color="#4285F4" />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          {/* Légende de la route */}
-          {(departCoords || destCoords) && (
-            <View style={styles.legendRow}>
-              {departCoords && (
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: theme.colors.success }]} />
-                  <Text style={styles.legendText} numberOfLines={1}>{activeRide.departure_location}</Text>
+              {/* Légende de la route */}
+              {(departCoords || destCoords) && (
+                <View style={styles.legendRow}>
+                  {departCoords && (
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: theme.colors.success }]} />
+                      <Text style={styles.legendText} numberOfLines={1}>{activeRide.departure_location}</Text>
+                    </View>
+                  )}
+                  {destCoords && (
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: theme.colors.error }]} />
+                      <Text style={styles.legendText} numberOfLines={1}>{activeRide.arrival_location}</Text>
+                    </View>
+                  )}
                 </View>
               )}
-              {destCoords && (
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: theme.colors.error }]} />
-                  <Text style={styles.legendText} numberOfLines={1}>{activeRide.arrival_location}</Text>
-                </View>
-              )}
-            </View>
-          )}
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.googleMapsBtn} onPress={openGoogleMaps}>
-              <Ionicons name="map" size={18} color="#4285F4" />
-              <Text style={styles.googleMapsBtnText}>Navigation GPS sur Google Maps</Text>
-              <Ionicons name="open-outline" size={16} color="#4285F4" />
-            </TouchableOpacity>
-
-            <View style={styles.actionRow}>
-              {isDriver ? (
-                <TouchableOpacity style={styles.completeBtn} onPress={handleCompleteRide}>
-                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
-                  <Text style={styles.completeBtnText}>Terminer le trajet</Text>
-                </TouchableOpacity>
-              ) : (
-                <>
-                  <TouchableOpacity style={styles.completeBtn} onPress={handlePassengerComplete}>
-                    <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
-                    <Text style={styles.completeBtnText}>Je suis arrivé(e)</Text>
+              {/* Footer */}
+              <View style={styles.footer}>
+                {activeRide.status === 'started' && (
+                  <TouchableOpacity style={styles.googleMapsBtn} onPress={openGoogleMaps}>
+                    <Ionicons name="map" size={18} color="#4285F4" />
+                    <Text style={styles.googleMapsBtnText}>Navigation GPS sur Google Maps</Text>
+                    <Ionicons name="open-outline" size={16} color="#4285F4" />
                   </TouchableOpacity>
+                )}
+
+                <View style={styles.actionRow}>
+                  {activeRide.status === 'active' ? (
+                    <TouchableOpacity style={styles.startBtn} onPress={handleStartRide}>
+                      <Ionicons name="play-circle" size={20} color={theme.colors.white} />
+                      <Text style={styles.startBtnText}>Démarrer le trajet</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={styles.completeBtn} onPress={isDriver ? handleCompleteRide : handlePassengerComplete}>
+                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                      <Text style={styles.completeBtnText}>{isDriver ? 'Terminer le trajet' : 'Je suis arrivé(e)'}</Text>
+                    </TouchableOpacity>
+                  )}
+                  
                   <TouchableOpacity style={styles.reportBtn} onPress={() => setShowReportModal(true)}>
                     <Ionicons name="warning-outline" size={20} color={theme.colors.white} />
                     <Text style={styles.reportBtnText}>Signaler</Text>
                   </TouchableOpacity>
-                </>
-              )}
-            </View>
+                </View>
+              </View>
+            </>
           </View>
-        </View>
       </Modal>
 
       {/* Report Problem Modal */}
@@ -602,7 +741,7 @@ export default function LiveRideModal() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.reportOverlay}>
           <View style={styles.reportCard}>
             <Text style={styles.reportTitle}>🚨 Signaler un problème</Text>
-            <Text style={styles.reportSubtitle}>Décrivez brièvement le problème. L'administration sera alertée immédiatement.</Text>
+            <Text style={styles.reportSubtitle}>Décrivez le problème. Votre position GPS sera automatiquement envoyée à l'administration.</Text>
             <TextInput
               style={styles.reportInput}
               placeholder="Ex: retard important, comportement dangereux..."
@@ -672,4 +811,70 @@ const styles = StyleSheet.create({
   reportSendBtn: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: theme.colors.error, alignItems: 'center' },
   reportSendBtnDisabled: { backgroundColor: '#FCA5A5' },
   reportSendText: { fontSize: 15, color: theme.colors.white, fontWeight: 'bold' },
+  passengerWaitingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: '#FAFAFA',
+  },
+  pulsingCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  waitingTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  waitingText: {
+    fontSize: 16,
+    color: theme.colors.textLight,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 40,
+  },
+  passengerReportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+  },
+  passengerReportText: {
+    fontSize: 14,
+    color: theme.colors.error,
+    fontWeight: '600',
+  },
+  startBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    padding: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  startBtnText: {
+    color: theme.colors.white,
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
 });

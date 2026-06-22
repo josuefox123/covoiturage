@@ -1,4 +1,19 @@
 """
+========================================================
+
+Fichier :
+routing.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
+"""
 WebSocket URL routing pour Django Channels.
 """
 from django.urls import re_path

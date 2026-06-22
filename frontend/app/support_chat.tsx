@@ -1,4 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+/**
+ * ==============================================================
+ * Fichier :
+ * support_chat.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -45,6 +57,12 @@ interface Conversation {
   participant_2: string | null;
 }
 
+/**
+ * Composant SupportChatScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à SupportChatScreen.
+ */
 export default function SupportChatScreen() {
   const router = useRouter();
   const { user, authFetch } = useAuth();
@@ -118,7 +136,7 @@ export default function SupportChatScreen() {
   }, [messages.length]);
 
   // --- Send text message ---
-  const sendText = async () => {
+  const sendText = useCallback(async () => {
     if (!text.trim() || !conversation) return;
     const content = text.trim();
     setText('');
@@ -138,10 +156,10 @@ export default function SupportChatScreen() {
     } finally {
       setSendingMessage(false);
     }
-  };
+  }, [text, conversation, authFetch]);
 
   // --- Send media via FormData ---
-  const sendMedia = async (
+  const sendMedia = useCallback(async (
     type: 'image',
     uri: string,
     name: string,
@@ -166,10 +184,10 @@ export default function SupportChatScreen() {
     } finally {
       setSendingMessage(false);
     }
-  };
+  }, [conversation, authFetch]);
 
   // --- Pick image from gallery ---
-  const pickImage = async () => {
+  const pickImage = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       CustomAlert.alert('Permission refusée', "L'accès à la galerie est requis.");
@@ -184,10 +202,10 @@ export default function SupportChatScreen() {
       const name = asset.uri.split('/').pop() || 'photo.jpg';
       await sendMedia('image', asset.uri, name, asset.mimeType || 'image/jpeg');
     }
-  };
+  }, [sendMedia]);
 
   // --- Take a photo ---
-  const takePhoto = async () => {
+  const takePhoto = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       CustomAlert.alert('Permission refusée', "L'accès à la caméra est requis.");
@@ -201,10 +219,10 @@ export default function SupportChatScreen() {
       const name = asset.uri.split('/').pop() || 'photo.jpg';
       await sendMedia('image', asset.uri, name, asset.mimeType || 'image/jpeg');
     }
-  };
+  }, [sendMedia]);
 
   // --- Share location ---
-  const shareLocation = async () => {
+  const shareLocation = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       CustomAlert.alert('Permission refusée', "L'accès à la localisation est requis.");
@@ -230,16 +248,16 @@ export default function SupportChatScreen() {
     } finally {
       setSendingMessage(false);
     }
-  };
+  }, [conversation, authFetch]);
 
   // --- Format time ---
-  const formatTime = (dateStr: string) => {
+  const formatTime = useCallback((dateStr: string) => {
     const d = new Date(dateStr);
     return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  };
+  }, []);
 
   // --- Render message bubble ---
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = useCallback(({ item }: { item: Message }) => {
     // "isMe" = ce message a été envoyé par l'utilisateur connecté sur l'appli mobile
     // On compare les IDs en string pour éviter les problèmes de type (UUID vs string)
     const myId = String(user?.id || '');
@@ -316,7 +334,9 @@ export default function SupportChatScreen() {
         </View>
       </View>
     );
-  };
+  }, [user, formatTime]);
+
+  const keyExtractor = useCallback((item: Message) => item.id, []);
 
   if (loading) {
     return (
@@ -350,10 +370,14 @@ export default function SupportChatScreen() {
       <FlatList
         ref={flatListRef}
         data={messages}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesList}
         keyboardShouldPersistTaps="handled"
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={64} color={theme.colors.textMuted} />

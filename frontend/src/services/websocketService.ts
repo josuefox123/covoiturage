@@ -1,4 +1,16 @@
 /**
+ * ==============================================================
+ * Fichier :
+ * websocketService.ts
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
+/**
  * Service WebSocket pour le chat en temps réel.
  *
  * Connexion : ws://<host>/ws/chat/<conversationId>/?token=<JWT>
@@ -56,7 +68,6 @@ export class WebSocketService {
     this.ws = new WebSocket(fullUrl);
 
     this.ws.onopen = () => {
-      console.log('[WS] Connecté au chat');
       this.reconnectAttempts = 0;
       this.reconnectDelay = 1000;
       this.onOpen?.();
@@ -72,7 +83,6 @@ export class WebSocketService {
     };
 
     this.ws.onclose = (event) => {
-      console.log(`[WS] Déconnecté (code=${event.code})`);
       this.onClose?.();
 
       // Ne pas se reconnecter si fermeture volontaire (4001=auth, 4003=forbidden)
@@ -134,7 +144,6 @@ export class WebSocketService {
     this.reconnectAttempts++;
     this.onReconnecting?.(this.reconnectAttempts);
 
-    console.log(`[WS] Reconnexion dans ${this.reconnectDelay}ms (tentative ${this.reconnectAttempts})`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
@@ -145,15 +154,15 @@ export class WebSocketService {
   }
 }
 
-/**
- * Crée l'URL WebSocket en fonction de l'URL API de base.
- * ex: http://192.168.1.10:8000 → ws://192.168.1.10:8000/ws/chat/<id>/
- */
 export function buildWsUrl(apiBaseUrl: string, conversationId: string): string {
-  const wsBase = apiBaseUrl
+  let wsBase = apiBaseUrl
     .replace(/^https:\/\//, 'wss://')
     .replace(/^http:\/\//, 'ws://')
     .replace(/\/+$/, ''); // supprimer le slash final
+
+  if (wsBase.endsWith('/api')) {
+    wsBase = wsBase.substring(0, wsBase.length - 4);
+  }
 
   return `${wsBase}/ws/chat/${conversationId}/`;
 }

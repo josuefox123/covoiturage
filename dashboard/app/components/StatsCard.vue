@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+StatsCard.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div class="bg-card rounded-xl p-5 border border-border shadow-sm flex items-center justify-between">
     <div>

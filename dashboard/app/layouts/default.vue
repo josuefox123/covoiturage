@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+default.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div class="flex h-screen bg-background overflow-hidden">
     <Sidebar />

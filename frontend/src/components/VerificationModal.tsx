@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * VerificationModal.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -23,6 +35,12 @@ interface Props {
   userName?: string;
 }
 
+/**
+ * Composant VerificationModal.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à VerificationModal.
+ */
 export default function VerificationModal({ visible, onDismiss, onVerify, userName }: Props) {
   const scaleAnim  = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;

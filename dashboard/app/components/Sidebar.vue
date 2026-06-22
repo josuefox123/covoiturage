@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+Sidebar.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <aside class="w-64 bg-card border-r border-border h-full flex flex-col">
     <div class="p-6 flex items-center gap-3">
@@ -26,6 +38,10 @@
         <Icon name="ph:ticket" class="w-5 h-5" />
         <span>Réservations</span>
       </NuxtLink>
+      <NuxtLink to="/parcels" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" active-class="bg-primary/10 text-primary font-medium">
+        <Icon name="ph:package" class="w-5 h-5" />
+        <span>Colis</span>
+      </NuxtLink>
       <NuxtLink to="/vehicles" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" active-class="bg-primary/10 text-primary font-medium">
         <Icon name="ph:steering-wheel" class="w-5 h-5" />
         <span>Véhicules</span>
@@ -37,6 +53,16 @@
       <NuxtLink to="/promotions" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" active-class="bg-primary/10 text-primary font-medium">
         <Icon name="ph:star" class="w-5 h-5" />
         <span>Promotions</span>
+      </NuxtLink>
+
+      <div class="text-xs font-semibold text-textMuted uppercase tracking-wider mb-2 mt-4 px-2">Finances</div>
+      <NuxtLink to="/financial-settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
+        <Icon name="ph:money" class="w-5 h-5" />
+        <span>Commissions</span>
+      </NuxtLink>
+      <NuxtLink to="/refunds" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
+        <Icon name="ph:receipt" class="w-5 h-5" />
+        <span>Remboursements</span>
       </NuxtLink>
 
       <div class="text-xs font-semibold text-textMuted uppercase tracking-wider mb-2 mt-4 px-2">Support</div>

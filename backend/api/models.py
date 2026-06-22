@@ -1,3 +1,18 @@
+"""
+========================================================
+
+Fichier :
+models.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 import uuid
@@ -17,12 +32,30 @@ class UserManager(BaseUserManager):
         return self.create_user(phone, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
+    """
+    Modèle représentant un utilisateur du système Zemy.
+    
+    Rôle :
+        Gère les informations de profil, l'authentification et les préférences.
+        Peut être passager ou conducteur.
+        
+    Relations :
+        - vehicles : Véhicules possédés
+        - preference : Préférences de voyage
+        - rides_driven : Trajets créés
+        - bookings : Réservations effectuées
+    
+    Contraintes :
+        - Le téléphone doit être unique.
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     full_name = models.CharField(max_length=255, blank=True, null=True)
     email = models.EmailField(unique=True, blank=True, null=True)
     phone = models.CharField(max_length=20, unique=True, verbose_name="Email, Téléphone ou Nom")
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     rating = models.FloatField(default=0.0)
+    parcels_completed = models.IntegerField(default=0)
+    parcel_rating = models.FloatField(default=0.0)
     is_verified = models.BooleanField(default=False)
     fcm_token = models.CharField(max_length=500, blank=True, null=True, verbose_name="FCM Token")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -44,6 +77,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.phone
 
 class Vehicle(models.Model):
+    """
+    Modèle représentant un véhicule.
+    
+    Rôle :
+        Stocke les informations du véhicule d'un conducteur pour un trajet.
+        
+    Relations :
+        - owner (User) : Propriétaire du véhicule.
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vehicles')
     
@@ -58,6 +100,7 @@ class Vehicle(models.Model):
     license_plate = models.CharField(max_length=50)
     driver_license_number = models.CharField(max_length=100, blank=True, null=True)
     license_expiration = models.DateField(blank=True, null=True)
+    driver_license_photo = models.ImageField(upload_to='licenses/', blank=True, null=True)
 
     class Meta:
         verbose_name = "Véhicule"
@@ -67,12 +110,24 @@ class Vehicle(models.Model):
         return f"{self.brand_model} - {self.license_plate}"
 
 class UserPreference(models.Model):
+    """
+    Modèle des préférences de voyage d'un utilisateur.
+    
+    Rôle :
+        Définit si l'utilisateur accepte la musique, fumer, discuter, etc.
+        
+    Relations :
+        - user (User) : Utilisateur lié.
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preference')
     music = models.BooleanField(default=True)
     smoking = models.BooleanField(default=False)
     chatty = models.BooleanField(default=True)
     air_conditioner = models.BooleanField(default=True)
+    pets_allowed = models.BooleanField(default=False)
+    luggage_allowed = models.BooleanField(default=True)
+    stops_allowed = models.BooleanField(default=True)
     notes = models.TextField(blank=True, null=True, help_text="Préférences personnalisées du voyageur")
 
     class Meta:
@@ -83,25 +138,101 @@ class UserPreference(models.Model):
         return f"Preferences de {self.user.phone}"
 
 
+class RideSeries(models.Model):
+    """
+    Modèle pour les trajets récurrents.
+    
+    Rôle :
+        Permet de générer automatiquement des instances de trajets (`Ride`)
+        selon une fréquence définie (quotidien, hebdomadaire).
+        
+    Relations :
+        - driver (User) : Conducteur créateur.
+        - vehicle (Vehicle) : Véhicule utilisé.
+        - rides : Instances de trajets générées.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    driver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ride_series')
+    start_date = models.DateField()
+    end_date = models.DateField()
+    repeat_type = models.CharField(max_length=20, default='daily')  # 'daily', 'weekly'
+    week_days = models.JSONField(blank=True, null=True)  # List of numbers (0=Mon, 6=Sun)
+    departure_time = models.TimeField()
+    departure_location = models.CharField(max_length=255)
+    arrival_location = models.CharField(max_length=255)
+    price_per_seat = models.IntegerField()
+    driver_payout = models.IntegerField(default=0)
+    zemy_commission = models.IntegerField(default=0)
+    total_seats = models.IntegerField()
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Colis
+    accepts_parcels = models.BooleanField(default=False)
+    max_parcels = models.IntegerField(default=0)
+    max_weight_per_parcel = models.FloatField(default=0.0)
+    max_dimensions = models.CharField(max_length=50, blank=True, null=True)
+    price_per_parcel = models.IntegerField(default=0)
+    allowed_parcel_types = models.JSONField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Série de Trajets"
+        verbose_name_plural = "Séries de Trajets"
+
+    def __str__(self):
+        return f"Série de {self.driver} du {self.start_date} au {self.end_date}"
+
 class Ride(models.Model):
+    """
+    Modèle représentant une instance de trajet (covoiturage).
+    
+    Rôle :
+        Gère un trajet spécifique avec une date, un départ et une arrivée.
+        Peut également inclure le transport de colis.
+        
+    Relations :
+        - series (RideSeries) : Série parente (optionnel).
+        - driver (User) : Conducteur.
+        - vehicle (Vehicle) : Véhicule utilisé.
+        - bookings : Réservations associées.
+        - parcels : Colis associés.
+    """
     STATUS_CHOICES = [
         ('active', 'Active'),
+        ('started', 'Started'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    series = models.ForeignKey(RideSeries, on_delete=models.CASCADE, null=True, blank=True, related_name='rides')
     driver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='rides_driven')
     vehicle = models.ForeignKey(Vehicle, on_delete=models.SET_NULL, null=True, blank=True)
     departure_location = models.CharField(max_length=255)
     arrival_location = models.CharField(max_length=255)
-    departure_date = models.DateField()
+    departure_date = models.DateField(db_index=True)
     departure_time = models.TimeField()
     price_per_seat = models.IntegerField()
+    driver_payout = models.IntegerField(default=0)
+    zemy_commission = models.IntegerField(default=0)
     total_seats = models.IntegerField()
     seats_available = models.IntegerField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True)
+    driver_latitude = models.FloatField(blank=True, null=True)
+    driver_longitude = models.FloatField(blank=True, null=True)
+    
+    # Colis
+    accepts_parcels = models.BooleanField(default=False)
+    max_parcels = models.IntegerField(default=0)
+    parcels_available = models.IntegerField(default=0)
+    max_weight_per_parcel = models.FloatField(default=0.0)
+    max_dimensions = models.CharField(max_length=50, blank=True, null=True)
+    price_per_parcel = models.IntegerField(default=0)
+    allowed_parcel_types = models.JSONField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Trajet"
@@ -111,6 +242,16 @@ class Ride(models.Model):
         return f"Trajet {self.departure_location} -> {self.arrival_location}"
 
 class Booking(models.Model):
+    """
+    Modèle représentant une réservation de place(s) dans un trajet.
+    
+    Rôle :
+        Lie un passager à un trajet et gère le statut de paiement et d'acceptation.
+        
+    Relations :
+        - ride (Ride) : Trajet réservé.
+        - passenger (User) : Passager effectuant la réservation.
+    """
     STATUS_CHOICES = [
         ('pending', 'En attente'),
         ('confirmed', 'Confirmée'),
@@ -118,11 +259,19 @@ class Booking(models.Model):
         ('completed', 'Terminée'),
     ]
 
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('escrow', 'Retenu par Zemy'),
+        ('paid', 'Payé au conducteur'),
+        ('refunded', 'Remboursé'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='bookings')
     passenger = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
     seats_booked = models.IntegerField(default=1)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -131,8 +280,32 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Reservation {self.id} pour {self.ride}"
+        
+    @property
+    def total_amount(self):
+        return self.seats_booked * self.ride.price_per_seat
+
+    @property
+    def amount_paid_online(self):
+        from .models import FinancialSettings
+        settings = FinancialSettings.objects.first()
+        if not settings:
+            return 0
+        commission_zemy = (self.total_amount * settings.commission_percentage) / 100
+        return max(commission_zemy, settings.min_commission)
+
+    @property
+    def amount_due_to_driver(self):
+        return self.total_amount - self.amount_paid_online
 
 class Conversation(models.Model):
+    """
+    Modèle représentant une conversation de messagerie.
+    
+    Rôle :
+        Regroupe les messages échangés entre deux utilisateurs,
+        soit pour un trajet, soit pour le support.
+    """
     CONVERSATION_TYPE_CHOICES = [
         ('ride', 'Ride'),
         ('support', 'Support'),
@@ -154,6 +327,12 @@ class Conversation(models.Model):
         return f"Conversation [{self.conversation_type}] {self.id}"
 
 class Message(models.Model):
+    """
+    Modèle représentant un message individuel.
+    
+    Rôle :
+        Stocke le texte, la pièce jointe ou la localisation envoyée dans une conversation.
+    """
     MESSAGE_TYPE_CHOICES = [
         ('text', 'Text'),
         ('image', 'Image'),
@@ -183,6 +362,12 @@ class Message(models.Model):
         return f"Message [{self.message_type}] {self.id}"
 
 class Notification(models.Model):
+    """
+    Modèle de notification.
+    
+    Rôle :
+        Alerte les utilisateurs d'événements importants (trajet confirmé, message).
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
     title = models.CharField(max_length=255)
@@ -197,6 +382,13 @@ class Notification(models.Model):
         return f"Notification {self.title} to {self.user.email if self.user else 'All'}"
 
 class AppBranding(models.Model):
+    """
+    Modèle de personnalisation de l'application.
+    
+    Rôle :
+        Gère le logo et l'animation de démarrage (splash screen).
+        Une seule instance active à la fois.
+    """
     logo = models.ImageField(upload_to='branding/', null=True, blank=True)
     logo_scale = models.FloatField(default=1.0)
     logo_position_x = models.FloatField(default=0.0)
@@ -219,6 +411,12 @@ class AppBranding(models.Model):
         return f"App Branding ({'Active' if self.is_active else 'Inactive'})"
 
 class VerificationRequest(models.Model):
+    """
+    Modèle de demande de vérification de compte.
+    
+    Rôle :
+        Stocke les pièces d'identité fournies par l'utilisateur pour devenir conducteur certifié.
+    """
     STATUS_CHOICES = [
         ('pending', 'En attente'),
         ('approved', 'Approuvée'),
@@ -242,6 +440,12 @@ class VerificationRequest(models.Model):
         return f"Vérification pour {self.user.full_name or self.user.phone} ({self.get_status_display()})"
 
 class Promotion(models.Model):
+    """
+    Modèle de bannière promotionnelle.
+    
+    Rôle :
+        Affiche des annonces dans l'application mobile.
+    """
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255, blank=True, null=True)
     image = models.ImageField(upload_to='promotions/')
@@ -263,6 +467,12 @@ class Promotion(models.Model):
         return self.title
 
 class MobileSettings(models.Model):
+    """
+    Modèle de configuration mobile.
+    
+    Rôle :
+        Paramètres globaux de l'application (singleton).
+    """
     show_promotions = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -281,3 +491,175 @@ class MobileSettings(models.Model):
 
     def __str__(self):
         return "Paramètres Mobile"
+
+class FinancialSettings(models.Model):
+    """
+    Modèle de paramètres financiers.
+    
+    Rôle :
+        Gère les taux de commission appliqués aux trajets et colis (singleton).
+    """
+    commission_percentage = models.FloatField(default=10.0)
+    min_commission = models.IntegerField(default=100)
+    max_commission = models.IntegerField(default=2000, blank=True, null=True)
+    is_commission_active = models.BooleanField(default=True)
+    
+    parcel_commission_percentage = models.FloatField(default=8.0)
+    min_parcel_commission = models.IntegerField(default=100)
+    max_parcel_commission = models.IntegerField(default=2000, blank=True, null=True)
+    is_parcel_commission_active = models.BooleanField(default=True)
+    
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Paramètres Financiers"
+        verbose_name_plural = "Paramètres Financiers"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super(FinancialSettings, self).save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Paramètres Financiers"
+
+class RefundRequest(models.Model):
+    """
+    Modèle de demande de remboursement.
+    
+    Rôle :
+        Géré par l'administrateur lorsqu'un trajet est annulé de manière conflictuelle.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('approved', 'Approuvée'),
+        ('rejected', 'Rejetée'),
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='refund_requests')
+    passenger = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refund_requests_as_passenger')
+    driver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refund_requests_as_driver')
+    amount = models.IntegerField()
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Demande de Remboursement"
+        verbose_name_plural = "Demandes de Remboursement"
+
+    def __str__(self):
+        return f"Remboursement #{self.id} - {self.status}"
+
+class Transaction(models.Model):
+    """
+    Modèle de transaction financière.
+    
+    Rôle :
+        Historique des paiements (trajet, colis, commission Zemy).
+    """
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('completed', 'Effectué'),
+    ]
+    TYPE_CHOICES = [
+        ('ride', 'Trajet'),
+        ('parcel', 'Colis'),
+        ('withdrawal', 'Retrait'),
+        ('refund', 'Remboursement'),
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+    ride = models.ForeignKey(Ride, on_delete=models.SET_NULL, null=True, blank=True)
+    parcel = models.ForeignKey('Parcel', on_delete=models.SET_NULL, null=True, blank=True)
+    transaction_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='ride')
+    amount = models.IntegerField(default=0)
+    driver_payout = models.IntegerField(default=0)
+    zemy_commission = models.IntegerField(default=0)
+    total_price = models.IntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Transaction"
+        verbose_name_plural = "Transactions"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Transaction {self.id} - {self.total_price} FCFA"
+
+class Parcel(models.Model):
+    """
+    Modèle d'envoi de colis.
+    
+    Rôle :
+        Permet à un utilisateur d'envoyer un colis via un trajet existant.
+        
+    Relations :
+        - ride (Ride) : Le trajet transportant le colis.
+        - sender_user (User) : L'utilisateur expéditeur (optionnel).
+    """
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('accepted', 'Accepté'),
+        ('picked_up', 'Récupéré'),
+        ('in_transit', 'En cours'),
+        ('delivered', 'Livré'),
+        ('cancelled', 'Annulé'),
+    ]
+
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('escrow', 'Retenu par Zemy'),
+        ('paid', 'Payé au conducteur'),
+        ('refunded', 'Remboursé'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='parcels')
+    sender_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_parcels')
+    
+    # Informations expéditeur et destinataire
+    sender_name = models.CharField(max_length=255)
+    sender_phone = models.CharField(max_length=20)
+    receiver_name = models.CharField(max_length=255)
+    receiver_phone = models.CharField(max_length=20)
+    
+    # Lieux
+    pickup_location = models.CharField(max_length=255)
+    dropoff_location = models.CharField(max_length=255)
+    
+    # Détails du colis
+    description = models.TextField()
+    weight = models.FloatField()
+    dimensions = models.CharField(max_length=50) # 'Petit', 'Moyen', 'Grand'
+    estimated_value = models.IntegerField(default=0)
+    photo = models.ImageField(upload_to='parcels/', blank=True, null=True)
+    special_instructions = models.TextField(blank=True, null=True)
+    
+    # Finance
+    price = models.IntegerField()
+    zemy_commission = models.IntegerField(default=0)
+    driver_payout = models.IntegerField(default=0)
+    
+    # Suivi
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    qr_code_data = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Colis"
+        verbose_name_plural = "Colis"
+
+    def __str__(self):
+        return f"Colis {self.id} - {self.status}"
+

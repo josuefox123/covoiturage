@@ -1,5 +1,18 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * _layout.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState } from 'react';
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AnimatedSplash from '../src/components/AnimatedSplash';
@@ -19,12 +32,19 @@ function NotificationInitializer() {
   return null;
 }
 
+/**
+ * Composant RootLayout.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à RootLayout.
+ */
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
         <StatusBar style="dark" />
 
         {/* Initialisation silencieuse des notifications push */}
@@ -51,5 +71,6 @@ export default function RootLayout() {
         <CustomAlertProvider />
       </AuthProvider>
       </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+index.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">

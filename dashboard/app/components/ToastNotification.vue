@@ -1,7 +1,19 @@
+<!--
+==========================================================
+Fichier :
+ToastNotification.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <Transition name="toast">
     <div
-      v-if="show"
+      v-if="isVisible"
       class="fixed top-5 right-5 z-[100] flex items-center space-x-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-sm w-full"
       :class="typeConfig.bg"
     >
@@ -19,9 +31,9 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-
 const props = defineProps<{
-  show: boolean
+  show?: boolean
+  modelValue?: boolean
   type?: 'success' | 'error' | 'warning' | 'info'
   title: string
   message?: string
@@ -30,7 +42,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  'update:modelValue': [value: boolean]
 }>()
+
+const isVisible = computed(() => props.show !== undefined ? props.show : props.modelValue)
 
 const typeConfig = computed(() => {
   const map: Record<string, any> = {
@@ -61,10 +76,12 @@ const typeConfig = computed(() => {
   }
   return map[props.type || 'info']
 })
-
-watch(() => props.show, (val) => {
+watch(isVisible, (val) => {
   if (val && (props.duration || 3500)) {
-    setTimeout(() => emit('close'), props.duration || 3500)
+    setTimeout(() => {
+      emit('close')
+      emit('update:modelValue', false)
+    }, props.duration || 3500)
   }
 })
 </script>

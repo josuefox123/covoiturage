@@ -1,3 +1,18 @@
+"""
+========================================================
+
+Fichier :
+urls.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
@@ -5,20 +20,25 @@ from .views import (
     dashboard_stats, save_fcm_token,
     UserViewSet, VehicleViewSet, UserPreferenceViewSet,
     RideViewSet, BookingViewSet, ConversationViewSet, MessageViewSet, NotificationViewSet,
-    AppBrandingView, VerificationRequestViewSet, PromotionViewSet, MobileSettingsView
+    AppBrandingView, VerificationRequestViewSet, PromotionViewSet, MobileSettingsView,
+    FinancialSettingsViewSet, RefundRequestViewSet, TransactionViewSet, ParcelViewSet
 )
 
 router = DefaultRouter()
-router.register(r'users', UserViewSet)
-router.register(r'vehicles', VehicleViewSet)
-router.register(r'preferences', UserPreferenceViewSet)
-router.register(r'rides', RideViewSet)
-router.register(r'bookings', BookingViewSet)
-router.register(r'conversations', ConversationViewSet)
-router.register(r'messages', MessageViewSet)
-router.register(r'notifications', NotificationViewSet)
+router.register(r'users', UserViewSet, basename='user')
+router.register(r'vehicles', VehicleViewSet, basename='vehicle')
+router.register(r'preferences', UserPreferenceViewSet, basename='preference')
+router.register(r'rides', RideViewSet, basename='ride')
+router.register(r'bookings', BookingViewSet, basename='booking')
+router.register(r'conversations', ConversationViewSet, basename='conversation')
+router.register(r'messages', MessageViewSet, basename='message')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'verifications', VerificationRequestViewSet, basename='verification')
 router.register(r'promotions', PromotionViewSet, basename='promotion')
+router.register(r'financial-settings', FinancialSettingsViewSet, basename='financial_settings')
+router.register(r'refund-requests', RefundRequestViewSet, basename='refund_requests')
+router.register(r'transactions', TransactionViewSet, basename='transactions')
+router.register(r'parcels', ParcelViewSet, basename='parcel')
 
 urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),

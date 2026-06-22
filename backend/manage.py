@@ -1,3 +1,18 @@
+"""
+========================================================
+
+Fichier :
+manage.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
 import os

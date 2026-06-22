@@ -1,8 +1,20 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * publish.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator,
-  Modal, Image, Animated, Dimensions, Keyboard,
+  Modal, Image, Animated, Dimensions, Keyboard, Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,6 +33,12 @@ const { width } = Dimensions.get('window');
 const PROFILE_STEPS = ['personal', 'vehicle', 'preferences'] as const;
 type ProfileStep = typeof PROFILE_STEPS[number];
 
+/**
+ * Composant PublishScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à PublishScreen.
+ */
 export default function PublishScreen() {
   const router = useRouter();
   const authCtx = useAuth();
@@ -45,6 +63,31 @@ export default function PublishScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickingLocationFor, setPickingLocationFor] = useState<'departure' | 'arrival' | null>(null);
 
+  // Recurrent rides
+  const [isRecurrent, setIsRecurrent] = useState(false);
+  const [endDateObj, setEndDateObj] = useState(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000));
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [repeatType, setRepeatType] = useState<'single_week' | 'weekly'>('single_week');
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+
+  const getEstimatedRides = () => {
+    if (!isRecurrent || selectedDays.length === 0) return 0;
+    if (repeatType === 'single_week') {
+      return selectedDays.length;
+    }
+    if (endDateObj < selectedDateObj) return 0;
+    let count = 0;
+    const current = new Date(selectedDateObj);
+    const end = new Date(endDateObj);
+    while (current <= end) {
+      const jsDay = current.getDay();
+      const myDay = jsDay === 0 ? 6 : jsDay - 1; // 0=Mon
+      if (selectedDays.includes(myDay)) count++;
+      current.setDate(current.getDate() + 1);
+    }
+    return count;
+  };
+
   // Coordinates for estimation
   const [departureCords, setDepartureCords] = useState<{ lat: number; lon: number } | null>(null);
   const [arrivalCords, setArrivalCords] = useState<{ lat: number; lon: number } | null>(null);
@@ -60,10 +103,20 @@ export default function PublishScreen() {
   const [optPets, setOptPets] = useState(false);
   const [optStops, setOptStops] = useState(false);
 
+  // Parcel state
+  const [acceptsParcels, setAcceptsParcels] = useState(false);
+  const [maxParcels, setMaxParcels] = useState(1);
+  const [maxWeightPerParcel, setMaxWeightPerParcel] = useState('');
+  const [maxDimensions, setMaxDimensions] = useState('Petit'); // 'Petit', 'Moyen', 'Grand'
+  const [pricePerParcel, setPricePerParcel] = useState('');
+  const [allowedParcelTypes, setAllowedParcelTypes] = useState<string[]>([]);
+  const ALL_PARCEL_TYPES = ['Documents', 'Colis', 'Alimentation', 'Électronique', 'Autres'];
+
   // Profile completion modal
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [profileStep, setProfileStep] = useState<ProfileStep>('personal');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [financialSettings, setFinancialSettings] = useState<any>(null);
 
   // Profile fields
   const [editName, setEditName] = useState(user?.full_name || '');
@@ -86,6 +139,7 @@ export default function PublishScreen() {
   const [hasVehicle, setHasVehicle] = useState(false);
   const [checkingVehicle, setCheckingVehicle] = useState(true);
   const [showVehicleWarning, setShowVehicleWarning] = useState(false);
+  const [showExpiredLicenseWarning, setShowExpiredLicenseWarning] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -103,6 +157,26 @@ export default function PublishScreen() {
       const data = await authFetch(`/vehicles/?owner=${user.id}`);
       const results = Array.isArray(data) ? data : data.results || [];
       if (results.length > 0) {
+        const primaryVehicle = results[0];
+        
+        if (primaryVehicle.vehicle_type === 'voiture') {
+          if (!primaryVehicle.license_expiration || !primaryVehicle.driver_license_number || !primaryVehicle.driver_license_photo) {
+            setHasVehicle(false);
+            setShowExpiredLicenseWarning(true);
+            return;
+          }
+          
+          const expDate = new Date(primaryVehicle.license_expiration);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          if (expDate < today) {
+            setHasVehicle(false);
+            setShowExpiredLicenseWarning(true);
+            return;
+          }
+        }
+        
         setHasVehicle(true);
       } else {
         setHasVehicle(false);
@@ -128,6 +202,18 @@ export default function PublishScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    const fetchSettings = async () => {
+      try {
+        const data = await authFetch('/financial-settings/');
+        if (data && data.length > 0) {
+          setFinancialSettings(data[0]);
+        }
+      } catch (e) {
+        console.error("Erreur param financiers", e);
+      }
+    };
+    fetchSettings();
   }, []);
 
   const handlePressIn = () => {
@@ -205,25 +291,62 @@ export default function PublishScreen() {
       return;
     }
 
+    if (isRecurrent) {
+      if (selectedDays.length === 0) {
+        CustomAlert.alert('Erreur', 'Veuillez sélectionner au moins un jour pour la récurrence.');
+        return;
+      }
+      if (repeatType === 'weekly' && endDateObj < selectedDateObj) {
+        CustomAlert.alert('Erreur', 'La date de fin doit être postérieure à la date de début.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const dateString = selectedDateObj.toISOString().split('T')[0];
+      const payload: any = {
+        departure_location: departure,
+        arrival_location: arrival,
+        departure_date: dateString,
+        departure_time: time + ':00',
+        driver_payout: parseInt(price),
+        total_seats: seats,
+        seats_available: seats,
+        vehicle: null,
+        accepts_parcels: acceptsParcels,
+      };
 
-      await authFetch('/rides/', {
+      if (acceptsParcels) {
+        payload.max_parcels = maxParcels;
+        payload.max_weight_per_parcel = parseFloat(maxWeightPerParcel || '0');
+        payload.max_dimensions = maxDimensions;
+        payload.price_per_parcel = parseInt(pricePerParcel || '0');
+        payload.allowed_parcel_types = allowedParcelTypes;
+      }
+
+      if (isRecurrent) {
+        payload.is_recurrent = true;
+        payload.start_date = dateString;
+        if (repeatType === 'single_week') {
+          const end = new Date(selectedDateObj);
+          end.setDate(end.getDate() + 6);
+          payload.end_date = end.toISOString().split('T')[0];
+        } else {
+          payload.end_date = endDateObj.toISOString().split('T')[0];
+        }
+        payload.repeat_type = 'weekly';
+        payload.week_days = selectedDays;
+      }
+
+      const res = await authFetch('/rides/', {
         method: 'POST',
-        body: JSON.stringify({
-          departure_location: departure,
-          arrival_location: arrival,
-          departure_date: dateString,
-          departure_time: time + ':00',
-          price_per_seat: parseInt(price),
-          total_seats: seats,
-          seats_available: seats,
-          vehicle: null,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      CustomAlert.alert('Félicitations ! 🎉', `Votre trajet de ${departure} vers ${arrival} a été publié !`, [
+      const message = isRecurrent && res.message ? res.message : `Votre trajet de ${departure} vers ${arrival} a été publié !`;
+      
+      CustomAlert.alert('Félicitations ! 🎉', message, [
         { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
       ]);
 
@@ -427,15 +550,15 @@ export default function PublishScreen() {
               </TouchableOpacity>
             )}
 
-            {/* ITINERAIRE SECTION */}
-            <Text style={styles.sectionTitle}>📍 Itinéraire</Text>
+            {/* Informations du trajet */}
+            <Text style={styles.sectionTitle}>Informations du trajet</Text>
             
             <View style={styles.card}>
               <TouchableOpacity style={styles.locationCard} onPress={() => setPickingLocationFor('departure')} activeOpacity={0.7}>
-                <Ionicons name="ellipse" color="#22C55E" size={16} />
+                <Ionicons name="ellipse-outline" color={theme.colors.primary} size={20} />
                 <View style={styles.locationContent}>
-                  <Text style={styles.locationLabel}>Départ</Text>
-                  <Text style={styles.locationValue}>{departure || "Choisir le lieu de départ"}</Text>
+                  <Text style={styles.locationLabel}>Lieu de départ</Text>
+                  <Text style={styles.locationValue}>{departure || "Choisir le départ"}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
               </TouchableOpacity>
@@ -443,41 +566,311 @@ export default function PublishScreen() {
               <View style={styles.dividerLine} />
 
               <TouchableOpacity style={styles.locationCard} onPress={() => setPickingLocationFor('arrival')} activeOpacity={0.7}>
-                <Ionicons name="location" color="#EF4444" size={18} style={{ marginLeft: -1 }} />
+                <Ionicons name="location-outline" color={theme.colors.primary} size={22} style={{ marginLeft: -1 }} />
                 <View style={styles.locationContent}>
-                  <Text style={styles.locationLabel}>Arrivée</Text>
+                  <Text style={styles.locationLabel}>Destination</Text>
                   <Text style={styles.locationValue}>{arrival || "Choisir la destination"}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
 
-            {/* Estimation */}
             {showEstimation && (
               <View style={styles.estimationRow}>
                 {estimationLoading ? (
                   <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : estimation ? (
                   <>
-                    <Text style={styles.estText}>📏 {estimation.distanceKm.toLocaleString()} km</Text>
-                    <Text style={styles.estText}>⏱ {formatDuration(estimation.durationMin)}</Text>
+                    <Ionicons name="analytics-outline" size={16} color={theme.colors.textLight} />
+                    <Text style={styles.estText}>{estimation.distanceKm.toLocaleString()} km</Text>
+                    <Ionicons name="time-outline" size={16} color={theme.colors.textLight} />
+                    <Text style={styles.estText}>{formatDuration(estimation.durationMin)}</Text>
                   </>
                 ) : null}
               </View>
             )}
 
-            {/* DATE & HEURE SECTION */}
-            <Text style={styles.sectionTitle}>📅 Date et Heure</Text>
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.halfCard} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
-                <Text style={styles.halfCardLabel}>Date</Text>
-                <Text style={styles.halfCardValue}>{selectedDateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</Text>
-              </TouchableOpacity>
+            {!isRecurrent ? (
+              <View style={styles.row}>
+                <TouchableOpacity style={styles.halfCard} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+                  <Text style={styles.halfCardLabel}>Date de départ</Text>
+                  <Text style={styles.halfCardValue}>{selectedDateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity style={styles.halfCard} onPress={() => setShowTimePicker(true)} activeOpacity={0.7}>
-                <Text style={styles.halfCardLabel}>Heure</Text>
-                <Text style={styles.halfCardValue}>{time}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.halfCard} onPress={() => setShowTimePicker(true)} activeOpacity={0.7}>
+                  <Text style={styles.halfCardLabel}>Heure de départ</Text>
+                  <Text style={styles.halfCardValue}>{time}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.row}>
+                <TouchableOpacity style={[styles.halfCard, { flex: 1 }]} onPress={() => setShowTimePicker(true)} activeOpacity={0.7}>
+                  <Text style={styles.halfCardLabel}>Heure de départ</Text>
+                  <Text style={styles.halfCardValue}>{time}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.row}>
+              <View style={[styles.halfCard, { paddingVertical: 12 }]}>
+                <Text style={styles.halfCardLabel}>Nombre de places</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                  <TouchableOpacity onPress={() => setSeats(Math.max(1, seats - 1))} style={styles.seatStepperBtn}>
+                    <Ionicons name="remove" size={20} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={styles.halfCardValue}>{seats}</Text>
+                  <TouchableOpacity onPress={() => setSeats(Math.min(6, seats + 1))} style={styles.seatStepperBtn}>
+                    <Ionicons name="add" size={20} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={[styles.halfCard, { paddingVertical: 12 }]}>
+                <Text style={styles.halfCardLabel}>Montant souhaité (FCFA)</Text>
+                <TextInput
+                  style={[styles.halfCardValue, { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 0, paddingBottom: 4, marginTop: 4 }]}
+                  placeholder="Ex: 1000"
+                  placeholderTextColor={theme.colors.textLight}
+                  value={price}
+                  onChangeText={setPrice}
+                  keyboardType="numeric"
+                  maxLength={6}
+                />
+              </View>
+            </View>
+
+            {price ? (
+              <View style={styles.commissionBox}>
+                <View style={styles.commissionRow}>
+                  <Text style={styles.commissionLabel}>Vous recevrez :</Text>
+                  <Text style={styles.commissionValue}>{parseInt(price)} FCFA</Text>
+                </View>
+                <View style={styles.commissionRow}>
+                  <Text style={styles.commissionLabelSub}>Commission Zemy ({financialSettings?.commission_percentage || 10}%) :</Text>
+                  <Text style={styles.commissionValueSub}>{Math.max(financialSettings?.min_commission || 100, Math.floor(parseInt(price) * ((financialSettings?.commission_percentage || 10) / 100)))} FCFA</Text>
+                </View>
+                <View style={[styles.commissionRow, { borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 8, marginTop: 4 }]}>
+                  <Text style={styles.commissionLabelTotal}>Le passager paiera :</Text>
+                  <Text style={styles.commissionValueTotal}>{parseInt(price) + Math.max(financialSettings?.min_commission || 100, Math.floor(parseInt(price) * ((financialSettings?.commission_percentage || 10) / 100)))} FCFA</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* OPTIONS SECTION */}
+            <Text style={styles.sectionTitle}>Services à bord</Text>
+            <View style={styles.optionsList}>
+              <OptionCard label="Bagages autorisés" icon={<Ionicons name="briefcase-outline" size={20} color={theme.colors.text} />} value={optLuggage} onChange={setOptLuggage} />
+              <OptionCard label="Climatisation" icon={<Ionicons name="snow-outline" size={20} color={theme.colors.text} />} value={optAirCond} onChange={setOptAirCond} />
+              <OptionCard label="Recharge téléphone" icon={<Ionicons name="battery-charging-outline" size={20} color={theme.colors.text} />} value={optCharge} onChange={setOptCharge} />
+              <OptionCard label="Animaux acceptés" icon={<Ionicons name="paw-outline" size={20} color={theme.colors.text} />} value={optPets} onChange={setOptPets} />
+            </View>
+
+            {/* PARCELS SECTION */}
+            <Text style={styles.sectionTitle}>Transport de colis</Text>
+            <View style={styles.recurrentWrapper}>
+              <View style={styles.recurrentHeader}>
+                <Text style={styles.recurrentHeaderText}>J'accepte de transporter des colis</Text>
+                <Switch
+                  value={acceptsParcels}
+                  onValueChange={setAcceptsParcels}
+                  trackColor={{ false: '#E5E7EB', true: theme.colors.primaryLight }}
+                  thumbColor={acceptsParcels ? theme.colors.primary : '#FFFFFF'}
+                />
+              </View>
+
+              {acceptsParcels && (
+                <View style={styles.recurrentBody}>
+                  <View style={styles.row}>
+                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
+                      <Text style={styles.halfCardLabel}>Max colis</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                        <TouchableOpacity onPress={() => setMaxParcels(Math.max(1, maxParcels - 1))} style={styles.seatStepperBtn}>
+                          <Ionicons name="remove" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                        <Text style={styles.halfCardValue}>{maxParcels}</Text>
+                        <TouchableOpacity onPress={() => setMaxParcels(Math.min(10, maxParcels + 1))} style={styles.seatStepperBtn}>
+                          <Ionicons name="add" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
+                      <Text style={styles.halfCardLabel}>Poids max/colis (kg)</Text>
+                      <TextInput
+                        style={[styles.halfCardValue, { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 0, paddingBottom: 4, marginTop: 4 }]}
+                        placeholder="Ex: 5"
+                        placeholderTextColor={theme.colors.textLight}
+                        value={maxWeightPerParcel}
+                        onChangeText={setMaxWeightPerParcel}
+                        keyboardType="numeric"
+                        maxLength={4}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.row}>
+                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
+                      <Text style={styles.halfCardLabel}>Taille max</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 8 }}>
+                        {['Petit', 'Moyen', 'Grand'].map(dim => (
+                          <TouchableOpacity
+                            key={dim}
+                            style={[styles.dayBox, maxDimensions === dim && styles.dayBoxActive, { width: 'auto', paddingHorizontal: 12 }]}
+                            onPress={() => setMaxDimensions(dim)}
+                          >
+                            <Text style={[styles.dayBoxText, maxDimensions === dim && styles.dayBoxTextActive]}>{dim}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
+                      <Text style={styles.halfCardLabel}>Prix/colis (FCFA)</Text>
+                      <TextInput
+                        style={[styles.halfCardValue, { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 0, paddingBottom: 4, marginTop: 4 }]}
+                        placeholder="Ex: 1000"
+                        placeholderTextColor={theme.colors.textLight}
+                        value={pricePerParcel}
+                        onChangeText={setPricePerParcel}
+                        keyboardType="numeric"
+                        maxLength={6}
+                      />
+                    </View>
+                  </View>
+
+                  {pricePerParcel ? (
+                        <View style={[styles.commissionBox, { marginTop: 8 }]}>
+                          <View style={styles.commissionRow}>
+                            <Text style={styles.commissionLabel}>Prix conducteur :</Text>
+                            <Text style={styles.commissionValue}>{parseInt(pricePerParcel)} FCFA</Text>
+                          </View>
+                          <View style={styles.commissionRow}>
+                            <Text style={styles.commissionLabelSub}>Commission Zemy ({financialSettings?.parcel_commission_percentage || 8}%) :</Text>
+                            <Text style={styles.commissionValueSub}>{Math.max(financialSettings?.min_parcel_commission || 100, Math.floor(parseInt(pricePerParcel) * ((financialSettings?.parcel_commission_percentage || 8) / 100)))} FCFA</Text>
+                          </View>
+                          <View style={[styles.commissionRow, { borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 8, marginTop: 4 }]}>
+                            <Text style={styles.commissionLabelTotal}>L'expéditeur paiera :</Text>
+                            <Text style={styles.commissionValueTotal}>{parseInt(pricePerParcel) + Math.max(financialSettings?.min_parcel_commission || 100, Math.floor(parseInt(pricePerParcel) * ((financialSettings?.parcel_commission_percentage || 8) / 100)))} FCFA</Text>
+                          </View>
+                        </View>
+                      ) : null}
+
+                      <Text style={[styles.halfCardLabel, { marginTop: 16, marginBottom: 8 }]}>Types de colis autorisés</Text>
+                  <View style={[styles.daysContainer, { justifyContent: 'flex-start' }]}>
+                    {ALL_PARCEL_TYPES.map(type => {
+                      const isSelected = allowedParcelTypes.includes(type);
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={[styles.dayBox, isSelected && styles.dayBoxActive, { width: 'auto', paddingHorizontal: 12, marginBottom: 8 }]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setAllowedParcelTypes(prev => prev.filter(t => t !== type));
+                            } else {
+                              setAllowedParcelTypes(prev => [...prev, type]);
+                            }
+                          }}
+                        >
+                          <Text style={[styles.dayBoxText, isSelected && styles.dayBoxTextActive]}>{type}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Répétition */}
+            <Text style={styles.sectionTitle}>Répétition</Text>
+            <View style={styles.recurrentWrapper}>
+              <View style={styles.recurrentHeader}>
+                <Text style={styles.recurrentHeaderText}>Trajet récurrent</Text>
+                <Switch
+                  value={isRecurrent}
+                  onValueChange={setIsRecurrent}
+                  trackColor={{ false: '#E5E7EB', true: theme.colors.primaryLight }}
+                  thumbColor={isRecurrent ? theme.colors.primary : '#FFFFFF'}
+                />
+              </View>
+
+              {isRecurrent && (
+                <View style={styles.recurrentBody}>
+                  <View style={styles.repeatTypeContainer}>
+                    <TouchableOpacity
+                      style={[styles.repeatBox, repeatType === 'single_week' && styles.repeatBoxActive]}
+                      onPress={() => setRepeatType('single_week')}
+                    >
+                      <Ionicons name="calendar-outline" size={18} color={repeatType === 'single_week' ? theme.colors.primary : theme.colors.textLight} />
+                      <Text style={[styles.repeatBoxText, repeatType === 'single_week' && styles.repeatBoxTextActive]}>Une seule semaine</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.repeatBox, repeatType === 'weekly' && styles.repeatBoxActive]}
+                      onPress={() => setRepeatType('weekly')}
+                    >
+                      <Ionicons name="calendar-number-outline" size={18} color={repeatType === 'weekly' ? theme.colors.primary : theme.colors.textLight} />
+                      <Text style={[styles.repeatBoxText, repeatType === 'weekly' && styles.repeatBoxTextActive]}>Toutes les semaines</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {repeatType === 'single_week' && (
+                    <View style={styles.dateBlock}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.recurrentLabel}>Date de début</Text>
+                        <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
+                          <Text style={styles.dateSelectorText}>
+                            {selectedDateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ flex: 1 }} />
+                    </View>
+                  )}
+
+                  {repeatType === 'weekly' && (
+                    <View style={styles.dateBlock}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.recurrentLabel}>Date de début</Text>
+                        <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
+                          <Text style={styles.dateSelectorText}>
+                            {selectedDateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ width: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.recurrentLabel}>Date de fin</Text>
+                        <TouchableOpacity style={styles.dateSelector} onPress={() => setShowEndDatePicker(true)}>
+                          <Text style={styles.dateSelectorText}>
+                            {endDateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  <Text style={styles.recurrentLabel}>Sélectionnez les jours</Text>
+                  <View style={styles.daysContainer}>
+                    {['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'].map((day, idx) => {
+                      const isSelected = selectedDays.includes(idx);
+                      return (
+                        <TouchableOpacity
+                          key={day}
+                          style={[styles.dayBox, isSelected && styles.dayBoxActive]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setSelectedDays(prev => prev.filter(d => d !== idx));
+                            } else {
+                              setSelectedDays(prev => [...prev, idx]);
+                            }
+                          }}
+                        >
+                          <Text style={[styles.dayBoxText, isSelected && styles.dayBoxTextActive]}>{day}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
             </View>
 
             {showDatePicker && (
@@ -493,6 +886,24 @@ export default function PublishScreen() {
                     setSelectedDateObj(selectedDate);
                   } else if (event.type === 'dismissed') {
                     setShowDatePicker(false);
+                  }
+                }}
+              />
+            )}
+
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={endDateObj}
+                mode="date"
+                display="default"
+                minimumDate={selectedDateObj}
+                onChange={(event, selectedDate) => {
+                  setShowEndDatePicker(Platform.OS === 'ios');
+                  if (event.type === 'set' && selectedDate) {
+                    setShowEndDatePicker(false);
+                    setEndDateObj(selectedDate);
+                  } else if (event.type === 'dismissed') {
+                    setShowEndDatePicker(false);
                   }
                 }}
               />
@@ -519,62 +930,52 @@ export default function PublishScreen() {
               />
             )}
 
-            {/* PRIX SECTION */}
-            <Text style={styles.sectionTitle}>💰 Prix par place</Text>
-            <View style={styles.priceCard}>
-              <TextInput
-                style={styles.priceInput}
-                placeholder="5 000"
-                placeholderTextColor={theme.colors.textLight}
-                value={price}
-                onChangeText={setPrice}
-                keyboardType="numeric"
-                maxLength={6}
-              />
-              <Text style={styles.priceCurrency}>FCFA</Text>
-            </View>
-
-            {/* PLACES SECTION */}
-            <Text style={styles.sectionTitle}>👥 Nombre de places</Text>
-            <View style={styles.seatsContainer}>
-              {[1, 2, 3, 4, 5, 6].map(num => (
-                <TouchableOpacity
-                  key={num}
-                  style={[styles.seatBox, seats === num && styles.seatBoxActive]}
-                  onPress={() => setSeats(num)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.seatBoxText, seats === num && styles.seatBoxTextActive]}>{num}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* OPTIONS SECTION */}
-            <Text style={styles.sectionTitle}>⚙️ Services à bord</Text>
-            <View style={styles.optionsList}>
-              <OptionCard label="Bagages autorisés" icon="🧳" value={optLuggage} onChange={setOptLuggage} />
-              <OptionCard label="Climatisation" icon="❄️" value={optAirCond} onChange={setOptAirCond} />
-              <OptionCard label="Recharge téléphone" icon="🔌" value={optCharge} onChange={setOptCharge} />
-              <OptionCard label="Animaux acceptés" icon="🐶" value={optPets} onChange={setOptPets} />
-            </View>
-
             {/* SUMMARY SECTION */}
             {showSummary && (
               <View style={styles.summaryBox}>
-                <Text style={styles.summaryTitle}>Aperçu de l'annonce</Text>
+                <Text style={styles.summaryTitle}>Résumé</Text>
                 
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryTextBold}>📍 {departure}</Text>
-                  <Ionicons name="arrow-down" size={16} color={theme.colors.textMuted} />
-                  <Text style={styles.summaryTextBold}>📍 {arrival}</Text>
+                <View style={styles.summaryGridItem}>
+                  <Text style={styles.summaryTextBold}>Départ :</Text>
+                  <Text style={styles.summaryTextValue}>{departure}</Text>
+                </View>
+                <View style={styles.summaryGridItem}>
+                  <Text style={styles.summaryTextBold}>Destination :</Text>
+                  <Text style={styles.summaryTextValue}>{arrival}</Text>
+                </View>
+                <View style={styles.summaryGridItem}>
+                  <Text style={styles.summaryTextBold}>Date :</Text>
+                  <Text style={styles.summaryTextValue}>{selectedDateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+                </View>
+                <View style={styles.summaryGridItem}>
+                  <Text style={styles.summaryTextBold}>Heure :</Text>
+                  <Text style={styles.summaryTextValue}>{time}</Text>
                 </View>
 
-                <View style={styles.summaryGrid}>
-                  <Text style={styles.summaryText}>📅 {selectedDateObj.toLocaleDateString('fr-FR')} • {time}</Text>
-                  <Text style={styles.summaryText}>👥 {seats} place{seats > 1 ? 's' : ''}</Text>
-                </View>
-                
-                <Text style={styles.summaryPrice}>💰 {parseInt(price).toLocaleString()} FCFA</Text>
+                {isRecurrent && (
+                  <>
+                    <View style={styles.summaryGridItem}>
+                      <Text style={styles.summaryTextBold}>Récurrence :</Text>
+                      <Text style={styles.summaryTextValue}>{repeatType === 'single_week' ? 'Une seule semaine' : 'Toutes les semaines'}</Text>
+                    </View>
+                    <View style={styles.summaryGridItem}>
+                      <Text style={styles.summaryTextBold}>Jours :</Text>
+                      <Text style={styles.summaryTextValue}>
+                        {selectedDays.map(d => ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'][d]).join(', ')}
+                      </Text>
+                    </View>
+                    {repeatType === 'weekly' && (
+                      <View style={styles.summaryGridItem}>
+                        <Text style={styles.summaryTextBold}>Fin :</Text>
+                        <Text style={styles.summaryTextValue}>{endDateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+                      </View>
+                    )}
+                    <View style={[styles.summaryGridItem, { marginTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 8 }]}>
+                      <Text style={[styles.summaryTextBold, { color: theme.colors.primary }]}>Nombre estimé de trajets :</Text>
+                      <Text style={[styles.summaryTextBold, { color: theme.colors.primary, fontWeight: '800' }]}>{getEstimatedRides()}</Text>
+                    </View>
+                  </>
+                )}
               </View>
             )}
 
@@ -591,7 +992,7 @@ export default function PublishScreen() {
                 {loading ? (
                   <ActivityIndicator color={theme.colors.white} size="small" />
                 ) : (
-                  <Text style={styles.publishBigBtnText}>🚗 Publier le trajet</Text>
+                  <Text style={styles.publishBigBtnText}>Publier le trajet</Text>
                 )}
               </TouchableOpacity>
             </Animated.View>
@@ -791,6 +1192,34 @@ export default function PublishScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Expired License Warning Modal */}
+      <Modal visible={showExpiredLicenseWarning} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity style={{ alignSelf: 'flex-end', padding: 8 }} onPress={() => setShowExpiredLicenseWarning(false)}>
+              <Ionicons name="close" size={24} color={theme.colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={{ alignItems: 'center', padding: 16 }}>
+              <Ionicons name="warning-outline" size={60} color={theme.colors.error} style={{ marginBottom: 16 }} />
+              <Text style={styles.modalTitle}>Permis invalide</Text>
+              <Text style={[styles.notLoggedText, { textAlign: 'center', marginTop: 8 }]}>
+                Les informations de votre permis de conduire sont manquantes ou expirées. Veuillez les mettre à jour pour pouvoir publier un trajet.
+              </Text>
+
+              <TouchableOpacity style={[styles.modalBtn, { marginTop: 24, width: '100%' }]} onPress={() => {
+                setShowExpiredLicenseWarning(false);
+                router.push('/(tabs)/profile');
+              }}>
+                <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                  <Text style={styles.modalBtnText}>Mettre à jour le permis</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -815,43 +1244,68 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontSize: 16, fontWeight: '700', color: theme.colors.text, marginTop: 16, marginBottom: 12 },
 
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, marginBottom: 16 },
   locationCard: { flexDirection: 'row', alignItems: 'center', padding: 12 },
   locationContent: { flex: 1, marginLeft: 12 },
   locationLabel: { fontSize: 13, color: theme.colors.textLight, marginBottom: 2 },
   locationValue: { fontSize: 16, fontWeight: '600', color: theme.colors.text },
   dividerLine: { height: 1, backgroundColor: '#F3F4F6', marginHorizontal: 40 },
 
-  estimationRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 8, marginTop: 8 },
+  estimationRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 8, marginTop: 8, marginBottom: 16 },
   estText: { fontSize: 14, fontWeight: '600', color: theme.colors.textLight },
 
-  row: { flexDirection: 'row', gap: 12 },
+  row: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   halfCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   halfCardLabel: { fontSize: 13, color: theme.colors.textLight, marginBottom: 4 },
   halfCardValue: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
+
+  // Styles for Recurrent Rides
+  recurrentWrapper: { backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, marginBottom: 16 },
+  recurrentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#F8FAFC' },
+  recurrentHeaderText: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
+  recurrentBody: { padding: 16, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  
+  dateBlock: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  recurrentLabel: { fontSize: 14, fontWeight: '600', color: theme.colors.text, marginBottom: 8 },
+  dateSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' },
+  dateSelectorText: { fontSize: 14, fontWeight: '600', color: theme.colors.text },
+  
+  repeatTypeContainer: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  repeatBox: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  repeatBoxActive: { backgroundColor: '#EFF6FF', borderColor: theme.colors.primary },
+  repeatBoxText: { fontSize: 13, fontWeight: '600', color: theme.colors.textLight },
+  repeatBoxTextActive: { color: theme.colors.primary },
+
+  daysContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  dayBox: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  dayBoxActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  dayBoxText: { fontSize: 13, fontWeight: '600', color: theme.colors.textLight },
+  dayBoxTextActive: { color: theme.colors.white },
 
   priceCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   priceInput: { fontSize: 32, fontWeight: '800', color: theme.colors.text, textAlign: 'center', minWidth: 120 },
   priceCurrency: { fontSize: 18, fontWeight: '700', color: theme.colors.textLight, marginLeft: 8 },
 
-  seatsContainer: { flexDirection: 'row', justifyContent: 'space-between' },
-  seatBox: { flex: 1, aspectRatio: 1, marginHorizontal: 4, backgroundColor: '#FFFFFF', borderRadius: 12, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  seatBoxActive: { backgroundColor: theme.colors.primary },
-  seatBoxText: { fontSize: 18, fontWeight: '700', color: theme.colors.text },
-  seatBoxTextActive: { color: theme.colors.white },
-
-  optionsList: { gap: 8 },
+  seatStepperBtn: { padding: 8, backgroundColor: '#EFF6FF', borderRadius: 8 },
+  optionsList: { gap: 8, marginBottom: 16 },
   optionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   optionIcon: { fontSize: 20, marginRight: 12 },
   optionLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: theme.colors.text },
 
   summaryBox: { backgroundColor: '#EFF6FF', borderRadius: 16, padding: 16, marginTop: 24, borderWidth: 1, borderColor: '#BFDBFE' },
+  
+  commissionBox: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, marginTop: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  commissionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  commissionLabel: { fontSize: 14, fontWeight: '600', color: theme.colors.text },
+  commissionValue: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
+  commissionLabelSub: { fontSize: 13, color: theme.colors.textLight },
+  commissionValueSub: { fontSize: 13, color: theme.colors.textLight },
+  commissionLabelTotal: { fontSize: 15, fontWeight: '800', color: theme.colors.primary },
+  commissionValueTotal: { fontSize: 16, fontWeight: '800', color: theme.colors.primary },
   summaryTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.primary, marginBottom: 12, textTransform: 'uppercase' },
-  summaryRow: { flexDirection: 'column', gap: 4, marginBottom: 12 },
-  summaryTextBold: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
-  summaryGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  summaryText: { fontSize: 14, fontWeight: '500', color: theme.colors.text },
-  summaryPrice: { fontSize: 20, fontWeight: '800', color: theme.colors.primaryDark, textAlign: 'right' },
+  summaryGridItem: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  summaryTextBold: { fontSize: 14, fontWeight: '600', color: theme.colors.textLight },
+  summaryTextValue: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
 
   publishBigBtn: { backgroundColor: theme.colors.primary, height: 62, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   publishBigBtnDisabled: { opacity: 0.6 },

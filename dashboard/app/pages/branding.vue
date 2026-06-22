@@ -1,6 +1,18 @@
+<!--
+==========================================================
+Fichier :
+branding.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import type { Canvas, FabricImage } from 'fabric'
+// Import types if needed, using any for broad compatibility with fabric v5/v6
 import { useApi } from '../composables/useApi'
 
 definePageMeta({
@@ -16,8 +28,8 @@ const configRuntime = useRuntimeConfig()
 // Canvas state
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let fabric: any = null
-let fabricCanvas: Canvas | null = null
-let currentImage: FabricImage | null = null
+let fabricCanvas: any = null
+let currentImage: any = null
 
 // Form state
 const isLoading = ref(true)
@@ -236,7 +248,7 @@ const saveBranding = async () => {
 onMounted(async () => {
   if (!import.meta.client) return
 
-  const fabricModule = await import('fabric')
+  const fabricModule: any = await import('fabric')
   fabric = {
     Canvas: fabricModule.Canvas || fabricModule.fabric?.Canvas,
     Image: fabricModule.Image || fabricModule.FabricImage || fabricModule.fabric?.Image || fabricModule.fabric?.FabricImage
@@ -334,6 +346,7 @@ onUnmounted(() => {
               <Icon name="ph:upload-simple-bold" class="w-10 h-10 text-primary mb-3" />
               <p class="text-text font-medium">Cliquez ou glissez une image ici</p>
               <p class="text-sm text-textMuted mt-1">Format recommandé : PNG transparent ou SVG.</p>
+              <p class="text-xs text-textMuted mt-1">Dimensions recommandées : 500x500 pixels (carré).</p>
            </div>
         </div>
 

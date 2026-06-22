@@ -1,5 +1,17 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * [id].tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Animated, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +33,12 @@ const COLORS = {
   grayLight: '#F9FAFB'
 };
 
+/**
+ * Composant RideManagementScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à RideManagementScreen.
+ */
 export default function RideManagementScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -29,17 +47,14 @@ export default function RideManagementScreen() {
   const [ride, setRide] = useState<Ride | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Animations
   const statusAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
-
-  const loadData = async () => {
+  const loadData = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const [rideData, bookingsData] = await Promise.all([
         authFetch(`/rides/${id}/`),
         authFetch(`/bookings/?ride=${id}`)
@@ -47,11 +62,29 @@ export default function RideManagementScreen() {
       setRide(rideData);
       setBookings(Array.isArray(bookingsData) ? bookingsData : bookingsData?.results || []);
     } catch (error: any) {
-      CustomAlert.alert('Erreur', error.message || 'Impossible de charger le trajet.');
-      router.back();
+      if (showLoading) {
+        CustomAlert.alert('Erreur', error.message || 'Impossible de charger le trajet.');
+        router.back();
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    loadData(true);
+
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [id]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData(false);
+    setRefreshing(false);
   };
 
   const playStatusAnimation = () => {
@@ -108,16 +141,58 @@ export default function RideManagementScreen() {
     );
   };
 
-  const handleChatPassenger = async () => {
+  const handleChatWithPassenger = async (passengerId: string) => {
     try {
-      const response = await authFetch('/conversations/ride-chat/', {
-        method: 'POST',
-        body: JSON.stringify({ ride_id: id }),
-      });
-      router.push(`/chat/${response.id}`);
+      const conversationsList = await authFetch('/conversations/');
+      const convs = Array.isArray(conversationsList) ? conversationsList : conversationsList.results || [];
+      
+      const match = convs.find((c: any) => 
+        String(c.ride) === String(id) && 
+        (String(c.participant_1) === String(passengerId) || String(c.participant_2) === String(passengerId))
+      );
+      
+      if (match) {
+        router.push(`/chat/${match.id}`);
+      } else {
+        const newConv = await authFetch('/conversations/', {
+          method: 'POST',
+          body: JSON.stringify({
+            conversation_type: 'ride',
+            ride: id,
+            participant_1: passengerId,
+            participant_2: user?.id
+          })
+        });
+        router.push(`/chat/${newConv.id}`);
+      }
     } catch (error: any) {
       CustomAlert.alert('Erreur', 'Impossible d\'ouvrir la discussion.');
     }
+  };
+
+  const handleContactPassengers = () => {
+    const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'completed'].includes(b.status));
+    if (activeBookings.length === 0) return;
+    if (activeBookings.length === 1) {
+      const pId = activeBookings[0].passenger_details?.id;
+      if (pId) handleChatWithPassenger(pId);
+      return;
+    }
+    
+    const options = activeBookings.map(b => ({
+      text: b.passenger_details?.full_name || 'Passager',
+      onPress: () => {
+        const pId = b.passenger_details?.id;
+        if (pId) handleChatWithPassenger(pId);
+      }
+    }));
+    options.push({ text: 'Annuler', style: 'cancel' } as any);
+    
+    CustomAlert.alert(
+      'Contacter un passager',
+      'Choisissez le passager avec qui vous souhaitez discuter :',
+      options
+    );
   };
 
   const handleCallPassenger = (phone?: string) => {
@@ -126,6 +201,23 @@ export default function RideManagementScreen() {
       return;
     }
     Linking.openURL(`tel:${phone}`);
+  };
+
+  const getBookingStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+      case 'active':
+      case 'pending':
+        return { text: 'Confirmée', color: COLORS.success, bg: '#F0FDF4' };
+      case 'completed':
+        return { text: 'Arrivé(e)', color: COLORS.primary, bg: '#EFF6FF' };
+      case 'cancelled':
+        return { text: 'Annulée', color: COLORS.error, bg: '#FEF2F2' };
+      case 'rejected':
+        return { text: 'Rejetée', color: COLORS.error, bg: '#FEF2F2' };
+      default:
+        return { text: status.toUpperCase(), color: COLORS.textLight, bg: COLORS.grayLight };
+    }
   };
 
   if (loading) {
@@ -138,10 +230,10 @@ export default function RideManagementScreen() {
 
   if (!ride) return null;
 
-  const confirmedBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'active');
+  const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'completed'].includes(b.status));
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled' || b.status === 'rejected');
   
-  const totalRevenue = confirmedBookings.reduce((sum, b) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
+  const totalRevenue = bookings.filter(b => b.status === 'confirmed' || b.status === 'active').reduce((sum, b) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
   const seatsBooked = ride.total_seats - ride.seats_available;
 
   const getStatusDisplay = () => {
@@ -166,24 +258,13 @@ export default function RideManagementScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* Driver Card */}
-        <View style={[styles.card, styles.driverCard]}>
-          <View style={styles.driverAvatar}>
-            <Text style={styles.driverAvatarText}>
-              {user?.full_name ? user.full_name.substring(0, 2).toUpperCase() : 'VO'}
-            </Text>
-          </View>
-          <View style={styles.driverInfo}>
-            <Text style={styles.driverName}>Vous ({user?.full_name || 'Conducteur'})</Text>
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={14} color={COLORS.warning} />
-              <Text style={styles.ratingText}>5.0</Text>
-              <Text style={styles.ridesCount}>• 12 trajets</Text>
-            </View>
-          </View>
-        </View>
+      <ScrollView 
+        contentContainerStyle={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+        }
+      >
 
         {/* Status Bar */}
         <Animated.View style={[styles.statusBar, { backgroundColor: statusInfo.bg, transform: [{ scale: statusAnim }] }]}>
@@ -249,22 +330,26 @@ export default function RideManagementScreen() {
         </View>
 
         {/* Passengers */}
-        <Text style={styles.sectionHeader}>Passagers confirmés ({confirmedBookings.length})</Text>
+        <Text style={styles.sectionHeader}>Passagers ({activeBookings.length})</Text>
         
-        {confirmedBookings.length === 0 ? (
+        {activeBookings.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="people" size={40} color={COLORS.border} />
             <Text style={styles.emptyText}>Aucun passager pour l'instant</Text>
           </View>
         ) : (
-          confirmedBookings.map((booking) => (
+          activeBookings.map((booking) => (
             <View key={booking.id} style={styles.passengerCard}>
               <View style={styles.passengerHeader}>
-                <View style={styles.passengerAvatar}>
-                  <Text style={styles.passengerAvatarText}>
-                    {booking.passenger_details?.full_name?.substring(0,2).toUpperCase() || 'PA'}
-                  </Text>
-                </View>
+                {booking.passenger_details?.avatar ? (
+                  <Image source={{ uri: booking.passenger_details.avatar }} style={styles.passengerAvatarImage} />
+                ) : (
+                  <View style={styles.passengerAvatar}>
+                    <Text style={styles.passengerAvatarText}>
+                      {booking.passenger_details?.full_name?.substring(0, 2).toUpperCase() || 'PA'}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.passengerDetails}>
                   <Text style={styles.passengerName}>{booking.passenger_details?.full_name}</Text>
                   <Text style={styles.passengerPhone}>{booking.passenger_details?.phone || 'Numéro masqué'}</Text>
@@ -272,6 +357,14 @@ export default function RideManagementScreen() {
                     <Ionicons name="star" size={12} color={COLORS.warning} />
                     <Text style={styles.ratingTextSmall}>4.8</Text>
                     <Text style={styles.seatBadge}>{booking.seats_booked} place(s)</Text>
+                    {(() => {
+                      const badge = getBookingStatusDisplay(booking.status);
+                      return (
+                        <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
+                          <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
               </View>
@@ -279,13 +372,18 @@ export default function RideManagementScreen() {
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>Paiement:</Text>
                 <Text style={styles.paymentValue}>{(ride.price_per_seat || 0) * (booking.seats_booked || 1)} FCFA</Text>
-                <View style={[styles.paymentBadge, { backgroundColor: '#F0FDF4' }]}>
-                  <Text style={[styles.paymentBadgeText, { color: COLORS.success }]}>Payé</Text>
+                <View style={[styles.paymentBadge, { backgroundColor: ['confirmed', 'active', 'pending', 'completed'].includes(booking.status) ? '#F0FDF4' : '#FFFBEB' }]}>
+                  <Text style={[styles.paymentBadgeText, { color: ['confirmed', 'active', 'pending', 'completed'].includes(booking.status) ? COLORS.success : COLORS.warning }]}>
+                    {['confirmed', 'active', 'pending', 'completed'].includes(booking.status) ? 'Payé' : 'En attente'}
+                  </Text>
                 </View>
               </View>
 
               <View style={styles.passengerActions}>
-                <TouchableOpacity style={styles.actionBtn} onPress={handleChatPassenger}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => {
+                  const pId = booking.passenger_details?.id;
+                  if (pId) handleChatWithPassenger(pId);
+                }}>
                   <Ionicons name="chatbubble-outline" size={20} color={COLORS.primary} />
                   <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Message</Text>
                 </TouchableOpacity>
@@ -305,16 +403,30 @@ export default function RideManagementScreen() {
             {cancelledBookings.map((booking) => (
               <View key={booking.id} style={[styles.passengerCard, { opacity: 0.7 }]}>
                 <View style={styles.passengerHeader}>
-                  <View style={[styles.passengerAvatar, { backgroundColor: COLORS.grayLight }]}>
-                    <Text style={[styles.passengerAvatarText, { color: COLORS.textLight }]}>
-                      {booking.passenger_details?.full_name?.substring(0,2).toUpperCase() || 'PA'}
-                    </Text>
-                  </View>
+                  {booking.passenger_details?.avatar ? (
+                    <Image source={{ uri: booking.passenger_details.avatar }} style={styles.passengerAvatarImage} />
+                  ) : (
+                    <View style={[styles.passengerAvatar, { backgroundColor: COLORS.grayLight }]}>
+                      <Text style={[styles.passengerAvatarText, { color: COLORS.textLight }]}>
+                        {booking.passenger_details?.full_name?.substring(0,2).toUpperCase() || 'PA'}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.passengerDetails}>
                     <Text style={[styles.passengerName, { color: COLORS.textLight, textDecorationLine: 'line-through' }]}>
                       {booking.passenger_details?.full_name}
                     </Text>
-                    <Text style={styles.passengerPhone}>Annulé</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[styles.passengerPhone, { marginBottom: 0 }]}>Annulée</Text>
+                      {(() => {
+                        const badge = getBookingStatusDisplay(booking.status);
+                        return (
+                          <View style={[styles.statusBadge, { backgroundColor: badge.bg, marginLeft: 8 }]}>
+                            <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
+                          </View>
+                        );
+                      })()}
+                    </View>
                   </View>
                 </View>
               </View>
@@ -325,28 +437,69 @@ export default function RideManagementScreen() {
         {/* Preferences & Vehicle Info */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Véhicule & Préférences</Text>
-          <View style={styles.prefRow}>
-            <Ionicons name="car-outline" size={22} color={COLORS.textLight} />
-            <View style={styles.prefContent}>
-              <Text style={styles.prefTitle}>Mon Véhicule</Text>
-              <Text style={styles.prefSubtitle}>Immatriculé • Autorisé</Text>
+          
+          {ride.driver_details?.vehicles && ride.driver_details.vehicles.length > 0 ? (
+            <View style={styles.vehicleDetailsRow}>
+              <Ionicons name="car-sport-outline" size={24} color={COLORS.primary} />
+              <View style={styles.vehicleTextContainer}>
+                <Text style={styles.vehicleModelText}>
+                  {ride.driver_details.vehicles[0].brand_model}
+                </Text>
+                <Text style={styles.vehiclePlateText}>
+                  Couleur : {ride.driver_details.vehicles[0].color} • Immatriculation : {ride.driver_details.vehicles[0].license_plate}
+                </Text>
+                <Text style={styles.vehicleTypeText}>
+                  Type : {ride.driver_details.vehicles[0].vehicle_type.toUpperCase()}
+                </Text>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.vehicleDetailsRow}>
+              <Ionicons name="car-outline" size={24} color={COLORS.textLight} />
+              <View style={styles.vehicleTextContainer}>
+                <Text style={styles.noVehicleText}>Aucun véhicule enregistré dans le profil.</Text>
+              </View>
+            </View>
+          )}
+
           <View style={styles.divider} />
-          <View style={styles.prefTags}>
-            <View style={styles.tag}>
-              <Ionicons name="logo-no-smoking" size={16} color={COLORS.text} />
-              <Text style={styles.tagText}>Non fumeur</Text>
+
+          {ride.driver_details?.preference ? (
+            <View style={styles.preferencesSection}>
+              <Text style={styles.subSectionTitle}>Préférences de voyage</Text>
+              <View style={styles.prefTagsContainer}>
+                <View style={styles.prefTagItem}>
+                  <Text style={styles.prefTagText}>🎵 {ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
+                </View>
+                <View style={styles.prefTagItem}>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "🚬 Fumeur" : "Non-fumeur"}</Text>
+                </View>
+                <View style={styles.prefTagItem}>
+                  <Text style={styles.prefTagText}>💬 {ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
+                </View>
+                <View style={styles.prefTagItem}>
+                  <Text style={styles.prefTagText}>❄️ {ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
+                </View>
+                <View style={styles.prefTagItem}>
+                  <Text style={styles.prefTagText}>🐾 {ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
+                </View>
+                <View style={styles.prefTagItem}>
+                  <Text style={styles.prefTagText}>💼 {ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
+                </View>
+                <View style={styles.prefTagItem}>
+                  <Text style={styles.prefTagText}>📍 {ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
+                </View>
+              </View>
+              {ride.driver_details.preference.notes ? (
+                <View style={styles.notesContainer}>
+                  <Text style={styles.notesLabel}>Notes complémentaires :</Text>
+                  <Text style={styles.notesText}>"{ride.driver_details.preference.notes}"</Text>
+                </View>
+              ) : null}
             </View>
-            <View style={styles.tag}>
-              <Ionicons name="musical-notes-outline" size={16} color={COLORS.text} />
-              <Text style={styles.tagText}>Musique</Text>
-            </View>
-            <View style={styles.tag}>
-              <Ionicons name="briefcase-outline" size={16} color={COLORS.text} />
-              <Text style={styles.tagText}>Bagages acceptés</Text>
-            </View>
-          </View>
+          ) : (
+            <Text style={styles.noVehicleText}>Aucune préférence enregistrée dans le profil.</Text>
+          )}
         </View>
 
         {/* Main Actions */}
@@ -369,11 +522,11 @@ export default function RideManagementScreen() {
       </ScrollView>
 
       {/* Floating Action Button */}
-      {confirmedBookings.length > 0 && ride.status === 'active' && (
+      {activeBookings.length > 0 && ride.status === 'active' && (
         <View style={styles.fabContainer}>
-          <TouchableOpacity style={styles.fab} onPress={handleChatPassenger} activeOpacity={0.9}>
+          <TouchableOpacity style={styles.fab} onPress={handleContactPassengers} activeOpacity={0.9}>
             <Ionicons name="chatbubbles" size={20} color={COLORS.white} />
-            <Text style={styles.fabText}>Contacter tous les passagers</Text>
+            <Text style={styles.fabText}>Contacter les passagers</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -414,6 +567,7 @@ const styles = StyleSheet.create({
   driverCard: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   driverAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   driverAvatarText: { color: COLORS.white, fontSize: 18, fontWeight: 'bold' },
+  driverAvatarImage: { width: 50, height: 50, borderRadius: 25, marginRight: 16 },
   driverInfo: { flex: 1 },
   driverName: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
   ratingRow: { flexDirection: 'row', alignItems: 'center' },
@@ -449,11 +603,15 @@ const styles = StyleSheet.create({
   passengerHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   passengerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E0F2FE', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   passengerAvatarText: { color: COLORS.primary, fontSize: 16, fontWeight: '700' },
+  passengerAvatarImage: { width: 44, height: 44, borderRadius: 22, marginRight: 12 },
   passengerDetails: { flex: 1 },
   passengerName: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
   passengerPhone: { fontSize: 13, color: COLORS.textLight, marginBottom: 4 },
   ratingTextSmall: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginLeft: 4, marginRight: 8 },
   seatBadge: { backgroundColor: COLORS.grayLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 12, color: COLORS.text, overflow: 'hidden' },
+
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginLeft: 8 },
+  statusBadgeText: { fontSize: 11, fontWeight: '700' },
 
   paymentRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.grayLight, padding: 12, borderRadius: 10, marginBottom: 16 },
   paymentLabel: { fontSize: 14, color: COLORS.textLight, marginRight: 8 },
@@ -465,13 +623,24 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
   actionBtnText: { fontSize: 14, fontWeight: '600' },
 
-  prefRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  prefContent: { flex: 1 },
-  prefTitle: { fontSize: 16, fontWeight: '600', color: COLORS.text },
-  prefSubtitle: { fontSize: 13, color: COLORS.textLight, marginTop: 2 },
-  prefTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.grayLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6 },
-  tagText: { fontSize: 13, color: COLORS.text, fontWeight: '500' },
+  subSectionTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
+
+  // Vehicle Info Styles
+  vehicleDetailsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 4 },
+  vehicleTextContainer: { flex: 1, gap: 4 },
+  vehicleModelText: { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  vehiclePlateText: { fontSize: 13, color: COLORS.textLight },
+  vehicleTypeText: { fontSize: 12, fontWeight: '600', color: COLORS.primary, textTransform: 'uppercase' },
+  noVehicleText: { fontSize: 14, color: COLORS.textLight, fontStyle: 'italic' },
+
+  // Preferences Styles
+  preferencesSection: { paddingHorizontal: 4 },
+  prefTagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  prefTagItem: { backgroundColor: COLORS.grayLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  prefTagText: { fontSize: 12, color: COLORS.text, fontWeight: '500' },
+  notesContainer: { backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, marginTop: 8 },
+  notesLabel: { fontSize: 12, fontWeight: '700', color: COLORS.primary, marginBottom: 4 },
+  notesText: { fontSize: 13, color: COLORS.text, fontStyle: 'italic' },
 
   mainActions: { marginTop: 8, gap: 16 },
   btnSuccess: { flexDirection: 'row', backgroundColor: COLORS.success, padding: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: COLORS.success, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },

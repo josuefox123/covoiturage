@@ -1,4 +1,19 @@
 """
+========================================================
+
+Fichier :
+consumers.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
+"""
 WebSocket Consumer pour le chat en temps réel.
 
 Flux de connexion :

@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * CustomAlert.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { theme } from '../styles/theme';

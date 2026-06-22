@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * CustomAlert.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, Modal, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +26,12 @@ interface CustomAlertProps {
 
 const { width } = Dimensions.get('window');
 
+/**
+ * Composant CustomAlert.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à CustomAlert.
+ */
 export default function CustomAlert({
   visible,
   title,

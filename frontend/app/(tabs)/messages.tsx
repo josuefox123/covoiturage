@@ -1,11 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+/**
+ * ==============================================================
+ * Fichier :
+ * messages.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
+import ConversationCard from '../../src/components/chat/ConversationCard';
+import MessageEmptyState from '../../src/components/chat/MessageEmptyState';
+import MessageSkeleton from '../../src/components/chat/MessageSkeleton';
 
+const FILTERS = ['Tous', 'Non lus', 'Conducteurs', 'Passagers', 'Actifs', 'Terminés', 'Favoris'];
+
+/**
+ * Composant MessagesScreen.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à MessagesScreen.
+ */
 export default function MessagesScreen() {
   const router = useRouter();
   const authCtx = useAuth();
@@ -14,73 +38,121 @@ export default function MessagesScreen() {
   
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('Tous');
 
-  useEffect(() => {
-    if (user) {
-      fetchConversations();
-    }
-  }, [user]);
+  // Real-time polling
+  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
 
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const data = await authFetch('/conversations/');
-      // On masque les conversations de support dans cet onglet (elles restent dans la bulle)
-      const filtered = Array.isArray(data) ? data.filter((c: any) => c.conversation_type !== 'support') : (data.results ? data.results.filter((c: any) => c.conversation_type !== 'support') : []);
+      let filtered = Array.isArray(data) ? data : (data.results || []);
+      // Filter out support conversations
+      filtered = filtered.filter((c: any) => c.conversation_type !== 'support');
+      
+      // Sort by latest message
+      filtered.sort((a: any, b: any) => {
+        const dateA = a.last_message?.created_at || a.updated_at || a.created_at;
+        const dateB = b.last_message?.created_at || b.updated_at || b.created_at;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      });
+      
       setConversations(filtered);
     } catch (error) {
-      console.log('Erreur fetchConversations:', error);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  };
+  }, [authFetch]);
 
-  const renderItem = ({ item }: { item: any }) => {
-    // Determine the other participant
-    const otherUser = item.participant_1_details?.id === user?.id 
-      ? item.participant_2_details 
-      : item.participant_1_details;
-    
-    const userName = otherUser?.full_name || 'Utilisateur';
-    const userAvatar = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
-    const lastMsgContent = item.last_message?.content || 'Nouvelle conversation';
-    const isUnread = item.last_message && !item.last_message.is_read && item.last_message.sender_details?.id !== user?.id;
+  // Handle Focus & Polling
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchConversations();
+        // Start polling every 10 seconds for real-time updates without refreshing indicator
+        const interval = setInterval(() => {
+          fetchConversations(true);
+        }, 10000);
+        setPollInterval(interval);
 
-    return (
-      <TouchableOpacity
-        style={styles.chatCard}
-        onPress={() => router.push(`/chat/${item.id}`)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{userAvatar}</Text>
-          </View>
-          {isUnread && <View style={styles.activeIndicator} />}
-        </View>
+        return () => {
+          clearInterval(interval);
+        };
+      }
+    }, [user, fetchConversations])
+  );
 
-        <View style={styles.chatDetails}>
-          <View style={styles.chatHeader}>
-            <Text style={styles.userName}>{userName}</Text>
-          </View>
-          
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {lastMsgContent}
-          </Text>
-        </View>
+  // Swipe Actions
+  const handleArchive = useCallback((id: string) => {
+    // Optimistic UI update
+    setConversations(prev => prev.filter(c => c.id !== id));
+  }, []);
 
-        <View style={styles.rightActions}>
-          {isUnread ? (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>1</Text>
-            </View>
-          ) : (
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const handleDelete = useCallback((id: string) => {
+    setConversations(prev => prev.filter(c => c.id !== id));
+  }, []);
+
+  const handlePin = useCallback((id: string) => {
+    // Pin to top locally for now
+    setConversations(prev => {
+      const idx = prev.findIndex(c => c.id === id);
+      if (idx > -1) {
+        const item = prev[idx];
+        const newArr = [...prev];
+        newArr.splice(idx, 1);
+        newArr.unshift(item);
+        return newArr;
+      }
+      return prev;
+    });
+  }, []);
+
+  // Filter & Search Logic
+  const filteredConversations = useMemo(() => {
+    return conversations.filter(c => {
+      // 1. Search Query
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const otherUser = c.participant_1_details?.id === user?.id ? c.participant_2_details : c.participant_1_details;
+        const nameMatch = otherUser?.full_name?.toLowerCase().includes(q);
+        const msgMatch = c.last_message?.content?.toLowerCase().includes(q);
+        const rideMatch = c.ride_details?.departure_location?.toLowerCase().includes(q) || c.ride_details?.arrival_location?.toLowerCase().includes(q);
+        
+        if (!nameMatch && !msgMatch && !rideMatch) return false;
+      }
+
+      // 2. Filters
+      switch(activeFilter) {
+        case 'Non lus':
+          return c.unread_count > 0;
+        case 'Conducteurs':
+          // Assuming user is passenger for this ride
+          return c.ride_details?.driver === c.participant_2_details?.id; // rough logic, adjust based on schema
+        case 'Passagers':
+          return c.ride_details?.driver === user?.id;
+        case 'Actifs':
+          return c.ride_details?.status === 'confirmed' || c.ride_details?.status === 'started';
+        case 'Terminés':
+          return c.ride_details?.status === 'completed';
+        default:
+          return true; // 'Tous'
+      }
+    });
+  }, [conversations, searchQuery, activeFilter, user]);
+
+  const renderItem = useCallback(({ item }: { item: any }) => (
+    <ConversationCard 
+      item={item} 
+      currentUserId={user?.id || ''} 
+      onArchive={handleArchive}
+      onDelete={handleDelete}
+      onPin={handlePin}
+    />
+  ), [user, handleArchive, handleDelete, handlePin]);
+
+  const keyExtractor = useCallback((item: any) => item.id.toString(), []);
 
   if (!user) {
     return (
@@ -99,57 +171,140 @@ export default function MessagesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Discussions 💬</Text>
-        <Text style={styles.subtitle}>Échangez avec vos conducteurs et passagers.</Text>
+        <Text style={styles.title} accessibilityRole="header">Discussions</Text>
+        
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={theme.colors.textMuted} style={styles.searchIcon} />
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Rechercher (nom, ville, message)..."
+            placeholderTextColor={theme.colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            accessibilityLabel="Rechercher dans les conversations"
+            accessibilityHint="Saisissez un nom, une ville ou un mot-clé de message"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color={theme.colors.textLight} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll} contentContainerStyle={styles.filtersContainer}>
+          {FILTERS.map(filter => (
+            <TouchableOpacity 
+              key={filter}
+              style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+              onPress={() => setActiveFilter(filter)}
+            >
+              <Text style={[styles.filterText, activeFilter === filter && styles.filterTextActive]}>{filter}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      <FlatList
-        data={conversations}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        refreshing={loading}
-        onRefresh={fetchConversations}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubble-ellipses-outline" size={48} color={theme.colors.textMuted} />
-              <Text style={styles.emptyTitle}>Aucune discussion</Text>
-              <Text style={styles.emptySubtitle}>Vos conversations apparaîtront ici lorsque vous réserverez ou publierez un trajet.</Text>
-            </View>
-          ) : (
-            <ActivityIndicator size="large" color={theme.colors.primary} style={{marginTop: 50}} />
-          )
-        }
-      />
+      {/* List */}
+      {loading && conversations.length === 0 ? (
+        <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }}>
+          <MessageSkeleton />
+          <MessageSkeleton />
+          <MessageSkeleton />
+          <MessageSkeleton />
+          <MessageSkeleton />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredConversations}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshing={loading && conversations.length > 0}
+          onRefresh={() => fetchConversations(false)}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
+          ListEmptyComponent={<MessageEmptyState />}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  header: { paddingHorizontal: theme.spacing.lg, marginVertical: theme.spacing.lg },
-  title: { ...theme.typography.h2, color: theme.colors.text },
-  subtitle: { ...theme.typography.bodyLarge, color: theme.colors.textLight, marginTop: 4 },
-  listContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xl },
-  chatCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: theme.borderRadius.lg, padding: theme.spacing.md, ...theme.shadows.sm },
-  avatarContainer: { position: 'relative', marginRight: theme.spacing.md },
-  avatarCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: theme.colors.secondaryLight, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: theme.colors.secondaryDark, fontWeight: '700', fontSize: 16 },
-  activeIndicator: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: theme.colors.success, borderWidth: 2, borderColor: theme.colors.white },
-  chatDetails: { flex: 1 },
-  chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-  userName: { ...theme.typography.bodyLarge, fontWeight: '600', color: theme.colors.text },
-  lastMessage: { ...theme.typography.bodyMedium, color: theme.colors.textLight, marginTop: 4 },
-  rightActions: { marginLeft: theme.spacing.sm, justifyContent: 'center', alignItems: 'center' },
-  unreadBadge: { backgroundColor: theme.colors.primary, width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
-  unreadText: { color: theme.colors.white, fontSize: 11, fontWeight: '700' },
-  separator: { height: theme.spacing.md },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80, paddingHorizontal: theme.spacing.xl },
-  emptyTitle: { ...theme.typography.h3, color: theme.colors.text, marginTop: theme.spacing.md, marginBottom: theme.spacing.xs },
-  emptySubtitle: { ...theme.typography.bodyMedium, color: theme.colors.textMuted, textAlign: 'center' },
+  container: { 
+    flex: 1, 
+    backgroundColor: theme.colors.background 
+  },
+  header: { 
+    paddingHorizontal: theme.spacing.lg, 
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  title: { 
+    ...theme.typography.h2, 
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    height: 48,
+    marginBottom: theme.spacing.md,
+  },
+  searchIcon: {
+    marginRight: theme.spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...theme.typography.bodyMedium,
+    color: theme.colors.text,
+    height: '100%',
+  },
+  filtersScroll: {
+    marginBottom: theme.spacing.xs,
+  },
+  filtersContainer: {
+    paddingRight: theme.spacing.xl,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: theme.colors.border,
+    marginRight: 8,
+  },
+  filterChipActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  filterText: {
+    ...theme.typography.bodyMedium,
+    color: theme.colors.textLight,
+    fontWeight: '500',
+  },
+  filterTextActive: {
+    color: theme.colors.white,
+    fontWeight: '700',
+  },
+  listContent: { 
+    paddingBottom: theme.spacing.xl,
+    paddingTop: theme.spacing.md,
+  },
+  separator: { 
+    height: 1, 
+    backgroundColor: theme.colors.border,
+    marginLeft: 88, // Align with content, bypassing avatar
+  },
 });

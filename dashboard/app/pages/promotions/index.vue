@@ -1,3 +1,15 @@
+<!--
+==========================================================
+Fichier :
+index.vue
+
+Description :
+Composant / Vue de l'application Dashboard Zemy.
+
+Projet :
+Zemy
+==========================================================
+-->
 <template>
   <div>
     <!-- Toast Notification -->
@@ -34,51 +46,11 @@
         <div class="p-6 overflow-y-auto flex-1 space-y-4">
           
           <div>
-            <label class="block text-sm font-medium text-text mb-1">Titre *</label>
-            <input v-model="form.title" type="text" class="w-full px-3 py-2 border border-border rounded-lg bg-background text-text focus:outline-none focus:border-primary" placeholder="-50% sur le 1er trajet" />
+            <label class="block text-sm font-medium text-text mb-1">Nom (interne) *</label>
+            <input v-model="form.title" type="text" class="w-full px-3 py-2 border border-border rounded-lg bg-background text-text focus:outline-none focus:border-primary" placeholder="Identifiant de la promotion (ex: Promo été)" />
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-text mb-1">Sous-titre</label>
-            <input v-model="form.subtitle" type="text" class="w-full px-3 py-2 border border-border rounded-lg bg-background text-text focus:outline-none focus:border-primary" placeholder="Utilisez le code BIENVENUE" />
-          </div>
 
-          <div class="flex gap-4">
-            <div class="flex-1">
-              <label class="block text-sm font-medium text-text mb-1">Couleur</label>
-              <input v-model="form.color" type="color" class="w-full h-10 px-1 py-1 border border-border rounded-lg bg-background cursor-pointer" />
-            </div>
-            <div class="flex-1 relative">
-              <label class="block text-sm font-medium text-text mb-1">Icône</label>
-              <button 
-                @click.prevent="showIconSelector = !showIconSelector"
-                class="w-full flex items-center justify-between px-3 py-2 border border-border rounded-lg bg-background text-text focus:outline-none focus:border-primary hover:bg-background/80"
-              >
-                <div class="flex items-center gap-2">
-                  <Icon v-if="form.icon" :name="`ion:${form.icon}`" class="w-5 h-5 text-primary" />
-                  <span v-if="form.icon" class="truncate max-w-[100px]">{{ form.icon }}</span>
-                  <span v-else class="text-textMuted">Choisir</span>
-                </div>
-                <Icon name="ph:caret-down" class="w-4 h-4 text-textMuted" />
-              </button>
-
-              <!-- Dropdown Sélecteur d'icônes -->
-              <div v-if="showIconSelector" class="absolute z-10 mt-1 w-64 sm:w-[280px] bg-card border border-border rounded-xl shadow-lg p-3 max-h-60 overflow-y-auto right-0 sm:-right-4">
-                <div class="grid grid-cols-5 gap-2">
-                  <button 
-                    v-for="icon in predefinedIcons" 
-                    :key="icon"
-                    @click.prevent="form.icon = icon; showIconSelector = false"
-                    class="p-2 rounded-lg flex items-center justify-center transition-colors"
-                    :class="form.icon === icon ? 'bg-primary/20 text-primary border border-primary/30' : 'hover:bg-background text-text hover:text-primary'"
-                    :title="icon"
-                  >
-                    <Icon :name="`ion:${icon}`" class="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div class="flex gap-4">
             <div class="flex-1">
@@ -96,6 +68,7 @@
           <div>
             <label class="block text-sm font-medium text-text mb-1">Image de fond *</label>
             <input type="file" @change="onFileChange" accept="image/*" class="w-full text-sm text-textMuted file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer" />
+            <p class="text-xs text-textMuted mt-1">Dimensions recommandées : 280x140 pixels (format 2:1).</p>
             <div v-if="imagePreview || formModal.promo?.image" class="mt-2 h-32 w-full rounded-lg overflow-hidden border border-border relative">
               <img :src="imagePreview || formModal.promo?.image" class="w-full h-full object-cover" />
             </div>
@@ -174,13 +147,12 @@
               </td>
               <td class="px-5 py-4">
                 <div class="flex items-center space-x-3">
-                  <div class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0" :style="{ backgroundColor: promo.color }">
-                    <img v-if="promo.image" :src="promo.image" alt="" class="w-full h-full object-cover opacity-80 mix-blend-overlay" />
-                    <Icon v-else-if="promo.icon" :name="`ion:${promo.icon}`" class="w-6 h-6 text-white absolute" />
+                  <div class="w-20 h-10 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <img v-if="promo.image" :src="promo.image" alt="" class="w-full h-full object-cover" />
+                    <Icon v-else name="ph:image" class="w-5 h-5 text-textMuted" />
                   </div>
                   <div>
                     <p class="font-semibold text-text">{{ promo.title }}</p>
-                    <p class="text-xs text-textMuted">{{ promo.subtitle || '—' }}</p>
                   </div>
                 </div>
               </td>
@@ -366,7 +338,7 @@ async function savePromotion() {
 
     if (formModal.isEditing) {
       const res = await fetchApi<any>(`/promotions/${formModal.promo.id}/`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: formData
       })
       const idx = promotions.value.findIndex(p => p.id === formModal.promo.id)

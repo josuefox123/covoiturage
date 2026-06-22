@@ -1,6 +1,19 @@
-import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
+/**
+ * ==============================================================
+ * Fichier :
+ * AuthContext.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
+import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchApi } from '../services/api';
+import * as SecureStore from 'expo-secure-store';
+import { fetchApi, apiEventEmitter } from '../services/api';
 
 export interface User {
   id: string;
@@ -39,7 +52,7 @@ const defaultContext: AuthContextData = {
 
 const AuthContext = createContext<AuthContextData>(defaultContext);
 
-const STORAGE_TOKEN_KEY = '@zemy_access_token';
+const STORAGE_TOKEN_KEY = 'zemy_access_token';
 const STORAGE_USER_KEY = '@zemy_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -49,9 +62,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // On mount: restore saved session
   useEffect(() => {
+    // Écouter les erreurs 401 globales pour déconnecter l'utilisateur
+    const handleUnauthorized = () => {
+      logout();
+    };
+    apiEventEmitter.on('unauthorized', handleUnauthorized);
+
     const restoreSession = async () => {
       try {
-        const savedToken = await AsyncStorage.getItem(STORAGE_TOKEN_KEY);
+        const savedToken = await SecureStore.getItemAsync(STORAGE_TOKEN_KEY);
         const savedUser = await AsyncStorage.getItem(STORAGE_USER_KEY);
         if (savedToken && savedUser) {
           setToken(savedToken);
@@ -70,19 +89,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
           } catch (e) {
-            console.log('Failed to fetch fresh user data:', e);
           }
         }
       } catch (e) {
-        console.log('Failed to restore session:', e);
       } finally {
         setIsLoading(false);
       }
     };
     restoreSession();
+
+    return () => {
+      apiEventEmitter.off('unauthorized', handleUnauthorized);
+    };
   }, []);
 
-  const loginWithPassword = async (identifier: string, password: string) => {
+  const loginWithPassword = useCallback(async (identifier: string, password: string) => {
     setIsLoading(true);
     try {
       const data = await fetchApi('/auth/login/', {
@@ -92,17 +113,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(data.access);
       setUser(data.user);
       try {
-        await AsyncStorage.setItem(STORAGE_TOKEN_KEY, data.access);
+        await SecureStore.setItemAsync(STORAGE_TOKEN_KEY, data.access);
         await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
       } catch (e) {}
     } catch (error) {
-      throw error; // Propage l'erreur vers l'appelant (LoginScreen)
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const registerWithPassword = async (userData: any) => {
+  const registerWithPassword = useCallback(async (userData: any) => {
     setIsLoading(true);
     try {
       const data = await fetchApi('/auth/register/', {
@@ -112,58 +133,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(data.access);
       setUser(data.user);
       try {
-        await AsyncStorage.setItem(STORAGE_TOKEN_KEY, data.access);
+        await SecureStore.setItemAsync(STORAGE_TOKEN_KEY, data.access);
         await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
       } catch (e) {}
     } catch (error) {
-      throw error; // Propage l'erreur vers l'appelant (RegisterScreen)
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setToken(null);
     setUser(null);
     try {
-      await AsyncStorage.removeItem(STORAGE_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(STORAGE_TOKEN_KEY);
       await AsyncStorage.removeItem(STORAGE_USER_KEY);
     } catch (e) {
-      console.log('Failed to remove session:', e);
     }
-  };
+  }, []);
 
-  const authFetch = async (endpoint: string, options: RequestInit = {}) => {
+  const authFetch = useCallback(async (endpoint: string, options: RequestInit = {}) => {
     const headers: any = { ...(options.headers || {}) };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     return fetchApi(endpoint, { ...options, headers });
-  };
+  }, [token]);
 
-  const updateUser = (updates: Partial<User>) => {
+  const updateUser = useCallback((updates: Partial<User>) => {
     setUser(prev => {
       if (!prev) return prev;
       const newUser = { ...prev, ...updates };
-      // Éviter de re-rendre toute l'application si aucune donnée n'a changé
       if (JSON.stringify(prev) === JSON.stringify(newUser)) return prev;
       
-      AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser)).catch(e => 
-        console.log('Failed to save updated user:', e)
-      );
+      AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser)).catch(() => {});
       return newUser;
     });
-  };
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!user || !user.id || !token) return;
     try {
       const data = await authFetch(`/users/${user.id}/`);
       updateUser(data);
     } catch (e) {
-      console.log('Failed to refresh user:', e);
     }
-  };
+  }, [user?.id, token, authFetch, updateUser]);
 
   const contextValue = useMemo(() => ({
     user,
@@ -175,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authFetch,
     updateUser,
     refreshUser
-  }), [user, token, isLoading]);
+  }), [user, token, isLoading, loginWithPassword, registerWithPassword, logout, authFetch, updateUser, refreshUser]);
 
   return (
     <AuthContext.Provider value={contextValue}>

@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * tailwind.config.ts
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import type { Config } from 'tailwindcss'
 
 export default <Partial<Config>>{

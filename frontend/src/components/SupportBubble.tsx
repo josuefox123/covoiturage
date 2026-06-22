@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * SupportBubble.tsx
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 import React, { useRef, useEffect } from 'react';
 import {
   TouchableOpacity,
@@ -9,6 +21,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 
+/**
+ * Composant SupportBubble.
+ *
+ * Responsabilités :
+ * - Affichage et gestion de l'état lié à SupportBubble.
+ */
 export default function SupportBubble() {
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(1)).current;

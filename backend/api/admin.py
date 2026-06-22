@@ -1,3 +1,18 @@
+"""
+========================================================
+
+Fichier :
+admin.py
+
+Description :
+
+Module de l'application Zemy.
+
+Projet :
+Zemy
+
+========================================================
+"""
 from django.contrib import admin
 from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Promotion, MobileSettings
 

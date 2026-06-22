@@ -1,3 +1,15 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * auth.global.ts
+ *
+ * Description :
+ * Composant ou logique de l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
 // Middleware de protection des routes du dashboard admin
 // Redirige vers /login si le cookie de token n'est pas présent
 
