@@ -63,6 +63,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    
+    is_archived = models.BooleanField(default=False)
+    archive_reason = models.TextField(blank=True, null=True)
+    archived_at = models.DateTimeField(blank=True, null=True)
+    archived_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='archived_users')
 
     objects = UserManager()
 
@@ -663,3 +668,24 @@ class Parcel(models.Model):
     def __str__(self):
         return f"Colis {self.id} - {self.status}"
 
+class AuditLog(models.Model):
+    """
+    Modèle de log d'audit.
+    
+    Rôle :
+        Garde une trace des actions de modération (ex: archivage de compte).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    admin_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='audit_actions')
+    target_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_events')
+    action = models.CharField(max_length=50)
+    reason = models.TextField(blank=True, null=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Log d'Audit"
+        verbose_name_plural = "Logs d'Audit"
+
+    def __str__(self):
+        return f"[{self.created_at}] {self.admin_user} -> {self.action} on {self.target_user}"
