@@ -66,10 +66,6 @@ export default function VerifyIdentityScreen() {
   const [submitting,  setSubmitting]  = useState(false);
   const [submitted,   setSubmitted]   = useState(false);
 
-  // Preview modal state
-  const [previewUri, setPreviewUri]     = useState<string | null>(null);
-  const [pendingSetter, setPendingSetter] = useState<((uri: string) => void) | null>(null);
-
   const progressAnim = useRef(new Animated.Value(0)).current;
   const cardAnim     = useRef(new Animated.Value(0)).current;
   const successScale = useRef(new Animated.Value(0)).current;
@@ -111,23 +107,8 @@ export default function VerifyIdentityScreen() {
       : await ImagePicker.launchImageLibraryAsync({ allowsEditing: false, quality: 0.85, mediaTypes: ['images'] });
 
     if (!result.canceled && result.assets[0]) {
-      // Show preview modal before confirming
-      setPreviewUri(result.assets[0].uri);
-      setPendingSetter(() => setter);
+      setter(result.assets[0].uri);
     }
-  };
-
-  const confirmPhoto = () => {
-    if (previewUri && pendingSetter) {
-      pendingSetter(previewUri);
-    }
-    setPreviewUri(null);
-    setPendingSetter(null);
-  };
-
-  const cancelPhoto = () => {
-    setPreviewUri(null);
-    setPendingSetter(null);
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -415,34 +396,6 @@ export default function VerifyIdentityScreen() {
         </View>
       </SafeAreaView>
 
-      {/* ── Photo Preview Modal ─────────────────────────────────────────── */}
-      {previewUri && (
-        <View style={styles.previewModal}>
-          <View style={styles.previewOverlay}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewTitle}>Vérifiez votre photo</Text>
-              <Text style={styles.previewSubtitle}>La photo est-elle nette et bien cadrée ?</Text>
-            </View>
-
-            <Image
-              source={{ uri: previewUri }}
-              style={styles.previewImage}
-              resizeMode="contain"
-            />
-
-            <View style={styles.previewActions}>
-              <TouchableOpacity style={styles.previewRetakeBtn} onPress={cancelPhoto} activeOpacity={0.85}>
-                <Ionicons name="refresh" size={20} color="#374151" />
-                <Text style={styles.previewRetakeText}>Reprendre</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.previewConfirmBtn} onPress={confirmPhoto} activeOpacity={0.85}>
-                <Ionicons name="checkmark" size={20} color="#FFFFFF" />
-                <Text style={styles.previewConfirmText}>Utiliser cette photo</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
@@ -632,68 +585,6 @@ const styles = StyleSheet.create({
   statusValue: { fontSize: 16, color: '#111827', fontWeight: '700' },
   successBtn: { width: '100%', borderRadius: 16, backgroundColor: '#F3F4F6', paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   successBtnText: { fontSize: 16, fontWeight: '700', color: '#374151' },
-  // Photo Preview Modal
-  previewModal: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1000,
-    backgroundColor: '#000000',
-  },
-  previewOverlay: {
-    flex: 1,
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
-  },
-  previewHeader: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  previewTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 6,
-  },
-  previewSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.65)',
-    textAlign: 'center',
-  },
-  previewImage: {
-    flex: 1,
-    width: '100%',
-    borderRadius: 20,
-  },
-  previewActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  previewRetakeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  previewRetakeText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  previewConfirmBtn: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#2563EB',
-    borderRadius: 16,
-    paddingVertical: 16,
-  },
-  previewConfirmText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });
 
 const pcStyles = StyleSheet.create({
