@@ -28,6 +28,7 @@ import {
   Platform,
   Modal,
   Pressable,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '../../src/styles/theme';
@@ -454,18 +455,21 @@ export default function ProfileScreen() {
 
   const PrefCard = ({ label, value, onToggle, icon }: PrefCardProps) => (
     <TouchableOpacity
-      style={[styles.prefCard, value && styles.prefCardActive]}
+      style={styles.prefRow}
       onPress={onToggle}
       activeOpacity={0.8}
     >
-      <Ionicons name={icon as any} size={28} color={value ? theme.colors.primary : theme.colors.textMuted} style={{ marginBottom: 12 }} />
-      <Text style={[styles.prefCardLabel, value && styles.prefCardLabelActive]}>{label}</Text>
-      <View style={[styles.prefBadge, value ? styles.prefBadgeActive : styles.prefBadgeInactive]}>
-        <Ionicons name={value ? "checkmark" : "close"} size={12} color={value ? theme.colors.white : theme.colors.textMuted} />
-        <Text style={[styles.prefBadgeText, value ? styles.prefBadgeTextActive : styles.prefBadgeTextInactive]}>
-          {value ? 'Activé' : 'Désactivé'}
-        </Text>
+      <View style={[styles.prefIconContainer, value && { backgroundColor: `${theme.colors.primary}15` }]}>
+        <Ionicons name={icon as any} size={20} color={value ? theme.colors.primary : theme.colors.textMuted} />
       </View>
+      <Text style={[styles.prefRowLabel, value && { color: theme.colors.text, fontWeight: '600' }]}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        trackColor={{ false: '#E5E7EB', true: `${theme.colors.primary}80` }}
+        thumbColor={value ? theme.colors.primary : '#F9FAFB'}
+        ios_backgroundColor="#E5E7EB"
+      />
     </TouchableOpacity>
   );
 
@@ -1336,55 +1340,31 @@ const styles = StyleSheet.create({
   },
   // Preferences Cards
   prefCardsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
-    justifyContent: 'space-between',
   },
-  prefCard: {
-    width: '48%',
+  prefRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F7F8FA',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 16,
-    alignItems: 'flex-start',
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  prefCardActive: {
-    backgroundColor: `${theme.colors.primary}10`,
-    borderColor: `${theme.colors.primary}30`,
-  },
-  prefCardLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: 8,
-  },
-  prefCardLabelActive: {
-    color: theme.colors.primary,
-  },
-  prefBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  prefBadgeInactive: {
+  prefIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  prefBadgeActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  prefBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  prefBadgeTextInactive: {
+  prefRowLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
     color: theme.colors.textMuted,
-  },
-  prefBadgeTextActive: {
-    color: theme.colors.white,
   },
 });

@@ -23,6 +23,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 const SNOOZE_KEY = '@zemy_verify_snoozed_until';
@@ -42,6 +43,9 @@ interface Props {
  * - Affichage et gestion de l'état lié à VerificationModal.
  */
 export default function VerificationModal({ visible, onDismiss, onVerify, userName }: Props) {
+  const { user } = useAuth();
+  const isRejected = user?.verification_status === 'rejected';
+
   const scaleAnim  = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim  = useRef(new Animated.Value(0)).current;
@@ -130,9 +134,14 @@ export default function VerificationModal({ visible, onDismiss, onVerify, userNa
             </Animated.View>
 
             {/* Titre */}
-            <Text style={styles.headerTitle}>Vérification requise{dots}</Text>
+            <Text style={styles.headerTitle}>
+              {isRejected ? "Vérification rejetée ❌" : `Vérification requise${dots}`}
+            </Text>
             <Text style={styles.headerSub}>
-              Bonjour {userName ? <Text style={{ fontWeight: '800' }}>{userName}</Text> : 'là'} ! 👋
+              {isRejected 
+                ? "Vos documents n'ont pas pu être validés." 
+                : `Bonjour ${userName ? userName : 'là'} ! 👋`
+              }
             </Text>
 
             {/* Motif décoratif */}
@@ -160,9 +169,12 @@ export default function VerificationModal({ visible, onDismiss, onVerify, userNa
 
             {/* Alerte rouge */}
             <View style={styles.alertBox}>
-              <Ionicons name="information-circle" size={18} color="#DC2626" />
+              <Ionicons name={isRejected ? "alert-circle" : "information-circle"} size={18} color="#DC2626" />
               <Text style={styles.alertText}>
-                Sans vérification, vous ne pouvez pas réserver de course.
+                {isRejected 
+                  ? "Veuillez soumettre des photos de meilleure qualité pour pouvoir réserver."
+                  : "Sans vérification, vous ne pouvez pas réserver de course."
+                }
               </Text>
             </View>
 
@@ -173,13 +185,15 @@ export default function VerificationModal({ visible, onDismiss, onVerify, userNa
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={['#2563EB', '#1E40AF']}
+                colors={isRejected ? ['#DC2626', '#B91C1C'] : ['#2563EB', '#1E40AF']}
                 style={styles.ctaBtnGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 <Ionicons name="shield-checkmark" size={20} color="#FFFFFF" />
-                <Text style={styles.ctaBtnText}>Se faire vérifier maintenant</Text>
+                <Text style={styles.ctaBtnText}>
+                  {isRejected ? "Recommencer la vérification" : "Se faire vérifier maintenant"}
+                </Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </LinearGradient>
             </TouchableOpacity>

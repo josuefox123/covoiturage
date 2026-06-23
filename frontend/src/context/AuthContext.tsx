@@ -23,31 +23,35 @@ export interface User {
   avatar: string | null;
   rating?: number;
   is_verified?: boolean;
-  verification_status?: 'not_verified' | 'pending' | 'verified';
+  verification_status?: 'not_verified' | 'pending' | 'verified' | 'rejected';
 }
 
 interface AuthContextData {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  hasStartedVerification: boolean;
   loginWithPassword: (identifier: string, password: string) => Promise<void>;
   registerWithPassword: (data: any) => Promise<void>;
   logout: () => void;
   authFetch: (endpoint: string, options?: RequestInit) => Promise<any>;
   updateUser: (updates: Partial<User>) => void;
   refreshUser: () => Promise<void>;
+  setHasStartedVerification: (val: boolean) => void;
 }
 
 const defaultContext: AuthContextData = {
   user: null,
   token: null,
   isLoading: true,
+  hasStartedVerification: false,
   loginWithPassword: async () => {},
   registerWithPassword: async () => {},
   logout: () => {},
   authFetch: async () => ({}),
   updateUser: () => {},
   refreshUser: async () => {},
+  setHasStartedVerification: () => {},
 };
 
 const AuthContext = createContext<AuthContextData>(defaultContext);
@@ -59,6 +63,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true); // true = checking saved session
+  const [hasStartedVerification, setHasStartedVerificationState] = useState<boolean>(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@zemy_started_verification').then(val => {
+      if (val === 'true') {
+        setHasStartedVerificationState(true);
+      }
+    }).catch(() => {});
+  }, []);
 
   // On mount: restore saved session
   useEffect(() => {
@@ -146,11 +159,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async () => {
     setToken(null);
     setUser(null);
+    setHasStartedVerificationState(false);
     try {
       await SecureStore.deleteItemAsync(STORAGE_TOKEN_KEY);
       await AsyncStorage.removeItem(STORAGE_USER_KEY);
+      await AsyncStorage.removeItem('@zemy_started_verification');
     } catch (e) {
     }
+  }, []);
+
+  const setHasStartedVerification = useCallback(async (val: boolean) => {
+    setHasStartedVerificationState(val);
+    try {
+      if (val) {
+        await AsyncStorage.setItem('@zemy_started_verification', 'true');
+      } else {
+        await AsyncStorage.removeItem('@zemy_started_verification');
+      }
+    } catch (_) {}
   }, []);
 
   const authFetch = useCallback(async (endpoint: string, options: RequestInit = {}) => {
@@ -192,13 +218,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     token,
     isLoading,
+    hasStartedVerification,
     loginWithPassword,
     registerWithPassword,
     logout,
     authFetch,
     updateUser,
-    refreshUser
-  }), [user, token, isLoading, loginWithPassword, registerWithPassword, logout, authFetch, updateUser, refreshUser]);
+    refreshUser,
+    setHasStartedVerification
+  }), [user, token, isLoading, hasStartedVerification, loginWithPassword, registerWithPassword, logout, authFetch, updateUser, refreshUser, setHasStartedVerification]);
 
   return (
     <AuthContext.Provider value={contextValue}>

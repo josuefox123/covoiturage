@@ -13,6 +13,7 @@ Zemy
 
 ========================================================
 """
+# pyrefly: ignore [missing-import]
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import api_view, permission_classes, action
@@ -204,6 +205,10 @@ def request_verification(request):
 
     if not all([selfie, id_front, id_back]):
         return Response({'error': 'Tous les documents (selfie, recto, verso) sont requis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Par défaut, utiliser le selfie comme photo de profil (avatar)
+    user.avatar = selfie
+    user.save(update_fields=['avatar'])
 
     # Créer ou mettre à jour la demande de vérification
     VerificationRequest.objects.update_or_create(

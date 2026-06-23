@@ -117,7 +117,7 @@ const formatFullDate = (dateString: string | undefined) => {
  */
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, authFetch, refreshUser } = useAuth();
+  const { user, authFetch, refreshUser, hasStartedVerification, setHasStartedVerification } = useAuth();
 
   const [departure, setDeparture] = useState('');
   const [destination, setDestination] = useState('');
@@ -140,7 +140,11 @@ export default function HomeScreen() {
   const shouldShowVerificationModal =
     !!user &&
     !user.is_verified &&
-    (user.verification_status === 'not_verified' || user.verification_status === undefined);
+    user.verification_status !== 'pending' &&
+    !hasStartedVerification &&
+    (user.verification_status === 'not_verified' ||
+      user.verification_status === 'rejected' ||
+      user.verification_status === undefined);
 
   const [showVerifModal, setShowVerifModal] = useState(false);
 
@@ -158,6 +162,7 @@ export default function HomeScreen() {
 
   const handleVerifGo = () => {
     setShowVerifModal(false);
+    setHasStartedVerification(true);
     router.push('/verify-identity');
   };
   // ──────────────────────────────────────────────────────────────────────────

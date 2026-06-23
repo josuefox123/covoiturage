@@ -21,6 +21,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,11 +43,11 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { id: 'intro',    label: 'Bienvenue',     icon: 'shield-checkmark' },
-  { id: 'selfie',   label: 'Selfie',        icon: 'camera' },
-  { id: 'id_front', label: 'CNI Recto',     icon: 'card' },
-  { id: 'id_back',  label: 'CNI Verso',     icon: 'card' },
-  { id: 'submit',   label: 'Confirmer',     icon: 'checkmark-done' },
+  { id: 'intro', label: 'Bienvenue', icon: 'shield-checkmark' },
+  { id: 'selfie', label: 'Selfie', icon: 'camera' },
+  { id: 'id_front', label: 'CNI Recto', icon: 'card' },
+  { id: 'id_back', label: 'CNI Verso', icon: 'card' },
+  { id: 'submit', label: 'Confirmer', icon: 'checkmark-done' },
 ];
 
 /**
@@ -57,17 +58,23 @@ const STEPS: Step[] = [
  */
 export default function VerifyIdentityScreen() {
   const router = useRouter();
-  const { authFetch, updateUser } = useAuth();
+  const { authFetch, updateUser, setHasStartedVerification, refreshUser } = useAuth();
+
+  useEffect(() => {
+    setHasStartedVerification(true);
+  }, [setHasStartedVerification]);
 
   const [currentStep, setCurrentStep] = useState<number>(0);
-  const [selfieUri,   setSelfieUri]   = useState<string | null>(null);
-  const [idFrontUri,  setIdFrontUri]  = useState<string | null>(null);
-  const [idBackUri,   setIdBackUri]   = useState<string | null>(null);
-  const [submitting,  setSubmitting]  = useState(false);
-  const [submitted,   setSubmitted]   = useState(false);
+  const [selfieUri, setSelfieUri] = useState<string | null>(null);
+  const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
+  const [idBackUri, setIdBackUri] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [loadingImage, setLoadingImage] = useState<boolean>(false);
+  const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const cardAnim     = useRef(new Animated.Value(0)).current;
+  const cardAnim = useRef(new Animated.Value(0)).current;
   const successScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -102,12 +109,20 @@ export default function VerifyIdentityScreen() {
       return;
     }
 
-    const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.85 })
-      : await ImagePicker.launchImageLibraryAsync({ allowsEditing: false, quality: 0.85, mediaTypes: ['images'] });
+    setLoadingImage(true);
+    try {
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.80 })
+        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: false, quality: 0.80, mediaTypes: ['images'] });
 
-    if (!result.canceled && result.assets[0]) {
-      setter(result.assets[0].uri);
+      if (!result.canceled && result.assets[0]) {
+        setter(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      CustomAlert.alert('Erreur', 'Impossible de capturer ou de charger l\'image.');
+    } finally {
+      setLoadingImage(false);
     }
   };
 
@@ -117,11 +132,11 @@ export default function VerifyIdentityScreen() {
       CustomAlert.alert('Erreur', 'Veuillez fournir toutes les photos requises.');
       return;
     }
-    
+
     setSubmitting(true);
     try {
       const formData = new FormData();
-      
+
       const appendImage = (name: string, uri: string) => {
         const filename = uri.split('/').pop() || `${name}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
@@ -141,8 +156,10 @@ export default function VerifyIdentityScreen() {
         method: 'POST',
         body: formData,
       });
-      // Mettre à jour le statut localement → le modal disparaît immédiatement
-      updateUser({ verification_status: 'pending' });
+      
+      // Rafraîchir l'utilisateur pour obtenir le nouvel avatar et le statut à jour depuis le backend
+      await refreshUser();
+      
       setSubmitted(true);
     } catch (e: any) {
       CustomAlert.alert('Erreur', e?.message || 'Impossible d\'envoyer la demande.');
@@ -160,9 +177,9 @@ export default function VerifyIdentityScreen() {
 
   const canGoNext = () => {
     const step = STEPS[currentStep];
-    if (step.id === 'selfie')   return !!selfieUri;
+    if (step.id === 'selfie') return !!selfieUri;
     if (step.id === 'id_front') return !!idFrontUri;
-    if (step.id === 'id_back')  return !!idBackUri;
+    if (step.id === 'id_back') return !!idBackUri;
     return true;
   };
 
@@ -174,10 +191,10 @@ export default function VerifyIdentityScreen() {
         <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
           <Animated.View style={[styles.successCard, { transform: [{ scale: successScale }] }]}>
             <View style={styles.successIconWrapper}>
-               <Ionicons name="shield-checkmark" size={42} color={PRIMARY} />
+              <Ionicons name="shield-checkmark" size={42} color={PRIMARY} />
             </View>
             <Text style={styles.successTitle}>Votre identité est en cours de vérification</Text>
-            
+
             <View style={styles.statusBox}>
               <View style={styles.statusRow}>
                 <Ionicons name="time-outline" size={24} color="#6B7280" />
@@ -199,6 +216,13 @@ export default function VerifyIdentityScreen() {
 
   const step = STEPS[currentStep];
 
+  const isPhotoStep = step.id === 'selfie' || step.id === 'id_front' || step.id === 'id_back';
+  const hasPhoto = isPhotoStep && (
+    (step.id === 'selfie' && !!selfieUri) ||
+    (step.id === 'id_front' && !!idFrontUri) ||
+    (step.id === 'id_back' && !!idBackUri)
+  );
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFillObject} />
@@ -210,7 +234,7 @@ export default function VerifyIdentityScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={22} color="#1F2937" />
             </TouchableOpacity>
-            
+
             <View style={styles.docStatusWrapper}>
               <Text style={styles.docStatusTitle}>Documents fournis</Text>
               <View style={styles.docStatusRow}>
@@ -225,7 +249,7 @@ export default function VerifyIdentityScreen() {
                 </Text>
               </View>
             </View>
-            
+
             <View style={{ width: 42 }} />
           </View>
 
@@ -281,19 +305,29 @@ export default function VerifyIdentityScreen() {
             {/* ═══ ÉTAPE 1 : Selfie ═══ */}
             {step.id === 'selfie' && (
               <View style={styles.stepContent}>
-                <View style={styles.miniBadge}>
-                  <Ionicons name={step.icon as any} size={20} color={PRIMARY} />
-                </View>
-                <Text style={styles.stepTitle}>Votre selfie</Text>
-                <Text style={styles.stepDesc}>
-                  Prenez une photo de votre visage. Assurez-vous que votre visage est bien visible et bien éclairé.
-                </Text>
+                {!selfieUri && (
+                  <>
+                    <View style={styles.miniBadge}>
+                      <Ionicons name={step.icon as any} size={20} color={PRIMARY} />
+                    </View>
+                    <Text style={styles.stepTitle}>Votre selfie</Text>
+                    <Text style={styles.stepDesc}>
+                      Prenez une photo de votre visage. Assurez-vous que votre visage est bien visible et bien éclairé.
+                    </Text>
+                  </>
+                )}
+                {selfieUri && (
+                  <Text style={styles.stepTitlePreview}>Photo de votre selfie</Text>
+                )}
                 <PhotoCapture
                   uri={selfieUri}
                   placeholder="Prendre un selfie"
                   placeholderIcon="person"
                   onCamera={() => pickImage('camera', setSelfieUri, true)}
                   onGallery={() => pickImage('gallery', setSelfieUri, true)}
+                  onContinue={goNext}
+                  onView={() => setFullscreenUri(selfieUri)}
+                  loading={loadingImage}
                 />
               </View>
             )}
@@ -301,19 +335,29 @@ export default function VerifyIdentityScreen() {
             {/* ═══ ÉTAPE 2 : CNI Recto ═══ */}
             {step.id === 'id_front' && (
               <View style={styles.stepContent}>
-                <View style={styles.miniBadge}>
-                  <Ionicons name={step.icon as any} size={20} color={PRIMARY} />
-                </View>
-                <Text style={styles.stepTitle}>Document — Recto</Text>
-                <Text style={styles.stepDesc}>
-                  Photographiez le recto de votre Carte Nationale d'Identité ou de votre passeport.
-                </Text>
+                {!idFrontUri && (
+                  <>
+                    <View style={styles.miniBadge}>
+                      <Ionicons name={step.icon as any} size={20} color={PRIMARY} />
+                    </View>
+                    <Text style={styles.stepTitle}>Document — Recto</Text>
+                    <Text style={styles.stepDesc}>
+                      Photographiez le recto de votre Carte Nationale d'Identité ou de votre passeport.
+                    </Text>
+                  </>
+                )}
+                {idFrontUri && (
+                  <Text style={styles.stepTitlePreview}>Photo de votre pièce d'identité (Recto)</Text>
+                )}
                 <PhotoCapture
                   uri={idFrontUri}
                   placeholder="Photographier le recto"
                   placeholderIcon="card"
                   onCamera={() => pickImage('camera', setIdFrontUri)}
                   onGallery={() => pickImage('gallery', setIdFrontUri)}
+                  onContinue={goNext}
+                  onView={() => setFullscreenUri(idFrontUri)}
+                  loading={loadingImage}
                 />
               </View>
             )}
@@ -321,19 +365,29 @@ export default function VerifyIdentityScreen() {
             {/* ═══ ÉTAPE 3 : CNI Verso ═══ */}
             {step.id === 'id_back' && (
               <View style={styles.stepContent}>
-                <View style={styles.miniBadge}>
-                  <Ionicons name={step.icon as any} size={20} color={PRIMARY} />
-                </View>
-                <Text style={styles.stepTitle}>Document — Verso</Text>
-                <Text style={styles.stepDesc}>
-                  Photographiez maintenant le verso (dos) de votre document d'identité.
-                </Text>
+                {!idBackUri && (
+                  <>
+                    <View style={styles.miniBadge}>
+                      <Ionicons name={step.icon as any} size={20} color={PRIMARY} />
+                    </View>
+                    <Text style={styles.stepTitle}>Document — Verso</Text>
+                    <Text style={styles.stepDesc}>
+                      Photographiez maintenant le verso (dos) de votre document d'identité.
+                    </Text>
+                  </>
+                )}
+                {idBackUri && (
+                  <Text style={styles.stepTitlePreview}>Photo de votre pièce d'identité (Verso)</Text>
+                )}
                 <PhotoCapture
                   uri={idBackUri}
                   placeholder="Photographier le verso"
                   placeholderIcon="card"
                   onCamera={() => pickImage('camera', setIdBackUri)}
                   onGallery={() => pickImage('gallery', setIdBackUri)}
+                  onContinue={goNext}
+                  onView={() => setFullscreenUri(idBackUri)}
+                  loading={loadingImage}
                 />
               </View>
             )}
@@ -351,9 +405,9 @@ export default function VerifyIdentityScreen() {
 
                 {/* Récap photos */}
                 <View style={styles.recapGrid}>
-                  <RecapThumb label="Selfie"     uri={selfieUri}  />
-                  <RecapThumb label="CNI Recto"  uri={idFrontUri} />
-                  <RecapThumb label="CNI Verso"  uri={idBackUri}  />
+                  <RecapThumb label="Selfie" uri={selfieUri} />
+                  <RecapThumb label="CNI Recto" uri={idFrontUri} />
+                  <RecapThumb label="CNI Verso" uri={idBackUri} />
                 </View>
 
                 {/* Bouton submit */}
@@ -376,12 +430,15 @@ export default function VerifyIdentityScreen() {
         {/* ── Navigation buttons ───────────────────────────────────────── */}
         <View style={styles.navRow}>
           {currentStep > 0 ? (
-            <TouchableOpacity style={styles.navBtnSecondary} onPress={goPrev}>
+            <TouchableOpacity
+              style={[styles.navBtnSecondary, hasPhoto && { flex: 0, width: 120 }]}
+              onPress={goPrev}
+            >
               <Text style={styles.navBtnSecondaryText}>Précédent</Text>
             </TouchableOpacity>
           ) : <View style={{ flex: 1 }} />}
 
-          {step.id !== 'submit' && (
+          {step.id !== 'submit' && !hasPhoto && (
             <TouchableOpacity
               style={[styles.navBtnPrimary, !canGoNext() && styles.navBtnDisabled]}
               onPress={goNext}
@@ -396,6 +453,33 @@ export default function VerifyIdentityScreen() {
         </View>
       </SafeAreaView>
 
+      {/* Modal d'Aperçu Plein Écran */}
+      <Modal
+        visible={!!fullscreenUri}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setFullscreenUri(null)}
+      >
+        <View style={styles.modalBg}>
+          <SafeAreaView style={styles.modalContent} edges={['top', 'bottom', 'left', 'right']}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Aperçu de la photo</Text>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setFullscreenUri(null)}>
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {fullscreenUri && (
+              <Image
+                source={{ uri: fullscreenUri }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            )}
+          </SafeAreaView>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -403,49 +487,79 @@ export default function VerifyIdentityScreen() {
 // ── Sub-components ──────────────────────────────────────────────────────────
 
 function PhotoCapture({
-  uri, placeholder, placeholderIcon, onCamera, onGallery,
+  uri, placeholder, placeholderIcon, onCamera, onGallery, onContinue, onView, loading,
 }: {
   uri: string | null;
   placeholder: string;
   placeholderIcon: string;
   onCamera: () => void;
   onGallery: () => void;
+  onContinue: () => void;
+  onView: () => void;
+  loading: boolean;
 }) {
+  if (loading) {
+    return (
+      <View style={[pcStyles.container, pcStyles.loadingContainer]}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={pcStyles.loadingText}>Traitement de l'image...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={pcStyles.container}>
       {uri ? (
-        <View style={pcStyles.preview}>
-          <Image 
-            source={{ uri }} 
-            style={pcStyles.img} 
-            resizeMode="cover"
-          />
-          <View style={pcStyles.overlay}>
-            <TouchableOpacity style={pcStyles.retakeBtn} onPress={onCamera}>
-              <Ionicons name="refresh" size={16} color="#FFFFFF" />
-              <Text style={pcStyles.retakeText}>Reprendre</Text>
-            </TouchableOpacity>
+        <View style={pcStyles.previewContainer}>
+          <TouchableOpacity style={pcStyles.preview} onPress={onView} activeOpacity={0.9}>
+            <Image
+              key={uri}
+              source={{ uri }}
+              style={pcStyles.img}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <View style={pcStyles.statusContainer}>
+            <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+            <Text style={pcStyles.statusText}>Photo enregistrée</Text>
           </View>
-          <View style={pcStyles.successBadge}>
-            <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+
+          <TouchableOpacity style={pcStyles.viewBtn} onPress={onView} activeOpacity={0.85}>
+            <Ionicons name="eye-outline" size={18} color="#4B5563" />
+            <Text style={pcStyles.viewBtnText}> Voir la photo</Text>
+          </TouchableOpacity>
+
+          <View style={pcStyles.actionRow}>
+            <TouchableOpacity style={pcStyles.retakeBtnNew} onPress={onCamera} activeOpacity={0.85}>
+              <Ionicons name="refresh" size={18} color="#4B5563" />
+              <Text style={pcStyles.retakeBtnNewText}> Reprendre</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={pcStyles.continueBtnNew} onPress={onContinue} activeOpacity={0.85}>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+              <Text style={pcStyles.continueBtnNewText}> Continuer</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : (
-        <View style={pcStyles.empty}>
-          <Ionicons name={placeholderIcon as any} size={48} color="#E5E7EB" />
-          <Text style={pcStyles.emptyText}>{placeholder}</Text>
-        </View>
+        <>
+          <View style={pcStyles.empty}>
+            <Ionicons name={placeholderIcon as any} size={48} color="#E5E7EB" />
+            <Text style={pcStyles.emptyText}>{placeholder}</Text>
+          </View>
+          <View style={pcStyles.btnRow}>
+            <TouchableOpacity style={pcStyles.btn} onPress={onCamera} activeOpacity={0.85}>
+              <Ionicons name="camera" size={18} color="#FFFFFF" />
+              <Text style={pcStyles.btnText}>Caméra</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={pcStyles.btnOutline} onPress={onGallery} activeOpacity={0.85}>
+              <Ionicons name="images" size={18} color="#1F2937" />
+              <Text style={pcStyles.btnOutlineText}>Galerie</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
-      <View style={pcStyles.btnRow}>
-        <TouchableOpacity style={pcStyles.btn} onPress={onCamera} activeOpacity={0.85}>
-          <Ionicons name="camera" size={18} color="#FFFFFF" />
-          <Text style={pcStyles.btnText}>Caméra</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={pcStyles.btnOutline} onPress={onGallery} activeOpacity={0.85}>
-          <Ionicons name="images" size={18} color="#1F2937" />
-          <Text style={pcStyles.btnOutlineText}>Galerie</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -454,7 +568,7 @@ function RecapThumb({ label, uri }: { label: string; uri: string | null }) {
   return (
     <View style={rtStyles.container}>
       {uri ? (
-        <Image source={{ uri }} style={rtStyles.img} resizeMode="cover" />
+        <Image key={uri} source={{ uri }} style={rtStyles.img} resizeMode="cover" />
       ) : (
         <View style={rtStyles.empty}>
           <Ionicons name="image-outline" size={24} color="#D1D5DB" />
@@ -534,7 +648,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   stepTitle: { fontSize: 22, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 10 },
-  stepDesc:  { fontSize: 15, color: '#6B7280', textAlign: 'center', lineHeight: 22, marginBottom: 28 },
+  stepDesc: { fontSize: 15, color: '#6B7280', textAlign: 'center', lineHeight: 22, marginBottom: 28 },
   requirementList: { width: '100%', gap: 16, marginBottom: 20 },
   requirementRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   requirementText: { flex: 1, fontSize: 15, color: '#374151', fontWeight: '500' },
@@ -585,22 +699,29 @@ const styles = StyleSheet.create({
   statusValue: { fontSize: 16, color: '#111827', fontWeight: '700' },
   successBtn: { width: '100%', borderRadius: 16, backgroundColor: '#F3F4F6', paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   successBtnText: { fontSize: 16, fontWeight: '700', color: '#374151' },
+  stepTitlePreview: { fontSize: 20, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 20 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.95)', justifyContent: 'center' },
+  modalContent: { flex: 1, justifyContent: 'space-between' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+  modalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  modalCloseBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.15)', justifyContent: 'center', alignItems: 'center' },
+  modalImage: { flex: 1, width: '100%', height: '100%' },
 });
 
 const pcStyles = StyleSheet.create({
   container: { width: '100%', marginBottom: 12 },
   preview: {
     width: '100%',
-    height: 220,
+    height: 280,
     borderRadius: 20,
     overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#F3F4F6',
+    marginBottom: 12,
+    backgroundColor: '#111827',
   },
   img: {
     ...StyleSheet.absoluteFillObject,
-    width: undefined,
-    height: undefined,
+    width: '100%',
+    height: '100%',
   },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-end', padding: 12 },
   retakeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
@@ -620,6 +741,18 @@ const pcStyles = StyleSheet.create({
     borderRadius: 16, backgroundColor: '#F3F4F6',
   },
   btnOutlineText: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  loadingContainer: { height: 260, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+  previewContainer: { width: '100%' },
+  statusContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4, marginBottom: 16 },
+  statusText: { color: '#10B981', fontSize: 14, fontWeight: '700' },
+  viewBtn: { width: '100%', paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 },
+  viewBtnText: { fontSize: 15, fontWeight: '600', color: '#4B5563' },
+  actionRow: { flexDirection: 'row', gap: 12, width: '100%' },
+  retakeBtnNew: { flex: 1, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  retakeBtnNewText: { fontSize: 15, fontWeight: '600', color: '#4B5563' },
+  continueBtnNew: { flex: 1, paddingVertical: 14, borderRadius: 16, backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  continueBtnNewText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });
 
 const rtStyles = StyleSheet.create({

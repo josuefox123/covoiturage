@@ -34,10 +34,11 @@ class UserSerializer(serializers.ModelSerializer):
     preference = UserPreferenceSerializer(read_only=True)
     vehicles = serializers.SerializerMethodField()
     rides_count = serializers.SerializerMethodField()
+    verification_status = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'avatar', 'rating', 'parcels_completed', 'parcel_rating', 'is_verified', 'is_active', 'created_at', 'preference', 'vehicles', 'rides_count']
+        fields = ['id', 'full_name', 'email', 'phone', 'avatar', 'rating', 'parcels_completed', 'parcel_rating', 'is_verified', 'is_active', 'created_at', 'preference', 'vehicles', 'rides_count', 'verification_status']
 
     @extend_schema_field(dict)
     def get_vehicles(self, obj):
@@ -46,6 +47,21 @@ class UserSerializer(serializers.ModelSerializer):
     @extend_schema_field(int)
     def get_rides_count(self, obj):
         return obj.rides_driven.filter(status='completed').count()
+
+    @extend_schema_field(str)
+    def get_verification_status(self, obj):
+        if obj.is_verified:
+            return 'verified'
+        from .models import VerificationRequest
+        existing = VerificationRequest.objects.filter(user=obj).first()
+        if existing:
+            if existing.status == 'approved':
+                return 'verified'
+            elif existing.status == 'rejected':
+                return 'rejected'
+            else:
+                return 'pending'
+        return 'not_verified'
 
 class AdminUserSerializer(serializers.ModelSerializer):
     """
