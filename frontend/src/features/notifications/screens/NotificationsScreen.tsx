@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Text, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../../styles/theme';
 
@@ -17,6 +18,7 @@ import { EmptyState } from '../components/EmptyState';
 const FILTERS: NotificationFilterType[] = ['Toutes', 'Non lues', 'Trajets', 'Paiements', 'Messages', 'Promotions'];
 
 export default function NotificationsScreen() {
+  const router = useRouter();
   const {
     notifications,
     isLoading,
@@ -53,11 +55,16 @@ export default function NotificationsScreen() {
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <View>
-          <Text style={styles.title}>Notifications</Text>
-          {unreadCount > 0 && (
-            <Text style={styles.subtitle}>{unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}</Text>
-          )}
+        <View style={styles.titleRow}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.title}>Notifications</Text>
+            {unreadCount > 0 && (
+              <Text style={styles.subtitle}>{unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}</Text>
+            )}
+          </View>
         </View>
         <TouchableOpacity style={styles.readAllBtn} onPress={markAllAsRead}>
           <Ionicons name="checkmark-done" size={20} color={theme.colors.primary} />
@@ -158,6 +165,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backBtn: {
+    marginRight: 12,
   },
   title: {
     fontSize: 28,

@@ -22,6 +22,7 @@ import { theme } from '../styles/theme';
 import * as Location from 'expo-location';
 import { useAuth } from '../context/AuthContext';
 import { Ride } from '../types';
+import { CustomAlert } from '../utils/CustomAlert';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -345,7 +346,7 @@ export default function LiveRideModal() {
 
   const openGoogleMaps = () => {
     if (!destCoords) {
-      Alert.alert('Erreur', "L'adresse d'arrivée n'a pas pu être géolocalisée.");
+      CustomAlert.alert('Erreur', "L'adresse d'arrivée n'a pas pu être géolocalisée.");
       return;
     }
     const dest = `${destCoords.lat},${destCoords.lon}`;
@@ -369,7 +370,7 @@ export default function LiveRideModal() {
   };
 
   const handleStartRide = () => {
-    Alert.alert('Démarrer le trajet', 'Voulez-vous démarrer ce trajet ? Le suivi GPS sera activé.', [
+    CustomAlert.alert('Démarrer le trajet', 'Voulez-vous démarrer ce trajet ? Le suivi GPS sera activé.', [
       { text: 'Non', style: 'cancel' },
       {
         text: 'Oui, démarrer',
@@ -382,9 +383,9 @@ export default function LiveRideModal() {
             const updatedRide = resp.results || resp;
             setActiveRide(updatedRide);
             await startTracking();
-            Alert.alert('✅ Trajet démarré', 'Le trajet a commencé. Bonne route !');
+            CustomAlert.alert('✅ Trajet démarré', 'Le trajet a commencé. Bonne route !');
           } catch (error: any) {
-            Alert.alert('Erreur', error.message || 'Impossible de démarrer le trajet.');
+            CustomAlert.alert('Erreur', error.message || 'Impossible de démarrer le trajet.');
           }
         },
       },
@@ -392,7 +393,7 @@ export default function LiveRideModal() {
   };
 
   const handleCompleteRide = () => {
-    Alert.alert('Terminer le trajet', 'Avez-vous terminé ce trajet ?', [
+    CustomAlert.alert('Terminer le trajet', 'Avez-vous terminé ce trajet ?', [
       { text: 'Non', style: 'cancel' },
       {
         text: 'Oui, terminer',
@@ -402,9 +403,9 @@ export default function LiveRideModal() {
             if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
-            Alert.alert('✅ Trajet terminé', 'Merci pour ce trajet !');
+            CustomAlert.alert('✅ Trajet terminé', 'Merci pour ce trajet !');
           } catch (error: any) {
-            Alert.alert('Erreur', error.message || 'Impossible de terminer le trajet.');
+            CustomAlert.alert('Erreur', error.message || 'Impossible de terminer le trajet.');
           }
         },
       },
@@ -412,7 +413,7 @@ export default function LiveRideModal() {
   };
 
   const handlePassengerComplete = () => {
-    Alert.alert('Terminer ma réservation', 'Confirmez-vous être arrivé(e) à destination ?', [
+    CustomAlert.alert('Terminer ma réservation', 'Confirmez-vous être arrivé(e) à destination ?', [
       { text: 'Non', style: 'cancel' },
       {
         text: 'Oui, je suis arrivé(e)',
@@ -424,9 +425,9 @@ export default function LiveRideModal() {
             if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
-            Alert.alert('✅ Arrivé(e) !', 'Votre trajet est terminé. Merci d\'avoir voyagé avec nous !');
+            CustomAlert.alert('✅ Arrivé(e) !', 'Votre trajet est terminé. Merci d\'avoir voyagé avec nous !');
           } catch (error: any) {
-            Alert.alert('Erreur', error.message || 'Impossible de terminer la réservation.');
+            CustomAlert.alert('Erreur', error.message || 'Impossible de terminer la réservation.');
           }
         },
       },
@@ -452,9 +453,9 @@ export default function LiveRideModal() {
       if (!isMountedRef.current) return;
       setShowReportModal(false);
       setProblemText('');
-      Alert.alert('✅ Envoyé', "Votre problème a été signalé. L'administration vous contactera.");
+      CustomAlert.alert('✅ Envoyé', "Votre problème a été signalé. L'administration vous contactera.");
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Impossible de signaler le problème.');
+      CustomAlert.alert('Erreur', error.message || 'Impossible de signaler le problème.');
     } finally {
       if (isMountedRef.current) setSendingReport(false);
     }

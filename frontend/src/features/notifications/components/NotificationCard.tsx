@@ -1,11 +1,11 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated as RNAnimated, Alert } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Notification } from '../types/notification';
 import { theme } from '../../../styles/theme';
 import { getNotificationStyle } from '../constants/notificationTypes';
 import { formatTimeAgo } from '../utils/notificationHelpers';
+import { CustomAlert } from '../../../utils/CustomAlert';
 
 interface Props {
   notification: Notification;
@@ -15,12 +15,10 @@ interface Props {
 }
 
 export const NotificationCard = ({ notification, onRead, onDelete, onPress }: Props) => {
-  const swipeableRef = useRef<Swipeable>(null);
   const { icon, color } = getNotificationStyle(notification);
 
   const handleDeletePress = () => {
-    swipeableRef.current?.close();
-    Alert.alert(
+    CustomAlert.alert(
       "Supprimer la notification",
       "Êtes-vous sûr de vouloir supprimer cette notification définitivement ?",
       [
@@ -31,7 +29,7 @@ export const NotificationCard = ({ notification, onRead, onDelete, onPress }: Pr
   };
 
   const handleLongPress = () => {
-    Alert.alert(
+    CustomAlert.alert(
       "Options",
       "Que souhaitez-vous faire ?",
       [
@@ -43,29 +41,7 @@ export const NotificationCard = ({ notification, onRead, onDelete, onPress }: Pr
     );
   };
 
-  const renderRightActions = (progress: RNAnimated.AnimatedInterpolation<number>, dragX: RNAnimated.AnimatedInterpolation<number>) => {
-    const scale = dragX.interpolate({
-      inputRange: [-80, -40, 0],
-      outputRange: [1, 0.8, 0],
-      extrapolate: 'clamp',
-    });
-
-    return (
-      <Pressable onPress={handleDeletePress} style={styles.deleteAction}>
-        <RNAnimated.View style={[styles.deleteIconContainer, { transform: [{ scale }] }]}>
-          <Ionicons name="trash" size={24} color="#FFFFFF" />
-        </RNAnimated.View>
-      </Pressable>
-    );
-  };
-
   return (
-    <Swipeable
-      ref={swipeableRef}
-      renderRightActions={renderRightActions}
-      friction={2}
-      rightThreshold={40}
-    >
       <Pressable 
         style={[styles.card, !notification.is_read && styles.cardUnread]}
         onPress={() => {
@@ -86,14 +62,18 @@ export const NotificationCard = ({ notification, onRead, onDelete, onPress }: Pr
             <Text style={[styles.title, !notification.is_read && styles.textBold]} numberOfLines={1}>
               {notification.title}
             </Text>
-            <Text style={styles.time}>{formatTimeAgo(notification.created_at)}</Text>
+            <View style={styles.rightHeader}>
+              <Text style={styles.time}>{formatTimeAgo(notification.created_at)}</Text>
+              <TouchableOpacity onPress={handleDeletePress} style={styles.trashBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
           </View>
           <Text style={[styles.message, !notification.is_read && styles.textBold]} numberOfLines={2}>
             {notification.message}
           </Text>
         </View>
       </Pressable>
-    </Swipeable>
   );
 };
 
@@ -166,21 +146,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     color: theme.colors.text,
   },
-  deleteAction: {
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 80,
-    borderRadius: 18,
-    marginBottom: theme.spacing.md,
-    marginLeft: theme.spacing.sm,
-  },
-  deleteIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
+  rightHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
+  trashBtn: {
+    marginLeft: 8,
+  },
+
 });

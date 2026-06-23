@@ -62,6 +62,11 @@ export default function TabsLayout() {
               <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={24} color={color} />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Optionnel : on peut émettre un event pour vider le formulaire si déjà sur l'écran
+            },
+          })}
         />
         <Tabs.Screen
           name="trips"

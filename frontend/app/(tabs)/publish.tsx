@@ -126,6 +126,11 @@ export default function PublishScreen() {
   const [brandModel, setBrandModel] = useState('');
   const [vehicleColor, setVehicleColor] = useState('');
   const [plate, setPlate] = useState('');
+  const [vehicleType, setVehicleType] = useState('voiture');
+  const [driverLicense, setDriverLicense] = useState('');
+  const [licenseExpiration, setLicenseExpiration] = useState('');
+  const [licenseExpirationError, setLicenseExpirationError] = useState('');
+  const [driverLicensePhoto, setDriverLicensePhoto] = useState<string | null>(null);
 
   // Prefs state
   const [music, setMusic] = useState(true);
@@ -351,8 +356,18 @@ export default function PublishScreen() {
         { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
       ]);
 
+      // Vider le formulaire pour le prochain trajet
+      setDeparture('');
+      setArrival('');
+      setDepartureCords(null);
+      setArrivalCords(null);
+      setEstimation(null);
       setPrice('');
       setSeats(3);
+      setIsRecurrent(false);
+      setSelectedDays([]);
+      setAcceptsParcels(false);
+      
     } catch (error: any) {
       CustomAlert.alert('Erreur', error.message || 'Impossible de publier le trajet.');
     } finally {
@@ -405,24 +420,82 @@ export default function PublishScreen() {
     }
   };
 
-  const handleSaveVehicle = async () => {
-    if (brandModel.trim() && plate.trim()) {
-      setIsSavingProfile(true);
-      try {
-        await authFetch('/vehicles/', {
-          method: 'POST',
-          body: JSON.stringify({
-            brand_model: brandModel,
-            color: vehicleColor,
-            license_plate: plate,
-            owner: user!.id
-          }),
-        });
-        setHasVehicle(true);
-      } catch (_) { }
-      finally { setIsSavingProfile(false); }
+  const pickLicensePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      CustomAlert.alert('Permission refusée', 'Vous devez autoriser l\'accès à vos photos.');
+      return;
     }
-    setProfileStep('preferences');
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setDriverLicensePhoto(result.assets[0].uri);
+    }
+  };
+
+  const handleSaveVehicle = async () => {
+    if (!brandModel.trim() || !plate.trim()) {
+      CustomAlert.alert('Erreur', 'Veuillez remplir les champs obligatoires du véhicule.');
+      return;
+    }
+
+    if (vehicleType === 'voiture') {
+      if (!driverLicense.trim() || !licenseExpiration.trim() || !driverLicensePhoto) {
+        CustomAlert.alert('Erreur', 'Les informations du permis de conduire (numéro, date d\'expiration et photo) sont obligatoires pour les voitures.');
+        return;
+      }
+      
+      const expDate = new Date(licenseExpiration);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (expDate < today) {
+        setLicenseExpirationError('La date de votre permis est déjà expirée.');
+        return;
+      } else {
+        setLicenseExpirationError('');
+      }
+    }
+
+    setIsSavingProfile(true);
+    
+    const formData = new FormData();
+    formData.append('owner', user!.id);
+    formData.append('brand_model', brandModel);
+    formData.append('color', vehicleColor);
+    formData.append('license_plate', plate);
+    formData.append('vehicle_type', vehicleType);
+    
+    if (vehicleType === 'voiture') {
+      formData.append('driver_license_number', driverLicense);
+      formData.append('license_expiration', licenseExpiration);
+    }
+
+    if (vehicleType === 'voiture' && driverLicensePhoto && !driverLicensePhoto.startsWith('http')) {
+      const filename = driverLicensePhoto.split('/').pop() || 'license.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      formData.append('driver_license_photo', {
+        uri: driverLicensePhoto,
+        name: filename,
+        type
+      } as any);
+    }
+
+    try {
+      await authFetch('/vehicles/', {
+        method: 'POST',
+        body: formData,
+      });
+      setHasVehicle(true);
+      setProfileStep('preferences');
+    } catch (e: any) { 
+      CustomAlert.alert('Erreur', e.message || 'Impossible d\'ajouter le véhicule.');
+    } finally { 
+      setIsSavingProfile(false); 
+    }
   };
 
   const handleSavePrefs = async () => {
@@ -1002,157 +1075,221 @@ export default function PublishScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Profile Completion Modal */}
       <AppBottomSheet
         visible={profileModalVisible}
         onClose={() => setProfileModalVisible(false)}
         snapPoints={['75%', '95%']}
         initialIndex={0}
       >
+        <View style={styles.modalHeaderModern}>
+          <Text style={styles.modalTitle}>Complétion du profil</Text>
+        </View>
 
-            <View style={styles.modalHeaderModern}>
-              <Text style={styles.modalTitle}>Complétion du profil</Text>
+        <View>
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressLabel}>Étape {PROFILE_STEPS.indexOf(profileStep) + 1} sur 3 ({Math.round(getProfileProgress())}%)</Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${getProfileProgress()}%` }]} />
             </View>
+          </View>
 
-            <View style={styles.progressContainer}>
-              <Text style={styles.progressLabel}>Étape {PROFILE_STEPS.indexOf(profileStep) + 1} sur 3 ({Math.round(getProfileProgress())}%)</Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${getProfileProgress()}%` }]} />
-              </View>
-            </View>
-
-            {/* Step 1: Personal Info */}
-            {profileStep === 'personal' && (
-              <>
-                <TouchableOpacity style={styles.avatarPicker} onPress={pickAvatar} activeOpacity={0.8}>
-                  {avatarUri ? (
-                    <View style={styles.avatarWrapper}>
-                      <Image source={{ uri: avatarUri }} style={styles.avatar} />
-                      <View style={styles.avatarBadge}>
-                        <Ionicons name="camera" size={16} color={theme.colors.white} />
-                      </View>
+          {/* Step 1: Personal Info */}
+          {profileStep === 'personal' && (
+            <>
+              <TouchableOpacity style={styles.avatarPicker} onPress={pickAvatar} activeOpacity={0.8}>
+                {avatarUri ? (
+                  <View style={styles.avatarWrapper}>
+                    <Image source={{ uri: avatarUri }} style={styles.avatar} />
+                    <View style={styles.avatarBadge}>
+                      <Ionicons name="camera" size={16} color={theme.colors.white} />
                     </View>
-                  ) : (
-                    <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.avatarPlaceholder}>
-                      <Ionicons name="camera" size={40} color={theme.colors.white} />
-                      <Text style={styles.avatarPlaceholderText}>Ajouter une photo</Text>
-                    </LinearGradient>
+                  </View>
+                ) : (
+                  <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.avatarPlaceholder}>
+                    <Ionicons name="camera" size={40} color={theme.colors.white} />
+                    <Text style={styles.avatarPlaceholderText}>Ajouter une photo</Text>
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.inputWrapper}>
+                <Ionicons name="person-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Nom complet"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={editEmail}
+                  onChangeText={setEditEmail}
+                  placeholder="votre@email.com"
+                  placeholderTextColor={theme.colors.textMuted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <TouchableOpacity style={styles.modalBtn} onPress={handleSavePersonal} disabled={isSavingProfile}>
+                <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                  {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Step 2: Vehicle */}
+          {profileStep === 'vehicle' && (
+            <>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="pricetag-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={plate}
+                  onChangeText={setPlate}
+                  placeholder="Immatriculation (ex: BJ-1234)"
+                  placeholderTextColor={theme.colors.textMuted}
+                  autoCapitalize="characters"
+                />
+              </View>
+
+              <Text style={styles.vehicleTypeLabel}>Type de véhicule</Text>
+              <View style={styles.vehicleTypeContainer}>
+                {['Moto', 'Tricycle', 'Voiture'].map(type => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.vehicleTypeBtn,
+                      vehicleType === type.toLowerCase() && styles.vehicleTypeBtnActive
+                    ]}
+                    onPress={() => setVehicleType(type.toLowerCase())}
+                  >
+                    <Text style={[
+                      styles.vehicleTypeText,
+                      vehicleType === type.toLowerCase() && styles.vehicleTypeTextActive
+                    ]}>{type}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Section Permis de conduire (Obligatoire pour Voiture) */}
+              {vehicleType === 'voiture' && (
+                <>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginTop: 12, marginBottom: 8 }}>Permis de conduire</Text>
+                  
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="id-card-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.modalInputModern}
+                      value={driverLicense}
+                      onChangeText={setDriverLicense}
+                      placeholder="Numéro de permis (Obligatoire)"
+                      placeholderTextColor={theme.colors.textMuted}
+                    />
+                  </View>
+
+                  <TouchableOpacity style={[styles.inputWrapper, licenseExpirationError ? { borderColor: theme.colors.error } : null]} onPress={() => setShowDatePicker(true)}>
+                    <Ionicons name="calendar-outline" size={20} color={licenseExpirationError ? theme.colors.error : theme.colors.textMuted} style={styles.inputIcon} />
+                    <Text style={[styles.modalInputModern, { paddingTop: Platform.OS === 'ios' ? 16 : 14, color: licenseExpiration ? theme.colors.text : theme.colors.textMuted }]}>
+                      {licenseExpiration || "Date d'expiration (Obligatoire)"}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {licenseExpirationError ? (
+                    <Text style={{ color: theme.colors.error, fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
+                      {licenseExpirationError}
+                    </Text>
+                  ) : null}
+
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={licenseExpiration ? new Date(licenseExpiration) : new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowDatePicker(Platform.OS === 'ios');
+                        if (selectedDate) {
+                          const formattedDate = selectedDate.toISOString().split('T')[0];
+                          setLicenseExpiration(formattedDate);
+                          
+                          const expDate = new Date(selectedDate);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          expDate.setHours(0, 0, 0, 0);
+                          
+                          if (expDate < today) {
+                            setLicenseExpirationError('La date de votre permis est déjà expirée.');
+                          } else {
+                            setLicenseExpirationError('');
+                          }
+                        }
+                      }}
+                    />
                   )}
+
+                  <TouchableOpacity 
+                    style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 24, gap: 12 }}
+                    onPress={pickLicensePhoto}
+                  >
+                    <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
+                    <Text style={{ flex: 1, color: theme.colors.text, fontSize: 14 }}>
+                      {driverLicensePhoto ? 'Photo sélectionnée' : 'Ajouter une photo du permis'}
+                    </Text>
+                    {driverLicensePhoto && <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />}
+                  </TouchableOpacity>
+                </>
+              )}
+
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity style={styles.modalBtnSkip} onPress={() => setProfileStep('preferences')}>
+                  <Text style={styles.modalBtnSkipText}>Passer</Text>
                 </TouchableOpacity>
-
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="person-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={editName}
-                    onChangeText={setEditName}
-                    placeholder="Nom complet"
-                    placeholderTextColor={theme.colors.textMuted}
-                  />
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={editEmail}
-                    onChangeText={setEditEmail}
-                    placeholder="votre@email.com"
-                    placeholderTextColor={theme.colors.textMuted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-
-                <TouchableOpacity style={styles.modalBtn} onPress={handleSavePersonal} disabled={isSavingProfile}>
+                <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSaveVehicle} disabled={isSavingProfile}>
                   <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
                     {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
-              </>
-            )}
+              </View>
+            </>
+          )}
 
-            {/* Step 2: Vehicle */}
-            {profileStep === 'vehicle' && (
-              <>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="car-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={brandModel}
-                    onChangeText={setBrandModel}
-                    placeholder="Marque et Modèle"
-                    placeholderTextColor={theme.colors.textMuted}
-                  />
-                </View>
+          {/* Step 3: Preferences */}
+          {profileStep === 'preferences' && (
+            <>
+              <View style={styles.prefCardsContainer}>
+                <PrefCardModal icon="musical-notes" label="Musique" value={music} onToggle={() => setMusic(!music)} />
+                <PrefCardModal icon="chatbubbles" label="Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
+                <PrefCardModal icon="logo-no-smoking" label="Fumeurs" value={smoking} onToggle={() => setSmoking(!smoking)} />
+                <PrefCardModal icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
+              </View>
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="color-palette-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={vehicleColor}
-                    onChangeText={setVehicleColor}
-                    placeholder="Couleur"
-                    placeholderTextColor={theme.colors.textMuted}
-                  />
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="pricetag-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={plate}
-                    onChangeText={setPlate}
-                    placeholder="Immatriculation"
-                    placeholderTextColor={theme.colors.textMuted}
-                    autoCapitalize="characters"
-                  />
-                </View>
-
-                <View style={styles.modalBtnRow}>
-                  <TouchableOpacity style={styles.modalBtnSkip} onPress={() => setProfileStep('preferences')}>
-                    <Text style={styles.modalBtnSkipText}>Passer</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSaveVehicle} disabled={isSavingProfile}>
-                    <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                      {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Continuer →</Text>}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {/* Step 3: Preferences */}
-            {profileStep === 'preferences' && (
-              <>
-                <View style={styles.prefCardsContainer}>
-                  <PrefCardModal icon="musical-notes" label="Musique" value={music} onToggle={() => setMusic(!music)} />
-                  <PrefCardModal icon="chatbubbles" label="Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
-                  <PrefCardModal icon="logo-no-smoking" label="Fumeurs" value={smoking} onToggle={() => setSmoking(!smoking)} />
-                  <PrefCardModal icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
-                </View>
-
-                <View style={styles.modalBtnRow}>
-                  <TouchableOpacity style={styles.modalBtnSkip} onPress={() => { setProfileModalVisible(false); handlePublish(); }}>
-                    <Text style={styles.modalBtnSkipText}>Passer</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSavePrefs} disabled={isSavingProfile}>
-                    <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                      {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Terminer 🚀</Text>}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity style={styles.modalBtnSkip} onPress={() => { setProfileModalVisible(false); handlePublish(); }}>
+                  <Text style={styles.modalBtnSkipText}>Passer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSavePrefs} disabled={isSavingProfile}>
+                  <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Terminer 🚀</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
       </AppBottomSheet>
 
       {/* Location Picker Modal */}
-      <AppBottomSheet
+      <Modal
         visible={pickingLocationFor !== null}
-        onClose={() => setPickingLocationFor(null)}
-        snapPoints={['75%', '95%']}
-        initialIndex={0}
-        useScrollView={false}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setPickingLocationFor(null)}
       >
             <LocationPicker
               title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
@@ -1171,58 +1308,58 @@ export default function PublishScreen() {
               }}
               onCancel={() => setPickingLocationFor(null)}
             />
-      </AppBottomSheet>
+      </Modal>
 
       {/* Vehicle Warning Modal */}
       <AppBottomSheet
         visible={showVehicleWarning}
         onClose={() => setShowVehicleWarning(false)}
-        snapPoints={['40%', '60%']}
-        initialIndex={0}
+        snapPoints={['40%', '50%']}
       >
+        <View style={{ alignItems: 'center', padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+            <Ionicons name="bicycle-outline" size={46} color={theme.colors.primary} />
+            <Ionicons name="car-sport-outline" size={46} color={theme.colors.primary} />
+            <Ionicons name="car-outline" size={46} color={theme.colors.primary} />
+          </View>
+          <Text style={styles.modalTitle}>Véhicule requis</Text>
+          <Text style={[styles.notLoggedText, { textAlign: 'center', marginTop: 8 }]}>
+            Vous devez enregistrer votre véhicule (moto, tricycle ou voiture) et votre permis de conduire dans votre profil avant de publier.
+          </Text>
 
-            <View style={{ alignItems: 'center', padding: 16 }}>
-              <Ionicons name="car-outline" size={60} color={theme.colors.primary} style={{ marginBottom: 16 }} />
-              <Text style={styles.modalTitle}>Véhicule requis</Text>
-              <Text style={[styles.notLoggedText, { textAlign: 'center', marginTop: 8 }]}>
-                Vous devez enregistrer votre véhicule et votre permis de conduire dans votre profil avant de publier.
-              </Text>
-
-              <TouchableOpacity style={[styles.modalBtn, { marginTop: 24, width: '100%' }]} onPress={() => {
-                setShowVehicleWarning(false);
-                router.push('/(tabs)/profile');
-              }}>
-                <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                  <Text style={styles.modalBtnText}>Aller au profil</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+          <TouchableOpacity style={[styles.modalBtn, { marginTop: 24, width: '100%' }]} onPress={() => {
+            setShowVehicleWarning(false);
+            router.push('/(tabs)/profile');
+          }}>
+            <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+              <Text style={styles.modalBtnText}>Aller au profil</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </AppBottomSheet>
 
       {/* Expired License Warning Modal */}
       <AppBottomSheet
         visible={showExpiredLicenseWarning}
         onClose={() => setShowExpiredLicenseWarning(false)}
-        snapPoints={['40%', '60%']}
-        initialIndex={0}
+        snapPoints={['40%', '50%']}
       >
+        <View style={{ alignItems: 'center', padding: 16 }}>
+          <Ionicons name="warning-outline" size={60} color={theme.colors.error} style={{ marginBottom: 16 }} />
+          <Text style={styles.modalTitle}>Permis invalide</Text>
+          <Text style={[styles.notLoggedText, { textAlign: 'center', marginTop: 8 }]}>
+            Les informations de votre permis de conduire sont manquantes ou expirées. Veuillez les mettre à jour pour pouvoir publier un trajet.
+          </Text>
 
-            <View style={{ alignItems: 'center', padding: 16 }}>
-              <Ionicons name="warning-outline" size={60} color={theme.colors.error} style={{ marginBottom: 16 }} />
-              <Text style={styles.modalTitle}>Permis invalide</Text>
-              <Text style={[styles.notLoggedText, { textAlign: 'center', marginTop: 8 }]}>
-                Les informations de votre permis de conduire sont manquantes ou expirées. Veuillez les mettre à jour pour pouvoir publier un trajet.
-              </Text>
-
-              <TouchableOpacity style={[styles.modalBtn, { marginTop: 24, width: '100%' }]} onPress={() => {
-                setShowExpiredLicenseWarning(false);
-                router.push('/(tabs)/profile');
-              }}>
-                <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                  <Text style={styles.modalBtnText}>Mettre à jour le permis</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+          <TouchableOpacity style={[styles.modalBtn, { marginTop: 24, width: '100%' }]} onPress={() => {
+            setShowExpiredLicenseWarning(false);
+            router.push('/(tabs)/profile');
+          }}>
+            <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+              <Text style={styles.modalBtnText}>Mettre à jour le permis</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </AppBottomSheet>
     </SafeAreaView>
   );
@@ -1340,7 +1477,14 @@ const styles = StyleSheet.create({
   avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: theme.colors.white },
   avatarBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: theme.colors.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.colors.white },
   avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
-  avatarPlaceholderText: { fontSize: 11, color: theme.colors.white, fontWeight: '600', marginTop: 4 },
+  avatarPlaceholderText: { color: theme.colors.white, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  
+  vehicleTypeLabel: { fontSize: 14, fontWeight: '600', color: theme.colors.text, marginBottom: 8, marginLeft: 4 },
+  vehicleTypeContainer: { flexDirection: 'row', gap: 8, marginBottom: theme.spacing.lg },
+  vehicleTypeBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' },
+  vehicleTypeBtnActive: { backgroundColor: `${theme.colors.primary}15`, borderColor: theme.colors.primary },
+  vehicleTypeText: { fontSize: 13, fontWeight: '600', color: theme.colors.textMuted },
+  vehicleTypeTextActive: { color: theme.colors.primary },
 
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7F8FA', borderRadius: 16, height: 56, paddingHorizontal: 16, marginBottom: 16 },
   inputIcon: { marginRight: 12 },

@@ -696,248 +696,245 @@ export default function ProfileScreen() {
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </Animated.ScrollView>
 
-      {/* ========== MODAL: Informations personnelles ========== */}
       <AppBottomSheet
         visible={infoModalVisible}
         onClose={() => setInfoModalVisible(false)}
         snapPoints={['75%', '95%']}
-        initialIndex={0}
       >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Informations personnelles</Text>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Informations personnelles</Text>
+        </View>
+
+        <View>
+          <TouchableOpacity style={styles.modernAvatarPicker} onPress={pickAvatar} activeOpacity={0.8}>
+            {avatarUri ? (
+              <View style={styles.avatarWrapper}>
+                <Image source={{ uri: avatarUri }} style={styles.modernAvatar} />
+                <View style={styles.modernAvatarEditBadge}>
+                  <Ionicons name="camera" size={16} color={theme.colors.white} />
+                </View>
               </View>
+            ) : (
+              <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.modernAvatarPlaceholder}>
+                <Ionicons name="camera" size={40} color={theme.colors.white} />
+                <Text style={styles.modernAvatarText}>Ajouter une photo</Text>
+              </LinearGradient>
+            )}
+          </TouchableOpacity>
 
-              <View>
-                <TouchableOpacity style={styles.modernAvatarPicker} onPress={pickAvatar} activeOpacity={0.8}>
-                  {avatarUri ? (
-                    <View style={styles.avatarWrapper}>
-                      <Image source={{ uri: avatarUri }} style={styles.modernAvatar} />
-                      <View style={styles.modernAvatarEditBadge}>
-                        <Ionicons name="camera" size={16} color={theme.colors.white} />
-                      </View>
-                    </View>
-                  ) : (
-                    <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.modernAvatarPlaceholder}>
-                      <Ionicons name="camera" size={40} color={theme.colors.white} />
-                      <Text style={styles.modernAvatarText}>Ajouter une photo</Text>
-                    </LinearGradient>
-                  )}
-                </TouchableOpacity>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="person-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.modalInputModern}
+              value={editFullName}
+              onChangeText={setEditFullName}
+              placeholder="Nom complet"
+              placeholderTextColor={theme.colors.textMuted}
+            />
+          </View>
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="person-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={editFullName}
-                    onChangeText={setEditFullName}
-                    placeholder="Nom complet"
-                    placeholderTextColor={theme.colors.textMuted}
-                  />
-                </View>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="mail-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.modalInputModern}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              placeholder="votre@email.com"
+              placeholderTextColor={theme.colors.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              onBlur={handleEmailBlur}
+            />
+          </View>
+          {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={editEmail}
-                    onChangeText={setEditEmail}
-                    placeholder="Votre email"
-                    placeholderTextColor={theme.colors.textMuted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    onBlur={handleEmailBlur}
-                  />
-                </View>
-                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+          <View style={styles.inputWrapper}>
+            <Ionicons name="call-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.modalInputModern, phoneError ? { borderColor: theme.colors.error } : null]}
+              value={editPhone}
+              onChangeText={setEditPhone}
+              placeholder="+229 XX XX XX XX"
+              placeholderTextColor={theme.colors.textMuted}
+              keyboardType="phone-pad"
+              onBlur={handlePhoneBlur}
+            />
+          </View>
+          {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="phone-portrait-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={editPhone}
-                    onChangeText={setEditPhone}
-                    placeholder="+229 XX XX XX XX"
-                    placeholderTextColor={theme.colors.textMuted}
-                    keyboardType="phone-pad"
-                    onBlur={handlePhoneBlur}
-                  />
-                </View>
-                {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
-
-                <TouchableOpacity onPress={handleSavePersonalInfo} disabled={isSaving} activeOpacity={0.8}>
-                  <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                    {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
-                        <Text style={styles.modalBtnSaveText}>Sauvegarder les modifications</Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+          <TouchableOpacity onPress={handleSavePersonalInfo} disabled={isSaving} activeOpacity={0.8}>
+            <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+              {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                  <Text style={styles.modalBtnSaveText}>Sauvegarder les modifications</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </AppBottomSheet>
 
-      {/* ========== MODAL: Mon Véhicule ========== */}
       <AppBottomSheet
         visible={vehicleModalVisible}
         onClose={() => setVehicleModalVisible(false)}
         snapPoints={['75%', '95%']}
-        initialIndex={0}
       >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Mon véhicule</Text>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Mon véhicule</Text>
+        </View>
+
+        <View>
+          <View style={styles.vehicleIconContainer}>
+            <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
+              <Ionicons name="car-sport" size={48} color={theme.colors.white} />
+            </LinearGradient>
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Ionicons name="car-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.modalInputModern}
+              value={brand}
+              onChangeText={setBrand}
+              placeholder="Marque (ex: Toyota)"
+              placeholderTextColor={theme.colors.textMuted}
+            />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Ionicons name="car-sport-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.modalInputModern}
+              value={model}
+              onChangeText={setModel}
+              placeholder="Modèle (ex: Corolla)"
+              placeholderTextColor={theme.colors.textMuted}
+            />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Ionicons name="color-palette-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.modalInputModern}
+              value={color}
+              onChangeText={setColor}
+              placeholder="Couleur (ex: Gris)"
+              placeholderTextColor={theme.colors.textMuted}
+            />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Ionicons name="pricetag-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.modalInputModern}
+              value={plate}
+              onChangeText={setPlate}
+              placeholder="Immatriculation (ex: BJ-1234)"
+              placeholderTextColor={theme.colors.textMuted}
+              autoCapitalize="characters"
+            />
+          </View>
+
+          <Text style={styles.vehicleTypeLabel}>Type de véhicule</Text>
+          <View style={styles.vehicleTypeContainer}>
+            {['Moto', 'Tricycle', 'Voiture'].map(type => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.vehicleTypeBtn,
+                  vehicleType === type.toLowerCase() && styles.vehicleTypeBtnActive
+                ]}
+                onPress={() => setVehicleType(type.toLowerCase())}
+              >
+                <Text style={[
+                  styles.vehicleTypeText,
+                  vehicleType === type.toLowerCase() && styles.vehicleTypeTextActive
+                ]}>{type}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Section Permis de conduire (Obligatoire pour Voiture) */}
+          {vehicleType === 'voiture' && (
+            <>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginTop: 12, marginBottom: 8 }}>Permis de conduire</Text>
+              
+              <View style={styles.inputWrapper}>
+                <Ionicons name="id-card-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.modalInputModern}
+                  value={driverLicense}
+                  onChangeText={setDriverLicense}
+                  placeholder="Numéro de permis (Obligatoire)"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
               </View>
 
-              <View>
-                <View style={styles.vehicleIconContainer}>
-                  <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
-                    <Ionicons name="car-sport" size={48} color={theme.colors.white} />
-                  </LinearGradient>
-                </View>
+              <TouchableOpacity style={[styles.inputWrapper, licenseExpirationError ? { borderColor: theme.colors.error } : null]} onPress={() => setShowDatePicker(true)}>
+                <Ionicons name="calendar-outline" size={20} color={licenseExpirationError ? theme.colors.error : theme.colors.textMuted} style={styles.inputIcon} />
+                <Text style={[styles.modalInputModern, { paddingTop: Platform.OS === 'ios' ? 16 : 14, color: licenseExpiration ? theme.colors.text : theme.colors.textMuted }]}>
+                  {licenseExpiration || "Date d'expiration (Obligatoire)"}
+                </Text>
+              </TouchableOpacity>
+              
+              {licenseExpirationError ? (
+                <Text style={{ color: theme.colors.error, fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
+                  {licenseExpirationError}
+                </Text>
+              ) : null}
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="car-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={brand}
-                    onChangeText={setBrand}
-                    placeholder="Marque (ex: Toyota)"
-                    placeholderTextColor={theme.colors.textMuted}
-                  />
-                </View>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={licenseExpiration ? new Date(licenseExpiration) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      const formattedDate = selectedDate.toISOString().split('T')[0];
+                      setLicenseExpiration(formattedDate);
+                      
+                      const expDate = new Date(selectedDate);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      expDate.setHours(0, 0, 0, 0);
+                      
+                      if (expDate < today) {
+                        setLicenseExpirationError('La date de votre permis est déjà expirée.');
+                      } else {
+                        setLicenseExpirationError('');
+                      }
+                    }
+                  }}
+                />
+              )}
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="car-sport-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={model}
-                    onChangeText={setModel}
-                    placeholder="Modèle (ex: Corolla)"
-                    placeholderTextColor={theme.colors.textMuted}
-                  />
-                </View>
+              <TouchableOpacity 
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 24, gap: 12 }}
+                onPress={pickLicensePhoto}
+              >
+                <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
+                <Text style={{ flex: 1, color: theme.colors.text, fontSize: 14 }}>
+                  {driverLicensePhoto ? 'Photo sélectionnée' : 'Ajouter une photo du permis'}
+                </Text>
+                {driverLicensePhoto && <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />}
+              </TouchableOpacity>
+            </>
+          )}
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="color-palette-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={color}
-                    onChangeText={setColor}
-                    placeholder="Couleur (ex: Blanc)"
-                    placeholderTextColor={theme.colors.textMuted}
-                  />
-                </View>
 
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="pricetag-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.modalInputModern}
-                    value={plate}
-                    onChangeText={setPlate}
-                    placeholder="Immatriculation (ex: BJ-1234)"
-                    placeholderTextColor={theme.colors.textMuted}
-                    autoCapitalize="characters"
-                  />
-                </View>
-
-                <Text style={styles.vehicleTypeLabel}>Type de véhicule</Text>
-                <View style={styles.vehicleTypeContainer}>
-                  {['Moto', 'Tricycle', 'Voiture'].map(type => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.vehicleTypeBtn,
-                        vehicleType === type.toLowerCase() && styles.vehicleTypeBtnActive
-                      ]}
-                      onPress={() => setVehicleType(type.toLowerCase())}
-                    >
-                      <Text style={[
-                        styles.vehicleTypeText,
-                        vehicleType === type.toLowerCase() && styles.vehicleTypeTextActive
-                      ]}>{type}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Section Permis de conduire (Obligatoire pour Voiture) */}
-                {vehicleType === 'voiture' && (
-                  <>
-                    <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginTop: 12, marginBottom: 8 }}>Permis de conduire</Text>
-                    
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="id-card-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.modalInputModern}
-                        value={driverLicense}
-                        onChangeText={setDriverLicense}
-                        placeholder="Numéro de permis (Obligatoire)"
-                        placeholderTextColor={theme.colors.textMuted}
-                      />
-                    </View>
-
-                    <TouchableOpacity style={[styles.inputWrapper, licenseExpirationError ? { borderColor: theme.colors.error } : null]} onPress={() => setShowDatePicker(true)}>
-                      <Ionicons name="calendar-outline" size={20} color={licenseExpirationError ? theme.colors.error : theme.colors.textMuted} style={styles.inputIcon} />
-                      <Text style={[styles.modalInputModern, { paddingTop: Platform.OS === 'ios' ? 16 : 14, color: licenseExpiration ? theme.colors.text : theme.colors.textMuted }]}>
-                        {licenseExpiration || "Date d'expiration (Obligatoire)"}
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    {licenseExpirationError ? (
-                      <Text style={{ color: theme.colors.error, fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
-                        {licenseExpirationError}
-                      </Text>
-                    ) : null}
-
-                    {showDatePicker && (
-                      <DateTimePicker
-                        value={licenseExpiration ? new Date(licenseExpiration) : new Date()}
-                        mode="date"
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                          setShowDatePicker(Platform.OS === 'ios');
-                          if (selectedDate) {
-                            const formattedDate = selectedDate.toISOString().split('T')[0];
-                            setLicenseExpiration(formattedDate);
-                            
-                            const expDate = new Date(selectedDate);
-                            const today = new Date();
-                            today.setHours(0, 0, 0, 0);
-                            expDate.setHours(0, 0, 0, 0);
-                            
-                            if (expDate < today) {
-                              setLicenseExpirationError('La date de votre permis est déjà expirée.');
-                            } else {
-                              setLicenseExpirationError('');
-                            }
-                          }
-                        }}
-                      />
-                    )}
-
-                    <TouchableOpacity 
-                      style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 24, gap: 12 }}
-                      onPress={pickLicensePhoto}
-                    >
-                      <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
-                      <Text style={{ flex: 1, color: theme.colors.text, fontSize: 14 }}>
-                        {driverLicensePhoto ? 'Photo sélectionnée' : 'Ajouter une photo du permis'}
-                      </Text>
-                      {driverLicensePhoto && <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />}
-                    </TouchableOpacity>
-                  </>
-                )}
-
-                <TouchableOpacity onPress={handleSaveVehicle} disabled={isSaving} activeOpacity={0.8}>
-                  <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                    {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
-                        <Text style={styles.modalBtnSaveText}>{vehicleId ? 'Mettre à jour' : 'Ajouter le véhicule'}</Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+          <TouchableOpacity onPress={handleSaveVehicle} disabled={isSaving} activeOpacity={0.8}>
+            <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+              {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                  <Text style={styles.modalBtnSaveText}>{vehicleId ? 'Mettre à jour' : 'Ajouter le véhicule'}</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </AppBottomSheet>
 
       {/* ========== MODAL: Préférences ========== */}
@@ -945,52 +942,51 @@ export default function ProfileScreen() {
         visible={prefsModalVisible}
         onClose={() => setPrefsModalVisible(false)}
         snapPoints={['75%', '95%']}
-        initialIndex={0}
       >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Préférences de voyage</Text>
-              </View>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Préférences de voyage</Text>
+        </View>
 
-              <View>
+        <View>
 
-                <View style={styles.prefCardsContainer}>
-                  <PrefCard icon="musical-notes" label="Musique" value={music} onToggle={() => setMusic(!music)} />
-                  <PrefCard icon="chatbubbles" label="Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
-                  <PrefCard icon="logo-no-smoking" label="Fumeurs" value={smoking} onToggle={() => setSmoking(!smoking)} />
-                  <PrefCard icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
-                  <PrefCard icon="paw" label="Animaux" value={petsAllowed} onToggle={() => setPetsAllowed(!petsAllowed)} />
-                  <PrefCard icon="briefcase" label="Bagages" value={luggageAllowed} onToggle={() => setLuggageAllowed(!luggageAllowed)} />
-                  <PrefCard icon="flag" label="Arrêts" value={stopsAllowed} onToggle={() => setStopsAllowed(!stopsAllowed)} />
-                </View>
+          <View style={styles.prefCardsContainer}>
+            <PrefCard icon="musical-notes" label="Musique" value={music} onToggle={() => setMusic(!music)} />
+            <PrefCard icon="chatbubbles" label="Bavard(e)" value={chatty} onToggle={() => setChatty(!chatty)} />
+            <PrefCard icon="logo-no-smoking" label="Fumeurs" value={smoking} onToggle={() => setSmoking(!smoking)} />
+            <PrefCard icon="snow" label="Climatisation" value={airCond} onToggle={() => setAirCond(!airCond)} />
+            <PrefCard icon="paw" label="Animaux" value={petsAllowed} onToggle={() => setPetsAllowed(!petsAllowed)} />
+            <PrefCard icon="briefcase" label="Bagages" value={luggageAllowed} onToggle={() => setLuggageAllowed(!luggageAllowed)} />
+            <PrefCard icon="flag" label="Arrêts" value={stopsAllowed} onToggle={() => setStopsAllowed(!stopsAllowed)} />
+          </View>
 
-                <View style={{ marginTop: 24 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginBottom: 12 }}>
-                    Détails supplémentaires
-                  </Text>
-                  <View style={[styles.inputWrapper, { height: 100, alignItems: 'flex-start', paddingTop: 16 }]}>
-                    <Ionicons name="document-text-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                    <TextInput
-                      style={[styles.modalInputModern, { textAlignVertical: 'top', paddingTop: 0 }]}
-                      placeholder="Ex: Je voyage avec mon chat, j'aime faire des pauses régulières..."
-                      value={notes}
-                      onChangeText={setNotes}
-                      multiline
-                      placeholderTextColor={theme.colors.textMuted}
-                    />
-                  </View>
-                </View>
+          <View style={{ marginTop: 24 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginBottom: 12 }}>
+              Détails supplémentaires
+            </Text>
+            <View style={[styles.inputWrapper, { height: 100, alignItems: 'flex-start', paddingTop: 16 }]}>
+              <Ionicons name="document-text-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.modalInputModern, { textAlignVertical: 'top', paddingTop: 0 }]}
+                placeholder="Ex: Je voyage avec mon chat, j'aime faire des pauses régulières..."
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                placeholderTextColor={theme.colors.textMuted}
+              />
+            </View>
+          </View>
 
-                <TouchableOpacity style={{ marginTop: 16 }} onPress={handleSavePreferences} disabled={isSaving} activeOpacity={0.8}>
-                  <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                    {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
-                        <Text style={styles.modalBtnSaveText}>Sauvegarder</Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+          <TouchableOpacity style={{ marginTop: 16 }} onPress={handleSavePreferences} disabled={isSaving} activeOpacity={0.8}>
+            <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
+              {isSaving ? <ActivityIndicator color={theme.colors.white} /> : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                  <Text style={styles.modalBtnSaveText}>Sauvegarder</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </AppBottomSheet>
     </SafeAreaView>
   );

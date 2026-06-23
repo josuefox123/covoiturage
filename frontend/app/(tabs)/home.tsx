@@ -707,12 +707,11 @@ export default function HomeScreen() {
         }
       />
 
-      <AppBottomSheet
+      <Modal
         visible={pickingLocationFor !== null}
-        onClose={() => setPickingLocationFor(null)}
-        snapPoints={['75%', '95%']}
-        initialIndex={0}
-        useScrollView={false}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setPickingLocationFor(null)}
       >
         <LocationPicker
           title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
@@ -723,7 +722,7 @@ export default function HomeScreen() {
           }}
           onCancel={() => setPickingLocationFor(null)}
         />
-      </AppBottomSheet>
+      </Modal>
 
       {/* ── Modal de vérification obligatoire ── */}
       <VerificationModal

@@ -82,11 +82,16 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
   // Mémoïser les snapPoints pour éviter un re-render du BottomSheet si le parent re-rend
   const stableSnapPoints = useMemo(() => snapPoints, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // We capture the initial visibility to set the static 'index' prop.
+  // This prevents the prop from changing dynamically (which breaks the sheet),
+  // while allowing conditionally rendered sheets to mount open.
+  const isInitiallyVisible = useRef(visible).current;
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
       snapPoints={stableSnapPoints}
-      index={visible ? initialIndex : -1}
+      index={isInitiallyVisible ? initialIndex : -1}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}
       enablePanDownToClose
@@ -100,7 +105,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
           {children}
         </BottomSheetScrollView>
       ) : (
-        <View style={styles.contentContainer}>
+        <View style={[styles.contentContainer, { flex: 1, paddingHorizontal: 0, paddingTop: 0 }]}>
           {children}
         </View>
       )}
