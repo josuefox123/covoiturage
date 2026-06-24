@@ -27,10 +27,39 @@ def check_upcoming_departures():
     logger.info("[Departure Check] Le thread de vérification des départs a démarré.")
     while True:
         try:
-            from api.models import Ride, Booking, Notification
+            from api.models import Ride, Booking, Notification, Parcel
             from api.fcm import create_and_send_notification
+            from django.utils import timezone
+            from django.db import transaction
             
-            now = datetime.now()
+            now = timezone.now()
+            
+            # ==========================================
+            # 1. Nettoyage des réservations non payées (> 30 secondes)
+            # ==========================================
+            expired_time = now - timedelta(seconds=30)
+            
+            # Nettoyer les réservations de passagers
+            expired_bookings = Booking.objects.filter(payment_status='pending', created_at__lt=expired_time)
+            for eb in expired_bookings:
+                try:
+                    eb.delete()
+                    logger.info(f"[Cleanup] Réservation passager expirée supprimée (ID: {eb.id}).")
+                except Exception as e:
+                    logger.error(f"[Cleanup] Erreur lors de la suppression de la réservation {eb.id}: {e}")
+
+            # Nettoyer les réservations de colis
+            expired_parcels = Parcel.objects.filter(payment_status='pending', created_at__lt=expired_time)
+            for ep in expired_parcels:
+                try:
+                    ep.delete()
+                    logger.info(f"[Cleanup] Réservation colis expirée supprimée (ID: {ep.id}).")
+                except Exception as e:
+                    logger.error(f"[Cleanup] Erreur lors de la suppression du colis {ep.id}: {e}")
+
+            # ==========================================
+            # 2. Alertes de départ imminent
+            # ==========================================
             # Chercher les trajets actifs partant dans une fenêtre de 20 à 40 minutes à partir de maintenant
             start_range = now + timedelta(minutes=20)
             end_range = now + timedelta(minutes=40)
@@ -46,14 +75,14 @@ def check_upcoming_departures():
                 has_driver_notified = Notification.objects.filter(
                     user=ride.driver,
                     title="Départ dans 30 min ⏰",
-                    message__contains=str(ride.id)
+                    message__contains=ride.departure_location
                 ).exists()
                 
                 if not has_driver_notified:
                     create_and_send_notification(
                         user=ride.driver,
                         title="Départ dans 30 min ⏰",
-                        message=f"Rappel : Votre trajet {ride.departure_location} -> {ride.arrival_location} (ID: {ride.id}) commence dans environ 30 minutes. Préparez-vous !",
+                        message=f"Rappel : Votre trajet {ride.departure_location} -> {ride.arrival_location} commence dans environ 30 minutes. Préparez-vous !",
                         data={'type': 'departure_warning_driver', 'ride_id': str(ride.id), 'screen': 'trips'}
                     )
                 
@@ -63,22 +92,22 @@ def check_upcoming_departures():
                     has_passenger_notified = Notification.objects.filter(
                         user=booking.passenger,
                         title="Départ dans 30 min ⏰",
-                        message__contains=str(ride.id)
+                        message__contains=ride.departure_location
                     ).exists()
                     
                     if not has_passenger_notified:
                         create_and_send_notification(
                             user=booking.passenger,
                             title="Départ dans 30 min ⏰",
-                            message=f"Rappel : Votre départ pour le trajet {ride.departure_location} -> {ride.arrival_location} (ID: {ride.id}) est prévu dans environ 30 minutes !",
+                            message=f"Rappel : Votre départ pour le trajet {ride.departure_location} -> {ride.arrival_location} est prévu dans environ 30 minutes !",
                             data={'type': 'departure_warning_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
                         
         except Exception as e:
             logger.error(f"[Departure Check] Erreur : {e}")
             
-        # Revérifier toutes les 2 minutes
-        time.sleep(120)
+        # Revérifier toutes les 10 secondes
+        time.sleep(10)
 
 def start_departure_check_thread():
     thread = threading.Thread(target=check_upcoming_departures, daemon=True)

@@ -69,6 +69,7 @@ export default function RootLayout() {
           <Stack.Screen name="chat/[id]" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="support_chat" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
           <Stack.Screen name="weather" options={{ presentation: 'card', headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="payments" options={{ presentation: 'card', headerShown: false, animation: 'slide_from_bottom' }} />
         </Stack>
         <LiveRideModal />
           <CustomAlertProvider />

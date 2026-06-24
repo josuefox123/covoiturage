@@ -57,16 +57,43 @@ async function geocodeBenin(place: string): Promise<Coords | null> {
   }
 }
 
-async function getRoute(from: Coords, to: Coords): Promise<[number, number][] | null> {
+interface RouteData {
+  coords: [number, number][];
+  distance: number;
+  duration: number;
+}
+
+const formatDuration = (seconds: number): string => {
+  const mins = Math.round(seconds / 60);
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const remainingMins = mins % 60;
+  if (remainingMins === 0) return `${hours}h`;
+  return `${hours}h ${remainingMins}m`;
+};
+
+const formatDistance = (meters: number): string => {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  const kms = (meters / 1000).toFixed(1);
+  return `${kms} km`;
+};
+
+async function getRoutes(from: Coords, to: Coords): Promise<RouteData[] | null> {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson&alternatives=true`;
     const resp = await fetch(url);
     const data = await resp.json();
     if (data.routes && data.routes.length > 0) {
-      const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
-        ([lon, lat]: [number, number]) => [lat, lon]
-      );
-      return coords;
+      return data.routes.map((r: any) => {
+        const coords: [number, number][] = r.geometry.coordinates.map(
+          ([lon, lat]: [number, number]) => [lat, lon]
+        );
+        return {
+          coords,
+          distance: r.distance,
+          duration: r.duration
+        };
+      });
     }
     return null;
   } catch (err) {
@@ -109,6 +136,8 @@ export default function LiveRideModal() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [routes, setRoutes] = useState<RouteData[]>([]);
+  const [activeRouteIndex, setActiveRouteIndex] = useState<number>(0);
 
   const activeRideRef = useRef<Ride | null>(null);
   const isDriverRef = useRef<boolean>(false);
@@ -200,14 +229,38 @@ export default function LiveRideModal() {
 
   const geocodeRide = async (ride: Ride) => {
     try {
-      const [dep, dest] = await Promise.all([
-        geocodeBenin(ride.departure_location),
-        geocodeBenin(ride.arrival_location),
-      ]);
+      let dep: Coords | null = null;
+      let dest: Coords | null = null;
+
+      // Try using pre-stored coordinates first
+      if (ride.departure_latitude !== null && ride.departure_latitude !== undefined &&
+          ride.departure_longitude !== null && ride.departure_longitude !== undefined) {
+        dep = {
+          lat: Number(ride.departure_latitude),
+          lon: Number(ride.departure_longitude),
+        };
+      }
+      if (ride.arrival_latitude !== null && ride.arrival_latitude !== undefined &&
+          ride.arrival_longitude !== null && ride.arrival_longitude !== undefined) {
+        dest = {
+          lat: Number(ride.arrival_latitude),
+          lon: Number(ride.arrival_longitude),
+        };
+      }
+
+      // Fallback to geocoding if coordinates are missing
+      if (!dep && ride.departure_location) {
+        dep = await geocodeBenin(ride.departure_location);
+      }
+      if (!dest && ride.arrival_location) {
+        dest = await geocodeBenin(ride.arrival_location);
+      }
+
       if (!isMountedRef.current) return;
       if (dep) setDepartCoords(dep);
       if (dest) setDestCoords(dest);
     } catch (err) {
+      console.log('Error setting ride coords:', err);
     }
   };
 
@@ -306,19 +359,26 @@ export default function LiveRideModal() {
     loadRoute(departCoords, destCoords);
   }, [departCoords, destCoords, mapReady]);
 
+  useEffect(() => {
+    if (!mapReady || routes.length === 0) return;
+    sendToMap({ type: 'drawRoutes', routes, activeIndex: activeRouteIndex });
+  }, [routes, activeRouteIndex, mapReady]);
+
   const loadRoute = async (from: Coords, to: Coords) => {
     setRouteLoading(true);
     try {
-      const routeCoords = await getRoute(from, to);
+      const fetchedRoutes = await getRoutes(from, to);
       if (!isMountedRef.current) return;
 
-      if (routeCoords) {
-        sendToMap({ type: 'drawRoute', coords: routeCoords });
+      if (fetchedRoutes && fetchedRoutes.length > 0) {
+        setRoutes(fetchedRoutes);
+        setActiveRouteIndex(0);
         sendToMap({ type: 'fitBounds', points: [
           [from.lat, from.lon],
           [to.lat, to.lon],
         ]});
       } else {
+        setRoutes([]);
         sendToMap({
           type: 'fitBounds',
           points: [
@@ -339,6 +399,8 @@ export default function LiveRideModal() {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'ready' && isMountedRef.current) {
         setMapReady(true);
+      } else if (data.type === 'selectRoute' && isMountedRef.current) {
+        setActiveRouteIndex(data.index);
       }
     } catch (err) {
     }
@@ -574,16 +636,34 @@ export default function LiveRideModal() {
           destMarker = L.marker([msg.lat, msg.lon], { icon: makeIcon('dest-marker') })
             .bindTooltip('Arrivée', { permanent: true, direction: 'top', offset:[0,-8] }).addTo(map);
         }
-      } else if (msg.type === 'drawRoute') {
-        if (routeLine) map.removeLayer(routeLine);
-        routeLine = L.polyline(msg.coords, {
-          color: '#3B82F6',
-          weight: 5,
-          opacity: 0.85,
-          lineJoin: 'round',
-          smoothFactor: 2,
-          renderer: L.canvas()
-        }).addTo(map);
+      } else if (msg.type === 'drawRoutes') {
+        if (window.routeLines) {
+          window.routeLines.forEach(function(line) {
+            map.removeLayer(line);
+          });
+        }
+        window.routeLines = [];
+
+        msg.routes.forEach(function(r, index) {
+          var color = index === msg.activeIndex ? '#3B82F6' : '#9CA3AF';
+          var weight = index === msg.activeIndex ? 6 : 4;
+          var opacity = index === msg.activeIndex ? 0.9 : 0.4;
+          
+          var line = L.polyline(r.coords, {
+            color: color,
+            weight: weight,
+            opacity: opacity,
+            lineJoin: 'round',
+            smoothFactor: 2,
+            renderer: L.canvas()
+          }).addTo(map);
+          
+          line.on('click', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'selectRoute', index: index }));
+          });
+          
+          window.routeLines.push(line);
+        });
       } else if (msg.type === 'fitBounds') {
         map.fitBounds(msg.points, { padding: [40, 40] });
       }
@@ -704,6 +784,55 @@ export default function LiveRideModal() {
                 </View>
               )}
 
+              {/* Détails de l'itinéraire sélectionné */}
+              {routes.length > 0 && (
+                <View style={styles.routeDetailsRow}>
+                  <View style={styles.routeHeader}>
+                    <Ionicons name="git-branch-outline" size={16} color={theme.colors.primary} />
+                    <Text style={styles.routeTitle}>
+                      Itinéraire ({activeRouteIndex + 1}/{routes.length})
+                    </Text>
+                  </View>
+                  <View style={styles.routeStats}>
+                    <View style={styles.routeStatItem}>
+                      <Ionicons name="time-outline" size={15} color={theme.colors.textLight} />
+                      <Text style={styles.routeStatLabel}>Durée :</Text>
+                      <Text style={styles.routeStatValue}>
+                        {formatDuration(routes[activeRouteIndex].duration)}
+                      </Text>
+                    </View>
+                    <View style={styles.routeStatItem}>
+                      <Ionicons name="swap-horizontal-outline" size={15} color={theme.colors.textLight} />
+                      <Text style={styles.routeStatLabel}>Distance :</Text>
+                      <Text style={styles.routeStatValue}>
+                        {formatDistance(routes[activeRouteIndex].distance)}
+                      </Text>
+                    </View>
+                  </View>
+                  {routes.length > 1 && (
+                    <View style={styles.routeSelector}>
+                      {routes.map((_, idx) => (
+                        <TouchableOpacity
+                          key={idx}
+                          style={[
+                            styles.routeSelectorBtn,
+                            activeRouteIndex === idx && styles.routeSelectorBtnActive
+                          ]}
+                          onPress={() => setActiveRouteIndex(idx)}
+                        >
+                          <Text style={[
+                            styles.routeSelectorBtnText,
+                            activeRouteIndex === idx && styles.routeSelectorBtnTextActive
+                          ]}>
+                            Chemin {idx + 1}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
               {/* Footer */}
               <View style={styles.footer}>
                 {activeRide.status === 'started' && (
@@ -793,6 +922,18 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 12, color: theme.colors.text, fontWeight: '500', flex: 1 },
+  routeDetailsRow: { padding: 16, backgroundColor: theme.colors.white, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  routeHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  routeTitle: { fontSize: 13, fontWeight: '700', color: theme.colors.text },
+  routeStats: { flexDirection: 'row', gap: 20, marginBottom: 12 },
+  routeStatItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  routeStatLabel: { fontSize: 13, color: theme.colors.textLight },
+  routeStatValue: { fontSize: 13, fontWeight: '700', color: theme.colors.primary },
+  routeSelector: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  routeSelectorBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, borderColor: theme.colors.border, borderWidth: 1, alignItems: 'center', backgroundColor: '#F8FAFC' },
+  routeSelectorBtnActive: { backgroundColor: '#EFF6FF', borderColor: theme.colors.primary, borderWidth: 1.5 },
+  routeSelectorBtnText: { fontSize: 12, color: theme.colors.textLight, fontWeight: '600' },
+  routeSelectorBtnTextActive: { color: theme.colors.primary, fontWeight: '700' },
   footer: { padding: 16, backgroundColor: theme.colors.white, borderTopWidth: 1, borderTopColor: theme.colors.background, gap: 10 },
   googleMapsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', padding: 12, borderRadius: 12, gap: 8, borderWidth: 1, borderColor: '#BFDBFE' },
   googleMapsBtnText: { fontSize: 14, color: '#4285F4', fontWeight: '600', flex: 1 },

@@ -20,6 +20,8 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 import * as Location from 'expo-location';
+import { fetchApi } from '../services/api';
+import Fuse from 'fuse.js';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -40,7 +42,7 @@ interface LocationPickerProps {
 }
 
 const DEFAULT_LAT = 6.3703;
-const DEFAULT_LON = 2.3764;
+const DEFAULT_LON = 2.3912;
 
 /**
  * Composant LocationPicker.
@@ -67,9 +69,7 @@ export default function LocationPicker({
   
   const [mapReady, setMapReady] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,13 +105,16 @@ export default function LocationPicker({
     }).start();
   };
 
+  const initializedRef = useRef(false);
+
   const initializeLocation = async () => {
-    if (hasInitialized) return;
+    if (initializedRef.current) return;
+
+    initializedRef.current = true;
 
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setHasInitialized(true);
         return;
       }
 
@@ -125,11 +128,8 @@ export default function LocationPicker({
       if (!initialLocation) {
         setSelectedLocation({ latitude: location.lat, longitude: location.lon, name: 'Position actuelle' });
       }
-
-      setHasInitialized(true);
     } catch (error) {
       console.error('Error getting location:', error);
-      setHasInitialized(true);
     }
   };
 
@@ -154,8 +154,8 @@ export default function LocationPicker({
 
   const reverseGeocode = async (lat: number, lon: number) => {
     if (
-      Math.abs(lastReverseRef.current.lat - lat) < 0.00005 &&
-      Math.abs(lastReverseRef.current.lon - lon) < 0.00005
+      Math.abs(lastReverseRef.current.lat - lat) < 0.00001 &&
+      Math.abs(lastReverseRef.current.lon - lon) < 0.00001
     ) {
       return; // Already reversed this location
     }
@@ -174,6 +174,10 @@ export default function LocationPicker({
           headers: { 'User-Agent': 'CovoitBeninApp/1.0' },
         }
       );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
       const data = await response.json();
 
@@ -221,28 +225,113 @@ export default function LocationPicker({
   };
 
   const searchPlaces = async (query: string) => {
-    if (query.length < 2) {
+    if (query.trim().length < 2) {
       setSearchResults([]);
       setShowResults(false);
       return;
     }
 
     setIsSearching(true);
+
     searchAbort.current?.abort();
     searchAbort.current = new AbortController();
 
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1&accept-language=fr`,
+      // ===========================
+      // 1. Lieux populaires Zemy
+      // ===========================
+      let localResults: any[] = [];
+      try {
+        const localData = await fetchApi(
+          `/popular-places/?search=${encodeURIComponent(query)}`
+        );
+        localResults = Array.isArray(localData)
+          ? localData
+          : localData?.results || [];
+      } catch (err) {
+        console.log('Popular places error', err);
+      }
+
+      // ===========================
+      // 2. Photon
+      // ===========================
+      const photonResponse = await fetch(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(
+          `${query} Benin`
+        )}&limit=15`,
         {
           signal: searchAbort.current.signal,
-          headers: { 'User-Agent': 'CovoitBeninApp/1.0' },
         }
       );
 
-      const data = await response.json();
-      setSearchResults(data);
-      setShowResults(data.length > 0);
+      if (!photonResponse.ok) {
+        throw new Error(`HTTP ${photonResponse.status}`);
+      }
+
+      const photonData = await photonResponse.json();
+
+      const photonResults =
+        photonData?.features?.map((feature: any) => ({
+          id: feature.properties.osm_id,
+          lat: feature.geometry.coordinates[1],
+          lon: feature.geometry.coordinates[0],
+          name:
+            feature.properties.name ||
+            feature.properties.street ||
+            'Lieu',
+          city:
+            feature.properties.city ||
+            feature.properties.county ||
+            '',
+          country:
+            feature.properties.country ||
+            '',
+          display_name: [
+            feature.properties.name,
+            feature.properties.city,
+            feature.properties.country,
+          ]
+            .filter(Boolean)
+            .join(', '),
+          source: 'photon',
+        })) || [];
+
+      // ===========================
+      // Priorité Bénin
+      // ===========================
+      photonResults.sort((a: any, b: any) => {
+        const aBenin = a.country
+          ?.toLowerCase()
+          .includes('benin')
+          ? 1
+          : 0;
+        const bBenin = b.country
+          ?.toLowerCase()
+          .includes('benin')
+          ? 1
+          : 0;
+        return bBenin - aBenin;
+      });
+
+      // ===========================
+      // Fusion & Fuzzy Search
+      // ===========================
+      const combinedResults = [
+        ...localResults,
+        ...photonResults,
+      ];
+
+      const fuse = new Fuse(combinedResults, {
+        keys: ['name', 'display_name', 'city'],
+        threshold: 0.3,
+      });
+
+      const fuzzyResults = fuse.search(query);
+      const finalResults = fuzzyResults.map(r => r.item);
+
+      setSearchResults(finalResults);
+      setShowResults(finalResults.length > 0);
+
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Search error:', error);
@@ -265,15 +354,30 @@ export default function LocationPicker({
   }, []);
 
   const handleSelectResult = useCallback((item: any) => {
-    const lat = parseFloat(item.lat);
-    const lon = parseFloat(item.lon);
-
     setSearchQuery('');
     setShowResults(false);
     Keyboard.dismiss();
 
-    const parts = item.display_name.split(',');
-    const name = parts[0];
+    if (item.latitude !== undefined && item.longitude !== undefined) {
+      const selected = {
+        latitude: Number(item.latitude),
+        longitude: Number(item.longitude),
+        name: item.name,
+        address: item.city ? `${item.city}, Bénin` : 'Bénin',
+        city: item.city || '',
+        country: 'Bénin'
+      };
+      setSelectedLocation(selected);
+      sendToMap({ type: 'setView', lat: selected.latitude, lon: selected.longitude, zoom: 16 });
+      return;
+    }
+
+    const lat = Number(item.lat);
+    const lon = Number(item.lon);
+
+    const displayName = item.display_name || '';
+    const parts = displayName.split(',');
+    const name = parts[0] || 'Position choisie';
     const address = parts.slice(1, 3).join(',').trim();
     const city = parts[2]?.trim();
     const country = parts[parts.length - 1]?.trim();
@@ -293,6 +397,7 @@ export default function LocationPicker({
   const goToMyLocation = useCallback(() => {
     if (userLocation) {
       sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 15 });
+      sendToMap({ type: 'setUserMarker', lat: userLocation.lat, lon: userLocation.lon });
       reverseGeocode(userLocation.lat, userLocation.lon);
     }
   }, [userLocation, sendToMap]);
@@ -302,20 +407,15 @@ export default function LocationPicker({
   };
 
   const confirmLocation = useCallback(() => {
-    setIsConfirming(true);
     setShowConfirmModal(false);
 
-    if (selectedLocation) {
-      onLocationSelected(selectedLocation);
-    } else {
-      onLocationSelected({
+    onLocationSelected(
+      selectedLocation || {
         latitude: DEFAULT_LAT,
         longitude: DEFAULT_LON,
         name: 'Position choisie',
-      });
-    }
-    
-    setIsConfirming(false);
+      }
+    );
   }, [selectedLocation, onLocationSelected]);
 
   const zoomIn = useCallback(() => {
@@ -343,10 +443,12 @@ export default function LocationPicker({
 
         // Optimistically update location coordinates while dragging
         setSelectedLocation(prev => ({
-          ...(prev || {}),
           latitude: data.lat,
           longitude: data.lon,
-          name: prev?.name || 'Recherche en cours...',
+          name: prev?.name ?? 'Recherche en cours...',
+          address: prev?.address,
+          city: prev?.city,
+          country: prev?.country,
         }));
         
         setIsDragging(true);
@@ -358,7 +460,7 @@ export default function LocationPicker({
         dragTimeoutRef.current = setTimeout(() => {
           reverseGeocode(data.lat, data.lon);
           setIsDragging(false);
-        }, 500);
+        }, 800);
 
       } else if (data.type === 'ready') {
         setMapReady(true);
@@ -464,12 +566,13 @@ export default function LocationPicker({
   <script>
     var map = L.map('map', { 
       zoomControl: false
-    }).setView([${DEFAULT_LAT}, ${DEFAULT_LON}], 13);
+    }).setView([${DEFAULT_LAT}, ${DEFAULT_LON}], 12);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors',
-      detectRetina: true
+      detectRetina: true,
+      crossOrigin: true
     }).addTo(map);
     
     var userMarker = null;
@@ -607,6 +710,9 @@ export default function LocationPicker({
         cacheEnabled
         style={styles.map}
         scrollEnabled={false}
+        androidLayerType="hardware"
+        mixedContentMode="compatibility"
+        allowsInlineMediaPlayback
       />
 
       {!mapReady && (
@@ -633,6 +739,9 @@ export default function LocationPicker({
             returnKeyType="search"
             autoCapitalize="none"
           />
+          {isSearching && (
+            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} />
+          )}
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => {
               setSearchQuery('');
@@ -662,29 +771,46 @@ export default function LocationPicker({
             initialNumToRender={8}
             removeClippedSubviews={true}
             keyboardShouldPersistTaps="handled"
-            keyExtractor={(item) => item.place_id?.toString() || item.lat + item.lon}
-            renderItem={({ item, index }) => (
-              <TouchableOpacity
-                style={[
-                  styles.resultItem,
-                  index === searchResults.length - 1 && styles.resultItemLast
-                ]}
-                onPress={() => handleSelectResult(item)}
-              >
-                <View style={styles.resultIconContainer}>
-                  <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
-                </View>
-                <View style={styles.resultContent}>
-                  <Text style={styles.resultTitle} numberOfLines={1}>
-                    {item.display_name.split(',')[0]}
-                  </Text>
-                  <Text style={styles.resultSubtitle} numberOfLines={1}>
-                    {item.display_name.split(',').slice(1, 4).join(',').trim()}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.border} />
-              </TouchableOpacity>
-            )}
+             keyExtractor={(item) => item.id || item.place_id?.toString() || (item.latitude !== undefined ? `${item.latitude}-${item.longitude}` : `${item.lat}-${item.lon}`)}
+            renderItem={({ item, index }) => {
+              let title = '';
+              let subtitle = '';
+              
+              if (item.latitude !== undefined) {
+                // Local popular place match
+                title = item.name;
+                subtitle = item.city ? `${item.city}, Bénin` : 'Bénin';
+              } else {
+                // Nominatim match
+                const displayName = item.display_name || '';
+                const parts = displayName.split(',');
+                title = parts[0] || 'Lieu sans nom';
+                subtitle = parts.slice(1, 4).join(',').trim();
+              }
+              
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.resultItem,
+                    index === searchResults.length - 1 && styles.resultItemLast
+                  ]}
+                  onPress={() => handleSelectResult(item)}
+                >
+                  <View style={styles.resultIconContainer}>
+                    <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
+                  </View>
+                  <View style={styles.resultContent}>
+                    <Text style={styles.resultTitle} numberOfLines={1}>
+                      {title}
+                    </Text>
+                    <Text style={styles.resultSubtitle} numberOfLines={1}>
+                      {subtitle}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.border} />
+                </TouchableOpacity>
+              );
+            }}
           />
         </View>
       )}
@@ -728,18 +854,12 @@ export default function LocationPicker({
         </View>
 
         <TouchableOpacity
-          style={[styles.confirmButton, isConfirming && styles.confirmButtonDisabled]}
+          style={[styles.confirmButton, isLoadingAddress && styles.confirmButtonDisabled]}
           onPress={handleConfirmPress}
-          disabled={isConfirming || isLoadingAddress}
+          disabled={isLoadingAddress}
         >
-          {isConfirming ? (
-            <ActivityIndicator size="small" color={theme.colors.white} />
-          ) : (
-            <>
-              <Text style={styles.confirmButtonText}>Confirmer l'emplacement</Text>
-              <Ionicons name="arrow-forward" size={20} color={theme.colors.white} style={styles.confirmButtonIcon} />
-            </>
-          )}
+          <Text style={styles.confirmButtonText}>Confirmer l'emplacement</Text>
+          <Ionicons name="arrow-forward" size={20} color={theme.colors.white} style={styles.confirmButtonIcon} />
         </TouchableOpacity>
       </Animated.View>
 

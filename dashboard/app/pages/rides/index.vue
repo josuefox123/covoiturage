@@ -92,6 +92,10 @@ Zemy
                 <option value="cancelled">Annulé</option>
               </select>
             </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-text mb-1">Description (optionnel)</label>
+              <textarea v-model="formData.description" rows="3" placeholder="Ex: Voyage tranquille..." class="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:outline-none"></textarea>
+            </div>
           </div>
           <div class="pt-6 flex justify-end space-x-3 border-t border-border mt-6">
             <button type="button" @click="formModal.show = false" class="px-4 py-2 border border-border rounded-lg hover:bg-background">Annuler</button>
@@ -240,7 +244,7 @@ const formModal = reactive({ show: false, isEdit: false, rideId: null as any })
 const formData = reactive({
   driver: '', vehicle: '', departure_location: '', arrival_location: '',
   departure_date: '', departure_time: '', price_per_seat: 0,
-  total_seats: 4, seats_available: 4, status: 'active'
+  total_seats: 4, seats_available: 4, status: 'active', description: ''
 })
 
 function showToast(type: string, title: string, msg = '') {
@@ -295,7 +299,7 @@ function openCreateModal() {
   Object.assign(formData, {
     driver: '', vehicle: '', departure_location: '', arrival_location: '',
     departure_date: '', departure_time: '', price_per_seat: 0,
-    total_seats: 4, seats_available: 4, status: 'active'
+    total_seats: 4, seats_available: 4, status: 'active', description: ''
   })
   formModal.show = true
 }
@@ -307,7 +311,8 @@ function openEditModal(r: any) {
     driver: r.driver, vehicle: r.vehicle || '', departure_location: r.departure_location, 
     arrival_location: r.arrival_location, departure_date: r.departure_date, 
     departure_time: r.departure_time, price_per_seat: r.price_per_seat,
-    total_seats: r.total_seats, seats_available: r.seats_available, status: r.status
+    total_seats: r.total_seats, seats_available: r.seats_available, status: r.status,
+    description: r.description || ''
   })
   formModal.show = true
 }

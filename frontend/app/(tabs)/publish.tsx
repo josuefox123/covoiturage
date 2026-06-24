@@ -60,6 +60,7 @@ export default function PublishScreen() {
   );
   const [price, setPrice] = useState('');
   const [seats, setSeats] = useState(3);
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickingLocationFor, setPickingLocationFor] = useState<'departure' | 'arrival' | null>(null);
@@ -321,7 +322,17 @@ export default function PublishScreen() {
         seats_available: seats,
         vehicle: null,
         accepts_parcels: acceptsParcels,
+        description: description.trim() || null,
       };
+
+      if (departureCords) {
+        payload.departure_latitude = departureCords.lat;
+        payload.departure_longitude = departureCords.lon;
+      }
+      if (arrivalCords) {
+        payload.arrival_latitude = arrivalCords.lat;
+        payload.arrival_longitude = arrivalCords.lon;
+      }
 
       if (acceptsParcels) {
         payload.max_parcels = maxParcels;
@@ -364,6 +375,7 @@ export default function PublishScreen() {
       setEstimation(null);
       setPrice('');
       setSeats(3);
+      setDescription('');
       setIsRecurrent(false);
       setSelectedDays([]);
       setAcceptsParcels(false);
@@ -729,6 +741,21 @@ export default function PublishScreen() {
                 </View>
               </View>
             ) : null}
+
+            {/* DESCRIPTION SECTION */}
+            <Text style={styles.sectionTitle}>Description du trajet (optionnel)</Text>
+            <View style={styles.descriptionWrapper}>
+              <TextInput
+                style={styles.descriptionInput}
+                placeholder="Ex: Voyage calme, pas de bagages encombrants de préférence, arrêt possible sur la route..."
+                placeholderTextColor={theme.colors.textLight}
+                value={description}
+                onChangeText={setDescription}
+                multiline={true}
+                numberOfLines={3}
+                maxLength={300}
+              />
+            </View>
 
             {/* OPTIONS SECTION */}
             <Text style={styles.sectionTitle}>Services à bord</Text>
@@ -1506,4 +1533,22 @@ const styles = StyleSheet.create({
   prefBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8 },
   prefBadgeInactive: { backgroundColor: '#E5E7EB' },
   prefBadgeActive: { backgroundColor: theme.colors.primary },
+  descriptionWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 16,
+  },
+  descriptionInput: {
+    fontSize: 15,
+    color: theme.colors.text,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    paddingTop: 8,
+  },
 });

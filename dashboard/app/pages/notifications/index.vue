@@ -107,7 +107,7 @@ Zemy
                     <span v-if="!notif.user" class="font-semibold text-text">Notification globale</span>
                     <span v-else class="font-semibold text-text">Notification privée</span>
                     <p class="text-xs text-textMuted mt-0.5">
-                      {{ notif.user ? `Utilisateur #${notif.user}` : `${users.length} utilisateurs` }}
+                      {{ notif.user ? getUserName(notif) : `${users.length} utilisateurs` }}
                     </p>
                   </div>
                 </div>
@@ -240,7 +240,7 @@ Zemy
             <div class="bg-background/50 p-4 rounded-xl border border-border text-sm space-y-2">
               <div class="flex justify-between">
                 <span class="text-textMuted font-medium">Destinataire:</span>
-                <span class="text-text font-semibold">{{ viewingNotif.user ? `ID ${viewingNotif.user}` : 'Tous les utilisateurs' }}</span>
+                <span class="text-text font-semibold">{{ viewingNotif.user ? getUserName(viewingNotif) : 'Tous les utilisateurs' }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-textMuted font-medium">Date:</span>
@@ -397,6 +397,17 @@ const handleConfirmDelete = async () => {
     showDeleteConfirm.value = false
     notifToDelete.value = null
   }
+}
+
+const getUserName = (notif: any) => {
+  if (notif.user_details) {
+    return notif.user_details.full_name || notif.user_details.phone || notif.user_details.email || `Utilisateur #${notif.user}`
+  }
+  const u = users.value.find((usr: any) => usr.id === notif.user)
+  if (u) {
+    return u.full_name || u.phone || u.email || `Utilisateur #${notif.user}`
+  }
+  return `Utilisateur #${notif.user}`
 }
 
 // Time formatter

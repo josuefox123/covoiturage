@@ -151,13 +151,47 @@ class MessageSerializer(serializers.ModelSerializer):
     """
     sender_details = UserSerializer(source='sender', read_only=True)
     attachment_url = serializers.SerializerMethodField()
+    moderation_status = serializers.CharField(read_only=True)
 
     class Meta:
         model = Message
         fields = ['id', 'conversation', 'sender', 'sender_details', 'content',
                   'message_type', 'attachment', 'attachment_url',
-                  'location_lat', 'location_lng', 'is_read', 'is_urgent', 'created_at']
-        read_only_fields = ['sender', 'is_read']
+                  'location_lat', 'location_lng', 'is_read', 'is_urgent', 'created_at', 'moderation_status']
+        read_only_fields = ['sender', 'is_read', 'moderation_status']
+
+    def create(self, validated_data):
+        from .services.moderation_service import MessageModerator
+        from .models import ModerationLog
+
+        content = validated_data.get('content', '')
+        moderation_status = 'accepted'
+        
+        if content and validated_data.get('message_type', 'text') == 'text':
+            moderation_result = MessageModerator.analyze_and_filter(content)
+            moderation_status = moderation_result['status']
+            
+            if moderation_status in ['modified', 'blocked']:
+                validated_data['content'] = moderation_result['filtered_content']
+                
+        # Save the message
+        message = super().create(validated_data)
+        
+        # We temporarily store moderation_status on the instance to be used by the serializer representation
+        message.moderation_status = moderation_status
+        
+        # Log if modified or blocked
+        if moderation_status in ['modified', 'blocked']:
+            ModerationLog.objects.create(
+                message=message,
+                sender=message.sender,
+                original_content=content,
+                modified_content=moderation_result['filtered_content'],
+                action_taken=moderation_status,
+                detected_types=moderation_result['detected']
+            )
+
+        return message
 
     @extend_schema_field(str)
     def get_attachment_url(self, obj):
@@ -229,6 +263,8 @@ class NotificationSerializer(serializers.ModelSerializer):
     """
     Sérialiseur pour les notifications (Alertes push FCM ou in-app).
     """
+    user_details = UserSerializer(source='user', read_only=True)
+
     class Meta:
         model = Notification
         fields = '__all__'
@@ -297,4 +333,10 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Transaction
+        fields = '__all__'
+
+class PopularPlaceSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import PopularPlace
+        model = PopularPlace
         fields = '__all__'

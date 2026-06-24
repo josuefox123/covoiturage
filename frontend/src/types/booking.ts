@@ -27,4 +27,5 @@ export interface Booking {
   seats_booked: number;
   status: string;
   payment_status?: string;
+  transaction_id?: string | null;
 }

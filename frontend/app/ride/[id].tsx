@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
+import * as ExpoLinking from 'expo-linking';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ride, Booking } from '../../src/types';
 import { CustomAlert } from '../../src/utils/CustomAlert';
@@ -52,16 +53,25 @@ export default function RideDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [hasBooked, setHasBooked] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [myBooking, setMyBooking] = useState<Booking | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [parcels, setParcels] = useState<any[]>([]);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
 
+  const [financialSettings, setFinancialSettings] = useState<any>(null);
+
   const fetchRide = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
-      const data: Ride = await authFetch(`/rides/${id}/`);
+      const [data, settingsData] = await Promise.all([
+        authFetch(`/rides/${id}/`),
+        authFetch('/financial-settings/')
+      ]);
       setRide(data);
+      if (settingsData && settingsData.length > 0) {
+        setFinancialSettings(settingsData[0]);
+      }
 
       if (user) {
         if (data.driver_details?.id === user.id) {
@@ -74,16 +84,18 @@ export default function RideDetailScreen() {
         } else {
           const passengerBookings: Booking[] = await authFetch(`/bookings/?passenger=${user.id}`);
           const myBooking = passengerBookings.find((b) =>
-            b.status !== 'cancelled' && b.payment_status !== 'pending' && (typeof b.ride === 'object' && b.ride !== null
+            b.status !== 'cancelled' && (typeof b.ride === 'object' && b.ride !== null
               ? String(b.ride.id) === String(id)
               : String(b.ride) === String(id))
           );
           if (myBooking) {
             setHasBooked(true);
             setBookingId(myBooking.id);
+            setMyBooking(myBooking);
           } else {
             setHasBooked(false);
             setBookingId(null);
+            setMyBooking(null);
           }
         }
       }
@@ -187,55 +199,78 @@ export default function RideDetailScreen() {
     try {
       setBookingLoading(true);
 
-      // 1. Create booking (Pending)
+      // 1. Créer la réservation (Pending)
       const res = await authFetch('/bookings/', {
         method: 'POST',
         body: JSON.stringify({ ride: id, seats_booked: 1 })
       });
       currentBookingId = res.id;
 
-      // 2. Initialiser le paiement
+      // 2. Initialiser le paiement — le callback inclut le booking_id pour que
+      //    l'écran payments.tsx puisse vérifier automatiquement à son retour.
+      const callbackUrl = ExpoLinking.createURL('payments', {
+        queryParams: { booking_id: String(currentBookingId) }
+      });
       const payRes = await authFetch(`/bookings/${currentBookingId}/pay/`, {
-        method: 'POST'
+        method: 'POST',
+        body: JSON.stringify({ callback_url: callbackUrl })
       });
 
       if (payRes.url) {
-        // 3. Ouvrir le navigateur FedaPay
-        const result = await WebBrowser.openBrowserAsync(payRes.url);
-
-        // 4. Une fois fermé, on vérifie le paiement
-        CustomAlert.alert(
-          'Vérification du paiement',
-          'Veuillez patienter pendant que nous validons votre transaction...',
-          []
-        );
-
-        const verifyRes = await authFetch(`/bookings/${currentBookingId}/verify-payment/`, {
-          method: 'POST',
-          body: JSON.stringify({ transaction_id: payRes.transaction_id })
-        });
-
+        // 3. Ouvrir le navigateur natif (l'app reprend via deep link après paiement)
+        await WebBrowser.openAuthSessionAsync(payRes.url, callbackUrl);
+        // L'écran payments.tsx sera affiché automatiquement par Expo Router
+        // si le deep link fonctionne. Sinon, on vérifie ici aussi.
         setBookingId(currentBookingId);
         setHasBooked(true);
         await fetchRide(false);
-
-        CustomAlert.alert(
-          'Réservation confirmée ! 🎉',
-          `Votre place a été réservée. Vous avez payé la commission. Vous paierez le reste du montant directement à ${ride?.driver_details?.full_name || 'votre conducteur'} lors du trajet.`,
-          [
-            { text: 'Discuter maintenant', onPress: openChat },
-            { text: 'Fermer', style: 'cancel' }
-          ]
-        );
       }
     } catch (error: any) {
       if (currentBookingId) {
-        // Supprimer la réservation en attente si erreur ou abandon
-        try {
-          await authFetch(`/bookings/${currentBookingId}/`, { method: 'DELETE' });
-        } catch (e) { }
+        // On ne supprime PAS la réservation si un paiement a peut-être été initié
+        // L'utilisateur peut vérifier depuis l'écran payments
+        CustomAlert.alert(
+          'Paiement initié',
+          'Votre réservation a été créée. Si vous avez payé, vérifiez le statut dans "Mes trajets".',
+          [
+            { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/trips') },
+            { text: 'Fermer', style: 'cancel' }
+          ]
+        );
+      } else {
+        CustomAlert.alert('Erreur', error.message || "Impossible de créer la réservation. Veuillez réessayer.");
       }
-      CustomAlert.alert('Erreur', error.message || "Le paiement n'a pas été finalisé. Veuillez réessayer.");
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  /**
+   * Reprendre le paiement pour une réservation existante en statut pending.
+   * Appelle /pay/ qui réutilise la transaction FedaPay existante (anti-doublon)
+   * et rouvre le navigateur FedaPay.
+   */
+  const handleRetryPayment = async () => {
+    if (!bookingId) return;
+    try {
+      setBookingLoading(true);
+      const callbackUrl = ExpoLinking.createURL('payments', {
+        queryParams: { booking_id: String(bookingId) }
+      });
+      const payRes = await authFetch(`/bookings/${bookingId}/pay/`, {
+        method: 'POST',
+        body: JSON.stringify({ callback_url: callbackUrl })
+      });
+      if (payRes.url) {
+        // Rouvrir le checkout FedaPay (même transaction, pas de doublon)
+        await WebBrowser.openAuthSessionAsync(payRes.url, callbackUrl);
+        // Après fermeture du navigateur, rafraîchir l'état
+        await fetchRide(false);
+      } else if (payRes.error) {
+        CustomAlert.alert('Erreur', payRes.error);
+      }
+    } catch (error: any) {
+      CustomAlert.alert('Erreur', error.message || 'Impossible de relancer le paiement.');
     } finally {
       setBookingLoading(false);
     }
@@ -248,8 +283,8 @@ export default function RideDetailScreen() {
     }
 
     CustomAlert.alert(
-      'Conditions de réservation',
-      'Pour valider votre place, vous allez régler les frais de réservation en ligne.\n\nLe reste du montant sera à payer directement au conducteur lors du trajet (en espèces ou Mobile Money).',
+      'Conditions et règles de remboursement',
+      'Pour valider votre place, vous allez régler les frais de réservation en ligne. Le reste du montant sera à régler directement au conducteur lors du trajet.\n\nRègles de remboursement :\n• Annulation par le conducteur : Remboursement intégral (100%).\n• Annulation par vous à plus de 5h du départ (si montant ≥ 1 000 FCFA) : Éligible à un remboursement (soumis à validation).\n• Annulation par vous à moins de 5h du départ ou montant < 1 000 FCFA : Aucun remboursement possible.',
       [
         { text: 'Annuler', style: 'cancel' },
         { text: 'J\'accepte et je réserve', onPress: performBooking }
@@ -318,6 +353,20 @@ export default function RideDetailScreen() {
   const canChat = hasBooked || isOwnRide;
   const isCompleted = ride.status === 'completed';
   const isStarted = ride.status === 'started';
+
+  let totalParcelPrice = 0;
+  if (ride && financialSettings) {
+    const driverParcelPrice = ride.price_per_parcel || 0;
+    const commRate = financialSettings.parcel_commission_percentage || 8;
+    const commMin = financialSettings.min_parcel_commission || 100;
+    const parcelCommission = Math.max(commMin, Math.floor(driverParcelPrice * (commRate / 100)));
+    totalParcelPrice = driverParcelPrice + parcelCommission;
+  } else if (ride) {
+    // Default fallback calculation if settings are not loaded yet
+    const driverParcelPrice = ride.price_per_parcel || 0;
+    const parcelCommission = Math.max(100, Math.floor(driverParcelPrice * 0.08));
+    totalParcelPrice = driverParcelPrice + parcelCommission;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -418,7 +467,7 @@ export default function RideDetailScreen() {
                 </Text>
               </View>
               <View style={styles.priceAmountBlock}>
-                <Text style={[styles.priceValue, { color: '#047857' }]}>{ride.price_per_parcel?.toLocaleString() ?? "0"}</Text>
+                <Text style={[styles.priceValue, { color: '#047857' }]}>{totalParcelPrice.toLocaleString()}</Text>
                 <Text style={[styles.priceCurrency, { color: '#047857' }]}>FCFA</Text>
                 <Text style={[styles.priceUnit, { color: '#065F46' }]}>par colis</Text>
               </View>
@@ -433,6 +482,16 @@ export default function RideDetailScreen() {
             )}
           </View>
         )}
+
+        {/* Description du trajet */}
+        {ride.description ? (
+          <>
+            <Text style={styles.sectionTitle}>Description du trajet</Text>
+            <View style={styles.descriptionCard}>
+              <Text style={styles.descriptionText}>"{ride.description}"</Text>
+            </View>
+          </>
+        ) : null}
 
         {/* Driver Profile or Passengers */}
         {!isOwnRide ? (
@@ -759,7 +818,24 @@ export default function RideDetailScreen() {
 
         {!isOwnRide ? (
           hasBooked ? (
-            ride.status === 'active' ? (
+            myBooking?.payment_status === 'pending' ? (
+              // Réservation créée mais paiement pas encore validé — relancer le checkout FedaPay
+              <TouchableOpacity
+                style={[styles.bookBtn, { backgroundColor: '#D97706' }, bookingLoading && { opacity: 0.7 }]}
+                onPress={handleRetryPayment}
+                disabled={bookingLoading}
+                activeOpacity={0.85}
+              >
+                {bookingLoading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <View style={styles.btnRow}>
+                    <Ionicons name="card" size={20} color={COLORS.white} />
+                    <Text style={styles.bookBtnText}>Compléter le paiement</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : ride.status === 'active' ? (
               <TouchableOpacity
                 style={[styles.bookBtn, styles.cancelBtn, bookingLoading && { opacity: 0.7 }]}
                 onPress={handleCancelBooking}
@@ -779,7 +855,7 @@ export default function RideDetailScreen() {
               <View style={[styles.bookBtn, styles.bookedBtn, { opacity: 0.8 }]}>
                 <View style={styles.btnRow}>
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
-                  <Text style={styles.bookBtnText}>Place Réservée ({ride.status.toUpperCase()})</Text>
+                  <Text style={styles.bookBtnText}>Place Réservée ✅</Text>
                 </View>
               </View>
             )
@@ -921,4 +997,25 @@ const styles = StyleSheet.create({
   passengerActions: { flexDirection: 'row', gap: 12 },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
   actionBtnText: { fontSize: 14, fontWeight: '600' },
+  descriptionCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: COLORS.text,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
 });

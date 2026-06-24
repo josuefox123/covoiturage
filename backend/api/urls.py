@@ -17,11 +17,12 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     verify_code, register_user, login_user, request_verification, verification_status,
-    dashboard_stats, save_fcm_token,
+    dashboard_stats, save_fcm_token, payment_callback, fedapay_webhook,
     UserViewSet, VehicleViewSet, UserPreferenceViewSet,
     RideViewSet, BookingViewSet, ConversationViewSet, MessageViewSet, NotificationViewSet,
     AppBrandingView, VerificationRequestViewSet, PromotionViewSet, MobileSettingsView,
-    FinancialSettingsViewSet, RefundRequestViewSet, TransactionViewSet, ParcelViewSet
+    FinancialSettingsViewSet, RefundRequestViewSet, TransactionViewSet, ParcelViewSet,
+    PopularPlaceViewSet
 )
 
 router = DefaultRouter()
@@ -39,6 +40,7 @@ router.register(r'financial-settings', FinancialSettingsViewSet, basename='finan
 router.register(r'refund-requests', RefundRequestViewSet, basename='refund_requests')
 router.register(r'transactions', TransactionViewSet, basename='transactions')
 router.register(r'parcels', ParcelViewSet, basename='parcel')
+router.register(r'popular-places', PopularPlaceViewSet, basename='popular_place')
 
 urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),
@@ -50,5 +52,7 @@ urlpatterns = [
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path('branding/', AppBrandingView.as_view(), name='app_branding'),
     path('mobile-settings/', MobileSettingsView.as_view(), name='mobile_settings'),
+    path('payments/callback/', payment_callback, name='payment_callback'),
+    path('payments/webhook/', fedapay_webhook, name='fedapay_webhook'),
     path('', include(router.urls)),
 ]

@@ -170,6 +170,10 @@ class RideSeries(models.Model):
     zemy_commission = models.IntegerField(default=0)
     total_seats = models.IntegerField()
     vehicle = models.ForeignKey(Vehicle, on_delete=models.SET_NULL, null=True, blank=True)
+    departure_latitude = models.FloatField(blank=True, null=True)
+    departure_longitude = models.FloatField(blank=True, null=True)
+    arrival_latitude = models.FloatField(blank=True, null=True)
+    arrival_longitude = models.FloatField(blank=True, null=True)
     
     # Colis
     accepts_parcels = models.BooleanField(default=False)
@@ -226,6 +230,11 @@ class Ride(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True)
     driver_latitude = models.FloatField(blank=True, null=True)
     driver_longitude = models.FloatField(blank=True, null=True)
+    departure_latitude = models.FloatField(blank=True, null=True)
+    departure_longitude = models.FloatField(blank=True, null=True)
+    arrival_latitude = models.FloatField(blank=True, null=True)
+    arrival_longitude = models.FloatField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
     
     # Colis
     accepts_parcels = models.BooleanField(default=False)
@@ -277,6 +286,7 @@ class Booking(models.Model):
     seats_booked = models.IntegerField(default=1)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    transaction_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -285,6 +295,14 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Reservation {self.id} pour {self.ride}"
+
+    def delete(self, *args, **kwargs):
+        if self.status != 'cancelled' and self.ride:
+            from django.db.models import F
+            Ride.objects.filter(id=self.ride_id).update(
+                seats_available=F('seats_available') + self.seats_booked
+            )
+        super().delete(*args, **kwargs)
         
     @property
     def total_amount(self):
@@ -668,6 +686,14 @@ class Parcel(models.Model):
     def __str__(self):
         return f"Colis {self.id} - {self.status}"
 
+    def delete(self, *args, **kwargs):
+        if self.status != 'cancelled' and self.payment_status != 'refunded' and self.ride:
+            from django.db.models import F
+            Ride.objects.filter(id=self.ride_id).update(
+                parcels_available=F('parcels_available') + 1
+            )
+        super().delete(*args, **kwargs)
+
 class AuditLog(models.Model):
     """
     Modèle de log d'audit.
@@ -689,3 +715,84 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"[{self.created_at}] {self.admin_user} -> {self.action} on {self.target_user}"
+
+class ModerationLog(models.Model):
+    """
+    Modèle de log de modération automatique.
+    
+    Rôle :
+        Historique des messages filtrés ou bloqués automatiquement.
+    """
+    ACTION_CHOICES = [
+        ('modified', 'Modifié'),
+        ('blocked', 'Bloqué'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    message = models.ForeignKey(Message, on_delete=models.SET_NULL, null=True, blank=True, related_name='moderation_logs')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='moderated_messages')
+    original_content = models.TextField()
+    modified_content = models.TextField(blank=True, null=True)
+    action_taken = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    detected_types = models.JSONField(default=list, help_text="Liste des types d'informations personnelles détectées (ex: phone, whatsapp, email)")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Log de Modération"
+        verbose_name_plural = "Logs de Modération"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Modération ({self.action_taken}) - {self.sender} à {self.created_at}"
+
+class PopularPlace(models.Model):
+    """
+    Modèle représentant un lieu populaire / point d'intérêt au Bénin.
+    
+    Rôle :
+        Permet d'avoir une base locale de lieux très connus pour accélérer la recherche 
+        et s'affranchir des limites et lenteurs de Nominatim.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name="Nom du lieu")
+    latitude = models.FloatField(verbose_name="Latitude")
+    longitude = models.FloatField(verbose_name="Longitude")
+    city = models.CharField(max_length=255, blank=True, null=True, verbose_name="Ville")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Lieu populaire"
+        verbose_name_plural = "Lieux populaires"
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.city or 'Bénin'})"
+
+
+class Payment(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('SUCCESS', 'Success'),
+        ('FAILED', 'Failed'),
+        ('CANCELLED', 'Cancelled'),
+        ('REFUNDED', 'Refunded'),
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    transaction_id = models.CharField(max_length=100, unique=True)
+    amount = models.IntegerField()
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments')
+    booking = models.ForeignKey('Booking', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
+    parcel = models.ForeignKey('Parcel', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    provider = models.CharField(max_length=50, default='fedapay')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Paiement"
+        verbose_name_plural = "Paiements"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Payment {self.transaction_id} ({self.status}) - {self.amount} XOF"
+

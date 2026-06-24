@@ -14,7 +14,7 @@ Zemy
 ========================================================
 """
 from django.contrib import admin
-from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Promotion, MobileSettings
+from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Promotion, MobileSettings, Payment
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -111,3 +111,12 @@ class MobileSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('transaction_id', 'amount', 'user', 'booking', 'parcel', 'status', 'provider', 'created_at')
+    search_fields = ('transaction_id', 'user__phone', 'user__full_name')
+    list_filter = ('status', 'provider')
+    ordering = ('-created_at',)
+    readonly_fields = ('id', 'created_at', 'updated_at')

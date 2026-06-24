@@ -11,11 +11,13 @@
  * ==============================================================
  */
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
+import * as ExpoLinking from 'expo-linking';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ride } from '../../src/types';
 import { CustomAlert } from '../../src/utils/CustomAlert';
@@ -56,6 +58,7 @@ export default function BookParcelScreen() {
   const [receiverPhone, setReceiverPhone] = useState('');
   const [description, setDescription] = useState('');
   const [selectedType, setSelectedType] = useState<string>('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRide = async () => {
@@ -91,14 +94,41 @@ export default function BookParcelScreen() {
       return;
     }
 
+    const driverPrice = ride?.price_per_parcel || 0;
+    const commRate = financialSettings?.parcel_commission_percentage || 8;
+    const commMin = financialSettings?.min_parcel_commission || 100;
+    const zemyCommission = Math.max(commMin, Math.floor(driverPrice * (commRate / 100)));
+
     CustomAlert.alert(
-      'Frais de service Zemy',
-      `Vous allez payer ${ride?.price_per_parcel} FCFA en ligne. Ce montant sera transféré au conducteur une fois le colis livré.`,
+      'Conditions et règles de remboursement',
+      `Pour réserver la place pour votre colis, vous allez payer uniquement les frais de service de ${zemyCommission} FCFA en ligne. Le montant du transport (${driverPrice} FCFA) sera à régler directement au conducteur.\n\nRègles de remboursement :\n• Annulation par le conducteur : Remboursement intégral (100%).\n• Annulation par vous à plus de 5h du départ (si montant ≥ 1 000 FCFA) : Éligible à un remboursement (soumis à validation).\n• Annulation par vous à moins de 5h du départ ou montant < 1 000 FCFA : Aucun remboursement possible.`,
       [
         { text: 'Annuler', style: 'cancel' },
         { text: 'J\'accepte et je paie', onPress: performBooking }
       ]
     );
+  };
+
+  const pickImage = async (source: 'camera' | 'gallery') => {
+    const { status } = source === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status !== 'granted') {
+      CustomAlert.alert('Permission refusée', `Vous devez autoriser l'accès à ${source === 'camera' ? 'la caméra' : 'vos photos'}.`);
+      return;
+    }
+    try {
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.3 })
+        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, quality: 0.5, mediaTypes: ['images'] });
+
+      if (!result.canceled && result.assets[0]) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      CustomAlert.alert('Erreur', 'Impossible de charger l\'image.');
+    }
   };
 
   const performBooking = async () => {
@@ -107,56 +137,77 @@ export default function BookParcelScreen() {
       setBookingLoading(true);
 
       // 1. Create Parcel (Pending)
+      let body: any;
+      const payload: any = {
+        ride: rideId,
+        sender_name: senderName || user?.full_name || 'Expéditeur',
+        sender_phone: senderPhone || user?.phone || 'Non renseigné',
+        receiver_name: receiverName,
+        receiver_phone: receiverPhone,
+        pickup_location: ride?.departure_location || 'Lieu de départ',
+        dropoff_location: ride?.arrival_location || 'Lieu d\'arrivée',
+        description: description,
+        weight: ride?.max_weight_per_parcel || 1,
+        dimensions: ride?.max_dimensions || 'Moyen',
+        price: driverPrice + Math.max(
+          financialSettings?.min_parcel_commission || 100,
+          Math.floor((ride?.price_per_parcel || 0) * ((financialSettings?.parcel_commission_percentage || 8) / 100))
+        ),
+      };
+
+      if (photoUri) {
+        body = new FormData();
+        Object.keys(payload).forEach(key => {
+          body.append(key, payload[key].toString());
+        });
+
+        const filename = photoUri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        body.append('photo', {
+          uri: photoUri,
+          name: filename,
+          type
+        } as any);
+      } else {
+        body = JSON.stringify(payload);
+      }
+
       const res = await authFetch('/parcels/', {
         method: 'POST',
-        body: JSON.stringify({
-          ride: rideId,
-          receiver_name: receiverName,
-          receiver_phone: receiverPhone,
-          description: description,
-          parcel_type: selectedType,
-          dimensions: ride?.max_dimensions,
-          weight_kg: ride?.max_weight_per_parcel
-        })
+        body: body
       });
       currentParcelId = res.id;
 
-      // 2. Initialiser le paiement
+      // 2. Initialiser le paiement — le callback inclut le parcel_id pour que
+      //    l'écran payments.tsx puisse vérifier automatiquement à son retour.
+      const callbackUrl = ExpoLinking.createURL('payments', {
+        queryParams: { parcel_id: String(currentParcelId) }
+      });
       const payRes = await authFetch(`/parcels/${currentParcelId}/pay/`, {
-        method: 'POST'
+        method: 'POST',
+        body: JSON.stringify({ callback_url: callbackUrl })
       });
 
       if (payRes.url) {
-        // 3. Ouvrir le navigateur FedaPay
-        await WebBrowser.openBrowserAsync(payRes.url);
-
-        CustomAlert.alert(
-          'Vérification du paiement',
-          'Veuillez patienter pendant que nous validons votre transaction...',
-          []
-        );
-
-        await authFetch(`/parcels/${currentParcelId}/verify-payment/`, {
-          method: 'POST',
-          body: JSON.stringify({ transaction_id: payRes.transaction_id })
-        });
-
-        CustomAlert.alert(
-          'Colis enregistré ! 🎉',
-          `Votre envoi a été validé. Veuillez remettre le colis au conducteur à l'heure convenue. Le QR Code vous sera fourni dans vos envois.`,
-          [
-            { text: 'Voir mes envois', onPress: () => { router.replace('/(tabs)/trips'); } }
-          ]
-        );
+        // 3. Ouvrir le navigateur (l'app reprend via deep link après paiement)
+        await WebBrowser.openAuthSessionAsync(payRes.url, callbackUrl);
+        // L'écran payments.tsx prendra le relais via le deep link
       }
     } catch (error: any) {
       if (currentParcelId) {
-        try {
-          // If error occurs before payment confirmation, backend might leave it pending or delete it.
-          // Ideally we would delete the pending parcel.
-        } catch (e) { }
+        // On ne supprime PAS le colis si un paiement a peut-être été initié
+        CustomAlert.alert(
+          'Paiement initié',
+          'Votre colis a été enregistré. Si vous avez payé, vérifiez le statut dans "Mes envois".',
+          [
+            { text: 'Voir mes envois', onPress: () => { router.replace('/(tabs)/trips'); } },
+            { text: 'Fermer', style: 'cancel' }
+          ]
+        );
+      } else {
+        CustomAlert.alert('Erreur', error.message || "Impossible de créer l'envoi. Veuillez réessayer.");
       }
-      CustomAlert.alert('Erreur', error.message || "Le paiement n'a pas été finalisé.");
     } finally {
       setBookingLoading(false);
     }
@@ -186,75 +237,101 @@ export default function BookParcelScreen() {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>Trajet : {ride.departure_location} ➔ {ride.arrival_location}</Text>
-          <Text style={styles.infoText}>Prix conducteur : <Text style={styles.boldText}>{driverPrice} FCFA</Text></Text>
-          <Text style={styles.infoText}>Frais de service : <Text style={styles.boldText}>{zemyCommission} FCFA</Text></Text>
-          <Text style={[styles.infoText, { marginTop: 4, color: COLORS.primary }]}>Total à payer : <Text style={styles.boldText}>{totalPrice} FCFA</Text></Text>
-          <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: 8 }} />
-          <Text style={styles.infoText}>Poids maximum : <Text style={styles.boldText}>{ride.max_weight_per_parcel} kg</Text></Text>
-          <Text style={styles.infoText}>Dimensions max : <Text style={styles.boldText}>{ride.max_dimensions}</Text></Text>
-        </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.infoCard}>
+            <Text style={styles.sectionTitle}>Trajet : {ride.departure_location} ➔ {ride.arrival_location}</Text>
+            <Text style={styles.infoText}>Prix estimé du transport : <Text style={styles.boldText}>{driverPrice} FCFA</Text> (à régler au cond.)</Text>
+            <Text style={styles.infoText}>Frais de réservation (en ligne) : <Text style={styles.boldText}>{zemyCommission} FCFA</Text></Text>
+            <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: 8 }} />
+            <Text style={[styles.infoText, { marginTop: 4, color: COLORS.primary }]}>Coût total estimé : <Text style={styles.boldText}>{totalPrice} FCFA</Text></Text>
+            <Text style={styles.infoText}>Poids maximum : <Text style={styles.boldText}>{ride.max_weight_per_parcel} kg</Text></Text>
+            <Text style={styles.infoText}>Dimensions max : <Text style={styles.boldText}>{ride.max_dimensions}</Text></Text>
+          </View>
 
-        <Text style={styles.label}>Type de Colis</Text>
-        <View style={styles.typesContainer}>
-          {ride.allowed_parcel_types?.map((type: string) => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.typeBadge, selectedType === type && styles.typeBadgeActive]}
-              onPress={() => setSelectedType(type)}
-            >
-              <Text style={[styles.typeText, selectedType === type && styles.typeTextActive]}>{type}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          <Text style={styles.label}>Type de Colis</Text>
+          <View style={styles.typesContainer}>
+            {ride.allowed_parcel_types?.map((type: string) => (
+              <TouchableOpacity
+                key={type}
+                style={[styles.typeBadge, selectedType === type && styles.typeBadgeActive]}
+                onPress={() => setSelectedType(type)}
+              >
+                <Text style={[styles.typeText, selectedType === type && styles.typeTextActive]}>{type}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        <Text style={styles.label}>Description du colis</Text>
-        <TextInput
-          style={styles.textArea}
-          placeholder="Ex: Ordinateur portable dans une sacoche noire"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
+          <Text style={styles.label}>Description du colis</Text>
+          <TextInput
+            style={styles.textArea}
+            placeholder="Ex: Ordinateur portable dans une sacoche noire"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+          />
 
-        <Text style={styles.label}>Nom du Destinataire</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: Jean Dupont"
-          value={receiverName}
-          onChangeText={setReceiverName}
-        />
+          <Text style={styles.label}>Nom du Destinataire</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Jean Dupont"
+            value={receiverName}
+            onChangeText={setReceiverName}
+          />
 
-        <Text style={styles.label}>Numéro de Téléphone du Destinataire</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ex: 0022997000000"
-          keyboardType="phone-pad"
-          value={receiverPhone}
-          onChangeText={setReceiverPhone}
-        />
+          <Text style={styles.label}>Numéro de Téléphone du Destinataire</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: 0022997000000"
+            keyboardType="phone-pad"
+            value={receiverPhone}
+            onChangeText={setReceiverPhone}
+          />
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.bookBtn}
-          onPress={handleBooking}
-          disabled={bookingLoading}
-        >
-          {bookingLoading ? (
-            <ActivityIndicator color={COLORS.white} />
+          <Text style={styles.label}>Photo du Colis (Optionnel)</Text>
+          {photoUri ? (
+            <View style={styles.photoContainer}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+              <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => setPhotoUri(null)}>
+                <Ionicons name="close-circle" size={28} color={COLORS.error} />
+              </TouchableOpacity>
+            </View>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="card-outline" size={20} color={COLORS.white} />
-              <Text style={styles.bookBtnText}>Payer {totalPrice} FCFA</Text>
+            <View style={styles.photoBtnRow}>
+              <TouchableOpacity style={styles.photoBtnAction} onPress={() => pickImage('camera')}>
+                <Ionicons name="camera" size={20} color={COLORS.primary} />
+                <Text style={styles.photoBtnActionText}>Caméra</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.photoBtnAction} onPress={() => pickImage('gallery')}>
+                <Ionicons name="images" size={20} color={COLORS.primary} />
+                <Text style={styles.photoBtnActionText}>Galerie</Text>
+              </TouchableOpacity>
             </View>
           )}
-        </TouchableOpacity>
-      </View>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.bookBtn}
+            onPress={handleBooking}
+            disabled={bookingLoading}
+          >
+            {bookingLoading ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="card-outline" size={20} color={COLORS.white} />
+                <Text style={styles.bookBtnText}>Payer la réservation ({zemyCommission} FCFA)</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -280,4 +357,10 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.border, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 10 },
   bookBtn: { height: 56, backgroundColor: COLORS.primary, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3 },
   bookBtnText: { fontSize: 16, fontWeight: '700', color: COLORS.white },
+  photoBtnRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  photoBtnAction: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primaryLight, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0', borderStyle: 'dashed', gap: 8 },
+  photoBtnActionText: { color: COLORS.primary, fontWeight: '700', fontSize: 15 },
+  photoContainer: { position: 'relative', width: 120, height: 120, borderRadius: 12, overflow: 'hidden', marginTop: 4 },
+  photoPreview: { width: '100%', height: '100%', borderRadius: 12 },
+  photoRemoveBtn: { position: 'absolute', top: 4, right: 4, backgroundColor: COLORS.white, borderRadius: 14 },
 });

@@ -307,6 +307,13 @@ export default function RideManagementScreen() {
               <Text style={styles.metaText}>{ride.seats_available} / {ride.total_seats} places</Text>
             </View>
           </View>
+          {ride.description ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.descriptionLabel}>Description</Text>
+              <Text style={styles.descriptionText}>"{ride.description}"</Text>
+            </>
+          ) : null}
         </View>
 
         {/* Stats Grid */}
@@ -651,4 +658,6 @@ const styles = StyleSheet.create({
   fabContainer: { position: 'absolute', bottom: 24, left: 16, right: 16, alignItems: 'center' },
   fab: { flexDirection: 'row', backgroundColor: COLORS.primary, paddingVertical: 16, paddingHorizontal: 24, borderRadius: 30, alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   fabText: { color: COLORS.white, fontSize: 15, fontWeight: '700' },
+  descriptionLabel: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  descriptionText: { fontSize: 14, color: COLORS.textLight, fontStyle: 'italic', lineHeight: 20 },
 });

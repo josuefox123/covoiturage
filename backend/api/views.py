@@ -29,7 +29,7 @@ import random
 from .models import (
     Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, 
     AppBranding, VerificationRequest, Promotion, MobileSettings,
-    FinancialSettings, RefundRequest, Transaction, Parcel
+    FinancialSettings, RefundRequest, Transaction, Parcel, Payment
 )
 from .serializers import (
     UserSerializer, AdminUserSerializer, VehicleSerializer, UserPreferenceSerializer, 
@@ -242,6 +242,255 @@ def verification_status(request):
     return Response({'status': 'none', 'is_verified': False})
 
 
+def get_valid_callback_url(request, path):
+    """
+    Construit une URL absolue pour le callback. Si le serveur tourne en local
+    avec une adresse IP privée (ex: 192.168.x.x) ou localhost, on convertit le
+    hôte en utilisant le service DNS nip.io (ex: 192.168.x.x.nip.io) afin que
+    FedaPay accepte l'URL comme valide et qu'elle pointe quand même vers notre machine locale.
+    """
+    import re
+    from urllib.parse import urlparse, urlunparse
+    
+    uri = request.build_absolute_uri(path)
+    parsed = urlparse(uri)
+    netloc = parsed.netloc
+    
+    if ':' in netloc:
+        host, port = netloc.split(':', 1)
+        port_suffix = f":{port}"
+    else:
+        host = netloc
+        port_suffix = ""
+        
+    ip_pattern = r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$'
+    if re.match(ip_pattern, host):
+        new_host = f"{host}.nip.io"
+        new_netloc = f"{new_host}{port_suffix}"
+        parsed = parsed._replace(netloc=new_netloc)
+    elif host.lower() == 'localhost':
+        new_host = "127.0.0.1.nip.io"
+        new_netloc = f"{new_host}{port_suffix}"
+        parsed = parsed._replace(netloc=new_netloc)
+        
+    return urlunparse(parsed)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def payment_callback(request):
+    """
+    Endpoint de redirection FedaPay.
+    Reçoit la redirection après paiement et redirige le navigateur du mobile vers le schéma deep link 'zemy://'.
+    """
+    booking_id = request.GET.get('booking_id')
+    parcel_id = request.GET.get('parcel_id')
+    redirect_to = request.GET.get('redirect_to')
+    
+    if redirect_to:
+        import urllib.parse
+        parsed_redirect = urllib.parse.urlparse(redirect_to)
+        query_params = urllib.parse.parse_qs(parsed_redirect.query)
+        if booking_id and 'booking_id' not in query_params:
+            query_params['booking_id'] = [booking_id]
+        if parcel_id and 'parcel_id' not in query_params:
+            query_params['parcel_id'] = [parcel_id]
+        
+        new_query = urllib.parse.urlencode(query_params, doseq=True)
+        parsed_redirect = parsed_redirect._replace(query=new_query)
+        redirect_url = urllib.parse.urlunparse(parsed_redirect)
+    else:
+        app_scheme = "zemy://payments"
+        redirect_url = app_scheme
+        if booking_id:
+            redirect_url += f"?booking_id={booking_id}"
+        elif parcel_id:
+            redirect_url += f"?parcel_id={parcel_id}"
+        
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Redirection Zemy...</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                background-color: #F9FAFB;
+                color: #1F2937;
+                text-align: center;
+                padding: 20px;
+            }}
+            .spinner {{
+                border: 4px solid rgba(0, 0, 0, 0.1);
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                border-left-color: #2F80ED;
+                animation: spin 1s linear infinite;
+                margin-bottom: 20px;
+            }}
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            h2 {{
+                font-size: 20px;
+                font-weight: 600;
+                margin: 0 0 10px 0;
+            }}
+            p {{
+                font-size: 14px;
+                color: #6B7280;
+                margin: 0 0 20px 0;
+            }}
+            a {{
+                color: #2F80ED;
+                text-decoration: none;
+                font-weight: 500;
+            }}
+        </style>
+        <script>
+            window.onload = function() {{
+                // Redirection vers le deep link
+                window.location.href = "{redirect_url}";
+                
+                // Fallback de sécurité au bout de 2 secondes
+                setTimeout(function() {{
+                    document.getElementById('fallback').style.display = 'block';
+                }}, 2000);
+            }};
+        </script>
+    </head>
+    <body>
+        <div class="spinner"></div>
+        <h2>Redirection vers l'application...</h2>
+        <p>Votre paiement a été traité. Nous vous ramenons vers l'application Zemy.</p>
+        <div id="fallback" style="display: none;">
+            <p>Si la redirection ne fonctionne pas, <a href="{redirect_url}">cliquez ici pour revenir à l'application</a>.</p>
+        </div>
+    </body>
+    </html>
+    """
+    from django.http import HttpResponse
+    return HttpResponse(html_content, content_type="text/html; charset=utf-8")
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@csrf_exempt
+def fedapay_webhook(request):
+    """
+    Webhook FedaPay pour valider les paiements de manière asynchrone.
+    """
+    import json
+    try:
+        payload = json.loads(request.body)
+    except Exception as e:
+        return Response({"error": "JSON invalide"}, status=status.HTTP_400_BAD_REQUEST)
+
+    entity = payload.get('entity', {})
+    transaction_id = str(entity.get('id'))
+
+    if not transaction_id:
+        return Response({"error": "ID de transaction absent"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Récupérer ou créer l'enregistrement de paiement de façon atomique
+    from django.db import transaction
+    with transaction.atomic():
+        payment = Payment.objects.filter(transaction_id=transaction_id).select_for_update().first()
+        
+        booking = Booking.objects.filter(transaction_id=transaction_id).first()
+        parcel = Parcel.objects.filter(payments__transaction_id=transaction_id).first() or Parcel.objects.filter(id=entity.get('custom_metadata', {}).get('parcel_id') or entity.get('metadata', {}).get('parcel_id')).first()
+        
+        user = None
+        if booking:
+            user = booking.passenger
+        elif parcel:
+            user = parcel.sender_user
+            
+        if not payment:
+            payment = Payment.objects.create(
+                transaction_id=transaction_id,
+                amount=int(entity.get('amount', 0)),
+                user=user or User.objects.filter(is_staff=True).first(),
+                booking=booking,
+                parcel=parcel,
+                status='PENDING'
+            )
+            
+        old_status = payment.status
+        fedapay_status = entity.get('status', '').lower()
+        
+        new_status = 'PENDING'
+        if fedapay_status == 'approved':
+            new_status = 'SUCCESS'
+        elif fedapay_status in ['declined', 'failed']:
+            new_status = 'FAILED'
+        elif fedapay_status == 'canceled':
+            new_status = 'CANCELLED'
+        elif fedapay_status == 'refunded':
+            new_status = 'REFUNDED'
+            
+        payment.status = new_status
+        if not payment.booking and booking:
+            payment.booking = booking
+        if not payment.parcel and parcel:
+            payment.parcel = parcel
+        payment.save()
+        
+        if new_status == 'SUCCESS' and old_status != 'SUCCESS':
+            # Valider Booking
+            if payment.booking:
+                b = payment.booking
+                if b.payment_status != 'escrow':
+                    b.payment_status = 'escrow'
+                    b.status = 'confirmed'
+                    b.save()
+                    
+                    amount_due = int(b.amount_due_to_driver)
+                    commission = int(b.amount_paid_online)
+                    
+                    create_and_send_notification(
+                        user=b.passenger,
+                        title="Réservation confirmée ✅",
+                        message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {b.ride.departure_location} -> {b.ride.arrival_location}.",
+                        data={'type': 'payment_confirmed', 'booking_id': str(b.id), 'screen': 'trips'}
+                    )
+                    
+                    if b.ride.driver_details:
+                        create_and_send_notification(
+                            user=b.ride.driver_details,
+                            title="Nouvelle Réservation 🚗",
+                            message=f"{b.passenger.full_name} a réservé {b.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                            data={'type': 'new_booking', 'booking_id': str(b.id), 'screen': 'rides'}
+                        )
+                        
+            # Valider Parcel
+            if payment.parcel:
+                p = payment.parcel
+                if p.payment_status != 'escrow':
+                    p.payment_status = 'escrow'
+                    p.status = 'accepted'
+                    p.save()
+                    
+                    amount_due = p.driver_payout
+                    create_and_send_notification(
+                        user=p.ride.driver,
+                        title="Nouveau Colis Confirmé 📦",
+                        message=f"{p.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
+                        data={'type': 'parcel_confirmed', 'parcel_id': str(p.id), 'screen': 'rides'}
+                    )
+
+    return Response({"status": "ok"})
+
+
 @extend_schema(responses={200: dict}, tags=['Statistiques'])
 @extend_schema(responses={200: dict}, tags=['Statistiques'])
 @api_view(['GET'])
@@ -290,7 +539,7 @@ def dashboard_stats(request):
     transactions = Transaction.objects.filter(status='completed')
     total_revenue = transactions.aggregate(Sum('amount'))['amount__sum'] or 0
     monthly_revenue = transactions.filter(created_at__gte=month_start).aggregate(Sum('amount'))['amount__sum'] or 0
-    total_commission = transactions.aggregate(Sum('commission'))['commission__sum'] or 0
+    total_commission = transactions.aggregate(Sum('zemy_commission'))['zemy_commission__sum'] or 0
     
     refunds = RefundRequest.objects.filter(status='approved')
     total_refunded = refunds.aggregate(Sum('amount'))['amount__sum'] or 0
@@ -563,8 +812,12 @@ class RideViewSet(viewsets.ModelViewSet):
             departure_location = request.data.get('departure_location')
             arrival_location = request.data.get('arrival_location')
             departure_time = request.data.get('departure_time')
-            departure_time = request.data.get('departure_time')
             driver_payout = int(request.data.get('driver_payout', 0))
+            
+            dep_lat = request.data.get('departure_latitude')
+            dep_lon = request.data.get('departure_longitude')
+            arr_lat = request.data.get('arrival_latitude')
+            arr_lon = request.data.get('arrival_longitude')
             
             from .models import FinancialSettings
             settings = FinancialSettings.load()
@@ -613,7 +866,11 @@ class RideViewSet(viewsets.ModelViewSet):
                     max_weight_per_parcel=max_weight_per_parcel,
                     max_dimensions=max_dimensions,
                     price_per_parcel=price_per_parcel,
-                    allowed_parcel_types=allowed_parcel_types
+                    allowed_parcel_types=allowed_parcel_types,
+                    departure_latitude=dep_lat,
+                    departure_longitude=dep_lon,
+                    arrival_latitude=arr_lat,
+                    arrival_longitude=arr_lon
                 )
                 
                 current_date = start_date
@@ -646,7 +903,11 @@ class RideViewSet(viewsets.ModelViewSet):
                             max_weight_per_parcel=max_weight_per_parcel,
                             max_dimensions=max_dimensions,
                             price_per_parcel=price_per_parcel,
-                            allowed_parcel_types=allowed_parcel_types
+                            allowed_parcel_types=allowed_parcel_types,
+                            departure_latitude=dep_lat,
+                            departure_longitude=dep_lon,
+                            arrival_latitude=arr_lat,
+                            arrival_longitude=arr_lon
                         )
                         created_count += 1
                         
@@ -893,8 +1154,73 @@ class BookingViewSet(viewsets.ModelViewSet):
             existing_booking = Booking.objects.filter(ride=ride, passenger=request.user).exclude(status='cancelled').first()
             if existing_booking:
                 if existing_booking.payment_status == 'pending':
-                    existing_booking.delete() # Nettoie l'ancienne réservation non payée
-                    # Note: L'ancienne réservation libère potentiellement des places (géré par un signal ou on l'ignore ici si c'était pending et qu'elle n'avait pas encore décrémenté, ou si elle a décrémenté, delete() doit re-incrémenter via le signal)
+                    # Vérifier si un paiement a déjà été effectué via FedaPay
+                    if existing_booking.transaction_id:
+                        try:
+                            from django.conf import settings
+                            import requests
+                            api_key = settings.FEDAPAY_SECRET_KEY
+                            is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
+                            if api_key.startswith('sk_live_'):
+                                is_sandbox = False
+                            base_url = "https://sandbox-api.fedapay.com/v1" if is_sandbox else "https://api.fedapay.com/v1"
+                            headers = {
+                                "Authorization": f"Bearer {api_key}",
+                                "Content-Type": "application/json"
+                            }
+                            res = requests.get(f"{base_url}/transactions/{existing_booking.transaction_id}", headers=headers)
+                            if res.status_code == 200:
+                                tx_data = res.json().get('v1/transaction', {})
+                                if tx_data.get('status') == 'approved':
+                                    existing_booking.payment_status = 'escrow'
+                                    existing_booking.status = 'confirmed'
+                                    existing_booking.save()
+                                    
+                                    # Notifier le passager et le conducteur
+                                    from .fcm import create_and_send_notification
+                                    amount_due = int(existing_booking.amount_due_to_driver)
+                                    commission = int(existing_booking.amount_paid_online)
+                                    create_and_send_notification(
+                                        user=existing_booking.passenger,
+                                        title="Réservation confirmée ✅",
+                                        message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur.",
+                                        data={'type': 'payment_confirmed', 'booking_id': str(existing_booking.id), 'screen': 'trips'}
+                                    )
+                                    if ride.driver:
+                                        create_and_send_notification(
+                                            user=ride.driver,
+                                            title="Nouvelle réservation 🚗",
+                                            message=f"{existing_booking.passenger.full_name or existing_booking.passenger.phone} vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                                            data={'type': 'new_booking', 'booking_id': str(existing_booking.id), 'screen': 'rides'}
+                                        )
+                                    raise ValidationError({"error": "Vous avez déjà une réservation confirmée suite à votre paiement."})
+                        except ValidationError:
+                            raise
+                        except Exception:
+                            pass
+                    
+                    # Réutiliser la réservation existante en attente de paiement
+                    # Évite de détruire le lien vers la transaction FedaPay en cours de validation
+                    serializer = self.get_serializer(existing_booking)
+                    
+                    # S'assurer que la conversation existe
+                    passenger = request.user
+                    driver = ride.driver
+                    existing_conv = Conversation.objects.filter(
+                        ride=ride,
+                        conversation_type='ride'
+                    ).filter(
+                        Q(participant_1=passenger, participant_2=driver) |
+                        Q(participant_1=driver, participant_2=passenger)
+                    ).first()
+                    if not existing_conv:
+                        Conversation.objects.create(
+                            conversation_type='ride',
+                            ride=ride,
+                            participant_1=passenger,
+                            participant_2=driver,
+                        )
+                    return Response(serializer.data, status=status.HTTP_200_OK)
                 else:
                     raise ValidationError({"error": "Vous avez déjà une réservation pour ce trajet."})
                 
@@ -908,20 +1234,22 @@ class BookingViewSet(viewsets.ModelViewSet):
             # Save the new booking
             booking = serializer.save(passenger=request.user)
         
+        # Notifications temporairement désactivées à la création car la réservation n'est pas encore validée (payée)
         # 1. Passager: Réservation envoyée
-        create_and_send_notification(
-            user=booking.passenger,
-            title="Réservation envoyée 🚗",
-            message=f"Votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location} a été envoyée.",
-            data={'type': 'booking_sent', 'booking_id': str(booking.id), 'screen': 'trips'}
-        )
+        # create_and_send_notification(
+        #     user=booking.passenger,
+        #     title="Réservation envoyée 🚗",
+        #     message=f"Votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location} a été envoyée.",
+        #     data={'type': 'booking_sent', 'booking_id': str(booking.id), 'screen': 'trips'}
+        # )
         # 2. Conducteur: Nouvelle réservation
-        create_and_send_notification(
-            user=ride.driver,
-            title="Nouvelle réservation 👥",
-            message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} a réservé {booking.seats_booked} place(s) sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
-            data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'trips'}
-        )
+        # create_and_send_notification(
+        #     user=ride.driver,
+        #     title="Nouvelle réservation 👥",
+        #     message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} a réservé {booking.seats_booked} place(s) sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+        #     data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'trips'}
+        # )
+
         
         # Auto-create a conversation between the passenger and the driver for this ride
         passenger = request.user
@@ -941,6 +1269,13 @@ class BookingViewSet(viewsets.ModelViewSet):
                 ride=ride,
                 participant_1=passenger,
                 participant_2=driver,
+            )
+            # Message automatique pour les bagages
+            Message.objects.create(
+                conversation=existing_conv,
+                sender=driver,  # Envoyé au nom du conducteur
+                content="[Message Automatique] Bonjour ! Veuillez préciser dans cette discussion si vous voyagez avec des bagages (nombre, taille, etc.) pour ce trajet.",
+                message_type='text'
             )
         
         response_data = BookingSerializer(booking).data
@@ -966,23 +1301,24 @@ class BookingViewSet(viewsets.ModelViewSet):
                     locked_ride.seats_available += booking.seats_booked
                     locked_ride.save()
                 
-                request_user = self.request.user
-                if request_user == driver:
-                    # Cancelled by driver
-                    create_and_send_notification(
-                        user=passenger,
-                        title="Réservation annulée ❌",
-                        message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
-                        data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
-                    )
-                else:
-                    # Cancelled by passenger
-                    create_and_send_notification(
-                        user=driver,
-                        title="Réservation annulée ❌",
-                        message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
-                        data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
-                    )
+                if old_status == 'confirmed':
+                    request_user = self.request.user
+                    if request_user == driver:
+                        # Cancelled by driver
+                        create_and_send_notification(
+                            user=passenger,
+                            title="Réservation annulée ❌",
+                            message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                            data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
+                        )
+                    else:
+                        # Cancelled by passenger
+                        create_and_send_notification(
+                            user=driver,
+                            title="Réservation annulée ❌",
+                            message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+                            data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
+                        )
             
             elif new_status == 'confirmed':
                 # Conducteur: Réservation acceptée
@@ -1091,47 +1427,48 @@ class BookingViewSet(viewsets.ModelViewSet):
                     # No refund
                     pass
             
-            # Send notifications
-            if request.user == driver:
-                create_and_send_notification(
-                    user=passenger,
-                    title="Réservation annulée ❌",
-                    message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}. Remboursement intégral garanti.",
-                    data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
-                )
-                
-                conversation, _ = Conversation.objects.get_or_create(
-                    conversation_type='ride',
-                    ride=ride,
-                    participant_1=passenger if passenger.id < driver.id else driver,
-                    participant_2=driver if passenger.id < driver.id else passenger
-                )
-                Message.objects.create(
-                    conversation=conversation,
-                    sender=driver,
-                    content=f"Bonjour, j'ai malheureusement dû annuler votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
-                    message_type='text'
-                )
-            else:
-                create_and_send_notification(
-                    user=driver,
-                    title="Réservation annulée ❌",
-                    message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
-                    data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
-                )
-                
-                conversation, _ = Conversation.objects.get_or_create(
-                    conversation_type='ride',
-                    ride=ride,
-                    participant_1=passenger if passenger.id < driver.id else driver,
-                    participant_2=driver if passenger.id < driver.id else passenger
-                )
-                Message.objects.create(
-                    conversation=conversation,
-                    sender=passenger,
-                    content=f"Bonjour, j'ai annulé ma réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}. Bonne route !",
-                    message_type='text'
-                )
+            # Send notifications only if the booking was already confirmed/validated
+            if old_status == 'confirmed':
+                if request.user == driver:
+                    create_and_send_notification(
+                        user=passenger,
+                        title="Réservation annulée ❌",
+                        message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}. Remboursement intégral garanti.",
+                        data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    )
+                    
+                    conversation, _ = Conversation.objects.get_or_create(
+                        conversation_type='ride',
+                        ride=ride,
+                        participant_1=passenger if passenger.id < driver.id else driver,
+                        participant_2=driver if passenger.id < driver.id else passenger
+                    )
+                    Message.objects.create(
+                        conversation=conversation,
+                        sender=driver,
+                        content=f"Bonjour, j'ai malheureusement dû annuler votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                        message_type='text'
+                    )
+                else:
+                    create_and_send_notification(
+                        user=driver,
+                        title="Réservation annulée ❌",
+                        message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+                        data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    )
+                    
+                    conversation, _ = Conversation.objects.get_or_create(
+                        conversation_type='ride',
+                        ride=ride,
+                        participant_1=passenger if passenger.id < driver.id else driver,
+                        participant_2=driver if passenger.id < driver.id else passenger
+                    )
+                    Message.objects.create(
+                        conversation=conversation,
+                        sender=passenger,
+                        content=f"Bonjour, j'ai annulé ma réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}. Bonne route !",
+                        message_type='text'
+                    )
                 
         return Response({"status": "Réservation annulée avec succès."})
 
@@ -1179,14 +1516,14 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.passenger != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
-        if booking.payment_status != 'pending':
-            return Response({"error": "Cette réservation est déjà payée ou en cours."}, status=status.HTTP_400_BAD_REQUEST)
+        # Bloquer si déjà payé avec succès (escrow ou paid)
+        if booking.payment_status in ['escrow', 'paid']:
+            return Response({"error": "Cette réservation est déjà payée."}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
             api_key = settings.FEDAPAY_SECRET_KEY
             is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
             
-            # Si la clé fournie est une clé live, on force l'environnement en live pour éviter l'erreur d'authentification
             if api_key.startswith('sk_live_'):
                 is_sandbox = False
                 
@@ -1196,13 +1533,49 @@ class BookingViewSet(viewsets.ModelViewSet):
                 "Content-Type": "application/json"
             }
             
-            amount_to_pay = int(booking.amount_paid_online)
+            import urllib.parse
+            frontend_callback = request.data.get('callback_url') or 'zemy://payments'
+            gateway_path = f'/api/payments/callback/?booking_id={booking.id}&redirect_to={urllib.parse.quote(frontend_callback)}'
+            callback_url = get_valid_callback_url(request, gateway_path)
 
-            # 1. Create Transaction
+            amount_to_pay = max(100, int(booking.amount_paid_online))
+
+            # ============================================================
+            # ANTI-DOUBLON : Réutiliser la transaction existante si PENDING
+            # ============================================================
+            existing_payment = Payment.objects.filter(
+                booking=booking, status='PENDING'
+            ).order_by('-created_at').first()
+            
+            if existing_payment and existing_payment.transaction_id and booking.transaction_id:
+                # Régénérer un token pour la transaction existante
+                transaction_id = existing_payment.transaction_id
+                token_res = requests.post(
+                    f"{base_url}/transactions/{transaction_id}/token",
+                    headers=headers
+                )
+                if token_res.status_code in [200, 201]:
+                    token_json = token_res.json()
+                    url = token_json.get('url')
+                    if not url:
+                        node = token_json.get('v1/token') or token_json.get('token')
+                        if isinstance(node, dict):
+                            url = node.get('url')
+                        elif isinstance(node, str) and node.startswith('tok_'):
+                            checkout_base = "https://checkout.fedapay.com/pay/" if not is_sandbox else "https://sandbox-checkout.fedapay.com/pay/"
+                            url = checkout_base + node
+                    if url:
+                        return Response({"url": url, "transaction_id": int(transaction_id)})
+                # Si la régénération échoue, on continue pour en créer une nouvelle
+
+            # ============================================================
+            # Créer une nouvelle transaction FedaPay
+            # ============================================================
             payload = {
                 "description": f"Commission Zemy pour trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}",
                 "amount": amount_to_pay,
                 "currency": {"iso": "XOF"},
+                "callback_url": callback_url,
                 "customer": {
                     "firstname": booking.passenger.full_name or "Passager",
                     "lastname": "Zemy",
@@ -1213,7 +1586,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                     }
                 }
             }
-            
+                
             tx_res = requests.post(f"{base_url}/transactions", json=payload, headers=headers)
             if tx_res.status_code not in [200, 201]:
                 return Response({"error": "Erreur FedaPay: " + tx_res.text}, status=status.HTTP_400_BAD_REQUEST)
@@ -1225,7 +1598,22 @@ class BookingViewSet(viewsets.ModelViewSet):
             if not transaction_id:
                 return Response({"error": "Impossible de créer la transaction FedaPay. Réponse: " + str(tx_json)}, status=status.HTTP_400_BAD_REQUEST)
                 
-            # 2. Generate Token
+            booking.transaction_id = str(transaction_id)
+            booking.save()
+            
+            # Enregistrement Payment (update si même transaction, sinon créer)
+            Payment.objects.update_or_create(
+                transaction_id=str(transaction_id),
+                defaults={
+                    'amount': amount_to_pay,
+                    'user': booking.passenger,
+                    'booking': booking,
+                    'status': 'PENDING',
+                    'provider': 'fedapay'
+                }
+            )
+                 
+            # Générer le token de paiement
             token_res = requests.post(f"{base_url}/transactions/{transaction_id}/token", headers=headers)
             if token_res.status_code not in [200, 201]:
                 return Response({"error": "Erreur Token FedaPay: " + token_res.text}, status=status.HTTP_400_BAD_REQUEST)
@@ -1233,7 +1621,6 @@ class BookingViewSet(viewsets.ModelViewSet):
             token_json = token_res.json()
             url = token_json.get('url')
             
-            # Si l'URL n'est pas à la racine du JSON, chercher dans le noeud 'v1/token' ou 'token'
             if not url:
                 node = token_json.get('v1/token') or token_json.get('token')
                 if isinstance(node, dict):
@@ -1250,18 +1637,25 @@ class BookingViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
     @action(detail=True, methods=['post'], url_path='verify-payment')
     def verify_payment(self, request, pk=None):
         import requests
         from django.conf import settings
+        from django.db import transaction
+        from .models import Payment
         
         booking = self.get_object()
-        transaction_id = request.data.get('transaction_id')
+        transaction_id = request.data.get('transaction_id') or booking.transaction_id
         
         if not transaction_id:
             return Response({"error": "transaction_id requis."}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
+            payment = Payment.objects.filter(transaction_id=transaction_id).first()
+            if payment and payment.status == 'SUCCESS':
+                return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
+                
             api_key = settings.FEDAPAY_SECRET_KEY
             is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
             
@@ -1274,7 +1668,6 @@ class BookingViewSet(viewsets.ModelViewSet):
                 "Content-Type": "application/json"
             }
             
-            # Retrieve transaction
             res = requests.get(f"{base_url}/transactions/{transaction_id}", headers=headers)
             if res.status_code != 200:
                 return Response({"error": "Impossible de récupérer la transaction: " + res.text}, status=status.HTTP_400_BAD_REQUEST)
@@ -1283,35 +1676,71 @@ class BookingViewSet(viewsets.ModelViewSet):
             tx_status = transaction_data.get('status')
             
             if tx_status == 'approved':
-                if booking.payment_status != 'escrow':
-                    booking.payment_status = 'escrow' # On garde 'escrow' pour dire que la commission est payée, ou on met 'paid'. Pour la compatibilité, on garde escrow ou on peut mettre une valeur plus claire. Gardons escrow.
-                    booking.status = 'confirmed'
-                    booking.save()
-                    
-                    amount_due = int(booking.amount_due_to_driver)
-                    commission = int(booking.amount_paid_online)
-                    
-                    # Notify Passenger
-                    from .models import create_and_send_notification
-                    create_and_send_notification(
-                        user=booking.passenger,
-                        title="Réservation confirmée ✅",
-                        message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
-                        data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
+                with transaction.atomic():
+                    payment, created = Payment.objects.select_for_update().get_or_create(
+                        transaction_id=transaction_id,
+                        defaults={
+                            'amount': int(transaction_data.get('amount', 0)),
+                            'user': booking.passenger,
+                            'booking': booking,
+                            'status': 'PENDING',
+                            'provider': 'fedapay'
+                        }
                     )
                     
-                    # Notify Driver
-                    if booking.ride.driver_details:
+                    if payment.status == 'SUCCESS':
+                        return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
+                        
+                    payment.status = 'SUCCESS'
+                    payment.save()
+                    
+                    if booking.payment_status != 'escrow':
+                        booking.payment_status = 'escrow'
+                        booking.status = 'confirmed'
+                        booking.save()
+                        
+                        amount_due = int(booking.amount_due_to_driver)
+                        commission = int(booking.amount_paid_online)
+                        
+                        from .models import create_and_send_notification
                         create_and_send_notification(
-                            user=booking.ride.driver_details,
-                            title="Nouvelle Réservation 🚗",
-                            message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
-                            data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
+                            user=booking.passenger,
+                            title="Réservation confirmée ✅",
+                            message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+                            data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
                         
+                        if booking.ride.driver_details:
+                            create_and_send_notification(
+                                user=booking.ride.driver_details,
+                                title="Nouvelle Réservation 🚗",
+                                message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                                data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
+                            )
+                            
                 return Response({"status": "Paiement validé avec succès."})
+            elif tx_status in ['pending', 'processing', 'started', 'waiting']:
+                # Distinguer : utilisateur n'a pas payé (mode=null) vs opérateur traite (mode renseigné)
+                tx_mode = transaction_data.get('mode')
+                payment_not_started = (tx_status == 'pending' and not tx_mode)
+                return Response({
+                    "status": "pending",
+                    "message": "Paiement en cours de validation." if not payment_not_started else "Le paiement n'a pas été complété sur FedaPay.",
+                    "payment_not_started": payment_not_started,
+                    "booking_id": str(booking.id),
+                    "ride_id": str(booking.ride.id) if hasattr(booking.ride, 'id') else str(booking.ride)
+                })
             else:
-                return Response({"error": f"Statut de la transaction : {tx_status}"}, status=status.HTTP_400_BAD_REQUEST)
+                new_status = 'PENDING'
+                if tx_status in ['declined', 'failed']:
+                    new_status = 'FAILED'
+                elif tx_status == 'canceled':
+                    new_status = 'CANCELLED'
+                elif tx_status == 'refunded':
+                    new_status = 'REFUNDED'
+                
+                Payment.objects.filter(transaction_id=transaction_id).update(status=new_status)
+                return Response({"error": f"Le paiement a échoué (statut: {tx_status})."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1847,6 +2276,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
     queryset = Parcel.objects.all().order_by('-created_at')
     serializer_class = ParcelSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -1912,6 +2342,223 @@ class ParcelViewSet(viewsets.ModelViewSet):
             data={'type': 'new_parcel', 'parcel_id': str(parcel.id), 'screen': 'trips'}
         )
 
+    @action(detail=True, methods=['post'], url_path='pay')
+    def pay_parcel(self, request, pk=None):
+        import requests
+        from django.conf import settings
+        
+        parcel = self.get_object()
+        if parcel.sender_user != request.user and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+            
+        # Bloquer si déjà payé avec succès
+        if parcel.payment_status in ['escrow', 'paid']:
+            return Response({"error": "Cette expédition est déjà payée."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            api_key = settings.FEDAPAY_SECRET_KEY
+            is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
+            if api_key.startswith('sk_live_'):
+                is_sandbox = False
+                
+            base_url = "https://sandbox-api.fedapay.com/v1" if is_sandbox else "https://api.fedapay.com/v1"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            import urllib.parse
+            frontend_callback = request.data.get('callback_url') or 'zemy://payments'
+            gateway_path = f'/api/payments/callback/?parcel_id={parcel.id}&redirect_to={urllib.parse.quote(frontend_callback)}'
+            callback_url = get_valid_callback_url(request, gateway_path)
+
+            amount_to_pay = max(100, int(parcel.zemy_commission))
+
+            # ============================================================
+            # ANTI-DOUBLON : Réutiliser la transaction existante si PENDING
+            # ============================================================
+            existing_payment = Payment.objects.filter(
+                parcel=parcel, status='PENDING'
+            ).order_by('-created_at').first()
+            
+            if existing_payment and existing_payment.transaction_id:
+                transaction_id = existing_payment.transaction_id
+                token_res = requests.post(
+                    f"{base_url}/transactions/{transaction_id}/token",
+                    headers=headers
+                )
+                if token_res.status_code in [200, 201]:
+                    token_json = token_res.json()
+                    url = token_json.get('url')
+                    if not url:
+                        node = token_json.get('v1/token') or token_json.get('token')
+                        if isinstance(node, dict):
+                            url = node.get('url')
+                        elif isinstance(node, str) and node.startswith('tok_'):
+                            checkout_base = "https://checkout.fedapay.com/pay/" if not is_sandbox else "https://sandbox-checkout.fedapay.com/pay/"
+                            url = checkout_base + node
+                    if url:
+                        return Response({"url": url, "transaction_id": int(transaction_id)})
+            
+            # ============================================================
+            # Créer une nouvelle transaction FedaPay
+            # ============================================================
+            payload = {
+                "description": f"Commission Zemy colis {parcel.ride.departure_location} -> {parcel.ride.arrival_location}",
+                "amount": amount_to_pay,
+                "currency": {"iso": "XOF"},
+                "callback_url": callback_url,
+                "customer": {
+                    "firstname": parcel.sender_user.full_name or "Client",
+                    "lastname": "Zemy",
+                    "email": parcel.sender_user.email or "client@zemy.bj",
+                    "phone_number": {
+                        "number": parcel.sender_user.phone or "+22900000000",
+                        "country": "bj"
+                    }
+                }
+            }
+                
+            tx_res = requests.post(f"{base_url}/transactions", json=payload, headers=headers)
+            if tx_res.status_code not in [200, 201]:
+                return Response({"error": "Erreur FedaPay: " + tx_res.text}, status=status.HTTP_400_BAD_REQUEST)
+                
+            tx_json = tx_res.json()
+            transaction_data = tx_json.get('v1/transaction') or tx_json.get('transaction') or {}
+            transaction_id = transaction_data.get('id')
+            
+            if not transaction_id:
+                return Response({"error": "Impossible de créer la transaction FedaPay."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            Payment.objects.update_or_create(
+                transaction_id=str(transaction_id),
+                defaults={
+                    'amount': amount_to_pay,
+                    'user': parcel.sender_user,
+                    'parcel': parcel,
+                    'status': 'PENDING',
+                    'provider': 'fedapay'
+                }
+            )
+                
+            token_res = requests.post(f"{base_url}/transactions/{transaction_id}/token", headers=headers)
+            if token_res.status_code not in [200, 201]:
+                return Response({"error": "Erreur Token FedaPay: " + token_res.text}, status=status.HTTP_400_BAD_REQUEST)
+                
+            token_json = token_res.json()
+            url = token_json.get('url')
+            
+            if not url:
+                node = token_json.get('v1/token') or token_json.get('token')
+                if isinstance(node, dict):
+                    url = node.get('url')
+                elif isinstance(node, str) and node.startswith('tok_'):
+                    checkout_base = "https://checkout.fedapay.com/pay/" if not is_sandbox else "https://sandbox-checkout.fedapay.com/pay/"
+                    url = checkout_base + node
+                    
+            if not url:
+                return Response({"error": "Impossible d'obtenir l'URL de paiement."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            return Response({"url": url, "transaction_id": transaction_id})
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='verify-payment')
+    def verify_payment(self, request, pk=None):
+        import requests
+        from django.conf import settings
+        from django.db import transaction
+        from .models import Payment
+        
+        parcel = self.get_object()
+        payment = Payment.objects.filter(parcel=parcel).first()
+        transaction_id = request.data.get('transaction_id') or (payment.transaction_id if payment else None)
+        
+        if not transaction_id:
+            return Response({"error": "transaction_id requis."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            payment = Payment.objects.filter(transaction_id=transaction_id).first()
+            if payment and payment.status == 'SUCCESS':
+                return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
+                
+            api_key = settings.FEDAPAY_SECRET_KEY
+            is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
+            if api_key.startswith('sk_live_'):
+                is_sandbox = False
+                
+            base_url = "https://sandbox-api.fedapay.com/v1" if is_sandbox else "https://api.fedapay.com/v1"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            res = requests.get(f"{base_url}/transactions/{transaction_id}", headers=headers)
+            if res.status_code != 200:
+                return Response({"error": "Impossible de récupérer la transaction: " + res.text}, status=status.HTTP_400_BAD_REQUEST)
+                
+            transaction_data = res.json().get('v1/transaction', {})
+            tx_status = transaction_data.get('status')
+            
+            if tx_status == 'approved':
+                with transaction.atomic():
+                    payment, created = Payment.objects.select_for_update().get_or_create(
+                        transaction_id=transaction_id,
+                        defaults={
+                            'amount': int(transaction_data.get('amount', 0)),
+                            'user': parcel.sender_user,
+                            'parcel': parcel,
+                            'status': 'PENDING',
+                            'provider': 'fedapay'
+                        }
+                    )
+                    
+                    if payment.status == 'SUCCESS':
+                        return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
+                        
+                    payment.status = 'SUCCESS'
+                    payment.save()
+                    
+                    if parcel.payment_status != 'escrow':
+                        parcel.payment_status = 'escrow'
+                        parcel.status = 'accepted'
+                        parcel.save()
+                        
+                        amount_due = parcel.driver_payout
+                        
+                        from .models import create_and_send_notification
+                        create_and_send_notification(
+                            user=parcel.ride.driver,
+                            title="Nouveau Colis Confirmé 📦",
+                            message=f"{parcel.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
+                            data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
+                        )
+                        
+                return Response({"status": "Paiement validé avec succès."})
+            elif tx_status in ['pending', 'processing', 'started', 'waiting']:
+                tx_mode = transaction_data.get('mode')
+                payment_not_started = (tx_status == 'pending' and not tx_mode)
+                return Response({
+                    "status": "pending",
+                    "message": "Paiement en cours de validation." if not payment_not_started else "Le paiement n'a pas été complété sur FedaPay.",
+                    "payment_not_started": payment_not_started,
+                    "parcel_id": str(parcel.id)
+                })
+            else:
+                new_status = 'PENDING'
+                if tx_status in ['declined', 'failed']:
+                    new_status = 'FAILED'
+                elif tx_status == 'canceled':
+                    new_status = 'CANCELLED'
+                elif tx_status == 'refunded':
+                    new_status = 'REFUNDED'
+                
+                Payment.objects.filter(transaction_id=transaction_id).update(status=new_status)
+                return Response({"error": f"Le paiement a échoué (statut: {tx_status})."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=True, methods=['post'], url_path='scan_qr')
     def scan_qr(self, request, pk=None):
         parcel = self.get_object()
@@ -1968,3 +2615,20 @@ class ParcelViewSet(viewsets.ModelViewSet):
                 )
             
         return Response({"status": f"Colis mis à jour : {parcel.status}"})
+
+from .models import PopularPlace
+from .serializers import PopularPlaceSerializer
+
+class PopularPlaceViewSet(viewsets.ModelViewSet):
+    queryset = PopularPlace.objects.all()
+    serializer_class = PopularPlaceSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(city__icontains=search)
+            )
+        return queryset

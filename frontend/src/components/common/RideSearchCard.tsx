@@ -72,7 +72,17 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
   }, [animated, index]);
 
   const driverName = ride.driver_details?.full_name || 'Conducteur';
-  const price = ride.price_per_seat?.toLocaleString() || '0';
+  
+  // Dynamic price detection
+  const showParcelPrice = ride.price_per_parcel !== undefined && 
+                           ride.price_per_parcel > 0 && 
+                           (!ride.price_per_seat || ride.price_per_seat === 0 || ride.seats_available === 0);
+  
+  const price = showParcelPrice 
+    ? (ride.price_per_parcel?.toLocaleString() || '0') 
+    : (ride.price_per_seat?.toLocaleString() || '0');
+    
+  const priceUnit = showParcelPrice ? 'par colis' : 'par place';
   const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
   const seatsLeft = ride.seats_available || 0;
 
@@ -101,15 +111,27 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
                 <Text style={styles.driverName}>{driverName}</Text>
                 <View style={styles.ratingContainer}>
                   <Ionicons name="star" size={12} color="#F59E0B" />
-                  <Text style={styles.ratingText}>{ride.driver_details?.rating || '4.9'}</Text>
-                  <Text style={styles.reviewCount}>(12 avis)</Text>
+                  <Text style={styles.ratingText}>
+                    {ride.driver_details?.rating ? Number(ride.driver_details.rating).toFixed(1) : '5.0'}
+                  </Text>
+                  <Text style={styles.reviewCount}>
+                    • {ride.driver_details?.rides_count ?? 0} trajet{(ride.driver_details?.rides_count ?? 0) > 1 ? 's' : ''}
+                  </Text>
                 </View>
               </View>
             </View>
             <View style={styles.priceSection}>
-              <Text style={styles.priceValue}>{price}</Text>
-              <Text style={styles.priceUnit}>FCFA</Text>
+              <Text style={styles.priceValue}>{price} FCFA</Text>
+              <Text style={styles.priceUnit}>{priceUnit}</Text>
             </View>
+          </View>
+
+          {/* Date de départ */}
+          <View style={styles.dateBar}>
+            <Ionicons name="calendar-outline" size={14} color={PRIMARY_COLOR} />
+            <Text style={styles.dateText}>
+              {formatFullDate(ride.departure_date)}
+            </Text>
           </View>
 
           {/* Trajet */}
@@ -120,34 +142,56 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
               <View style={[styles.timelineDot, { backgroundColor: '#10B981' }]} />
             </View>
             <View style={styles.routeDetails}>
+              {/* Point de départ */}
               <View style={styles.routePoint}>
-                <Text style={styles.locationName} numberOfLines={1}>
-                  {ride.departure_location || 'Départ'}
-                </Text>
-                <Text style={styles.routeTime}>{departureTime}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.locationLabel}>DÉPART</Text>
+                  <Text style={styles.locationName} numberOfLines={1}>
+                    {ride.departure_location || 'Départ'}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Text style={styles.routeTime}>{departureTime}</Text>
+                </View>
               </View>
+              
+              <View style={{ height: 16 }} />
+              
+              {/* Point d'arrivée */}
               <View style={styles.routePoint}>
-                <Text style={styles.locationName} numberOfLines={1}>
-                  {ride.arrival_location || 'Arrivée'}
-                </Text>
-                <Text style={styles.routeDate}>
-                  {formatFullDate(ride.departure_date)}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.locationLabel}>ARRIVÉE</Text>
+                  <Text style={styles.locationName} numberOfLines={1}>
+                    {ride.arrival_location || 'Arrivée'}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
 
           {/* Footer avec places dispo */}
           <View style={styles.rideFooter}>
-            <View style={styles.seatsContainer}>
-              <Ionicons name={ride.status === 'started' || ride.status === 'completed' ? "car-sport-outline" : "people-outline"} size={14} color={PRIMARY_COLOR} />
-              <Text style={styles.seatsText}>
-                {ride.status === 'started' ? 'En cours' : ride.status === 'completed' ? 'Terminé' : `${seatsLeft} place${seatsLeft > 1 ? 's' : ''} disponible${seatsLeft > 1 ? 's' : ''}`}
-              </Text>
+            <View style={styles.badgesContainer}>
+              <View style={styles.seatsContainer}>
+                <Ionicons 
+                  name={ride.status === 'started' || ride.status === 'completed' ? "car-sport-outline" : "people-outline"} 
+                  size={14} 
+                  color={PRIMARY_COLOR} 
+                />
+                <Text style={styles.seatsText}>
+                  {ride.status === 'started' 
+                    ? 'En cours' 
+                    : ride.status === 'completed' 
+                      ? 'Terminé' 
+                      : seatsLeft > 0 
+                        ? `${seatsLeft} place${seatsLeft > 1 ? 's' : ''}` 
+                        : 'Complet'}
+                </Text>
+              </View>
               {ride.accepts_parcels && (
-                <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 12, backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6}}>
-                  <Ionicons name="cube-outline" size={14} color="#10B981" />
-                  <Text style={{fontSize: 12, color: '#10B981', marginLeft: 4, fontWeight: '700'}}>Colis</Text>
+                <View style={styles.parcelBadge}>
+                  <Ionicons name="cube-outline" size={13} color="#10B981" />
+                  <Text style={styles.parcelBadgeText}>Colis</Text>
                 </View>
               )}
             </View>
@@ -181,8 +225,8 @@ const styles = StyleSheet.create({
   rideHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
   driverSection: {
     flexDirection: 'row',
@@ -214,15 +258,30 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   priceValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     color: PRIMARY_COLOR,
   },
   priceUnit: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6B7280',
     fontWeight: '600',
-    marginTop: -2,
+    marginTop: 1,
+  },
+  dateBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  dateText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
   },
   routeSection: {
     flexDirection: 'row',
@@ -259,13 +318,18 @@ const styles = StyleSheet.create({
   },
   routeDetails: {
     flex: 1,
-    justifyContent: 'space-between',
   },
   routePoint: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    minHeight: 32,
+    alignItems: 'center',
+  },
+  locationLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   locationName: {
     fontSize: 15,
@@ -275,14 +339,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   routeTime: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#111827',
-  },
-  routeDate: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
   },
   rideFooter: {
     flexDirection: 'row',
@@ -292,23 +351,46 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
+  badgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginRight: 8,
+  },
   seatsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   seatsText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: PRIMARY_COLOR,
-    marginLeft: 6,
+    marginLeft: 4,
+  },
+  parcelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  parcelBadgeText: {
+    fontSize: 12,
+    color: '#10B981',
+    marginLeft: 4,
+    fontWeight: '700',
   },
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   viewButtonText: {
     fontSize: 14,

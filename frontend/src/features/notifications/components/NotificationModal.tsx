@@ -40,11 +40,10 @@ export const NotificationModal = ({ notification, onClose }: Props) => {
           <Text style={styles.sectionTitle}>Détails</Text>
           <Text style={styles.message}>{notification.message}</Text>
           
-          {/* Si on avait des infos structurées depuis l'API */}
           {notification.ride_id && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Trajet concerné</Text>
-              <Text style={styles.detailValue}>#{notification.ride_id}</Text>
+              <Text style={styles.detailValue}>Voir l'onglet Trajets</Text>
             </View>
           )}
           {notification.amount && (

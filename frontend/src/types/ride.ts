@@ -24,9 +24,14 @@ export interface Ride {
   seats_available: number;
   total_seats: number;
   status: string;
+  description?: string;
   distance_km?: number;
   driver_latitude?: number | null;
   driver_longitude?: number | null;
+  departure_latitude?: number | null;
+  departure_longitude?: number | null;
+  arrival_latitude?: number | null;
+  arrival_longitude?: number | null;
   
   // Parcels
   accepts_parcels?: boolean;
