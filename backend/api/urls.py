@@ -23,7 +23,7 @@ from .views import (
     RideViewSet, BookingViewSet, ConversationViewSet, MessageViewSet, NotificationViewSet,
     AppBrandingView, VerificationRequestViewSet, PromotionViewSet, MobileSettingsView,
     FinancialSettingsViewSet, RefundRequestViewSet, TransactionViewSet, ParcelViewSet,
-    PopularPlaceViewSet
+    PopularPlaceViewSet, send_reset_code, verify_reset_code, reset_password
 )
 
 router = DefaultRouter()
@@ -51,6 +51,9 @@ urlpatterns = [
     path('auth/request-verification/', request_verification, name='request_verification'),
     path('auth/verification-status/', verification_status, name='verification_status'),
     path('auth/fcm-token/', save_fcm_token, name='save_fcm_token'),
+    path('auth/send-reset-code/', send_reset_code, name='send_reset_code'),
+    path('auth/verify-reset-code/', verify_reset_code, name='verify_reset_code'),
+    path('auth/reset-password/', reset_password, name='reset_password'),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path('branding/', AppBrandingView.as_view(), name='app_branding'),
     path('mobile-settings/', MobileSettingsView.as_view(), name='mobile_settings'),

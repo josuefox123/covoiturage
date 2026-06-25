@@ -2675,3 +2675,358 @@ class PopularPlaceViewSet(viewsets.ModelViewSet):
                 Q(name__icontains=search) | Q(city__icontains=search)
             )
         return queryset
+
+
+from django.core.mail import EmailMultiAlternatives
+from email.mime.image import MIMEImage
+from django.utils import timezone
+from datetime import timedelta
+from .models import PasswordResetOTP
+import logging
+import os
+import email
+import email.policy
+
+logger = logging.getLogger(__name__)
+
+class SafeEmailMultiAlternatives(EmailMultiAlternatives):
+    """
+    Subclass of EmailMultiAlternatives that implements a clean multipart/related structure
+    for inline attachments in Django 6.0+ without using the deprecated mixed_subtype.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._inline_attachments = []
+
+    def attach_inline(self, filename, content, mimetype, content_id):
+        self._inline_attachments.append((filename, content, mimetype, content_id))
+
+    def message(self, *, policy=email.policy.default):
+        # Generate standard message without standard attachments first
+        original_attachments = self.attachments
+        self.attachments = []
+        msg = super().message(policy=policy)
+        self.attachments = original_attachments
+
+        # If there are inline attachments, find the HTML part and add them as related
+        if self._inline_attachments:
+            if msg.is_multipart() and msg.get_content_subtype() == 'alternative':
+                payload = msg.get_payload()
+                html_part = None
+                for part in payload:
+                    if part.get_content_type() == 'text/html':
+                        html_part = part
+                        break
+                
+                if html_part is not None:
+                    for filename, content, mimetype, content_id in self._inline_attachments:
+                        maintype, subtype = mimetype.split('/', 1)
+                        html_part.add_related(
+                            content,
+                            maintype=maintype,
+                            subtype=subtype,
+                            cid=content_id
+                        )
+
+        # Add standard attachments as mixed
+        if self.attachments:
+            msg.make_mixed()
+            for attachment in self.attachments:
+                self._add_attachment(msg, *attachment)
+
+        return msg
+
+
+def send_zemy_reset_email(full_name, email, code):
+    subject = "Réinitialisation de votre mot de passe Zemy"
+    
+    html_message = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{subject}</title>
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                background-color: #F8FAFC;
+                color: #0F172A;
+                margin: 0;
+                padding: 0;
+                -webkit-font-smoothing: antialiased;
+            }}
+            .container {{
+                max-width: 580px;
+                margin: 30px auto;
+                background: #FFFFFF;
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                border: 1px solid #E2E8F0;
+            }}
+            .header {{
+                text-align: center;
+                margin-bottom: 30px;
+            }}
+            .logo-image {{
+                height: 50px;
+                vertical-align: middle;
+                display: inline-block;
+            }}
+            .brand-name {{
+                font-size: 28px;
+                font-weight: 800;
+                color: #0F172A;
+                letter-spacing: 0.5px;
+                vertical-align: middle;
+                display: inline-block;
+                margin-left: 8px;
+            }}
+            .logo-tagline {{
+                font-size: 12px;
+                color: #94A3B8;
+                font-weight: 500;
+                letter-spacing: 0.5px;
+                margin-top: 8px;
+            }}
+            h1 {{
+                font-size: 20px;
+                font-weight: 700;
+                color: #0F172A;
+                margin-top: 0;
+                margin-bottom: 20px;
+            }}
+            p {{
+                font-size: 15px;
+                line-height: 24px;
+                color: #475569;
+                margin-bottom: 20px;
+            }}
+            .otp-container {{
+                background-color: #F1F5F9;
+                border-radius: 14px;
+                padding: 24px;
+                text-align: center;
+                margin: 25px 0;
+                border: 1px solid #E2E8F0;
+            }}
+            .otp-code {{
+                font-size: 32px;
+                font-weight: 800;
+                letter-spacing: 6px;
+                color: #2563EB;
+                margin: 0;
+            }}
+            .warning-text {{
+                font-size: 13px;
+                color: #94A3B8;
+                line-height: 20px;
+            }}
+            .footer {{
+                margin-top: 35px;
+                border-top: 1px solid #E2E8F0;
+                padding-top: 25px;
+                text-align: center;
+            }}
+            .footer-brand {{
+                font-weight: 700;
+                color: #0F172A;
+                font-size: 14px;
+                margin-bottom: 4px;
+            }}
+            .footer-tagline {{
+                font-size: 12px;
+                color: #94A3B8;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div style="display: inline-block; vertical-align: middle;">
+                    <img src="cid:logo_zemy" class="logo-image" alt="Logo Zemy" />
+                  
+                </div>
+                <div class="logo-tagline" style="margin-top: 4px;">Transport & covoiturage</div>
+            </div>
+            
+            <h1>Bonjour {full_name},</h1>
+            
+            <p>Nous avons reçu une demande de réinitialisation de votre mot de passe Zemy.</p>
+            
+            <p>Votre code de vérification est :</p>
+            
+            <div class="otp-container">
+                <div class="otp-code">{code}</div>
+            </div>
+            
+            <p>Ce code est valable pendant <strong>10 minutes</strong>.</p>
+            
+            <p class="warning-text">Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.</p>
+            
+            <p>Merci de votre confiance.</p>
+            
+            <div class="footer">
+                <div class="footer-brand">L'équipe Zemy</div>
+                <div class="footer-tagline">Transport • Livraison • Mobilité</div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    text_message = f"""Bonjour {full_name},
+
+Nous avons reçu une demande de réinitialisation de votre mot de passe Zemy.
+
+Votre code de vérification est :
+
+{code}
+
+Ce code est valable pendant 10 minutes.
+
+Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité.
+
+Merci de votre confiance.
+
+L'équipe Zemy
+Transport • Livraison • Mobilité"""
+
+    try:
+        msg = SafeEmailMultiAlternatives(
+            subject=subject,
+            body=text_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email]
+        )
+        msg.attach_alternative(html_message, "text/html")
+
+        # Attacher le fichier logozemy.png en tant que ressource inline
+        logo_path = os.path.join(settings.BASE_DIR, 'static', 'logozemy.png')
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                img_data = f.read()
+                msg.attach_inline('logozemy.png', img_data, 'image/png', '<logo_zemy>')
+        else:
+            logger.warning(f"Fichier logo non trouvé à l'emplacement : {logo_path}")
+
+        msg.send(fail_silently=False)
+        logger.info(f"Email OTP de réinitialisation de mot de passe envoyé avec succès à {email}")
+        return True
+    except Exception as e:
+        logger.error(f"Échec de l'envoi de l'email OTP à {email} : {str(e)}")
+        raise e
+
+
+
+@extend_schema(request=dict, responses={200: dict, 400: dict, 500: dict}, tags=['Authentification'])
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@csrf_exempt
+def send_reset_code(request):
+    """
+    Génère et envoie un code OTP à l'adresse e-mail spécifiée pour réinitialiser le mot de passe.
+    """
+    email = request.data.get('email') or request.data.get('email_or_phone')
+    if not email:
+        return Response({'error': "L'adresse email est requise."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    email = email.strip()
+    user = User.objects.filter(email__iexact=email).first()
+    if not user:
+        return Response({'error': "Aucun compte n'est associé à cette adresse email."}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Supprimer les OTP précédents pour cet e-mail
+    PasswordResetOTP.objects.filter(email__iexact=email).delete()
+    
+    # Générer le code
+    code = str(random.randint(100000, 999999))
+    PasswordResetOTP.objects.create(email=email.lower(), code=code)
+    
+    # Envoyer l'email
+    try:
+        send_zemy_reset_email(user.full_name or "Utilisateur Zemy", email, code)
+        return Response({'message': "Code de réinitialisation envoyé avec succès par email."}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': "Une erreur est survenue lors de l'envoi de l'e-mail. Veuillez vérifier votre configuration."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Authentification'])
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@csrf_exempt
+def verify_reset_code(request):
+    """
+    Vérifie si le code OTP fourni pour un e-mail est correct, non expiré et n'a pas dépassé les tentatives.
+    """
+    email = request.data.get('email') or request.data.get('email_or_phone')
+    code = request.data.get('code')
+    
+    if not email or not code:
+        return Response({'error': "L'adresse email et le code OTP sont requis."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    email = email.strip()
+    otp = PasswordResetOTP.objects.filter(email__iexact=email).first()
+    if not otp:
+        return Response({'error': "Aucun code n'a été demandé pour cette adresse email."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if otp.is_verified:
+        return Response({'message': "Code déjà vérifié avec succès."}, status=status.HTTP_200_OK)
+        
+    if otp.attempts >= 5:
+        return Response({'error': "Nombre maximum de tentatives de validation dépassé. Veuillez demander un nouveau code."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    # Vérification de la date d'expiration (10 minutes)
+    if timezone.now() - otp.created_at > timedelta(minutes=10):
+        return Response({'error': "Le code de validation a expiré. Veuillez en demander un nouveau."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if otp.code != code:
+        otp.attempts += 1
+        otp.save()
+        remaining = 5 - otp.attempts
+        if remaining <= 0:
+            return Response({'error': "Nombre maximum de tentatives dépassé. Veuillez demander un nouveau code."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': f"Code de validation incorrect. Il vous reste {remaining} tentatives."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    # Validation réussie
+    otp.is_verified = True
+    otp.save()
+    return Response({'message': "Code vérifié avec succès."}, status=status.HTTP_200_OK)
+
+
+@extend_schema(request=dict, responses={200: dict, 400: dict, 404: dict}, tags=['Authentification'])
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@csrf_exempt
+def reset_password(request):
+    """
+    Modifie le mot de passe après vérification réussie du code OTP.
+    """
+    email = request.data.get('email') or request.data.get('email_or_phone')
+    code = request.data.get('code')
+    password = request.data.get('password')
+    
+    if not email or not code or not password:
+        return Response({'error': "Tous les champs sont requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    email = email.strip()
+    otp = PasswordResetOTP.objects.filter(email__iexact=email).first()
+    if not otp or not otp.is_verified:
+        return Response({'error': "Veuillez d'abord vérifier le code de validation OTP."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if timezone.now() - otp.created_at > timedelta(minutes=10):
+        return Response({'error': "Le code de validation a expiré. Veuillez recommencer la procédure."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    user = User.objects.filter(email__iexact=email).first()
+    if not user:
+        return Response({'error': "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        
+    # Modifier le mot de passe
+    user.set_password(password)
+    user.save()
+    
+    # Supprimer l'OTP pour empêcher toute réutilisation
+    otp.delete()
+    
+    return Response({'message': "Votre mot de passe a été modifié avec succès."}, status=status.HTTP_200_OK)

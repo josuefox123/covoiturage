@@ -803,3 +803,20 @@ class Payment(models.Model):
     def __str__(self):
         return f"Payment {self.transaction_id} ({self.status}) - {self.amount} XOF"
 
+
+class PasswordResetOTP(models.Model):
+    email = models.EmailField(verbose_name="Adresse email")
+    code = models.CharField(max_length=6, verbose_name="Code OTP")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    attempts = models.IntegerField(default=0, verbose_name="Tentatives de vérification")
+    is_verified = models.BooleanField(default=False, verbose_name="Vérifié")
+
+    class Meta:
+        verbose_name = "OTP de réinitialisation"
+        verbose_name_plural = "OTPs de réinitialisation"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.email} - {self.code}"
+
+
