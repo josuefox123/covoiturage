@@ -348,7 +348,7 @@ SPECTACULAR_SETTINGS = {
     ]
 }
 
-# Configuration de l'Email et du serveur SMTP (Gmail / Brevo) - Reload Trigger
+# Configuration de l'Email et du serveur SMTP (Titan) - Reload Trigger 2
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
