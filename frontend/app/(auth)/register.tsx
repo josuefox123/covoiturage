@@ -428,7 +428,7 @@ export default function RegisterScreen() {
 
           {/* ── En-tête ── */}
           <View style={styles.header}>
-            <Text style={styles.title}>Créer un compte 🚀</Text>
+            <Text style={styles.title}>Créer un compte </Text>
             <Text style={styles.subtitle}>
               Rejoignez Zemy pour vous déplacer facilement.
             </Text>
