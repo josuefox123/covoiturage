@@ -58,6 +58,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     parcel_rating = models.FloatField(default=0.0)
     is_verified = models.BooleanField(default=False)
     fcm_token = models.CharField(max_length=500, blank=True, null=True, verbose_name="FCM Token")
+    # Code pays ISO 3166-1 alpha-2 (ex: BJ, TG, CI, SN, BF, NE, CM, GA)
+    country = models.CharField(
+        max_length=5,
+        default='BJ',
+        blank=True,
+        verbose_name="Code pays (ISO 2 lettres)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
 

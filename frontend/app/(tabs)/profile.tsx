@@ -568,22 +568,39 @@ export default function ProfileScreen() {
           {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statCol}>
-              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statNumber}>
+                {(user?.rides_count ?? 0) + (user?.reviews_count ?? 0)}
+              </Text>
               <Text style={styles.statLabel}>Trajets</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Avis</Text>
+              <Text style={styles.statNumber}>
+                {user?.rating != null && user.rating > 0
+                  ? user.rating.toFixed(1)
+                  : '–'}
+              </Text>
+              <Text style={styles.statLabel}>Note ⭐</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>FCFA Économisés</Text>
+              <Text style={styles.statNumber}>
+                {(() => {
+                  const spent = user?.total_spent ?? 0;
+                  return spent >= 1000
+                    ? `${(spent / 1000).toFixed(1)}k`
+                    : `${spent}`;
+                })()}
+              </Text>
+              <Text style={styles.statLabel}>FCFA Dépensés</Text>
             </View>
           </View>
 
-          <Text style={styles.memberSinceText}>Membre depuis Mai 2026</Text>
+          <Text style={styles.memberSinceText}>
+            {user?.created_at
+              ? `Membre depuis ${new Date(user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
+              : 'Membre Zemy'}
+          </Text>
         </LinearGradient>
 
 

@@ -24,6 +24,14 @@ export interface User {
   rating?: number;
   is_verified?: boolean;
   verification_status?: 'not_verified' | 'pending' | 'verified' | 'rejected';
+  /** Date d'inscription ISO 8601 – ex: "2026-05-14T10:23:00Z" */
+  created_at?: string | null;
+  /** Nombre de trajets complétés en tant que conducteur */
+  rides_count?: number;
+  /** Nombre de réservations complétées en tant que passager (proxy avis) */
+  reviews_count?: number;
+  /** Total FCFA dépensé en covoiturage */
+  total_spent?: number;
 }
 
 interface AuthContextData {

@@ -35,10 +35,21 @@ class UserSerializer(serializers.ModelSerializer):
     vehicles = serializers.SerializerMethodField()
     rides_count = serializers.SerializerMethodField()
     verification_status = serializers.SerializerMethodField()
+    # Nombre de trajets effectués en tant que passager (proxy pour les avis)
+    reviews_count = serializers.SerializerMethodField()
+    # Total FCFA dépensé en covoiturage (trajets completés en tant que passager)
+    total_spent = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'avatar', 'rating', 'parcels_completed', 'parcel_rating', 'is_verified', 'is_active', 'created_at', 'preference', 'vehicles', 'rides_count', 'verification_status']
+        fields = [
+            'id', 'full_name', 'email', 'phone', 'country', 'avatar',
+            'rating', 'parcels_completed', 'parcel_rating',
+            'is_verified', 'is_active', 'created_at',
+            'preference', 'vehicles',
+            'rides_count', 'reviews_count', 'total_spent',
+            'verification_status',
+        ]
 
     @extend_schema_field(dict)
     def get_vehicles(self, obj):
@@ -46,7 +57,34 @@ class UserSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(int)
     def get_rides_count(self, obj):
+        """Nombre de trajets complétés en tant que conducteur."""
         return obj.rides_driven.filter(status='completed').count()
+
+    @extend_schema_field(int)
+    def get_reviews_count(self, obj):
+        """
+        Nombre de réservations complétées en tant que passager.
+        Utilisé comme proxy pour le nombre d'avis.
+        """
+        return obj.bookings.filter(status='completed').count()
+
+    @extend_schema_field(int)
+    def get_total_spent(self, obj):
+        """
+        Total FCFA dépensé par l'utilisateur en covoiturage
+        (somme des prix des réservations complétées).
+        """
+        from django.db.models import Sum, F, ExpressionWrapper, IntegerField
+        result = obj.bookings.filter(status='completed').aggregate(
+            total=Sum(
+                ExpressionWrapper(
+                    F('seats_booked') * F('ride__price_per_seat'),
+                    output_field=IntegerField()
+                )
+            )
+        )
+        return result['total'] or 0
+
 
     @extend_schema_field(str)
     def get_verification_status(self, obj):
@@ -240,17 +278,24 @@ class ConversationSerializer(serializers.ModelSerializer):
         return False
 
 class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur pour l'inscription d'un nouvel utilisateur.
+    Accepte le pays de l'utilisateur (code ISO 2 lettres) pour les marchés africains multi-pays.
+    """
     password = serializers.CharField(write_only=True)
+    # Code pays optionnel – défaut Bénin si non fourni
+    country = serializers.CharField(max_length=5, required=False, default='BJ')
     
     class Meta:
         model = User
-        fields = ['full_name', 'email', 'phone', 'password']
+        fields = ['full_name', 'email', 'phone', 'password', 'country']
         
     def create(self, validated_data):
         user = User.objects.create_user(
             phone=validated_data['phone'],
             email=validated_data.get('email', ''),
             full_name=validated_data.get('full_name', ''),
+            country=validated_data.get('country', 'BJ'),
             password=validated_data['password']
         )
         return user

@@ -16,7 +16,8 @@ Zemy
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    verify_code, register_user, login_user, request_verification, verification_status,
+    verify_code, register_user, login_user, check_availability,
+    request_verification, verification_status,
     dashboard_stats, save_fcm_token, payment_callback, fedapay_webhook,
     UserViewSet, VehicleViewSet, UserPreferenceViewSet,
     RideViewSet, BookingViewSet, ConversationViewSet, MessageViewSet, NotificationViewSet,
@@ -46,6 +47,7 @@ urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),
     path('auth/register/', register_user, name='register_user'),
     path('auth/login/', login_user, name='login_user'),
+    path('auth/check-availability/', check_availability, name='check_availability'),
     path('auth/request-verification/', request_verification, name='request_verification'),
     path('auth/verification-status/', verification_status, name='verification_status'),
     path('auth/fcm-token/', save_fcm_token, name='save_fcm_token'),

@@ -118,6 +118,49 @@ def save_fcm_token(request):
     request.user.save(update_fields=['fcm_token'])
     return Response({'status': 'FCM token enregistré avec succès.'})
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter('email', str, description='Email à vérifier', required=False),
+        OpenApiParameter('phone', str, description='Numéro de téléphone à vérifier', required=False),
+    ],
+    responses={200: dict},
+    tags=['Authentification']
+)
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def check_availability(request):
+    """
+    Vérifie si un email ou un numéro de téléphone est déjà utilisé.
+    
+    Paramètres GET :
+        - email  : adresse email à tester
+        - phone  : numéro de téléphone à tester
+    
+    Retourne :
+        - email_available  : True si l'email est libre
+        - phone_available  : True si le numéro est libre
+    """
+    email = request.query_params.get('email', '').strip()
+    phone = request.query_params.get('phone', '').strip()
+
+    result = {}
+
+    if email:
+        result['email_available'] = not User.objects.filter(email__iexact=email).exists()
+
+    if phone:
+        # Vérification directe ET avec préfixe +229 pour compatibilité
+        phone_taken = User.objects.filter(phone=phone).exists()
+        result['phone_available'] = not phone_taken
+
+    if not email and not phone:
+        return Response(
+            {'error': 'Fournir au moins email ou phone.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return Response(result)
+
 @extend_schema(request=dict, responses={201: dict, 400: dict}, tags=['Authentification'])
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
