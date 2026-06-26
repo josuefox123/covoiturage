@@ -27,7 +27,9 @@ Zemy
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
+
+const apexchart = defineAsyncComponent(() => import('vue3-apexcharts'))
 
 const props = defineProps({
   title: { type: String, required: true },
@@ -37,7 +39,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false }
 })
 
-const chartOptions = computed(() => ({
+const chartOptions = computed<any>(() => ({
   chart: {
     type: 'donut',
     fontFamily: 'inherit',

@@ -15,6 +15,7 @@
  * ==============================================================
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ActivityIndicator, StyleSheet,
   TouchableOpacity, Animated, ScrollView
@@ -86,15 +87,6 @@ export default function PaymentCallbackScreen() {
     if (pollingRef.current) { clearTimeout(pollingRef.current); pollingRef.current = null; }
     if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
   }, []);
-
-  useEffect(() => {
-    isMounted.current = true;
-    doVerify(0);
-    return () => {
-      isMounted.current = false;
-      clearPolling();
-    };
-  }, [booking_id, parcel_id]);
 
   const doVerify = useCallback(async (attempt: number) => {
     if (!isMounted.current) return;
@@ -207,7 +199,17 @@ export default function PaymentCallbackScreen() {
     }, 5000);
   }, [doVerify, clearPolling]);
 
-  // Ouvrir le checkout FedaPay pour payer (ou repayer)
+  useFocusEffect(
+    useCallback(() => {
+      isMounted.current = true;
+      doVerify(0);
+      return () => {
+        isMounted.current = false;
+        clearPolling();
+      };
+    }, [booking_id, parcel_id, doVerify, clearPolling])
+  );
+
   const handleOpenPayment = async () => {
     if (!booking_id && !parcel_id) return;
     setPaymentLoading(true);
@@ -226,13 +228,15 @@ export default function PaymentCallbackScreen() {
       });
 
       if (payRes?.url) {
-        // Ouvrir FedaPay checkout (réutilise la transaction existante, pas de doublon)
-        await WebBrowser.openAuthSessionAsync(payRes.url, callbackUrl);
-        // Après retour, revérifier
-        if (isMounted.current) {
-          setRetryCount(0);
-          doVerify(0);
-        }
+        // Rediriger vers l'écran de paiement
+        router.push({
+          pathname: '/payment-redirect',
+          params: {
+            checkoutUrl: payRes.url,
+            bookingId: booking_id ? String(booking_id) : undefined,
+            parcelId: parcel_id ? String(parcel_id) : undefined,
+          }
+        });
       } else if (payRes?.error) {
         setScreenStatus('failed');
         setMessage(payRes.error);

@@ -21,7 +21,7 @@ from .rides import (
 )
 from .payments import (
     payment_callback,
-    fedapay_webhook,
+    sync_payments,
     FinancialSettingsViewSet,
     RefundRequestViewSet,
     TransactionViewSet,
@@ -44,3 +44,8 @@ from .settings import (
     MobileSettingsView,
     PromotionViewSet,
 )
+from .support import (
+    contact_view,
+    SupportTicketViewSet,
+)
+

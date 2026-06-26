@@ -48,7 +48,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     Contraintes :
         - Le téléphone doit être unique.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)  # type: ignore[assignment]
     full_name = models.CharField(max_length=255, blank=True, null=True)
     email = models.EmailField(unique=True, blank=True, null=True)
     phone = models.CharField(max_length=20, unique=True, verbose_name="Email, Téléphone ou Nom")
@@ -76,7 +76,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     archived_at = models.DateTimeField(blank=True, null=True)
     archived_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='archived_users')
 
-    objects = UserManager()
+    objects: UserManager = UserManager()  # type: ignore[assignment]
 
     USERNAME_FIELD = 'phone'
     REQUIRED_FIELDS = []
@@ -303,13 +303,13 @@ class Booking(models.Model):
     def __str__(self):
         return f"Reservation {self.id} pour {self.ride}"
 
-    def delete(self, *args, **kwargs):
+    def delete(self, using=None, keep_parents=False):  # type: ignore[override]
         if self.status != 'cancelled' and self.ride:
             from django.db.models import F
             Ride.objects.filter(id=self.ride_id).update(
                 seats_available=F('seats_available') + self.seats_booked
             )
-        super().delete(*args, **kwargs)
+        return super().delete(using=using, keep_parents=keep_parents)
         
     @property
     def total_amount(self):
@@ -317,7 +317,6 @@ class Booking(models.Model):
 
     @property
     def amount_paid_online(self):
-        from .models import FinancialSettings
         settings = FinancialSettings.objects.first()
         if not settings:
             return 0
@@ -327,6 +326,31 @@ class Booking(models.Model):
     @property
     def amount_due_to_driver(self):
         return self.total_amount - self.amount_paid_online
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.status == 'confirmed':
+            try:
+                from django.db.models import Q
+                existing_conv = Conversation.objects.filter(
+                    ride=self.ride,
+                    conversation_type='ride'
+                ).filter(
+                    Q(participant_1=self.passenger, participant_2=self.ride.driver) |
+                    Q(participant_1=self.ride.driver, participant_2=self.passenger)
+                ).first()
+                
+                if not existing_conv:
+                    Conversation.objects.create(
+                        conversation_type='ride',
+                        ride=self.ride,
+                        participant_1=self.passenger,
+                        participant_2=self.ride.driver,
+                    )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error creating conversation for booking {self.id}: {str(e)}")
 
 class Conversation(models.Model):
     """
@@ -693,13 +717,13 @@ class Parcel(models.Model):
     def __str__(self):
         return f"Colis {self.id} - {self.status}"
 
-    def delete(self, *args, **kwargs):
+    def delete(self, using=None, keep_parents=False):  # type: ignore[override]
         if self.status != 'cancelled' and self.payment_status != 'refunded' and self.ride:
             from django.db.models import F
             Ride.objects.filter(id=self.ride_id).update(
                 parcels_available=F('parcels_available') + 1
             )
-        super().delete(*args, **kwargs)
+        return super().delete(using=using, keep_parents=keep_parents)
 
 class AuditLog(models.Model):
     """
@@ -792,6 +816,8 @@ class Payment(models.Model):
     parcel = models.ForeignKey('Parcel', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     provider = models.CharField(max_length=50, default='fedapay')
+    last_verification_at = models.DateTimeField(null=True, blank=True)
+    verification_attempts = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -818,5 +844,60 @@ class PasswordResetOTP(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.code}"
+
+
+class SupportTicket(models.Model):
+    CATEGORY_CHOICES = [
+        ('problem_ride', 'Problème de trajet'),
+        ('problem_parcel', 'Problème de colis'),
+        ('payment', 'Paiement'),
+        ('account', 'Compte'),
+        ('driver', 'Conducteur'),
+        ('suggestion', 'Suggestion'),
+        ('other', 'Autre'),
+    ]
+
+    STATUS_CHOICES = [
+        ('new', 'Nouveau'),
+        ('in_progress', 'En cours'),
+        ('resolved', 'Traité'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+    subject = models.CharField(max_length=255)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    ticket_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ticket de Support"
+        verbose_name_plural = "Tickets de Support"
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.ticket_number:
+            import datetime
+            import random
+            today = datetime.date.today()
+            today_str = today.strftime('%Y%m%d')
+            tickets_today_count = SupportTicket.objects.filter(created_at__date=today).count()
+            self.ticket_number = f"ZMY-{today_str}-{(tickets_today_count + 1):05d}"
+            
+            while SupportTicket.objects.filter(ticket_number=self.ticket_number).exists():
+                random_suffix = random.randint(10000, 99999)
+                self.ticket_number = f"ZMY-{today_str}-{random_suffix}"
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.ticket_number} - {self.name} ({self.get_status_display()})"
+
 
 

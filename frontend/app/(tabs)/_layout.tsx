@@ -15,6 +15,8 @@ import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
 import SupportBubble from '../../src/components/SupportBubble';
+import { useEffect } from 'react';
+import { useAuth } from '../../src/context/AuthContext';
 
 /**
  * Composant TabsLayout.
@@ -23,6 +25,21 @@ import SupportBubble from '../../src/components/SupportBubble';
  * - Affichage et gestion de l'état lié à TabsLayout.
  */
 export default function TabsLayout() {
+  const { authFetch, user } = useAuth();
+
+  useEffect(() => {
+    // Synchroniser les paiements FedaPay en arrière-plan au démarrage
+    if (user) {
+      authFetch('/payments/sync/', { method: 'POST' })
+        .then(res => {
+          if (res.synced_count > 0) {
+            console.log(`Synchronisé ${res.synced_count} paiements PENDING.`);
+          }
+        })
+        .catch(err => console.log('Erreur sync_payments', err));
+    }
+  }, [user]);
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs

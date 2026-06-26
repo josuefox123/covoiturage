@@ -11,7 +11,8 @@
  * ==============================================================
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl, Linking } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl, Linking, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -105,9 +106,13 @@ export default function RideDetailScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchRide(true);
+  useFocusEffect(
+    useCallback(() => {
+      fetchRide(true);
+    }, [id])
+  );
 
+  useEffect(() => {
     // Poll every 10 seconds for real-time database updates
     const interval = setInterval(() => {
       fetchRide(false);
@@ -206,10 +211,9 @@ export default function RideDetailScreen() {
       });
       currentBookingId = res.id;
 
-      // 2. Initialiser le paiement — le callback inclut le booking_id pour que
-      //    l'écran payments.tsx puisse vérifier automatiquement à son retour.
-      const callbackUrl = ExpoLinking.createURL('payments', {
-        queryParams: { booking_id: String(currentBookingId) }
+      // 2. Initialiser le paiement avec FedaPay
+      const callbackUrl = ExpoLinking.createURL(`ride/${id}`, {
+        queryParams: { action: 'payment_complete', booking_id: String(currentBookingId) }
       });
       const payRes = await authFetch(`/bookings/${currentBookingId}/pay/`, {
         method: 'POST',
@@ -217,18 +221,19 @@ export default function RideDetailScreen() {
       });
 
       if (payRes.url) {
-        // 3. Ouvrir le navigateur natif (l'app reprend via deep link après paiement)
-        await WebBrowser.openAuthSessionAsync(payRes.url, callbackUrl);
-        // L'écran payments.tsx sera affiché automatiquement par Expo Router
-        // si le deep link fonctionne. Sinon, on vérifie ici aussi.
         setBookingId(currentBookingId);
         setHasBooked(true);
-        await fetchRide(false);
+        // Rediriger vers l'écran de paiement
+        router.push({
+          pathname: '/payment-redirect',
+          params: {
+            checkoutUrl: payRes.url,
+            bookingId: String(currentBookingId),
+          }
+        });
       }
     } catch (error: any) {
       if (currentBookingId) {
-        // On ne supprime PAS la réservation si un paiement a peut-être été initié
-        // L'utilisateur peut vérifier depuis l'écran payments
         CustomAlert.alert(
           'Paiement initié',
           'Votre réservation a été créée. Si vous avez payé, vérifiez le statut dans "Mes trajets".',
@@ -254,18 +259,22 @@ export default function RideDetailScreen() {
     if (!bookingId) return;
     try {
       setBookingLoading(true);
-      const callbackUrl = ExpoLinking.createURL('payments', {
-        queryParams: { booking_id: String(bookingId) }
+      const callbackUrl = ExpoLinking.createURL(`ride/${id}`, {
+        queryParams: { action: 'payment_complete', booking_id: String(bookingId) }
       });
       const payRes = await authFetch(`/bookings/${bookingId}/pay/`, {
         method: 'POST',
         body: JSON.stringify({ callback_url: callbackUrl })
       });
       if (payRes.url) {
-        // Rouvrir le checkout FedaPay (même transaction, pas de doublon)
-        await WebBrowser.openAuthSessionAsync(payRes.url, callbackUrl);
-        // Après fermeture du navigateur, rafraîchir l'état
-        await fetchRide(false);
+        // Rediriger vers l'écran de paiement
+        router.push({
+          pathname: '/payment-redirect',
+          params: {
+            checkoutUrl: payRes.url,
+            bookingId: String(bookingId),
+          }
+        });
       } else if (payRes.error) {
         CustomAlert.alert('Erreur', payRes.error);
       }
@@ -400,6 +409,9 @@ export default function RideDetailScreen() {
           </View>
         )}
 
+
+
+      {/* Bouton Fixe Réserver */}
         {/* Big Date */}
         <Text style={styles.dateText}>
           {new Date(ride.departure_date).toLocaleDateString('fr-FR', {

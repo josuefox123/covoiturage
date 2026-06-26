@@ -157,112 +157,113 @@ def payment_callback(request):
 
 
 @api_view(['POST'])
-@permission_classes([permissions.AllowAny])
-@csrf_exempt
-def fedapay_webhook(request):
+@permission_classes([permissions.IsAuthenticated])
+def sync_payments(request):
     """
-    Webhook FedaPay pour valider les paiements de manière asynchrone.
+    Endpoint de synchronisation appelé par l'application mobile.
+    Vérifie tous les paiements PENDING de l'utilisateur connecté via FedaPay.
     """
-    import json
-    try:
-        payload = json.loads(request.body)
-    except Exception as e:
-        return Response({"error": "JSON invalide"}, status=status.HTTP_400_BAD_REQUEST)
-
-    entity = payload.get('entity', {})
-    transaction_id = str(entity.get('id'))
-
-    if not transaction_id:
-        return Response({"error": "ID de transaction absent"}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Récupérer ou créer l'enregistrement de paiement de façon atomique
     from django.db import transaction
-    with transaction.atomic():
-        payment = Payment.objects.filter(transaction_id=transaction_id).select_for_update().first()
-        
-        booking = Booking.objects.filter(transaction_id=transaction_id).first()
-        parcel = Parcel.objects.filter(payments__transaction_id=transaction_id).first() or Parcel.objects.filter(id=entity.get('custom_metadata', {}).get('parcel_id') or entity.get('metadata', {}).get('parcel_id')).first()
-        
-        user = None
-        if booking:
-            user = booking.passenger
-        elif parcel:
-            user = parcel.sender_user
+    from ..models import Payment
+    from ..services.fedapay_service import FedaPayService
+    
+    user = request.user
+    pending_payments = Payment.objects.filter(user=user, status='PENDING')
+    updated_payments = []
+    
+    for payment in pending_payments:
+        transaction_id = payment.transaction_id
+        if not transaction_id:
+            continue
             
-        if not payment:
-            payment = Payment.objects.create(
-                transaction_id=transaction_id,
-                amount=int(entity.get('amount', 0)),
-                user=user or User.objects.filter(is_staff=True).first(),
-                booking=booking,
-                parcel=parcel,
-                status='PENDING'
-            )
+        try:
+            transaction_data = FedaPayService.get_transaction_details(transaction_id)
+            tx_status = transaction_data.get('status', '').lower()
             
-        old_status = payment.status
-        fedapay_status = entity.get('status', '').lower()
-        
-        new_status = 'PENDING'
-        if fedapay_status == 'approved':
-            new_status = 'SUCCESS'
-        elif fedapay_status in ['declined', 'failed']:
-            new_status = 'FAILED'
-        elif fedapay_status == 'canceled':
-            new_status = 'CANCELLED'
-        elif fedapay_status == 'refunded':
-            new_status = 'REFUNDED'
-            
-        payment.status = new_status
-        if not payment.booking and booking:
-            payment.booking = booking
-        if not payment.parcel and parcel:
-            payment.parcel = parcel
-        payment.save()
-        
-        if new_status == 'SUCCESS' and old_status != 'SUCCESS':
-            # Valider Booking
-            if payment.booking:
-                b = payment.booking
-                if b.payment_status != 'escrow':
-                    b.payment_status = 'escrow'
-                    b.status = 'confirmed'
-                    b.save()
-                    
-                    amount_due = int(b.amount_due_to_driver)
-                    commission = int(b.amount_paid_online)
-                    
-                    create_and_send_notification(
-                        user=b.passenger,
-                        title="Réservation confirmée ✅",
-                        message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {b.ride.departure_location} -> {b.ride.arrival_location}.",
-                        data={'type': 'payment_confirmed', 'booking_id': str(b.id), 'screen': 'trips'}
-                    )
-                    
-                    if b.ride.driver_details:
-                        create_and_send_notification(
-                            user=b.ride.driver_details,
-                            title="Nouvelle Réservation 🚗",
-                            message=f"{b.passenger.full_name} a réservé {b.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
-                            data={'type': 'new_booking', 'booking_id': str(b.id), 'screen': 'rides'}
-                        )
+            if tx_status == 'approved':
+                with transaction.atomic():
+                    payment_locked = Payment.objects.select_for_update().filter(id=payment.id).first()
+                    if not payment_locked or payment_locked.status == 'SUCCESS':
+                        continue
                         
-            # Valider Parcel
-            if payment.parcel:
-                p = payment.parcel
-                if p.payment_status != 'escrow':
-                    p.payment_status = 'escrow'
-                    p.status = 'accepted'
-                    p.save()
+                    payment_locked.status = 'SUCCESS'
+                    from django.utils import timezone
+                    payment_locked.last_verification_at = timezone.now()
+                    payment_locked.save()
                     
-                    amount_due = p.driver_payout
-                    create_and_send_notification(
-                        user=p.ride.driver,
-                        title="Nouveau Colis Confirmé 📦",
-                        message=f"{p.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
-                        data={'type': 'parcel_confirmed', 'parcel_id': str(p.id), 'screen': 'rides'}
-                    )
+                    # Valider Booking
+                    if payment_locked.booking:
+                        booking = payment_locked.booking
+                        if booking.payment_status != 'escrow':
+                            booking.payment_status = 'escrow'
+                            booking.status = 'confirmed'
+                            booking.save()
+                            
+                            amount_due = int(booking.amount_due_to_driver)
+                            commission = int(booking.amount_paid_online)
+                            
+                            create_and_send_notification(
+                                user=booking.passenger,
+                                title="Réservation confirmée ✅",
+                                message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+                                data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
+                            )
+                            
+                            if booking.ride.driver_details:
+                                create_and_send_notification(
+                                    user=booking.ride.driver_details,
+                                    title="Nouvelle Réservation 🚗",
+                                    message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                                    data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
+                                )
+                                
+                    # Valider Parcel
+                    if payment_locked.parcel:
+                        parcel = payment_locked.parcel
+                        if parcel.payment_status != 'escrow':
+                            parcel.payment_status = 'escrow'
+                            parcel.status = 'accepted'
+                            parcel.save()
+                            
+                            amount_due = parcel.driver_payout
+                            create_and_send_notification(
+                                user=parcel.ride.driver,
+                                title="Nouveau Colis Confirmé 📦",
+                                message=f"{parcel.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
+                                data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
+                            )
+                            
+                    updated_payments.append({
+                        "transaction_id": transaction_id,
+                        "status": "SUCCESS",
+                        "booking_id": str(payment_locked.booking.id) if payment_locked.booking else None,
+                        "parcel_id": str(payment_locked.parcel.id) if payment_locked.parcel else None
+                    })
+                    
+            elif tx_status in ['declined', 'failed', 'canceled', 'refunded']:
+                new_status = 'FAILED'
+                if tx_status == 'canceled':
+                    new_status = 'CANCELLED'
+                elif tx_status == 'refunded':
+                    new_status = 'REFUNDED'
+                    
+                payment.status = new_status
+                from django.utils import timezone
+                payment.last_verification_at = timezone.now()
+                payment.save()
+                updated_payments.append({
+                    "transaction_id": transaction_id,
+                    "status": new_status,
+                })
+        except Exception as e:
+            # Ignore FedaPay errors during silent sync
+            print(f"Error syncing transaction {transaction_id}: {e}")
+            pass
 
-    return Response({"status": "ok"})
+    return Response({
+        "synced_count": len(updated_payments),
+        "updates": updated_payments
+    })
 
 
 @extend_schema(responses={200: dict}, tags=['Statistiques'])

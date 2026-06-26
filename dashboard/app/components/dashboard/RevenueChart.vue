@@ -46,7 +46,9 @@ Zemy
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
+
+const apexchart = defineAsyncComponent(() => import('vue3-apexcharts'))
 
 const props = defineProps({
   data: { type: Array, required: true },
@@ -60,7 +62,7 @@ const series = computed(() => [{
   data: props.data.map((d: any) => d.y)
 }])
 
-const chartOptions = computed(() => ({
+const chartOptions = computed<any>(() => ({
   chart: {
     type: 'area',
     fontFamily: 'inherit',

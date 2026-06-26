@@ -150,8 +150,8 @@ def dashboard_stats(request):
     active_rides_qs = Ride.objects.filter(status__in=['active', 'started'])[:20]
     map_data = []
     for r in active_rides_qs:
-        lat = r.departure_lat
-        lng = r.departure_lng
+        lat = r.departure_latitude
+        lng = r.departure_longitude
         # Si pas de coordonnées, on génère un point au pif proche du centre (Cotonou, Bénin)
         if not lat or not lng:
             import random

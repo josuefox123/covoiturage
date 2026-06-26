@@ -18,12 +18,13 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     verify_code, register_user, login_user, check_availability,
     request_verification, verification_status,
-    dashboard_stats, save_fcm_token, payment_callback, fedapay_webhook,
+    dashboard_stats, save_fcm_token, payment_callback, sync_payments,
     UserViewSet, VehicleViewSet, UserPreferenceViewSet,
     RideViewSet, BookingViewSet, ConversationViewSet, MessageViewSet, NotificationViewSet,
     AppBrandingView, VerificationRequestViewSet, PromotionViewSet, MobileSettingsView,
     FinancialSettingsViewSet, RefundRequestViewSet, TransactionViewSet, ParcelViewSet,
-    PopularPlaceViewSet, send_reset_code, verify_reset_code, reset_password
+    PopularPlaceViewSet, send_reset_code, verify_reset_code, reset_password,
+    contact_view, SupportTicketViewSet
 )
 
 router = DefaultRouter()
@@ -42,6 +43,7 @@ router.register(r'refund-requests', RefundRequestViewSet, basename='refund_reque
 router.register(r'transactions', TransactionViewSet, basename='transactions')
 router.register(r'parcels', ParcelViewSet, basename='parcel')
 router.register(r'popular-places', PopularPlaceViewSet, basename='popular_place')
+router.register(r'support-tickets', SupportTicketViewSet, basename='support_ticket')
 
 urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),
@@ -58,6 +60,7 @@ urlpatterns = [
     path('branding/', AppBrandingView.as_view(), name='app_branding'),
     path('mobile-settings/', MobileSettingsView.as_view(), name='mobile_settings'),
     path('payments/callback/', payment_callback, name='payment_callback'),
-    path('payments/webhook/', fedapay_webhook, name='fedapay_webhook'),
+    path('payments/sync/', sync_payments, name='sync_payments'),
+    path('contact/', contact_view, name='contact'),
     path('', include(router.urls)),
 ]

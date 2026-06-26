@@ -14,7 +14,7 @@ Zemy
 ========================================================
 """
 from django.contrib import admin
-from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Promotion, MobileSettings, Payment
+from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Promotion, MobileSettings, Payment, SupportTicket
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -120,3 +120,13 @@ class PaymentAdmin(admin.ModelAdmin):
     list_filter = ('status', 'provider')
     ordering = ('-created_at',)
     readonly_fields = ('id', 'created_at', 'updated_at')
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    list_display = ('ticket_number', 'name', 'email', 'category', 'subject', 'status', 'created_at')
+    search_fields = ('ticket_number', 'name', 'email', 'subject')
+    list_filter = ('status', 'category')
+    ordering = ('-created_at',)
+    readonly_fields = ('id', 'created_at', 'updated_at')
+

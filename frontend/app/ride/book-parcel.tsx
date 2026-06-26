@@ -11,7 +11,7 @@
  * ==============================================================
  */
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Image, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -59,6 +59,8 @@ export default function BookParcelScreen() {
   const [description, setDescription] = useState('');
   const [selectedType, setSelectedType] = useState<string>('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+
 
   useEffect(() => {
     const fetchRide = async () => {
@@ -133,6 +135,7 @@ export default function BookParcelScreen() {
 
   const performBooking = async () => {
     let currentParcelId: string | null = null;
+    const driverPrice = ride?.price_per_parcel || 0;
     try {
       setBookingLoading(true);
 
@@ -179,10 +182,9 @@ export default function BookParcelScreen() {
       });
       currentParcelId = res.id;
 
-      // 2. Initialiser le paiement — le callback inclut le parcel_id pour que
-      //    l'écran payments.tsx puisse vérifier automatiquement à son retour.
-      const callbackUrl = ExpoLinking.createURL('payments', {
-        queryParams: { parcel_id: String(currentParcelId) }
+      // 2. Initialiser le paiement avec FedaPay
+      const callbackUrl = ExpoLinking.createURL(`ride/book-parcel`, {
+        queryParams: { rideId, action: 'payment_complete', parcel_id: String(currentParcelId) }
       });
       const payRes = await authFetch(`/parcels/${currentParcelId}/pay/`, {
         method: 'POST',
@@ -190,9 +192,14 @@ export default function BookParcelScreen() {
       });
 
       if (payRes.url) {
-        // 3. Ouvrir le navigateur (l'app reprend via deep link après paiement)
-        await WebBrowser.openAuthSessionAsync(payRes.url, callbackUrl);
-        // L'écran payments.tsx prendra le relais via le deep link
+        // Rediriger vers l'écran de paiement
+        router.push({
+          pathname: '/payment-redirect',
+          params: {
+            checkoutUrl: payRes.url,
+            parcelId: String(currentParcelId),
+          }
+        });
       }
     } catch (error: any) {
       if (currentParcelId) {
@@ -332,6 +339,9 @@ export default function BookParcelScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+
+
     </SafeAreaView>
   );
 }

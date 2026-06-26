@@ -74,6 +74,47 @@ class ConversationViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+        conv_type = request.data.get('conversation_type', 'ride')
+        if conv_type == 'support':
+            return super().create(request, *args, **kwargs)
+            
+        ride_id = request.data.get('ride')
+        if not ride_id:
+            return Response({'error': 'ride is required for ride conversation.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            ride = Ride.objects.get(pk=ride_id)
+        except Ride.DoesNotExist:
+            return Response({'error': 'Trajet introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        participant_1_id = request.data.get('participant_1')
+        participant_2_id = request.data.get('participant_2')
+        
+        # Trouver qui est le passager (celui qui n'est pas le conducteur)
+        passenger_id = None
+        if participant_1_id and int(participant_1_id) != ride.driver.id:
+            passenger_id = participant_1_id
+        elif participant_2_id and int(participant_2_id) != ride.driver.id:
+            passenger_id = participant_2_id
+            
+        if not passenger_id:
+            return Response({'error': 'La conversation de trajet doit inclure le passager et le conducteur.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Vérifier que le passager a une réservation confirmée pour ce trajet
+        has_confirmed_booking = Booking.objects.filter(ride=ride, passenger_id=passenger_id, status='confirmed').exists()
+        if not has_confirmed_booking:
+            return Response({'error': "Vous devez avoir une réservation confirmée et payée pour démarrer une discussion."}, status=status.HTTP_403_FORBIDDEN)
+            
+        # Vérifier si l'utilisateur qui fait la requête est soit le passager, soit le conducteur
+        if request.user.id not in [int(participant_1_id or 0), int(participant_2_id or 0)]:
+            return Response({'error': "Vous n'êtes pas participant de cette discussion."}, status=status.HTTP_403_FORBIDDEN)
+            
+        return super().create(request, *args, **kwargs)
+
     @action(detail=False, methods=['get', 'post'], url_path='support-chat')
     def support_chat(self, request):
         """Get or create the support conversation for the current user."""
@@ -172,6 +213,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
         # If current user is the driver, they can also open the chat
         if passenger == driver:
             return Response({'error': 'Vous ne pouvez pas discuter avec vous-même.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Vérifier que le passager a une réservation confirmée pour ce trajet
+        has_confirmed_booking = Booking.objects.filter(ride=ride, passenger=passenger, status='confirmed').exists()
+        if not has_confirmed_booking:
+            return Response({'error': "Vous devez avoir une réservation confirmée et payée pour ce trajet pour démarrer une discussion."}, status=status.HTTP_403_FORBIDDEN)
 
         # Find or create the conversation
         conversation = Conversation.objects.filter(

@@ -24,8 +24,6 @@ class ApiConfig(AppConfig):
         # Prevent running twice when Django autoreloader restarts the thread
         if os.environ.get('RUN_MAIN') == 'true':
             from .departure_check import start_departure_check_thread
-            from .payment_check import start_payment_check_thread
             
             start_departure_check_thread()
-            start_payment_check_thread()
 

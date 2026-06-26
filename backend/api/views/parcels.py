@@ -35,6 +35,7 @@ from ..serializers import (
     FinancialSettingsSerializer, RefundRequestSerializer, TransactionSerializer, ParcelSerializer, PopularPlaceSerializer
 )
 from ..fcm import send_fcm_to_user, send_fcm_to_all_users, create_and_send_notification
+from .auth import get_valid_callback_url
 
 User = get_user_model()
 
@@ -126,29 +127,17 @@ class ParcelViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='pay')
     def pay_parcel(self, request, pk=None):
-        import requests
-        from django.conf import settings
+        from ..services.fedapay_service import FedaPayService
+        from ..models import Payment
         
         parcel = self.get_object()
         if parcel.sender_user != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
-        # Bloquer si déjà payé avec succès
         if parcel.payment_status in ['escrow', 'paid']:
             return Response({"error": "Cette expédition est déjà payée."}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            api_key = settings.FEDAPAY_SECRET_KEY
-            is_sandbox = settings.FEDAPAY_ENVIRONMENT == 'sandbox'
-            if api_key.startswith('sk_live_'):
-                is_sandbox = False
-                
-            base_url = "https://sandbox-api.fedapay.com/v1" if is_sandbox else "https://api.fedapay.com/v1"
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            
             import urllib.parse
             frontend_callback = request.data.get('callback_url') or 'zemy://payments'
             gateway_path = f'/api/payments/callback/?parcel_id={parcel.id}&redirect_to={urllib.parse.quote(frontend_callback)}'
@@ -156,41 +145,16 @@ class ParcelViewSet(viewsets.ModelViewSet):
 
             amount_to_pay = max(100, int(parcel.zemy_commission))
 
-            # ============================================================
-            # ANTI-DOUBLON : Réutiliser la transaction existante si PENDING
-            # ============================================================
             existing_payment = Payment.objects.filter(
                 parcel=parcel, status='PENDING'
             ).order_by('-created_at').first()
             
+            transaction_id = None
             if existing_payment and existing_payment.transaction_id:
                 transaction_id = existing_payment.transaction_id
-                token_res = requests.post(
-                    f"{base_url}/transactions/{transaction_id}/token",
-                    headers=headers
-                )
-                if token_res.status_code in [200, 201]:
-                    token_json = token_res.json()
-                    url = token_json.get('url')
-                    if not url:
-                        node = token_json.get('v1/token') or token_json.get('token')
-                        if isinstance(node, dict):
-                            url = node.get('url')
-                        elif isinstance(node, str) and node.startswith('tok_'):
-                            checkout_base = "https://checkout.fedapay.com/pay/" if not is_sandbox else "https://sandbox-checkout.fedapay.com/pay/"
-                            url = checkout_base + node
-                    if url:
-                        return Response({"url": url, "transaction_id": int(transaction_id)})
             
-            # ============================================================
-            # Créer une nouvelle transaction FedaPay
-            # ============================================================
-            payload = {
-                "description": f"Commission Zemy colis {parcel.ride.departure_location} -> {parcel.ride.arrival_location}",
-                "amount": amount_to_pay,
-                "currency": {"iso": "XOF"},
-                "callback_url": callback_url,
-                "customer": {
+            if not transaction_id:
+                customer_data = {
                     "firstname": parcel.sender_user.full_name or "Client",
                     "lastname": "Zemy",
                     "email": parcel.sender_user.email or "client@zemy.bj",
@@ -199,18 +163,15 @@ class ParcelViewSet(viewsets.ModelViewSet):
                         "country": "bj"
                     }
                 }
-            }
+                description = f"Commission Zemy colis {parcel.ride.departure_location} -> {parcel.ride.arrival_location}"
                 
-            tx_res = requests.post(f"{base_url}/transactions", json=payload, headers=headers)
-            if tx_res.status_code not in [200, 201]:
-                return Response({"error": "Erreur FedaPay: " + tx_res.text}, status=status.HTTP_400_BAD_REQUEST)
-                
-            tx_json = tx_res.json()
-            transaction_data = tx_json.get('v1/transaction') or tx_json.get('transaction') or {}
-            transaction_id = transaction_data.get('id')
-            
-            if not transaction_id:
-                return Response({"error": "Impossible de créer la transaction FedaPay."}, status=status.HTTP_400_BAD_REQUEST)
+                transaction_id = FedaPayService.create_transaction(
+                    amount=amount_to_pay,
+                    description=description,
+                    customer_data=customer_data,
+                    callback_url=callback_url,
+                    metadata={"parcel_id": str(parcel.id)}
+                )
                 
             Payment.objects.update_or_create(
                 transaction_id=str(transaction_id),
@@ -223,24 +184,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
                 }
             )
                 
-            token_res = requests.post(f"{base_url}/transactions/{transaction_id}/token", headers=headers)
-            if token_res.status_code not in [200, 201]:
-                return Response({"error": "Erreur Token FedaPay: " + token_res.text}, status=status.HTTP_400_BAD_REQUEST)
-                
-            token_json = token_res.json()
-            url = token_json.get('url')
-            
-            if not url:
-                node = token_json.get('v1/token') or token_json.get('token')
-                if isinstance(node, dict):
-                    url = node.get('url')
-                elif isinstance(node, str) and node.startswith('tok_'):
-                    checkout_base = "https://checkout.fedapay.com/pay/" if not is_sandbox else "https://sandbox-checkout.fedapay.com/pay/"
-                    url = checkout_base + node
-                    
-            if not url:
-                return Response({"error": "Impossible d'obtenir l'URL de paiement."}, status=status.HTTP_400_BAD_REQUEST)
-                
+            url = FedaPayService.generate_token(transaction_id)
             return Response({"url": url, "transaction_id": transaction_id})
             
         except Exception as e:
@@ -289,7 +233,10 @@ class ParcelViewSet(viewsets.ModelViewSet):
                     if payment.status == 'SUCCESS':
                         return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
                         
+                    from django.utils import timezone
                     payment.status = 'SUCCESS'
+                    payment.last_verification_at = timezone.now()
+                    payment.verification_attempts += 1
                     payment.save()
                     
                     if parcel.payment_status != 'escrow':
@@ -309,6 +256,13 @@ class ParcelViewSet(viewsets.ModelViewSet):
                         
                 return Response({"status": "Paiement validé avec succès."})
             elif tx_status in ['pending', 'processing', 'started', 'waiting']:
+                from django.utils import timezone
+                from django.db import models
+                Payment.objects.filter(transaction_id=transaction_id).update(
+                    last_verification_at=timezone.now(),
+                    verification_attempts=models.F('verification_attempts') + 1
+                )
+                
                 tx_mode = transaction_data.get('mode')
                 payment_not_started = (tx_status == 'pending' and not tx_mode)
                 return Response({
@@ -326,7 +280,13 @@ class ParcelViewSet(viewsets.ModelViewSet):
                 elif tx_status == 'refunded':
                     new_status = 'REFUNDED'
                 
-                Payment.objects.filter(transaction_id=transaction_id).update(status=new_status)
+                from django.utils import timezone
+                from django.db import models
+                Payment.objects.filter(transaction_id=transaction_id).update(
+                    status=new_status,
+                    last_verification_at=timezone.now(),
+                    verification_attempts=models.F('verification_attempts') + 1
+                )
                 return Response({"error": f"Le paiement a échoué (statut: {tx_status})."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

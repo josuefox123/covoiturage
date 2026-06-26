@@ -67,8 +67,6 @@ class BookingService:
                         except Exception:
                             pass
                             
-                    # S'assurer que la conversation existe
-                    BookingService._ensure_conversation(ride, passenger, ride.driver)
                     return existing_booking, False  # booking existant, non créé à neuf
                 else:
                     raise ValidationError({"error": "Vous avez déjà une réservation pour ce trajet."})
@@ -88,9 +86,6 @@ class BookingService:
                 payment_status=payment_status,
                 status='pending'
             )
-            
-            # Créer la conversation
-            BookingService._ensure_conversation(ride, passenger, ride.driver)
             
             return booking, True
 
@@ -200,23 +195,4 @@ class BookingService:
                     
         return True, "Réservation annulée avec succès."
 
-    @staticmethod
-    def _ensure_conversation(ride, participant_1, participant_2):
-        """
-        S'assure qu'une conversation de type 'ride' existe entre les deux participants pour ce trajet.
-        """
-        existing_conv = Conversation.objects.filter(
-            ride=ride,
-            conversation_type='ride'
-        ).filter(
-            Q(participant_1=participant_1, participant_2=participant_2) |
-            Q(participant_1=participant_2, participant_2=participant_1)
-        ).first()
-        
-        if not existing_conv:
-            Conversation.objects.create(
-                conversation_type='ride',
-                ride=ride,
-                participant_1=participant_1,
-                participant_2=participant_2,
-            )
+

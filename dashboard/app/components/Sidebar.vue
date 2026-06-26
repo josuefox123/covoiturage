@@ -70,6 +70,11 @@ Zemy
         <Icon name="ph:chat-circle-dots" class="w-5 h-5" />
         <span>Support Client</span>
       </NuxtLink>
+
+      <NuxtLink to="/support/tickets" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
+        <Icon name="ph:ticket" class="w-5 h-5" />
+        <span>Tickets Support</span>
+      </NuxtLink>
       
       <NuxtLink to="/branding" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
         <Icon name="ph:paint-brush-broad" class="w-5 h-5" />

@@ -15,7 +15,7 @@ Zemy
 """
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, FinancialSettings, RefundRequest, Transaction, Parcel
+from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, FinancialSettings, RefundRequest, Transaction, Parcel, SupportTicket
 
 class UserPreferenceSerializer(serializers.ModelSerializer):
     """
@@ -204,22 +204,23 @@ class MessageSerializer(serializers.ModelSerializer):
 
         content = validated_data.get('content', '')
         moderation_status = 'accepted'
-        
+        moderation_result: dict = {}
+
         if content and validated_data.get('message_type', 'text') == 'text':
             moderation_result = MessageModerator.analyze_and_filter(content)
             moderation_status = moderation_result['status']
-            
+
             if moderation_status in ['modified', 'blocked']:
                 validated_data['content'] = moderation_result['filtered_content']
-                
+
         # Save the message
         message = super().create(validated_data)
-        
+
         # We temporarily store moderation_status on the instance to be used by the serializer representation
         message.moderation_status = moderation_status
-        
+
         # Log if modified or blocked
-        if moderation_status in ['modified', 'blocked']:
+        if moderation_status in ['modified', 'blocked'] and moderation_result:
             ModerationLog.objects.create(
                 message=message,
                 sender=message.sender,
@@ -385,3 +386,28 @@ class PopularPlaceSerializer(serializers.ModelSerializer):
         from .models import PopularPlace
         model = PopularPlace
         fields = '__all__'
+
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SupportTicket
+        fields = '__all__'
+        read_only_fields = ('id', 'ticket_number', 'status', 'created_at', 'updated_at', 'ip_address')
+
+    def validate_message(self, value):
+        from django.utils.html import strip_tags
+        cleaned_value = strip_tags(value).strip()
+        if len(cleaned_value) < 10:
+            raise serializers.ValidationError("Le message doit contenir au moins 10 caractères.")
+        return cleaned_value
+
+    def validate(self, attrs):
+        from django.utils.html import strip_tags
+        if 'name' in attrs:
+            attrs['name'] = strip_tags(attrs['name']).strip()
+        if 'email' in attrs:
+            attrs['email'] = strip_tags(attrs['email']).strip()
+        if 'subject' in attrs:
+            attrs['subject'] = strip_tags(attrs['subject']).strip()
+        return attrs
+

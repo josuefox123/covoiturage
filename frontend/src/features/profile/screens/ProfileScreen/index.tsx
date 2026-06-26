@@ -408,7 +408,7 @@ export default function ProfileScreen() {
             <MenuItem
               icon="mail-outline"
               title="Nous contacter"
-              subtitle="support@zemy.bj"
+              subtitle="zemy@sinustic.com"
               onPress={() => router.push('/contact')}
             />
           </View>
