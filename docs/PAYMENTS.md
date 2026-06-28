@@ -1,3 +1,0 @@
-# Paiements - Zemy
-
-Transactions financières.
