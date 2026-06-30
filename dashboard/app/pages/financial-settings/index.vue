@@ -12,6 +12,14 @@ Zemy
 -->
 <template>
   <div class="max-w-3xl mx-auto space-y-6">
+    <!-- Toast Notification -->
+    <ToastNotification
+      :show="toast.show"
+      :type="toast.type"
+      :title="toast.title"
+      :message="toast.message"
+      @close="toast.show = false"
+    />
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold text-text">Paramètres Financiers & Commissions</h1>
@@ -182,7 +190,23 @@ Zemy
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, reactive } from 'vue'
+
 const { fetchApi } = useApi()
+
+// Toast
+const toast = reactive({
+  show: false,
+  type: 'success' as 'success' | 'error' | 'warning' | 'info',
+  title: '',
+  message: '',
+})
+function showToast(type: typeof toast.type, title: string, message = '') {
+  toast.type = type
+  toast.title = title
+  toast.message = message
+  toast.show = true
+}
 
 interface FinSettings {
   is_commission_active: boolean;
@@ -244,25 +268,27 @@ async function saveSettings() {
   error.value = ''
   
   try {
-    // Attempt PUT first, if it fails maybe it needs to be created
+    // Attempt PUT first; if 404, create via POST
     await fetchApi('/financial-settings/1/', {
       method: 'PUT',
       body: settings.value
     })
-    alert('Paramètres financiers sauvegardés avec succès !')
+    showToast('success', 'Sauvegardé', 'Les paramètres financiers ont été sauvegardés avec succès.')
   } catch (err: any) {
-    if (err.message?.includes('404')) {
+    if (err.status === 404 || err.message?.includes('404')) {
       try {
         await fetchApi('/financial-settings/', {
           method: 'POST',
           body: { id: 1, ...settings.value }
         })
-        alert('Paramètres financiers créés et sauvegardés avec succès !')
+        showToast('success', 'Créé', 'Les paramètres financiers ont été créés et sauvegardés avec succès.')
       } catch (e: any) {
-         error.value = e.message || 'Erreur lors de la sauvegarde.'
+        error.value = e.message || 'Erreur lors de la sauvegarde.'
+        showToast('error', 'Erreur', error.value)
       }
     } else {
       error.value = err.message || 'Erreur lors de la sauvegarde.'
+      showToast('error', 'Erreur', error.value)
     }
   } finally {
     loading.value = false

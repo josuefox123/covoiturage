@@ -297,7 +297,7 @@ const approve = async () => {
   try {
     await fetchApi(`/verifications/${route.params.id}/approve/`, {
       method: 'POST',
-      body: JSON.stringify({ motif: approveMotif.value }),
+      body: { motif: approveMotif.value },
     })
     showApproveModal.value = false
     approveMotif.value = ''
@@ -321,7 +321,7 @@ const reject = async () => {
   try {
     await fetchApi(`/verifications/${route.params.id}/reject/`, {
       method: 'POST',
-      body: JSON.stringify({ motif: rejectMotif.value }),
+      body: { motif: rejectMotif.value },
     })
     showRejectModal.value = false
     rejectMotif.value = ''

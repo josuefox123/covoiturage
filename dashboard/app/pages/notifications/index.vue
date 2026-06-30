@@ -209,8 +209,9 @@ Zemy
       type="warning"
       confirmText="Oui, envoyer"
       cancelText="Annuler"
+      :show-cancel="true"
       @confirm="handleConfirmSend"
-      @cancel="showConfirm = false"
+      @close="showConfirm = false"
     />
     
     <!-- Modale de Suppression -->
@@ -221,8 +222,9 @@ Zemy
       type="error"
       confirmText="Supprimer"
       cancelText="Annuler"
+      :show-cancel="true"
       @confirm="handleConfirmDelete"
-      @cancel="showDeleteConfirm = false"
+      @close="showDeleteConfirm = false"
     />
     
     <!-- Viewer Notification (Voir) -->

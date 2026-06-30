@@ -16,6 +16,10 @@ Zemy
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 from django.db.models import Q
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed
+from django.utils.translation import gettext_lazy as _
 
 User = get_user_model()
 
@@ -36,3 +40,27 @@ class EmailOrPhoneModelBackend(ModelBackend):
         if user.check_password(password) and self.user_can_authenticate(user):
             return user
         return None
+
+class SafeJWTAuthentication(JWTAuthentication):
+    def get_user(self, validated_token):
+        try:
+            user_id = validated_token[api_settings.USER_ID_CLAIM]
+        except KeyError:
+            raise InvalidToken(_("Token contained no recognizable user identification"))
+
+        try:
+            user = self.user_model.objects.get(**{api_settings.USER_ID_FIELD: user_id})
+        except self.user_model.DoesNotExist:
+            raise AuthenticationFailed(_("User not found"), code="user_not_found")
+
+        if getattr(user, 'is_archived', False):
+            raise AuthenticationFailed(
+                "Votre compte a été archivé. Veuillez contacter le support Zemy.",
+                code="user_archived"
+            )
+
+        if not user.is_active:
+            raise AuthenticationFailed(_("User is inactive"), code="user_inactive")
+
+        return user
+

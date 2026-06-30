@@ -130,6 +130,7 @@ Zemy
         <div class="relative w-64">
           <Icon name="ph:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
           <input 
+            v-model="searchQuery"
             type="text" 
             placeholder="Rechercher une ville..." 
             class="w-full pl-10 pr-4 py-2 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
@@ -156,7 +157,7 @@ Zemy
             <tr v-else-if="filteredRides.length === 0" class="text-center py-10">
               <td colspan="6" class="py-10 text-textMuted">Aucun trajet trouvé.</td>
             </tr>
-            <tr v-for="ride in filteredRides" :key="ride.id" class="hover:bg-background/30 transition-colors">
+            <tr v-for="ride in paginatedRides" :key="ride.id" class="hover:bg-background/30 transition-colors">
               <td class="px-6 py-4">
                 <div class="flex items-center space-x-2">
                   <div class="flex flex-col items-center mr-2">
@@ -216,10 +217,23 @@ Zemy
       </div>
       
       <div class="p-4 border-t border-border flex items-center justify-between text-sm text-textLight">
-        <span>Affichage de {{ filteredRides.length }} résultats</span>
-        <div class="flex space-x-1">
-          <button class="px-3 py-1 rounded-md border border-border hover:bg-background disabled:opacity-50" disabled>Précédent</button>
-          <button class="px-3 py-1 rounded-md border border-border hover:bg-background">Suivant</button>
+        <span>Affichage de {{ paginatedRides.length }} sur {{ filteredRides.length }} résultat(s)</span>
+        <div class="flex items-center space-x-1">
+          <button
+            class="px-3 py-1.5 rounded-lg border border-border hover:bg-background disabled:opacity-40 transition-colors"
+            :disabled="currentPage <= 1"
+            @click="currentPage--"
+          >
+            <Icon name="ph:caret-left" class="w-4 h-4" />
+          </button>
+          <span class="px-3 py-1.5 text-text font-medium">Page {{ currentPage }} / {{ totalPages || 1 }}</span>
+          <button
+            class="px-3 py-1.5 rounded-lg border border-border hover:bg-background disabled:opacity-40 transition-colors"
+            :disabled="currentPage >= totalPages"
+            @click="currentPage++"
+          >
+            <Icon name="ph:caret-right" class="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>
@@ -227,7 +241,7 @@ Zemy
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, reactive } from 'vue'
+import { ref, onMounted, computed, reactive, watch } from 'vue'
 
 const { fetchApi } = useApi()
 const rides = ref<any[]>([])
@@ -236,6 +250,9 @@ const vehicles = ref<any[]>([])
 const pending = ref(true)
 const saving = ref(false)
 const statusFilter = ref('all')
+const searchQuery = ref('')
+const currentPage = ref(1)
+const pageSize = 10
 
 const toast = reactive({ show: false, type: 'success' as any, title: '', message: '' })
 const deleteModal = reactive({ show: false, ride: null as any })
@@ -263,16 +280,41 @@ const getDisplayStatus = (ride: any) => {
 }
 
 const filteredRides = computed(() => {
-  if (statusFilter.value === 'all') return rides.value
-  
-  return rides.value.filter(ride => {
-    const status = getDisplayStatus(ride)
-    if (statusFilter.value === 'active') return status === 'Actif'
-    if (statusFilter.value === 'archived') return status === 'Archivé'
-    if (statusFilter.value === 'completed') return status === 'Terminé'
-    if (statusFilter.value === 'cancelled') return status === 'Annulé'
-    return true
-  })
+  let list = rides.value
+
+  // Filtre par statut
+  if (statusFilter.value !== 'all') {
+    list = list.filter(ride => {
+      const status = getDisplayStatus(ride)
+      if (statusFilter.value === 'active') return status === 'Actif'
+      if (statusFilter.value === 'archived') return status === 'Archivé'
+      if (statusFilter.value === 'completed') return status === 'Terminé'
+      if (statusFilter.value === 'cancelled') return status === 'Annulé'
+      return true
+    })
+  }
+
+  // Filtre par recherche
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(r =>
+      r.departure_location?.toLowerCase().includes(q) ||
+      r.arrival_location?.toLowerCase().includes(q)
+    )
+  }
+
+  return list
+})
+
+const totalPages = computed(() => Math.ceil(filteredRides.value.length / pageSize))
+
+const paginatedRides = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredRides.value.slice(start, start + pageSize)
+})
+
+watch([statusFilter, searchQuery], () => {
+  currentPage.value = 1
 })
 
 async function fetchData() {

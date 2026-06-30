@@ -80,11 +80,6 @@ Zemy
         <Icon name="ph:paint-brush-broad" class="w-5 h-5" />
         <span>Marque / Logo</span>
       </NuxtLink>
-
-      <NuxtLink to="/mobile-settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
-        <Icon name="ph:device-mobile" class="w-5 h-5" />
-        <span>Paramètres Mobile</span>
-      </NuxtLink>
     </nav>
   </aside>
 </template>

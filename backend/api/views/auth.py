@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 from ..models import (
     Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, 
     AppBranding, VerificationRequest, Promotion, MobileSettings,
-    FinancialSettings, RefundRequest, Transaction, Parcel, Payment, PasswordResetOTP, PopularPlace
+    FinancialSettings, RefundRequest, Transaction, Parcel, Payment, PasswordResetOTP, PopularPlace,
+    AuditLog
 )
 from ..serializers import (
     UserSerializer, AdminUserSerializer, VehicleSerializer, UserPreferenceSerializer, 
@@ -80,6 +81,11 @@ def verify_code(request):
                 return Response({'error': 'Le jeton ne contient pas de numéro de téléphone vérifié.'}, status=status.HTTP_400_BAD_REQUEST)
         # Get or create user
         user, created = User.objects.get_or_create(phone=phone)
+        if getattr(user, 'is_archived', False):
+            return Response({
+                "detail": "Votre compte a été archivé. Veuillez contacter le support Zemy."
+            }, status=status.HTTP_403_FORBIDDEN)
+            
         if created and full_name:
             user.full_name = full_name
             user.save()
@@ -171,11 +177,16 @@ def login_user(request):
     if not user:
         user = User.objects.filter(email=identifier).first()
 
+    if user and getattr(user, 'is_archived', False):
+        return Response({
+            "detail": "Votre compte a été archivé. Veuillez contacter le support Zemy."
+        }, status=status.HTTP_403_FORBIDDEN)
+
     if user and user.check_password(password):
         refresh = RefreshToken.for_user(user)
         user_data = UserSerializer(user).data
-        user_data['is_staff'] = user.is_staff
-        user_data['is_superuser'] = user.is_superuser
+        user_data['is_staff'] = getattr(user, 'is_staff', False)
+        user_data['is_superuser'] = getattr(user, 'is_superuser', False)
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
@@ -295,10 +306,97 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff:
+        if user.is_authenticated and getattr(user, 'is_staff', False):
+            if self.action == 'list':
+                return User.objects.filter(is_archived=False).order_by('-created_at')
             return User.objects.all().order_by('-created_at')
-        # Si c'est un utilisateur normal, il ne peut voir que lui-même
-        return User.objects.filter(id=user.id)
+        if user.is_authenticated:
+            return User.objects.filter(id=user.id, is_archived=False)
+        return User.objects.none()
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    def archive(self, request, pk=None):
+        user = self.get_object()
+        reason = request.data.get('reason', '')
+        
+        with transaction.atomic():
+            user.is_archived = True
+            user.is_active = False
+            user.archived_at = timezone.now()
+            user.archived_by = request.user
+            user.archive_reason = reason
+            user.save(update_fields=['is_archived', 'is_active', 'archived_at', 'archived_by', 'archive_reason'])
+            
+            # Invalidate Django sessions
+            from django.contrib.sessions.models import Session
+            for s in Session.objects.filter(expire_date__gte=timezone.now()):
+                data = s.get_decoded()
+                if data.get('_auth_user_id') == str(user.id):
+                    s.delete()
+                    
+            # Create AuditLog
+            AuditLog.objects.create(
+                admin_user=request.user,
+                target_user=user,
+                action="archive",
+                reason=reason
+            )
+            
+        return Response({"status": "Utilisateur archivé avec succès."})
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    def restore(self, request, pk=None):
+        user = self.get_object()
+        
+        with transaction.atomic():
+            user.is_archived = False
+            user.is_active = True
+            user.archived_at = None
+            user.archived_by = None
+            user.archive_reason = ''
+            user.save(update_fields=['is_archived', 'is_active', 'archived_at', 'archived_by', 'archive_reason'])
+            
+            # Create AuditLog
+            AuditLog.objects.create(
+                admin_user=request.user,
+                target_user=user,
+                action="restore",
+                reason="Restauration du compte utilisateur"
+            )
+            
+        return Response({"status": "Utilisateur restauré avec succès."})
+
+    @action(detail=True, methods=['delete'], url_path='permanent-delete', permission_classes=[permissions.IsAdminUser])
+    def permanent_delete(self, request, pk=None):
+        user = self.get_object()
+        full_name = getattr(user, 'full_name', 'Anonyme') or 'Anonyme'
+        phone = getattr(user, 'phone', 'N/A')
+        email = getattr(user, 'email', 'N/A')
+        user_details = f"{full_name} (Tél: {phone}, Email: {email})"
+        
+        with transaction.atomic():
+            # Create AuditLog
+            AuditLog.objects.create(
+                admin_user=request.user,
+                target_user=None,
+                action="permanent_delete",
+                reason=f"Suppression définitive de l'utilisateur : {user_details}"
+            )
+            # Delete user (will cascade delete related objects)
+            user.delete()
+            
+        return Response({"status": "Utilisateur supprimé définitivement avec succès."})
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
+    def archived(self, request):
+        queryset = User.objects.filter(is_archived=True).order_by('-archived_at')
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+            
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='rate')
     def rate_user(self, request, pk=None):
@@ -345,7 +443,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff:
+        if getattr(user, 'is_staff', False):
             return Vehicle.objects.all()
         return Vehicle.objects.filter(owner=user)
 
@@ -450,52 +548,7 @@ class VerificationRequestViewSet(viewsets.ModelViewSet):
 
 logger = logging.getLogger(__name__)
 
-class SafeEmailMultiAlternatives(EmailMultiAlternatives):
-    """
-    Subclass of EmailMultiAlternatives that implements a clean multipart/related structure
-    for inline attachments in Django 6.0+ without using the deprecated mixed_subtype.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._inline_attachments = []
-
-    def attach_inline(self, filename, content, mimetype, content_id):
-        self._inline_attachments.append((filename, content, mimetype, content_id))
-
-    def message(self, *, policy=email.policy.default):
-        # Generate standard message without standard attachments first
-        original_attachments = self.attachments
-        self.attachments = []
-        msg = super().message(policy=policy)
-        self.attachments = original_attachments
-
-        # If there are inline attachments, find the HTML part and add them as related
-        if self._inline_attachments:
-            if msg.is_multipart() and msg.get_content_subtype() == 'alternative':
-                payload = msg.get_payload()
-                html_part = None
-                for part in payload:
-                    if part.get_content_type() == 'text/html':
-                        html_part = part
-                        break
-                
-                if html_part is not None:
-                    for filename, content, mimetype, content_id in self._inline_attachments:
-                        maintype, subtype = mimetype.split('/', 1)
-                        html_part.add_related(
-                            content,
-                            maintype=maintype,
-                            subtype=subtype,
-                            cid=content_id
-                        )
-
-        # Add standard attachments as mixed
-        if self.attachments:
-            msg.make_mixed()
-            for attachment in self.attachments:
-                self._add_attachment(msg, *attachment)
-
-        return msg
+# SafeEmailMultiAlternatives class was removed. Standard Django EmailMultiAlternatives and MIMEImage are used instead.
 
 
 def send_zemy_reset_email(full_name, email, code):
@@ -655,7 +708,10 @@ L'équipe Zemy
 Transport • Livraison • Mobilité"""
 
     try:
-        msg = SafeEmailMultiAlternatives(
+        from django.core.mail import EmailMultiAlternatives
+        from email.mime.image import MIMEImage
+
+        msg = EmailMultiAlternatives(
             subject=subject,
             body=text_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -668,7 +724,10 @@ Transport • Livraison • Mobilité"""
         if os.path.exists(logo_path):
             with open(logo_path, 'rb') as f:
                 img_data = f.read()
-                msg.attach_inline('logozemy.png', img_data, 'image/png', '<logo_zemy>')
+                image = MIMEImage(img_data)
+                image.add_header('Content-ID', '<logo_zemy>')
+                image.add_header('Content-Disposition', 'inline', filename='logozemy.png')
+                msg.attach(image)
         else:
             logger.warning(f"Fichier logo non trouvé à l'emplacement : {logo_path}")
 
