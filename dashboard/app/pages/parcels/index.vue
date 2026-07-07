@@ -99,7 +99,7 @@ Zemy
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       <div class="bg-card p-4 rounded-xl border border-border shadow-sm">
         <p class="text-sm text-textMuted font-medium">Revenus totaux</p>
         <p class="text-2xl font-bold text-text mt-1">{{ stats.totalRevenue.toLocaleString() }} FCFA</p>

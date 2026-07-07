@@ -20,15 +20,15 @@ Zemy
       :message="toast.message"
       @close="toast.show = false"
     />
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold text-text">Paramètres Financiers & Commissions</h1>
-        <p class="text-textMuted mt-1">Gérez le calcul des commissions de l'application Zemy.</p>
+        <p class="text-textMuted mt-1">Gerez le calcul des commissions de l'application Zemy.</p>
       </div>
       <button
         @click="saveSettings"
         :disabled="loading"
-        class="bg-primary text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-primaryDark transition-colors shadow-sm disabled:opacity-50"
+        class="bg-primary text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-primaryDark transition-colors shadow-sm disabled:opacity-50 w-fit self-start sm:self-auto"
       >
         <span v-if="loading">Sauvegarde...</span>
         <span v-else>Sauvegarder</span>

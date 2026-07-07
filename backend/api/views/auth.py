@@ -308,11 +308,78 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_authenticated and getattr(user, 'is_staff', False):
             if self.action == 'list':
-                return User.objects.filter(is_archived=False).order_by('-created_at')
+                qs = User.objects.filter(is_archived=False)
+                is_staff_param = self.request.query_params.get('is_staff')
+                if is_staff_param == 'true':
+                    qs = qs.filter(is_staff=True)
+                elif is_staff_param == 'false':
+                    qs = qs.filter(is_staff=False)
+                return qs.order_by('-created_at')
             return User.objects.all().order_by('-created_at')
         if user.is_authenticated:
             return User.objects.filter(id=user.id, is_archived=False)
         return User.objects.none()
+
+    @action(detail=False, methods=['post'], url_path='create-admin', permission_classes=[permissions.IsAdminUser])
+    def create_admin(self, request):
+        full_name = request.data.get('full_name')
+        email = request.data.get('email')
+        phone = request.data.get('phone')
+
+        if not email or not full_name:
+            return Response({"error": "Nom et email sont requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Un utilisateur avec cet email existe déjà."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if phone and User.objects.filter(phone=phone).exists():
+            return Response({"error": "Un utilisateur avec ce téléphone existe déjà."}, status=status.HTTP_400_BAD_REQUEST)
+
+        import secrets
+        password = secrets.token_hex(6)  # Generates 12 hex characters password
+        
+        with transaction.atomic():
+            user = User.objects.create(
+                email=email,
+                full_name=full_name,
+                phone=phone,
+                is_staff=True,
+                is_active=True,
+                is_verified=True
+            )
+            user.set_password(password)
+            user.save()
+            
+            subject = "Création de votre compte Administrateur Zemy"
+            html_message = f"""
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family: Arial, sans-serif; background-color: #F8FAFC; color: #0F172A; padding: 40px;">
+                <div style="max-width: 580px; margin: 0 auto; background: #FFFFFF; padding: 40px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                    <h2 style="color: #2563EB;">Bienvenue sur Zemy !</h2>
+                    <p>Bonjour {full_name},</p>
+                    <p>Un compte administrateur a été créé pour vous sur le tableau de bord Zemy.</p>
+                    <p>Voici vos identifiants de connexion :</p>
+                    <p><strong>Email :</strong> {email}</p>
+                    <p><strong>Mot de passe :</strong> {password}</p>
+                    <p>Nous vous conseillons de vous connecter et de modifier ce mot de passe depuis votre profil dès que possible.</p>
+                    <p>Cordialement,<br>L'équipe Zemy</p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=f"Bonjour {full_name},\nVotre mot de passe est : {password}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[email]
+            )
+            msg.attach_alternative(html_message, "text/html")
+            msg.send(fail_silently=True)
+
+        return Response({"status": "Administrateur créé avec succès.", "email": email})
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def archive(self, request, pk=None):
@@ -851,3 +918,58 @@ def reset_password(request):
     
     return Response({'message': "Votre mot de passe a été modifié avec succès."}, status=status.HTTP_200_OK)
 
+@extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Authentification'])
+@api_view(['PUT'])
+@permission_classes([permissions.IsAuthenticated])
+def update_profile(request):
+    """
+    Permet à l'administrateur connecté de modifier ses informations.
+    """
+    user = request.user
+    full_name = request.data.get('full_name')
+    email = request.data.get('email')
+    phone = request.data.get('phone')
+
+    if email and email != user.email and User.objects.filter(email=email).exclude(id=user.id).exists():
+        return Response({'error': 'Cet email est déjà utilisé.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if phone and phone != user.phone and User.objects.filter(phone=phone).exclude(id=user.id).exists():
+        return Response({'error': 'Ce numéro de téléphone est déjà utilisé.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if full_name:
+        user.full_name = full_name
+    if email:
+        user.email = email
+    if phone:
+        user.phone = phone
+        
+    user.save()
+    
+    if user.is_staff:
+        data = AdminUserSerializer(user, context={'request': request}).data
+    else:
+        data = UserSerializer(user, context={'request': request}).data
+        
+    return Response({"status": "Profil mis à jour", "user": data})
+
+@extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Authentification'])
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def change_password(request):
+    """
+    Permet à l'administrateur de modifier son mot de passe depuis le profil.
+    """
+    user = request.user
+    old_password = request.data.get('old_password')
+    new_password = request.data.get('new_password')
+    
+    if not old_password or not new_password:
+        return Response({"error": "Veuillez fournir l'ancien et le nouveau mot de passe."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if not user.check_password(old_password):
+        return Response({"error": "L'ancien mot de passe est incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    user.set_password(new_password)
+    user.save()
+    
+    return Response({"status": "Mot de passe modifié avec succès."})

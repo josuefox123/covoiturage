@@ -39,7 +39,9 @@ export const useApi = () => {
   }
 
   const logout = () => {
+    const userCookie = useCookie('user')
     authCookie.value = null
+    userCookie.value = null
     return navigateTo('/login')
   }
 

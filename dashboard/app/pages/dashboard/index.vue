@@ -12,12 +12,12 @@ Zemy
 -->
 <template>
   <div class="space-y-8 pb-12">
-    <div class="flex justify-between items-end">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
       <div>
         <h1 class="text-3xl font-bold text-text mb-1 tracking-tight">Vue d'ensemble</h1>
         <p class="text-textMuted font-medium">Bienvenue sur votre tableau de bord administrateur Zemy</p>
       </div>
-      <div class="flex space-x-3">
+      <div class="flex space-x-3 self-start md:self-auto">
         <button class="flex items-center space-x-2 bg-white border border-border px-4 py-2 rounded-xl text-sm font-bold text-text hover:bg-background transition-colors shadow-sm">
           <Icon name="ph:export" class="w-4 h-4" />
           <span>Exporter</span>

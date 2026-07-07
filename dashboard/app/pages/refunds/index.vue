@@ -36,18 +36,18 @@ Zemy
       @confirm="handleConfirmAction"
     />
 
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold text-text">Demandes de Remboursement</h1>
         <p class="text-textMuted mt-1">Gérez les demandes d'annulation et de remboursement des passagers.</p>
       </div>
-      <button @click="fetchRefunds" class="p-2 bg-card border border-border rounded-lg text-textLight hover:text-primary transition-colors" title="Actualiser">
+      <button @click="fetchRefunds" class="p-2 bg-card border border-border rounded-lg text-textLight hover:text-primary transition-colors w-fit self-start sm:self-auto" title="Actualiser">
         <Icon name="ph:arrows-clockwise" class="w-5 h-5" :class="{ 'animate-spin': loading }" />
       </button>
     </div>
 
     <!-- Filtres statut -->
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
       <button
         v-for="s in statuses"
         :key="s.value"

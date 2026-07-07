@@ -61,12 +61,47 @@ Zemy
       @edit="openEditModal"
     />
 
+    <!-- Admin Creation Modal -->
+    <div v-if="adminModal.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="bg-card w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
+        <div class="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-text">Ajouter un Administrateur</h3>
+          <button @click="adminModal.show = false" class="p-1 text-textMuted hover:text-text rounded-lg hover:bg-background transition-colors">
+            <Icon name="ph:x" class="w-5 h-5" />
+          </button>
+        </div>
+        <form @submit.prevent="submitAdmin">
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-text mb-1">Nom complet *</label>
+              <input v-model="adminForm.full_name" required type="text" class="w-full px-3 py-2 rounded-lg border border-border focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-background text-text" placeholder="Ex: Jean Dupont" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text mb-1">Email *</label>
+              <input v-model="adminForm.email" required type="email" class="w-full px-3 py-2 rounded-lg border border-border focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-background text-text" placeholder="Ex: admin@zemy.com" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text mb-1">Téléphone</label>
+              <input v-model="adminForm.phone" type="text" class="w-full px-3 py-2 rounded-lg border border-border focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-background text-text" placeholder="Ex: +229..." />
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-border bg-background/50 flex justify-end gap-3">
+            <button type="button" @click="adminModal.show = false" class="px-4 py-2 text-sm font-medium text-text hover:bg-border rounded-xl transition-colors">Annuler</button>
+            <button type="submit" :disabled="adminModal.loading" class="px-4 py-2 text-sm font-medium bg-primary text-white hover:bg-primary-dark rounded-xl transition-colors disabled:opacity-50 flex items-center">
+              <Icon v-if="adminModal.loading" name="ph:spinner-gap" class="w-4 h-4 mr-2 animate-spin" />
+              Créer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Page Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <div>
         <h1 class="text-2xl font-bold text-text">Utilisateurs</h1>
         <p class="text-sm text-textLight mt-0.5">
-          {{ filteredUsers.length }} utilisateurs {{ activeTab === 'active' ? 'actifs' : 'archivés' }}
+          {{ filteredUsers.length }} {{ activeTab === 'admins' ? 'administrateurs' : (activeTab === 'active' ? 'utilisateurs actifs' : 'utilisateurs archivés') }}
         </p>
       </div>
       <button
@@ -76,6 +111,14 @@ Zemy
       >
         <Icon name="ph:user-plus" class="w-5 h-5 mr-2" />
         Ajouter un utilisateur
+      </button>
+      <button
+        v-if="activeTab === 'admins'"
+        @click="openAdminModal"
+        class="inline-flex items-center px-4 py-2.5 bg-primary text-white font-medium rounded-xl hover:bg-primary-dark transition-colors shadow-sm shadow-primary/30"
+      >
+        <Icon name="ph:shield-plus" class="w-5 h-5 mr-2" />
+        Ajouter un administrateur
       </button>
     </div>
 
@@ -96,6 +139,14 @@ Zemy
       >
         <span class="w-2 h-2 rounded-full bg-warning"></span>
         Archives
+      </button>
+      <button
+        @click="activeTab = 'admins'"
+        class="px-5 py-3 font-medium text-sm border-b-2 transition-all flex items-center gap-1.5"
+        :class="activeTab === 'admins' ? 'border-primary text-primary font-semibold' : 'border-transparent text-textLight hover:text-text'"
+      >
+        <span class="w-2 h-2 rounded-full bg-primary"></span>
+        Administrateurs
       </button>
     </div>
 
@@ -127,7 +178,7 @@ Zemy
         <table class="w-full text-left text-sm">
           <!-- Table Header -->
           <thead class="bg-background/60 text-textLight">
-            <tr v-if="activeTab === 'active'">
+            <tr v-if="activeTab === 'active' || activeTab === 'admins'">
               <th class="px-5 py-3 font-semibold">Utilisateur</th>
               <th class="px-5 py-3 font-semibold">Contact</th>
               <th class="px-5 py-3 font-semibold">Statut</th>
@@ -164,7 +215,7 @@ Zemy
               <td :colspan="activeTab === 'active' ? 5 : 9" class="py-16 text-center">
                 <div class="flex flex-col items-center space-y-3">
                   <div class="w-14 h-14 rounded-full bg-background flex items-center justify-center">
-                    <Icon :name="activeTab === 'active' ? 'ph:users-slash' : 'ph:archive-box'" class="w-7 h-7 text-textMuted" />
+                    <Icon :name="activeTab === 'active' ? 'ph:user-minus' : 'ph:archive-box'" class="w-7 h-7 text-textMuted" />
                   </div>
                   <p class="text-text font-medium">Aucun utilisateur trouvé</p>
                   <p class="text-textMuted text-sm">Essayez de modifier vos filtres ou de faire une autre recherche</p>
@@ -174,8 +225,8 @@ Zemy
 
             <!-- Rows -->
             <template v-else>
-              <!-- Active Users Rows -->
-              <template v-if="activeTab === 'active'">
+              <!-- Active & Admin Users Rows -->
+              <template v-if="activeTab === 'active' || activeTab === 'admins'">
                 <tr
                   v-for="user in paginatedUsers"
                   :key="user.id"
@@ -188,7 +239,12 @@ Zemy
                         <span v-else>{{ (user.full_name || user.phone)?.charAt(0)?.toUpperCase() }}</span>
                       </div>
                       <div>
-                        <p class="font-semibold text-text">{{ user.full_name || 'Anonyme' }}</p>
+                        <div class="flex items-center gap-1.5">
+                          <p class="font-semibold text-text">{{ user.full_name || 'Anonyme' }}</p>
+                          <span v-if="user.is_staff" class="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
+                            Admin
+                          </span>
+                        </div>
                         <div class="flex items-center text-xs text-textMuted">
                           <Icon name="ph:star-fill" class="text-warning mr-0.5 w-3 h-3" />
                           {{ user.rating || '4.5' }}
@@ -368,7 +424,7 @@ import { ref, computed, onMounted, reactive, watch } from 'vue'
 const { fetchApi } = useApi()
 
 // --- State ---
-const activeTab = ref<'active' | 'archived'>('active')
+const activeTab = ref<'active' | 'archived' | 'admins'>('active')
 const users = ref<any[]>([])
 const pending = ref(true)
 const search = ref('')
@@ -382,6 +438,9 @@ const detailModal = reactive({ show: false, user: null as any })
 const archiveModal = reactive({ show: false, user: null as any })
 const restoreModal = reactive({ show: false, user: null as any })
 const deleteModal = reactive({ show: false, user: null as any })
+
+const adminModal = reactive({ show: false, loading: false })
+const adminForm = reactive({ full_name: '', email: '', phone: '' })
 
 // --- Toast ---
 const toast = reactive({
@@ -437,7 +496,14 @@ watch(activeTab, () => {
 async function fetchUsers() {
   pending.value = true
   try {
-    const endpoint = activeTab.value === 'active' ? '/users/' : '/users/archived/'
+    let endpoint = '/users/'
+    if (activeTab.value === 'archived') {
+      endpoint = '/users/archived/'
+    } else if (activeTab.value === 'admins') {
+      endpoint = '/users/?is_staff=true'
+    } else {
+      endpoint = '/users/?is_staff=false'
+    }
     const data = await fetchApi<any[]>(endpoint)
     users.value = Array.isArray(data) ? data : (data as any).results || []
   } catch {
@@ -451,6 +517,34 @@ async function fetchUsers() {
 function openCreateModal() {
   formModal.user = null
   formModal.show = true
+}
+
+function openAdminModal() {
+  adminForm.full_name = ''
+  adminForm.email = ''
+  adminForm.phone = ''
+  adminModal.show = true
+}
+
+async function submitAdmin() {
+  adminModal.loading = true
+  try {
+    await fetchApi('/users/create-admin/', {
+      method: 'POST',
+      body: {
+        full_name: adminForm.full_name,
+        email: adminForm.email,
+        phone: adminForm.phone
+      }
+    })
+    showToast('success', 'Administrateur créé', `Le mot de passe a été envoyé à ${adminForm.email}.`)
+    adminModal.show = false
+    fetchUsers()
+  } catch (error: any) {
+    showToast('error', 'Erreur', error.data?.error || 'Impossible de créer l\'administrateur.')
+  } finally {
+    adminModal.loading = false
+  }
 }
 
 function openEditModal(user: any) {

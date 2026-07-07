@@ -12,6 +12,8 @@ from .auth import (
     VehicleViewSet,
     UserPreferenceViewSet,
     VerificationRequestViewSet,
+    update_profile,
+    change_password,
 )
 from .rides import (
     check_availability,

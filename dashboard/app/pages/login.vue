@@ -181,6 +181,13 @@ async function handleLogin() {
     }
 
     authCookie.value = res.access
+    
+    const userCookie = useCookie('user', {
+      maxAge: 60 * 60 * 24 * 7,
+      sameSite: 'lax',
+    })
+    userCookie.value = res.user
+
     await router.push('/dashboard')
   } catch (e: any) {
     const data = e?.data

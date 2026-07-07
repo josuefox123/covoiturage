@@ -108,18 +108,18 @@ Zemy
       </div>
     </div>
 
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <h1 class="text-2xl font-bold text-text">Trajets</h1>
-      <button @click="openCreateModal" class="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-colors flex items-center">
+      <button @click="openCreateModal" class="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-colors flex items-center w-fit">
         <Icon name="ph:plus" class="mr-2" />
         Ajouter
       </button>
     </div>
 
     <div class="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-      <div class="p-4 border-b border-border flex justify-between items-center">
-        <div class="flex space-x-2">
-          <select v-model="statusFilter" class="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+      <div class="p-4 border-b border-border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <div class="flex space-x-2 w-full sm:w-auto">
+          <select v-model="statusFilter" class="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-card text-text w-full sm:w-auto">
             <option value="all">Tous les statuts</option>
             <option value="active">Actif</option>
             <option value="archived">Archivé</option>
@@ -127,13 +127,13 @@ Zemy
             <option value="cancelled">Annulé</option>
           </select>
         </div>
-        <div class="relative w-64">
+        <div class="relative w-full sm:w-64">
           <Icon name="ph:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
           <input 
             v-model="searchQuery"
             type="text" 
             placeholder="Rechercher une ville..." 
-            class="w-full pl-10 pr-4 py-2 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+            class="w-full pl-10 pr-4 py-2 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-card text-text"
           >
         </div>
       </div>

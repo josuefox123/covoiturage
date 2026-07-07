@@ -11,9 +11,22 @@ Zemy
 ==========================================================
 -->
 <template>
-  <aside class="w-64 bg-card border-r border-border h-full flex flex-col">
-    <div class="p-6 flex items-center gap-3">
+  <aside
+    :class="[
+      isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-card border-r border-border h-full flex flex-col transition-transform duration-300 ease-in-out'
+    ]"
+  >
+    <div class="p-6 flex items-center justify-between gap-3">
       <img src="/images/logozemy.png" alt="Zemy Logo" class="h-8 object-contain">
+      <!-- Bouton de fermeture mobile -->
+      <button
+        @click="$emit('close')"
+        class="lg:hidden p-1.5 text-textLight hover:text-error hover:bg-error/10 rounded-lg transition-colors"
+        title="Fermer le menu"
+      >
+        <Icon name="ph:x" class="w-5 h-5" />
+      </button>
     </div>
 
     <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
@@ -83,6 +96,17 @@ Zemy
     </nav>
   </aside>
 </template>
+
+<script setup lang="ts">
+defineProps({
+  isOpen: {
+    type: Boolean,
+    default: false
+  }
+})
+
+defineEmits(['close'])
+</script>
 
 <style scoped>
 a {

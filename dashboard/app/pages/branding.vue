@@ -268,7 +268,7 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-text">Logo de Démarrage</h1>
         <p class="text-textMuted mt-1">Gérez le logo affiché à l'ouverture de l'application mobile et son animation.</p>
@@ -276,7 +276,7 @@ onUnmounted(() => {
       <button 
         @click="saveBranding" 
         :disabled="isSaving || isLoading"
-        class="bg-primary hover:bg-primaryDark text-white px-6 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2"
+        class="bg-primary hover:bg-primaryDark text-white px-6 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 w-fit self-start sm:self-auto"
       >
         <Icon v-if="isSaving" name="ph:spinner-gap-bold" class="w-5 h-5 animate-spin" />
         <Icon v-else name="ph:floppy-disk-bold" class="w-5 h-5" />

@@ -15,7 +15,7 @@
 
 export default defineNuxtRouteMiddleware((to) => {
   // Les pages publiques sont accessibles sans authentification
-  const publicRoutes = ['/', '/about', '/download', '/contact', '/login']
+  const publicRoutes = ['/', '/about', '/download', '/contact', '/login', '/landing/', '/landing/index.html']
   if (publicRoutes.includes(to.path)) return
 
   const token = useCookie('admin_token')

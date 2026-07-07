@@ -112,8 +112,8 @@ export default function VerifyIdentityScreen() {
     setLoadingImage(true);
     try {
       const result = source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.80 })
-        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: false, quality: 0.80, mediaTypes: ['images'] });
+        ? await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.50 })
+        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: false, quality: 0.50, mediaTypes: ['images'] });
 
       if (!result.canceled && result.assets[0]) {
         setter(result.assets[0].uri);
@@ -474,6 +474,7 @@ export default function VerifyIdentityScreen() {
                 source={{ uri: fullscreenUri }}
                 style={styles.modalImage}
                 resizeMode="contain"
+                resizeMethod="resize"
               />
             )}
           </SafeAreaView>
@@ -517,6 +518,7 @@ function PhotoCapture({
               source={{ uri }}
               style={pcStyles.img}
               resizeMode="contain"
+              resizeMethod="resize"
             />
           </TouchableOpacity>
 
@@ -568,7 +570,7 @@ function RecapThumb({ label, uri }: { label: string; uri: string | null }) {
   return (
     <View style={rtStyles.container}>
       {uri ? (
-        <Image key={uri} source={{ uri }} style={rtStyles.img} resizeMode="cover" />
+        <Image key={uri} source={{ uri }} style={rtStyles.img} resizeMode="cover" resizeMethod="resize" />
       ) : (
         <View style={rtStyles.empty}>
           <Ionicons name="image-outline" size={24} color="#D1D5DB" />

@@ -24,6 +24,7 @@ from .views import (
     AppBrandingView, VerificationRequestViewSet, PromotionViewSet, MobileSettingsView,
     FinancialSettingsViewSet, RefundRequestViewSet, TransactionViewSet, ParcelViewSet,
     PopularPlaceViewSet, send_reset_code, verify_reset_code, reset_password,
+    update_profile, change_password,
     contact_view, SupportTicketViewSet
 )
 
@@ -56,6 +57,8 @@ urlpatterns = [
     path('auth/send-reset-code/', send_reset_code, name='send_reset_code'),
     path('auth/verify-reset-code/', verify_reset_code, name='verify_reset_code'),
     path('auth/reset-password/', reset_password, name='reset_password'),
+    path('auth/update-profile/', update_profile, name='update_profile'),
+    path('auth/change-password/', change_password, name='change_password'),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path('branding/', AppBrandingView.as_view(), name='app_branding'),
     path('mobile-settings/', MobileSettingsView.as_view(), name='mobile_settings'),

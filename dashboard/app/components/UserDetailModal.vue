@@ -42,7 +42,12 @@ Zemy
                 <span v-else>{{ user.full_name?.charAt(0) || 'U' }}</span>
               </div>
               <div>
-                <h4 class="font-bold text-text text-lg">{{ user.full_name || 'Utilisateur Anonyme' }}</h4>
+                <div class="flex items-center gap-2">
+                  <h4 class="font-bold text-text text-lg">{{ user.full_name || 'Utilisateur Anonyme' }}</h4>
+                  <span v-if="user.is_staff" class="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
+                    Admin
+                  </span>
+                </div>
                 <div class="flex items-center mt-1">
                   <Icon name="ph:star-fill" class="text-warning w-4 h-4 mr-1" />
                   <span class="text-sm text-textLight">{{ user.rating || '4.5' }}/5</span>

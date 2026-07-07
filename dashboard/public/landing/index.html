@@ -168,6 +168,48 @@
       background: white;
     }
 
+    .btn-store {
+      display: inline-flex;
+      align-items: center;
+      background: var(--dark-bg);
+      color: white !important;
+      padding: 0.8rem 1.5rem;
+      border-radius: 16px;
+      text-decoration: none;
+      transition: var(--transition-smooth);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-store:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+      background: black;
+    }
+
+    .btn-store i {
+      font-size: 2rem;
+      margin-right: 0.8rem;
+    }
+
+    .btn-store .store-text {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+
+    .btn-store .store-text small {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.8;
+    }
+
+    .btn-store .store-text strong {
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
     /* ===== HERO SECTION WITH CAROUSEL ===== */
     .hero-section {
       padding: 120px 0 80px;
@@ -498,9 +540,7 @@
             <a class="nav-link" href="contact.html">Contact</a>
           </li>
         </ul>
-        <div class="d-flex">
-          <a href="/login" class="btn btn-primary">Se connecter <i class="ph-arrow-right"></i></a>
-        </div>
+
       </div>
     </div>
   </nav>
@@ -519,11 +559,22 @@
             </h1>
             <p class="hero-subtitle">La plateforme de covoiturage nouvelle génération. Économisez sur vos trajets,
               rencontrez des voyageurs de confiance et réduisez votre empreinte carbone.</p>
-            <div class="d-flex gap-3 flex-wrap">
-              <a href="#" class="btn btn-primary btn-lg"><i class="ph-download-simple"></i> Télécharger l'appli</a>
-              <a href="/login" class="btn btn-outline-primary btn-lg"><i class="ph-steering-wheel"></i> Espace
-                Conducteur</a>
-            </div>
+             <div class="d-flex gap-3 flex-wrap">
+               <a href="#" class="btn-store">
+                 <i class="ph-fill ph-apple-logo"></i>
+                 <div class="store-text">
+                   <small>Télécharger dans l'</small>
+                   <strong>App Store</strong>
+                 </div>
+               </a>
+               <a href="#" class="btn-store">
+                 <i class="ph-fill ph-google-play-logo" style="color: var(--secondary-color);"></i>
+                 <div class="store-text">
+                   <small>Disponible sur</small>
+                   <strong>Google Play</strong>
+                 </div>
+               </a>
+             </div>
             <div class="mt-4 d-flex gap-4">
               <div><small class="text-muted"><i class="ph-check-circle-fill text-success"></i> Paiement sécurisé</small>
               </div>
@@ -710,9 +761,20 @@
           <p class="lead text-white opacity-90 mb-5">Rejoignez plus de 150 000 voyageurs qui ont déjà fait le choix de
             l'intelligence collective.</p>
           <div class="d-flex gap-3 justify-content-center flex-wrap">
-            <a href="/login" class="btn btn-light-custom btn-lg px-5 py-3"><i class="ph-gauge"></i> Accéder au
-              Dashboard</a>
-            <a href="#" class="btn btn-outline-light btn-lg px-5 py-3"><i class="ph-play-circle"></i> Voir la démo</a>
+            <a href="#" class="btn-store">
+              <i class="ph-fill ph-apple-logo"></i>
+              <div class="store-text">
+                <small>Télécharger dans l'</small>
+                <strong>App Store</strong>
+              </div>
+            </a>
+            <a href="#" class="btn-store">
+              <i class="ph-fill ph-google-play-logo" style="color: var(--secondary-color);"></i>
+              <div class="store-text">
+                <small>Disponible sur</small>
+                <strong>Google Play</strong>
+              </div>
+            </a>
           </div>
           <p class="text-white-50 mt-4 small"><i class="ph-fill ph-check-circle"></i> Inscription gratuite - Sans
             engagement</p>

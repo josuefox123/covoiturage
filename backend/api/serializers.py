@@ -107,11 +107,21 @@ class AdminUserSerializer(serializers.ModelSerializer):
     Inclut des champs sensibles et toutes les informations.
     """
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    archived_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'full_name', 'email', 'phone', 'avatar', 'rating', 'is_verified', 'is_active', 'created_at', 'password']
-        read_only_fields = ['id', 'created_at', 'rating']
+        fields = [
+            'id', 'full_name', 'email', 'phone', 'avatar', 'rating', 
+            'is_verified', 'is_active', 'is_staff', 'created_at', 'password',
+            'is_archived', 'archived_at', 'archive_reason', 'archived_by_name'
+        ]
+        read_only_fields = ['id', 'created_at', 'rating', 'archived_at', 'archived_by_name']
+
+    def get_archived_by_name(self, obj):
+        if obj.archived_by:
+            return obj.archived_by.full_name or obj.archived_by.phone
+        return None
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)

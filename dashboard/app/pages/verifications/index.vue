@@ -12,21 +12,21 @@ Zemy
 -->
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <div class="flex items-center gap-3">
         <h1 class="text-2xl font-bold text-text">Vérifications d'identité</h1>
         <span v-if="pendingCount > 0" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning text-white">
           {{ pendingCount }} en attente
         </span>
       </div>
-      <button @click="fetchRequests" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-textMuted text-sm hover:bg-background transition-colors">
+      <button @click="fetchRequests" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-textMuted text-sm hover:bg-background transition-colors w-fit">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
         Actualiser
       </button>
     </div>
 
     <!-- Stats or Filters -->
-    <div class="flex items-center gap-4 mb-6">
+    <div class="flex flex-wrap items-center gap-2 sm:gap-4 mb-6">
       <button 
         @click="filterStatus = 'all'" 
         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
