@@ -64,10 +64,10 @@ class ParcelViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
-        if not user.is_staff:
+        if not getattr(user, 'is_staff', False):
             queryset = queryset.filter(Q(sender_user=user) | Q(ride__driver=user))
             
-        ride_id = self.request.query_params.get('ride')
+        ride_id = self.request.GET.get('ride')
         if ride_id:
             queryset = queryset.filter(ride_id=ride_id)
         return queryset
@@ -77,7 +77,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
         from ..models import FinancialSettings
         import uuid
         
-        if not self.request.user.is_verified:
+        if not getattr(self.request.user, 'is_verified', False):
             raise ValidationError({"error": "Votre compte doit être vérifié pour envoyer un colis."})
             
         ride = serializer.validated_data.get('ride')
@@ -127,9 +127,9 @@ class ParcelViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='pay')
     def pay_parcel(self, request, pk=None):
-        from ..services.fedapay_service import FedaPayService
-        from ..models import Payment
-        
+        """
+        Génère l'URL de paiement WebView pour FeexPay.
+        """
         parcel = self.get_object()
         if parcel.sender_user != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
@@ -139,155 +139,28 @@ class ParcelViewSet(viewsets.ModelViewSet):
             
         try:
             import urllib.parse
-            frontend_callback = request.data.get('callback_url') or 'zemy://payments'
-            gateway_path = f'/api/payments/callback/?parcel_id={parcel.id}&redirect_to={urllib.parse.quote(frontend_callback)}'
-            callback_url = get_valid_callback_url(request, gateway_path)
-
             amount_to_pay = max(100, int(parcel.zemy_commission))
-
-            existing_payment = Payment.objects.filter(
-                parcel=parcel, status='PENDING'
-            ).order_by('-created_at').first()
+            description = f"Commission Zemy colis {parcel.ride.departure_location} -> {parcel.ride.arrival_location}"
             
-            transaction_id = None
-            if existing_payment and existing_payment.transaction_id:
-                transaction_id = existing_payment.transaction_id
-            
-            if not transaction_id:
-                customer_data = {
-                    "firstname": parcel.sender_user.full_name or "Client",
-                    "lastname": "Zemy",
-                    "email": parcel.sender_user.email or "client@zemy.bj",
-                    "phone_number": {
-                        "number": parcel.sender_user.phone or "+22900000000",
-                        "country": "bj"
-                    }
-                }
-                description = f"Commission Zemy colis {parcel.ride.departure_location} -> {parcel.ride.arrival_location}"
-                
-                transaction_id = FedaPayService.create_transaction(
-                    amount=amount_to_pay,
-                    description=description,
-                    customer_data=customer_data,
-                    callback_url=callback_url,
-                    metadata={"parcel_id": str(parcel.id)}
-                )
-                
-            Payment.objects.update_or_create(
-                transaction_id=str(transaction_id),
-                defaults={
-                    'amount': amount_to_pay,
-                    'user': parcel.sender_user,
-                    'parcel': parcel,
-                    'status': 'PENDING',
-                    'provider': 'fedapay'
-                }
+            # Construire l'URL absolue vers notre page de checkout de paiement
+            path = (
+                f"/payments/checkout/"
+                f"?amount={amount_to_pay}"
+                f"&custom_id={parcel.id}"
+                f"&fullname={urllib.parse.quote(parcel.sender_user.full_name or 'Client Zemy')}"
+                f"&email={urllib.parse.quote(parcel.sender_user.email or 'client@zemy.bj')}"
+                f"&phone={urllib.parse.quote(parcel.sender_user.phone or '')}"
+                f"&description={urllib.parse.quote(description)}"
             )
-                
-            url = FedaPayService.generate_token(transaction_id)
-            return Response({"url": url, "transaction_id": transaction_id})
+            url = request.build_absolute_uri(path)
             
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=True, methods=['post'], url_path='verify-payment')
-    def verify_payment(self, request, pk=None):
-        import requests
-        from django.conf import settings
-        from django.db import transaction
-        from ..models import Payment
-        
-        parcel = self.get_object()
-        payment = Payment.objects.filter(parcel=parcel).first()
-        transaction_id = request.data.get('transaction_id') or (payment.transaction_id if payment else None)
-        
-        if not transaction_id:
-            return Response({"error": "transaction_id requis."}, status=status.HTTP_400_BAD_REQUEST)
+            # Retourner l'URL de paiement
+            return Response({
+                "url": url, 
+                "parcel_id": str(parcel.id),
+                "amount": amount_to_pay
+            })
             
-        try:
-            payment = Payment.objects.filter(transaction_id=transaction_id).first()
-            if payment and payment.status == 'SUCCESS':
-                return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
-                
-            from ..services.fedapay_service import FedaPayService
-            try:
-                transaction_data = FedaPayService.get_transaction_details(transaction_id)
-            except Exception as e:
-                return Response({"error": f"Impossible de récupérer la transaction: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-                
-            tx_status = transaction_data.get('status')
-            
-            if tx_status == 'approved':
-                with transaction.atomic():
-                    payment, created = Payment.objects.select_for_update().get_or_create(
-                        transaction_id=transaction_id,
-                        defaults={
-                            'amount': int(transaction_data.get('amount', 0)),
-                            'user': parcel.sender_user,
-                            'parcel': parcel,
-                            'status': 'PENDING',
-                            'provider': 'fedapay'
-                        }
-                    )
-                    
-                    if payment.status == 'SUCCESS':
-                        return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
-                        
-                    from django.utils import timezone
-                    payment.status = 'SUCCESS'
-                    payment.last_verification_at = timezone.now()
-                    payment.verification_attempts += 1
-                    payment.save()
-                    
-                    if parcel.payment_status != 'escrow':
-                        parcel.payment_status = 'escrow'
-                        parcel.status = 'accepted'
-                        parcel.save()
-                        
-                        amount_due = parcel.driver_payout
-                        
-                        from ..fcm import create_and_send_notification
-                        create_and_send_notification(
-                            user=parcel.ride.driver,
-                            title="Nouveau Colis Confirmé 📦",
-                            message=f"{parcel.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
-                            data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
-                        )
-                        
-                return Response({"status": "Paiement validé avec succès."})
-            elif tx_status in ['pending', 'processing', 'started', 'waiting']:
-                from django.utils import timezone
-                from django.db import models
-                Payment.objects.filter(transaction_id=transaction_id).update(
-                    last_verification_at=timezone.now(),
-                    verification_attempts=models.F('verification_attempts') + 1
-                )
-                
-                tx_mode = transaction_data.get('mode')
-                payment_not_started = (tx_status == 'pending' and not tx_mode)
-                return Response({
-                    "status": "pending",
-                    "message": "Paiement en cours de validation." if not payment_not_started else "Le paiement n'a pas été complété sur FedaPay.",
-                    "payment_not_started": payment_not_started,
-                    "parcel_id": str(parcel.id)
-                })
-            else:
-                new_status = 'PENDING'
-                if tx_status in ['declined', 'failed']:
-                    new_status = 'FAILED'
-                elif tx_status == 'canceled':
-                    new_status = 'CANCELLED'
-                elif tx_status == 'refunded':
-                    new_status = 'REFUNDED'
-                
-                from django.utils import timezone
-                from django.db import models
-                Payment.objects.filter(transaction_id=transaction_id).update(
-                    status=new_status,
-                    last_verification_at=timezone.now(),
-                    verification_attempts=models.F('verification_attempts') + 1
-                )
-                return Response({"error": f"Le paiement a échoué (statut: {tx_status})."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

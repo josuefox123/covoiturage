@@ -194,10 +194,11 @@ export default function BookParcelScreen() {
       if (payRes.url) {
         // Rediriger vers l'écran de paiement
         router.push({
-          pathname: '/payment-redirect',
+          pathname: '/payment',
           params: {
-            checkoutUrl: payRes.url,
-            parcelId: String(currentParcelId),
+            url: payRes.url,
+            parcel_id: String(currentParcelId),
+            amount: String(payRes.amount || 0)
           }
         });
       }

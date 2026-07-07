@@ -13,6 +13,7 @@ Zemy
 
 ========================================================
 """
+from api.models import Payment
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, FinancialSettings, RefundRequest, Transaction, Parcel, SupportTicket
@@ -420,4 +421,15 @@ class SupportTicketSerializer(serializers.ModelSerializer):
         if 'subject' in attrs:
             attrs['subject'] = strip_tags(attrs['subject']).strip()
         return attrs
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    user_details = UserSerializer(source='user', read_only=True)
+    booking_details = BookingSerializer(source='booking', read_only=True)
+    parcel_details = ParcelSerializer(source='parcel', read_only=True)
+
+    class Meta:
+        model = Transaction
+        fields = '__all__'
+
 

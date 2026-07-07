@@ -4,7 +4,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction, models
 from api.models import Payment
-from api.services.fedapay_service import FedaPayService
+from api.services.feexpay_service import FeexPayService
 from api.fcm import create_and_send_notification
 
 logger = logging.getLogger(__name__)
@@ -35,10 +35,10 @@ class Command(BaseCommand):
                 continue
                 
             try:
-                transaction_data = FedaPayService.get_transaction_details(transaction_id)
-                tx_status = transaction_data.get('status', '').lower()
+                transaction_data = FeexPayService.get_transaction_details(transaction_id)
+                tx_status = transaction_data.get('status', '').upper()
                 
-                if tx_status == 'approved':
+                if tx_status in ['SUCCESSFUL', 'SUCCESS', 'APPROVED']:
                     with transaction.atomic():
                         payment_locked = Payment.objects.select_for_update().filter(id=payment.id).first()
                         if not payment_locked or payment_locked.status == 'SUCCESS':
@@ -53,6 +53,12 @@ class Command(BaseCommand):
                         if payment_locked.booking:
                             booking = payment_locked.booking
                             if booking.payment_status != 'escrow':
+                                from api.models import Ride
+                                # Décrémenter les places sur le trajet
+                                ride = Ride.objects.select_for_update().get(id=booking.ride.id)
+                                ride.seats_available -= booking.seats_booked
+                                ride.save()
+
                                 booking.payment_status = 'escrow'
                                 booking.status = 'confirmed'
                                 booking.save()

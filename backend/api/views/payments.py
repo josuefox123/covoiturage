@@ -52,108 +52,195 @@ except Exception:
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
-def payment_callback(request):
+def payment_checkout(request):
     """
-    Endpoint de redirection FedaPay.
-    Reçoit la redirection après paiement et redirige le navigateur du mobile vers le schéma deep link 'zemy://'.
+    Rend la page HTML de checkout FeexPay qui charge le SDK React V2.
     """
-    booking_id = request.GET.get('booking_id')
-    parcel_id = request.GET.get('parcel_id')
-    redirect_to = request.GET.get('redirect_to')
+    from django.shortcuts import render
+    amount = request.GET.get('amount', '0')
+    custom_id = request.GET.get('custom_id', '')
+    description = request.GET.get('description', 'Paiement Zemy')
+    fullname = request.GET.get('fullname', '')
+    email = request.GET.get('email', '')
+    phone = request.GET.get('phone', '')
     
-    if redirect_to:
-        import urllib.parse
-        parsed_redirect = urllib.parse.urlparse(redirect_to)
-        query_params = urllib.parse.parse_qs(parsed_redirect.query)
-        if booking_id and 'booking_id' not in query_params:
-            query_params['booking_id'] = [booking_id]
-        if parcel_id and 'parcel_id' not in query_params:
-            query_params['parcel_id'] = [parcel_id]
-        
-        new_query = urllib.parse.urlencode(query_params, doseq=True)
-        parsed_redirect = parsed_redirect._replace(query=new_query)
-        redirect_url = urllib.parse.urlunparse(parsed_redirect)
-    else:
-        app_scheme = "zemy://payments"
-        redirect_url = app_scheme
-        if booking_id:
-            redirect_url += f"?booking_id={booking_id}"
-        elif parcel_id:
-            redirect_url += f"?parcel_id={parcel_id}"
-        
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Redirection Zemy...</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body {{
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                margin: 0;
-                background-color: #F9FAFB;
-                color: #1F2937;
-                text-align: center;
-                padding: 20px;
-            }}
-            .spinner {{
-                border: 4px solid rgba(0, 0, 0, 0.1);
-                width: 36px;
-                height: 36px;
-                border-radius: 50%;
-                border-left-color: #2F80ED;
-                animation: spin 1s linear infinite;
-                margin-bottom: 20px;
-            }}
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-            h2 {{
-                font-size: 20px;
-                font-weight: 600;
-                margin: 0 0 10px 0;
-            }}
-            p {{
-                font-size: 14px;
-                color: #6B7280;
-                margin: 0 0 20px 0;
-            }}
-            a {{
-                color: #2F80ED;
-                text-decoration: none;
-                font-weight: 500;
-            }}
-        </style>
-        <script>
-            window.onload = function() {{
-                // Redirection vers le deep link
-                window.location.href = "{redirect_url}";
-                
-                // Fallback de sécurité au bout de 2 secondes
-                setTimeout(function() {{
-                    document.getElementById('fallback').style.display = 'block';
-                }}, 2000);
-            }};
-        </script>
-    </head>
-    <body>
-        <div class="spinner"></div>
-        <h2>Redirection vers l'application...</h2>
-        <p>Votre paiement a été traité. Nous vous ramenons vers l'application Zemy.</p>
-        <div id="fallback" style="display: none;">
-            <p>Si la redirection ne fonctionne pas, <a href="{redirect_url}">cliquez ici pour revenir à l'application</a>.</p>
-        </div>
-    </body>
-    </html>
+    context = {
+        "merchant_id": settings.FEEXPAY_MERCHANT_ID,
+        "api_token": settings.FEEXPAY_API_TOKEN,
+        "mode": settings.FEEXPAY_MODE,
+        "amount": amount,
+        "custom_id": custom_id,
+        "description": description,
+        "fullname": fullname,
+        "email": email,
+        "phone": phone,
+    }
+    return render(request, 'api/payment_checkout.html', context)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def confirm_payment(request):
     """
-    from django.http import HttpResponse
-    return HttpResponse(html_content, content_type="text/html; charset=utf-8")
+    Endpoint de confirmation sécurisée appelé par le frontend après succès FeexPay.
+    Vérifie la transaction auprès de FeexPay et confirme la réservation ou le colis.
+    """
+    from ..services.feexpay_service import FeexPayService
+    from django.db import transaction
+    
+    reservation_id = request.data.get('reservation_id') or request.data.get('booking_id')
+    parcel_id = request.data.get('parcel_id')
+    transaction_id = request.data.get('transaction_id')
+    montant = request.data.get('montant')
+    payment_method = request.data.get('payment_method', 'local_money')
+    
+    if not transaction_id:
+        return Response({"error": "transaction_id requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if not reservation_id and not parcel_id:
+        return Response({"error": "reservation_id ou parcel_id requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        # 1. Vérification auprès de FeexPay
+        tx_data = FeexPayService.get_transaction_details(transaction_id)
+        tx_status = tx_data.get('status', '').upper()
+        
+        if tx_status not in ['SUCCESSFUL', 'SUCCESS', 'APPROVED']:
+            Payment.objects.filter(transaction_id=transaction_id).update(
+                status='FAILED',
+                last_verification_at=timezone.now()
+            )
+            if reservation_id:
+                Booking.objects.filter(id=reservation_id).update(status='cancelled', payment_status='pending')
+            elif parcel_id:
+                Parcel.objects.filter(id=parcel_id).update(status='cancelled', payment_status='pending')
+                
+            return Response({"error": f"La transaction n'est pas approuvée sur FeexPay. Statut: {tx_status}"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # 2. Traitement atomique de confirmation de réservation
+        with transaction.atomic():
+            payment, created = Payment.objects.select_for_update().get_or_create(
+                transaction_id=transaction_id,
+                defaults={
+                    'amount': int(tx_data.get('amount', montant or 0)),
+                    'user': request.user,
+                    'status': 'PENDING',
+                    'provider': 'feexpay'
+                }
+            )
+            
+            if payment.status == 'SUCCESS':
+                return Response({"already_processed": True, "message": "Paiement déjà validé avec succès."})
+                
+            payment.status = 'SUCCESS'
+            payment.last_verification_at = timezone.now()
+            payment.verification_attempts += 1
+            
+            if reservation_id:
+                booking = Booking.objects.select_for_update().filter(id=reservation_id).first()
+                if not booking:
+                    return Response({"error": "Réservation introuvable."}, status=status.HTTP_404_NOT_FOUND)
+                
+                payment.booking = booking
+                payment.save()
+                
+                if booking.payment_status != 'escrow':
+                    # Vérifier s'il y a assez de places disponibles
+                    ride = Ride.objects.select_for_update().get(id=booking.ride.id)
+                    if ride.seats_available < booking.seats_booked:
+                        booking.status = 'cancelled'
+                        booking.payment_status = 'pending'
+                        booking.save()
+                        return Response({"error": "Désolé, les places ne sont plus disponibles. Contactez le support pour remboursement."}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    # Décrémenter définitivement les places
+                    ride.seats_available -= booking.seats_booked
+                    ride.save()
+                    
+                    booking.payment_status = 'escrow'
+                    booking.status = 'confirmed'
+                    booking.transaction_id = transaction_id
+                    booking.save()
+                    
+                    # Créer l'écriture financière (Transaction historique)
+                    amount_due = int(booking.amount_due_to_driver)
+                    commission = int(booking.amount_paid_online)
+                    
+                    Transaction.objects.create(
+                        user=booking.passenger,
+                        ride=booking.ride,
+                        transaction_type='ride',
+                        amount=commission,
+                        driver_payout=amount_due,
+                        zemy_commission=commission,
+                        total_price=booking.total_amount,
+                        status='completed'
+                    )
+                    
+                    # Envoyer les notifications
+                    create_and_send_notification(
+                        user=booking.passenger,
+                        title="Réservation confirmée ✅",
+                        message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+                        data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    )
+                    
+                    if booking.ride.driver:
+                        create_and_send_notification(
+                            user=booking.ride.driver,
+                            title="Nouvelle Réservation 🚗",
+                            message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                            data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
+                        )
+                        
+            elif parcel_id:
+                parcel = Parcel.objects.select_for_update().filter(id=parcel_id).first()
+                if not parcel:
+                    return Response({"error": "Colis introuvable."}, status=status.HTTP_404_NOT_FOUND)
+                
+                payment.parcel = parcel
+                payment.save()
+                
+                if parcel.payment_status != 'escrow':
+                    parcel.payment_status = 'escrow'
+                    parcel.status = 'accepted'
+                    parcel.save()
+                    
+                    # Créer l'écriture financière (Transaction historique)
+                    Transaction.objects.create(
+                        user=parcel.sender_user,
+                        ride=parcel.ride,
+                        parcel=parcel,
+                        transaction_type='parcel',
+                        amount=parcel.zemy_commission,
+                        driver_payout=parcel.driver_payout,
+                        zemy_commission=parcel.zemy_commission,
+                        total_price=parcel.price,
+                        status='completed'
+                    )
+                    
+                    # Notifications
+                    amount_due = parcel.driver_payout
+                    create_and_send_notification(
+                        user=parcel.ride.driver,
+                        title="Nouveau Colis Confirmé 📦",
+                        message=f"{parcel.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
+                        data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
+                    )
+                    
+                    if parcel.sender_user:
+                        create_and_send_notification(
+                            user=parcel.sender_user,
+                            title="Colis payé et validé 📦",
+                            message=f"Le paiement de votre colis a été validé. Le conducteur transportera votre colis sur le trajet.",
+                            data={'type': 'parcel_confirmed_sender', 'parcel_id': str(parcel.id), 'screen': 'trips'}
+                        )
+                        
+            return Response({"status": "Paiement validé et réservation confirmée avec succès."})
+            
+    except Exception as e:
+        logger.error(f"Error confirming payment {transaction_id}: {e}")
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -161,11 +248,11 @@ def payment_callback(request):
 def sync_payments(request):
     """
     Endpoint de synchronisation appelé par l'application mobile.
-    Vérifie tous les paiements PENDING de l'utilisateur connecté via FedaPay.
+    Vérifie tous les paiements PENDING de l'utilisateur connecté via FeexPay.
     """
     from django.db import transaction
     from ..models import Payment
-    from ..services.fedapay_service import FedaPayService
+    from ..services.feexpay_service import FeexPayService
     
     user = request.user
     pending_payments = Payment.objects.filter(user=user, status='PENDING')
@@ -177,17 +264,16 @@ def sync_payments(request):
             continue
             
         try:
-            transaction_data = FedaPayService.get_transaction_details(transaction_id)
-            tx_status = transaction_data.get('status', '').lower()
+            transaction_data = FeexPayService.get_transaction_details(transaction_id)
+            tx_status = transaction_data.get('status', '').upper()
             
-            if tx_status == 'approved':
+            if tx_status in ['SUCCESSFUL', 'SUCCESS', 'APPROVED']:
                 with transaction.atomic():
                     payment_locked = Payment.objects.select_for_update().filter(id=payment.id).first()
                     if not payment_locked or payment_locked.status == 'SUCCESS':
                         continue
                         
                     payment_locked.status = 'SUCCESS'
-                    from django.utils import timezone
                     payment_locked.last_verification_at = timezone.now()
                     payment_locked.save()
                     
@@ -195,6 +281,11 @@ def sync_payments(request):
                     if payment_locked.booking:
                         booking = payment_locked.booking
                         if booking.payment_status != 'escrow':
+                            from api.models import Ride
+                            ride = Ride.objects.select_for_update().get(id=booking.ride.id)
+                            ride.seats_available -= booking.seats_booked
+                            ride.save()
+
                             booking.payment_status = 'escrow'
                             booking.status = 'confirmed'
                             booking.save()
@@ -205,15 +296,15 @@ def sync_payments(request):
                             create_and_send_notification(
                                 user=booking.passenger,
                                 title="Réservation confirmée ✅",
-                                message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+                                message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur.",
                                 data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                             )
                             
-                            if booking.ride.driver_details:
+                            if booking.ride.driver:
                                 create_and_send_notification(
-                                    user=booking.ride.driver_details,
+                                    user=booking.ride.driver,
                                     title="Nouvelle Réservation 🚗",
-                                    message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                                    message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s).",
                                     data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
                                 )
                                 
@@ -229,7 +320,7 @@ def sync_payments(request):
                             create_and_send_notification(
                                 user=parcel.ride.driver,
                                 title="Nouveau Colis Confirmé 📦",
-                                message=f"{parcel.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
+                                message=f"{parcel.sender_name} a confirmé l'envoi d'un colis.",
                                 data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
                             )
                             
@@ -240,26 +331,33 @@ def sync_payments(request):
                         "parcel_id": str(payment_locked.parcel.id) if payment_locked.parcel else None
                     })
                     
-            elif tx_status in ['declined', 'failed', 'canceled', 'refunded']:
+            elif tx_status in ['DECLINED', 'FAILED', 'CANCELED', 'CANCELLED', 'REFUNDED']:
                 new_status = 'FAILED'
-                if tx_status == 'canceled':
+                if tx_status in ['CANCELED', 'CANCELLED']:
                     new_status = 'CANCELLED'
-                elif tx_status == 'refunded':
+                elif tx_status == 'REFUNDED':
                     new_status = 'REFUNDED'
                     
                 payment.status = new_status
-                from django.utils import timezone
                 payment.last_verification_at = timezone.now()
                 payment.save()
+                
+                # Mettre à jour la réservation
+                if payment.booking:
+                    payment.booking.status = 'cancelled'
+                    payment.booking.save()
+                elif payment.parcel:
+                    payment.parcel.status = 'cancelled'
+                    payment.parcel.save()
+
                 updated_payments.append({
                     "transaction_id": transaction_id,
                     "status": new_status,
                 })
         except Exception as e:
-            # Ignore FedaPay errors during silent sync
             print(f"Error syncing transaction {transaction_id}: {e}")
             pass
-
+            
     return Response({
         "synced_count": len(updated_payments),
         "updates": updated_payments
@@ -359,6 +457,133 @@ class TransactionViewSet(viewsets.ModelViewSet):
         if user.is_staff:
             return self.queryset
         return self.queryset.filter(user=user)
+
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour la gestion et l'affichage des paiements dans le dashboard d'administration.
+    Prend en charge le listing, le filtrage, la recherche et l'export Excel/PDF.
+    """
+    from ..models import Payment
+    from ..serializers import PaymentSerializer
+    queryset = Payment.objects.all().order_by('-created_at')
+    serializer_class = PaymentSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        queryset = self.queryset.select_related('user', 'booking', 'parcel')
+        
+        status_filter = self.request.query_params.get('status')
+        provider_filter = self.request.query_params.get('provider')
+        user_phone = self.request.query_params.get('user_phone')
+        search = self.request.query_params.get('search')
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if provider_filter:
+            queryset = queryset.filter(provider=provider_filter)
+        if user_phone:
+            queryset = queryset.filter(user__phone__icontains=user_phone)
+        if search:
+            queryset = queryset.filter(
+                Q(transaction_id__icontains=search) |
+                Q(user__full_name__icontains=search) |
+                Q(user__phone__icontains=search)
+            )
+            
+        return queryset
+
+    @action(detail=False, methods=['get'], url_path='export-excel')
+    def export_excel(self, request):
+        import openpyxl
+        from django.http import HttpResponse
+        
+        payments = self.get_queryset()
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Paiements Zemy"
+        
+        headers = ["ID Transaction", "Date", "Utilisateur", "Téléphone", "Montant (FCFA)", "Service", "Statut", "Fournisseur"]
+        ws.append(headers)
+        
+        for p in payments:
+            service = "Trajet" if p.booking else ("Colis" if p.parcel else "Autre")
+            ws.append([
+                p.transaction_id,
+                p.created_at.strftime("%d/%m/%Y %H:%M") if p.created_at else "",
+                p.user.full_name if p.user else "",
+                p.user.phone if p.user else "",
+                p.amount,
+                service,
+                p.status,
+                p.provider
+            ])
+            
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename=paiements_zemy.xlsx'
+        wb.save(response)
+        return response
+
+    @action(detail=False, methods=['get'], url_path='export-pdf')
+    def export_pdf(self, request):
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from django.http import HttpResponse
+        
+        payments = self.get_queryset()
+        
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=paiements_zemy.pdf'
+        
+        doc = SimpleDocTemplate(response, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+        elements = []
+        
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'TitleStyle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            leading=28,
+            textColor=colors.HexColor('#2F80ED'),
+            alignment=1,
+            spaceAfter=20
+        )
+        
+        elements.append(Paragraph("Rapport des Paiements - ZEMY", title_style))
+        elements.append(Spacer(1, 10))
+        
+        data = [["ID Trans.", "Date", "Utilisateur", "Montant", "Type", "Statut"]]
+        for p in payments:
+            service = "Trajet" if p.booking else ("Colis" if p.parcel else "Autre")
+            name = (p.user.full_name or p.user.phone)[:15] if p.user else ""
+            data.append([
+                p.transaction_id[:12] + "..." if len(p.transaction_id) > 12 else p.transaction_id,
+                p.created_at.strftime("%d/%m/%y") if p.created_at else "",
+                name,
+                f"{p.amount} XOF",
+                service,
+                p.status
+            ])
+            
+        t = Table(data, colWidths=[100, 60, 110, 80, 70, 70])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2F80ED')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('BOTTOMPADDING', (0,0), (-1,0), 8),
+            ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#F9FAFB')),
+            ('GRID', (0,0), (-1,-1), 1, colors.HexColor('#E5E7EB')),
+            ('FONTSIZE', (0,1), (-1,-1), 9),
+        ]))
+        
+        elements.append(t)
+        doc.build(elements)
+        return response
 
 
 

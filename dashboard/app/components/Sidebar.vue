@@ -69,6 +69,10 @@ Zemy
       </NuxtLink>
 
       <div class="text-xs font-semibold text-textMuted uppercase tracking-wider mb-2 mt-4 px-2">Finances</div>
+      <NuxtLink to="/payments" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
+        <Icon name="ph:credit-card" class="w-5 h-5" />
+        <span>Paiements</span>
+      </NuxtLink>
       <NuxtLink to="/financial-settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text hover:bg-gray-100 transition-colors" active-class="bg-primaryLight text-primaryDark font-semibold">
         <Icon name="ph:money" class="w-5 h-5" />
         <span>Commissions</span>

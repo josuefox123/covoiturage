@@ -5,14 +5,14 @@ from django.utils.timezone import make_aware, now
 from rest_framework.exceptions import ValidationError
 from ..models import Booking, Ride, Conversation, Message, RefundRequest
 from ..fcm import create_and_send_notification
-from .fedapay_service import FedaPayService
+from .feexpay_service import FeexPayService
 
 class BookingService:
     @staticmethod
     def create_booking(passenger, ride_id, seats_booked, payment_status='pending'):
         """
         Gère la création sécurisée d'une réservation avec gestion des race conditions,
-        de la disponibilité des sièges et de la validation FedaPay.
+        de la disponibilité des sièges et de la validation FeexPay.
         """
         if not passenger.is_verified:
             raise ValidationError({"error": "Votre compte doit être vérifié pour réserver."})
@@ -37,14 +37,18 @@ class BookingService:
             existing_booking = Booking.objects.filter(ride=ride, passenger=passenger).exclude(status='cancelled').first()
             if existing_booking:
                 if existing_booking.payment_status == 'pending':
-                    # Vérifier si un paiement a déjà été effectué via FedaPay
+                    # Vérifier si un paiement a déjà été effectué via FeexPay
                     if existing_booking.transaction_id:
                         try:
-                            tx_data = FedaPayService.get_transaction_details(existing_booking.transaction_id)
-                            if tx_data.get('status') == 'approved':
+                            tx_data = FeexPayService.get_transaction_details(existing_booking.transaction_id)
+                            if tx_data.get('status') in ['SUCCESSFUL', 'SUCCESS', 'approved']:
                                 existing_booking.payment_status = 'escrow'
                                 existing_booking.status = 'confirmed'
                                 existing_booking.save()
+                                
+                                # Décrémenter les places lors de la confirmation
+                                ride.seats_available -= existing_booking.seats_booked
+                                ride.save()
                                 
                                 amount_due = int(existing_booking.amount_due_to_driver)
                                 commission = int(existing_booking.amount_paid_online)
@@ -74,9 +78,8 @@ class BookingService:
             if ride.seats_available < seats_booked:
                 raise ValidationError({"error": "Pas assez de places disponibles pour cette réservation."})
 
-            # Décrémenter les places
-            ride.seats_available -= seats_booked
-            ride.save()
+            # NE PAS décrémenter les places lors de la création de la réservation.
+            # Elles seront décrémentées lors de la validation du paiement (confirm_payment).
             
             # Créer la réservation
             booking = Booking.objects.create(
@@ -102,8 +105,8 @@ class BookingService:
         booking.status = 'cancelled'
         booking.save()
         
-        # Restituer les places si la réservation n'était pas déjà annulée
-        if old_status != 'cancelled':
+        # Restituer les places si la réservation était confirmée et qu'on l'annule
+        if old_status == 'confirmed':
             with transaction.atomic():
                 locked_ride = Ride.objects.select_for_update().get(id=booking.ride.id)
                 locked_ride.seats_available += booking.seats_booked

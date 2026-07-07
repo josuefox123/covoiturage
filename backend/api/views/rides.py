@@ -624,9 +624,9 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='pay')
     def pay_booking(self, request, pk=None):
-        from ..services.fedapay_service import FedaPayService
-        from ..models import Payment
-        
+        """
+        Génère l'URL de paiement WebView pour FeexPay.
+        """
         booking = self.get_object()
         if booking.passenger != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
@@ -636,165 +636,28 @@ class BookingViewSet(viewsets.ModelViewSet):
             
         try:
             import urllib.parse
-            frontend_callback = request.data.get('callback_url') or 'zemy://payments'
-            gateway_path = f'/api/payments/callback/?booking_id={booking.id}&redirect_to={urllib.parse.quote(frontend_callback)}'
-            callback_url = get_valid_callback_url(request, gateway_path)
-
             amount_to_pay = max(100, int(booking.amount_paid_online))
-
-            existing_payment = Payment.objects.filter(
-                booking=booking, status='PENDING'
-            ).order_by('-created_at').first()
+            description = f"Commission Zemy - Trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}"
             
-            transaction_id = None
-            if existing_payment and existing_payment.transaction_id and booking.transaction_id:
-                transaction_id = existing_payment.transaction_id
-            
-            if not transaction_id:
-                customer_data = {
-                    "firstname": booking.passenger.full_name or "Passager",
-                    "lastname": "Zemy",
-                    "email": booking.passenger.email or "client@zemy.bj",
-                    "phone_number": {
-                        "number": booking.passenger.phone or "+22900000000",
-                        "country": "bj"
-                    }
-                }
-                description = f"Commission Zemy pour trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}"
-                
-                transaction_id = FedaPayService.create_transaction(
-                    amount=amount_to_pay,
-                    description=description,
-                    customer_data=customer_data,
-                    callback_url=callback_url,
-                    metadata={"booking_id": str(booking.id)}
-                )
-                
-                booking.transaction_id = str(transaction_id)
-                booking.save()
-            
-            # Create or update Payment
-            Payment.objects.update_or_create(
-                transaction_id=str(transaction_id),
-                defaults={
-                    'amount': amount_to_pay,
-                    'user': booking.passenger,
-                    'booking': booking,
-                    'status': 'PENDING',
-                    'provider': 'fedapay'
-                }
+            # Construire l'URL absolue vers notre page de checkout de paiement
+            path = (
+                f"/payments/checkout/"
+                f"?amount={amount_to_pay}"
+                f"&custom_id={booking.id}"
+                f"&fullname={urllib.parse.quote(booking.passenger.full_name or 'Client Zemy')}"
+                f"&email={urllib.parse.quote(booking.passenger.email or 'client@zemy.bj')}"
+                f"&phone={urllib.parse.quote(booking.passenger.phone or '')}"
+                f"&description={urllib.parse.quote(description)}"
             )
-                 
-            url = FedaPayService.generate_token(transaction_id)
-            return Response({"url": url, "transaction_id": transaction_id})
+            url = request.build_absolute_uri(path)
             
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-    @action(detail=True, methods=['post'], url_path='verify-payment')
-    def verify_payment(self, request, pk=None):
-        import requests
-        from django.conf import settings
-        from django.db import transaction
-        from ..models import Payment
-        
-        booking = self.get_object()
-        transaction_id = request.data.get('transaction_id') or booking.transaction_id
-        
-        if not transaction_id:
-            return Response({"error": "transaction_id requis."}, status=status.HTTP_400_BAD_REQUEST)
+            # Retourner l'URL de paiement
+            return Response({
+                "url": url, 
+                "booking_id": str(booking.id),
+                "amount": amount_to_pay
+            })
             
-        try:
-            payment = Payment.objects.filter(transaction_id=transaction_id).first()
-            if payment and payment.status == 'SUCCESS':
-                return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
-                
-            from ..services.fedapay_service import FedaPayService
-            try:
-                transaction_data = FedaPayService.get_transaction_details(transaction_id)
-            except Exception as e:
-                return Response({"error": f"Impossible de récupérer la transaction: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-                
-            tx_status = transaction_data.get('status')
-            
-            if tx_status == 'approved':
-                with transaction.atomic():
-                    payment, created = Payment.objects.select_for_update().get_or_create(
-                        transaction_id=transaction_id,
-                        defaults={
-                            'amount': int(transaction_data.get('amount', 0)),
-                            'user': booking.passenger,
-                            'booking': booking,
-                            'status': 'PENDING',
-                            'provider': 'fedapay'
-                        }
-                    )
-                    
-                    if payment.status == 'SUCCESS':
-                        return Response({"already_processed": True, "status": "Paiement déjà validé avec succès."})
-                        
-                    payment.status = 'SUCCESS'
-                    payment.last_verification_at = timezone.now()
-                    payment.verification_attempts += 1
-                    payment.save()
-                    
-                    if booking.payment_status != 'escrow':
-                        booking.payment_status = 'escrow'
-                        booking.status = 'confirmed'
-                        booking.save()
-                        
-                        amount_due = int(booking.amount_due_to_driver)
-                        commission = int(booking.amount_paid_online)
-                        
-                        from ..fcm import create_and_send_notification
-                        create_and_send_notification(
-                            user=booking.passenger,
-                            title="Réservation confirmée ✅",
-                            message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
-                            data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
-                        )
-                        
-                        if booking.ride.driver_details:
-                            create_and_send_notification(
-                                user=booking.ride.driver_details,
-                                title="Nouvelle Réservation 🚗",
-                                message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
-                                data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
-                            )
-                            
-                return Response({"status": "Paiement validé avec succès."})
-            elif tx_status in ['pending', 'processing', 'started', 'waiting']:
-                Payment.objects.filter(transaction_id=transaction_id).update(
-                    last_verification_at=timezone.now(),
-                    verification_attempts=models.F('verification_attempts') + 1
-                )
-                
-                # Distinguer : utilisateur n'a pas payé (mode=null) vs opérateur traite (mode renseigné)
-                tx_mode = transaction_data.get('mode')
-                payment_not_started = (tx_status == 'pending' and not tx_mode)
-                return Response({
-                    "status": "pending",
-                    "message": "Paiement en cours de validation." if not payment_not_started else "Le paiement n'a pas été complété sur FedaPay.",
-                    "payment_not_started": payment_not_started,
-                    "booking_id": str(booking.id),
-                    "ride_id": str(booking.ride.id) if hasattr(booking.ride, 'id') else str(booking.ride)
-                })
-            else:
-                new_status = 'PENDING'
-                if tx_status in ['declined', 'failed']:
-                    new_status = 'FAILED'
-                elif tx_status == 'canceled':
-                    new_status = 'CANCELLED'
-                elif tx_status == 'refunded':
-                    new_status = 'REFUNDED'
-                
-                Payment.objects.filter(transaction_id=transaction_id).update(
-                    status=new_status,
-                    last_verification_at=timezone.now(),
-                    verification_attempts=models.F('verification_attempts') + 1
-                )
-                return Response({"error": f"Le paiement a échoué (statut: {tx_status})."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

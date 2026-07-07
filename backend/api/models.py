@@ -304,7 +304,7 @@ class Booking(models.Model):
         return f"Reservation {self.id} pour {self.ride}"
 
     def delete(self, using=None, keep_parents=False):  # type: ignore[override]
-        if self.status != 'cancelled' and self.ride:
+        if self.status == 'confirmed' and self.ride:
             from django.db.models import F
             Ride.objects.filter(id=self.ride_id).update(
                 seats_available=F('seats_available') + self.seats_booked
@@ -815,7 +815,7 @@ class Payment(models.Model):
     booking = models.ForeignKey('Booking', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     parcel = models.ForeignKey('Parcel', on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
-    provider = models.CharField(max_length=50, default='fedapay')
+    provider = models.CharField(max_length=50, default='feexpay')
     last_verification_at = models.DateTimeField(null=True, blank=True)
     verification_attempts = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

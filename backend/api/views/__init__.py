@@ -22,11 +22,13 @@ from .rides import (
     PopularPlaceViewSet,
 )
 from .payments import (
-    payment_callback,
+    payment_checkout,
+    confirm_payment,
     sync_payments,
     FinancialSettingsViewSet,
     RefundRequestViewSet,
     TransactionViewSet,
+    PaymentViewSet,
 )
 from .chat import (
     ConversationViewSet,

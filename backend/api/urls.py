@@ -18,7 +18,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     verify_code, register_user, login_user, check_availability,
     request_verification, verification_status,
-    dashboard_stats, save_fcm_token, payment_callback, sync_payments,
+    dashboard_stats, save_fcm_token, payment_checkout, confirm_payment, sync_payments,
+    PaymentViewSet,
     UserViewSet, VehicleViewSet, UserPreferenceViewSet,
     RideViewSet, BookingViewSet, ConversationViewSet, MessageViewSet, NotificationViewSet,
     AppBrandingView, VerificationRequestViewSet, PromotionViewSet, MobileSettingsView,
@@ -45,6 +46,7 @@ router.register(r'transactions', TransactionViewSet, basename='transactions')
 router.register(r'parcels', ParcelViewSet, basename='parcel')
 router.register(r'popular-places', PopularPlaceViewSet, basename='popular_place')
 router.register(r'support-tickets', SupportTicketViewSet, basename='support_ticket')
+router.register(r'payments', PaymentViewSet, basename='payments')
 
 urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),
@@ -62,7 +64,8 @@ urlpatterns = [
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path('branding/', AppBrandingView.as_view(), name='app_branding'),
     path('mobile-settings/', MobileSettingsView.as_view(), name='mobile_settings'),
-    path('payments/callback/', payment_callback, name='payment_callback'),
+    path('payments/checkout/', payment_checkout, name='payment_checkout'),
+    path('payments/confirm/', confirm_payment, name='confirm_payment'),
     path('payments/sync/', sync_payments, name='sync_payments'),
     path('contact/', contact_view, name='contact'),
     path('', include(router.urls)),

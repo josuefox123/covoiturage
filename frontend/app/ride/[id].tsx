@@ -225,10 +225,11 @@ export default function RideDetailScreen() {
         setHasBooked(true);
         // Rediriger vers l'écran de paiement
         router.push({
-          pathname: '/payment-redirect',
+          pathname: '/payment',
           params: {
-            checkoutUrl: payRes.url,
-            bookingId: String(currentBookingId),
+            url: payRes.url,
+            booking_id: String(currentBookingId),
+            amount: String(payRes.amount || 0)
           }
         });
       }
@@ -269,10 +270,11 @@ export default function RideDetailScreen() {
       if (payRes.url) {
         // Rediriger vers l'écran de paiement
         router.push({
-          pathname: '/payment-redirect',
+          pathname: '/payment',
           params: {
-            checkoutUrl: payRes.url,
-            bookingId: String(bookingId),
+            url: payRes.url,
+            booking_id: String(bookingId),
+            amount: String(payRes.amount || 0)
           }
         });
       } else if (payRes.error) {
