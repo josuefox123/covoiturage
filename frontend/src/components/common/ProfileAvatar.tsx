@@ -21,6 +21,8 @@ interface ProfileAvatarProps {
   showBorder?: boolean;
 }
 
+import { getMediaUrl } from '../../utils/media';
+
 /**
  * Composant ProfileAvatar.
  *
@@ -29,6 +31,7 @@ interface ProfileAvatarProps {
  */
 export default function ProfileAvatar({ name, url, size = 40, showBorder = false }: ProfileAvatarProps) {
   const initial = name ? name.charAt(0).toUpperCase() : '?';
+  const resolvedUrl = getMediaUrl(url);
 
   return (
     <View
@@ -42,9 +45,9 @@ export default function ProfileAvatar({ name, url, size = 40, showBorder = false
         showBorder && styles.border,
       ]}
     >
-      {url ? (
+      {resolvedUrl ? (
         <Image
-          source={{ uri: url }}
+          source={{ uri: resolvedUrl }}
           style={{ width: '100%', height: '100%', borderRadius: size / 2 }}
           resizeMode="cover"
         />

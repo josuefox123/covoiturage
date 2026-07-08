@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { theme } from '../../../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { getMediaUrl } from '../../../../utils/media';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../../../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
@@ -229,7 +230,7 @@ export default function ProfileScreen() {
           <View style={styles.profileMain}>
             <TouchableOpacity onPress={pickAvatar} style={styles.avatarWrapperSmall} activeOpacity={0.8}>
               {user.avatar ? (
-                <Image source={{ uri: user.avatar }} style={styles.avatarBig} resizeMode="cover" />
+                <Image source={{ uri: getMediaUrl(user.avatar) }} style={styles.avatarBig} resizeMode="cover" />
               ) : (
                 <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.avatarBig}>
                   <Text style={styles.avatarBigText}>{initials}</Text>

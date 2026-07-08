@@ -349,7 +349,7 @@ export default function RideManagementScreen() {
             <View key={booking.id} style={styles.passengerCard}>
               <View style={styles.passengerHeader}>
                 {booking.passenger_details?.avatar ? (
-                  <Image source={{ uri: booking.passenger_details.avatar }} style={styles.passengerAvatarImage} />
+                  <Image source={{ uri: getMediaUrl(booking.passenger_details.avatar) }} style={styles.passengerAvatarImage} />
                 ) : (
                   <View style={styles.passengerAvatar}>
                     <Text style={styles.passengerAvatarText}>
@@ -411,7 +411,7 @@ export default function RideManagementScreen() {
               <View key={booking.id} style={[styles.passengerCard, { opacity: 0.7 }]}>
                 <View style={styles.passengerHeader}>
                   {booking.passenger_details?.avatar ? (
-                    <Image source={{ uri: booking.passenger_details.avatar }} style={styles.passengerAvatarImage} />
+                    <Image source={{ uri: getMediaUrl(booking.passenger_details.avatar) }} style={styles.passengerAvatarImage} />
                   ) : (
                     <View style={[styles.passengerAvatar, { backgroundColor: COLORS.grayLight }]}>
                       <Text style={[styles.passengerAvatarText, { color: COLORS.textLight }]}>

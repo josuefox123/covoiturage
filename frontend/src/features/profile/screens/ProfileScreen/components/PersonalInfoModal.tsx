@@ -8,6 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getMediaUrl } from '../../../../../utils/media';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../../../../styles/theme';
@@ -166,7 +167,7 @@ export function PersonalInfoModal({
         <TouchableOpacity onPress={pickAvatar} style={styles.modernAvatarPicker} activeOpacity={0.8}>
           <View style={styles.avatarWrapper}>
             {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.modernAvatar} resizeMode="cover" />
+              <Image source={{ uri: getMediaUrl(avatarUri) }} style={styles.modernAvatar} resizeMode="cover" />
             ) : (
               <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.modernAvatarPlaceholder}>
                 <Ionicons name="person" size={40} color={theme.colors.white} />

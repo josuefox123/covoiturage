@@ -514,7 +514,7 @@ export default function RideDetailScreen() {
             <View style={styles.driverCard}>
               <View style={styles.driverProfileHeader}>
                 {ride.driver_details?.avatar ? (
-                  <Image source={{ uri: ride.driver_details.avatar }} style={styles.driverAvatarImage} />
+                  <Image source={{ uri: getMediaUrl(ride.driver_details.avatar) }} style={styles.driverAvatarImage} />
                 ) : (
                   <View style={styles.driverAvatarPlaceholder}>
                     <Text style={styles.driverAvatarText}>{driverAvatar}</Text>
@@ -644,7 +644,7 @@ export default function RideDetailScreen() {
                 <View key={booking.id} style={styles.passengerCard}>
                   <View style={styles.passengerHeader}>
                     {booking.passenger_details?.avatar ? (
-                      <Image source={{ uri: booking.passenger_details.avatar }} style={styles.passengerAvatarImage} />
+                      <Image source={{ uri: getMediaUrl(booking.passenger_details.avatar) }} style={styles.passengerAvatarImage} />
                     ) : (
                       <View style={styles.passengerAvatar}>
                         <Text style={styles.passengerAvatarText}>

@@ -1126,7 +1126,7 @@ export default function PublishScreen() {
               <TouchableOpacity style={styles.avatarPicker} onPress={pickAvatar} activeOpacity={0.8}>
                 {avatarUri ? (
                   <View style={styles.avatarWrapper}>
-                    <Image source={{ uri: avatarUri }} style={styles.avatar} />
+                    <Image source={{ uri: getMediaUrl(avatarUri) }} style={styles.avatar} />
                     <View style={styles.avatarBadge}>
                       <Ionicons name="camera" size={16} color={theme.colors.white} />
                     </View>

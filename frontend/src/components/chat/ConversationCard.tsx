@@ -15,6 +15,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { theme } from '../../styles/theme';
+import { getMediaUrl } from '../../utils/media';
 import { useRouter } from 'expo-router';
 
 interface ConversationCardProps {
@@ -116,7 +117,7 @@ export default function ConversationCard({ item, currentUserId, onArchive, onDel
       >
         <View style={styles.avatarContainer}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            <Image source={{ uri: getMediaUrl(avatarUrl) }} style={styles.avatarImage} />
           ) : (
             <View style={styles.avatarCircle}>
               <Text style={styles.avatarText}>{userAvatar}</Text>
