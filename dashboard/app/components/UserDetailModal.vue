@@ -38,7 +38,7 @@ Zemy
             <!-- Avatar + Name -->
             <div class="flex items-center space-x-4 p-4 bg-background rounded-xl">
               <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden text-primary font-bold text-xl">
-                <img v-if="user.avatar" :src="user.avatar" alt="" class="w-full h-full object-cover" />
+                <img v-if="user.avatar" :src="getMediaUrl(user.avatar)" alt="" class="w-full h-full object-cover" />
                 <span v-else>{{ user.full_name?.charAt(0) || 'U' }}</span>
               </div>
               <div>

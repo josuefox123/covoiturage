@@ -235,7 +235,7 @@ Zemy
                   <td class="px-5 py-4">
                     <div class="flex items-center space-x-3">
                       <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden flex-shrink-0">
-                        <img v-if="user.avatar" :src="user.avatar" alt="" class="w-full h-full object-cover" />
+                        <img v-if="user.avatar" :src="getMediaUrl(user.avatar)" alt="" class="w-full h-full object-cover" />
                         <span v-else>{{ (user.full_name || user.phone)?.charAt(0)?.toUpperCase() }}</span>
                       </div>
                       <div>
@@ -323,7 +323,7 @@ Zemy
                   <!-- Photo -->
                   <td class="px-5 py-4">
                     <div class="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning font-bold overflow-hidden flex-shrink-0">
-                      <img v-if="user.avatar" :src="user.avatar" alt="" class="w-full h-full object-cover" />
+                      <img v-if="user.avatar" :src="getMediaUrl(user.avatar)" alt="" class="w-full h-full object-cover" />
                       <span v-else>{{ (user.full_name || user.phone)?.charAt(0)?.toUpperCase() }}</span>
                     </div>
                   </td>

@@ -79,7 +79,7 @@ Zemy
           <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-background/50 transition-colors">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
-                <img :src="req.user_details.avatar || '/images/default-avatar.png'" class="w-10 h-10 rounded-full object-cover border border-border" />
+                <img :src="getMediaUrl(req.user_details.avatar) || '/images/default-avatar.png'" class="w-10 h-10 rounded-full object-cover border border-border" />
                 <div>
                   <div class="font-medium text-text">{{ req.user_details.full_name || 'Non renseigné' }}</div>
                   <div class="text-xs text-textMuted">{{ req.user_details.phone }}</div>

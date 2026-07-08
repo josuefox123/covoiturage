@@ -36,7 +36,7 @@ Zemy
       <!-- User Info Card -->
       <div class="bg-card rounded-xl p-6 border border-border shadow-sm">
         <div class="flex flex-col items-center text-center mb-6">
-          <img :src="req.user_details.avatar || '/images/default-avatar.png'" class="w-24 h-24 rounded-full object-cover border-4 border-background shadow-sm mb-4" />
+          <img :src="getMediaUrl(req.user_details.avatar) || '/images/default-avatar.png'" class="w-24 h-24 rounded-full object-cover border-4 border-background shadow-sm mb-4" />
           <h2 class="text-xl font-bold text-text">{{ req.user_details.full_name || 'Utilisateur inconnu' }}</h2>
           <p class="text-textMuted">{{ req.user_details.phone }}</p>
           <div class="mt-4">

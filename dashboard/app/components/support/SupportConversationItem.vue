@@ -32,7 +32,7 @@ Zemy
       <!-- Avatar Photo -->
       <img
         v-if="conversation.participant_1_details?.avatar"
-        :src="conversation.participant_1_details.avatar"
+        :src="getMediaUrl(conversation.participant_1_details.avatar)"
         alt=""
         class="w-10 h-10 rounded-full object-cover border border-border"
       />
