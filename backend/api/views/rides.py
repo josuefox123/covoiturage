@@ -94,6 +94,7 @@ class RideViewSet(viewsets.ModelViewSet):
     ViewSet principal pour la gestion des trajets.
     
     Endpoints supplémentaires :
+        - GET /api/rides/suggest-price/ : Suggestion de prix basée sur la distance
         - GET /api/rides/search/ : Recherche avancée de trajets
         - POST /api/rides/{id}/cancel/ : Annulation par le conducteur
         - POST /api/rides/{id}/start/ : Démarrer un trajet
@@ -151,10 +152,52 @@ class RideViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    @action(detail=False, methods=['get'], url_path='suggest-price', permission_classes=[permissions.IsAuthenticated])
+    def suggest_price(self, request):
+        """
+        Retourne un prix conseillé et les bornes min/max basés sur la distance.
+
+        Paramètres GET :
+            - distance_km : distance du trajet en kilomètres (obligatoire)
+
+        Retourne :
+            - suggested_price : prix conseillé (arrondi à 100 FCFA)
+            - min_price : borne basse autorisée
+            - max_price : borne haute autorisée
+            - price_per_km : tarif configuré (FCFA/km)
+            - margin_percent : marge appliquée
+        """
+        try:
+            distance_km = float(request.query_params.get('distance_km', 0))
+        except (ValueError, TypeError):
+            return Response({'error': 'distance_km invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if distance_km <= 0:
+            return Response({'error': 'distance_km doit être un nombre positif.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        fin_settings = FinancialSettings.load()
+        price_per_km = fin_settings.price_per_km
+        margin = fin_settings.price_margin_percent
+
+        raw_price = distance_km * price_per_km
+        # Arrondir au multiple de 100 le plus proche
+        suggested_price = int(round(raw_price / 100.0) * 100)
+        min_price = int(round(suggested_price * (1 - margin / 100.0) / 100.0) * 100)
+        max_price = int(round(suggested_price * (1 + margin / 100.0) / 100.0) * 100)
+
+        return Response({
+            'suggested_price': suggested_price,
+            'min_price': min_price,
+            'max_price': max_price,
+            'price_per_km': price_per_km,
+            'margin_percent': margin,
+        })
+
     def create(self, request, *args, **kwargs):
         from rest_framework.exceptions import ValidationError
         from datetime import datetime, timedelta
         from django.db import transaction
+
         
         is_recurrent = request.data.get('is_recurrent', False)
         
@@ -211,6 +254,18 @@ class RideViewSet(viewsets.ModelViewSet):
             price_per_parcel = int(request.data.get('price_per_parcel', 0)) if request.data.get('price_per_parcel') else 0
             allowed_parcel_types = request.data.get('allowed_parcel_types', [])
             
+            # Préférences conducteur
+            music = request.data.get('music', True)
+            smoking = request.data.get('smoking', False)
+            chatty = request.data.get('chatty', True)
+            air_conditioner = request.data.get('air_conditioner', True)
+            pets_allowed = request.data.get('pets_allowed', False)
+            luggage_allowed = request.data.get('luggage_allowed', True)
+            stops_allowed = request.data.get('stops_allowed', True)
+            description = request.data.get('description', '')
+            distance_km_val = request.data.get('distance_km')
+            duration_min_val = request.data.get('duration_min')
+
             with transaction.atomic():
                 from ..models import RideSeries, Ride, Vehicle
                 vehicle_obj = None
@@ -277,7 +332,18 @@ class RideViewSet(viewsets.ModelViewSet):
                             departure_latitude=dep_lat,
                             departure_longitude=dep_lon,
                             arrival_latitude=arr_lat,
-                            arrival_longitude=arr_lon
+                            arrival_longitude=arr_lon,
+                            # Préférences
+                            music=music,
+                            smoking=smoking,
+                            chatty=chatty,
+                            air_conditioner=air_conditioner,
+                            pets_allowed=pets_allowed,
+                            luggage_allowed=luggage_allowed,
+                            stops_allowed=stops_allowed,
+                            description=description,
+                            distance_km=float(distance_km_val) if distance_km_val else None,
+                            duration_min=int(duration_min_val) if duration_min_val else None,
                         )
                         created_count += 1
                         
@@ -295,13 +361,13 @@ class RideViewSet(viewsets.ModelViewSet):
             raise ValidationError({"error": "Votre compte doit être vérifié pour publier un trajet."})
             
         driver_payout = serializer.validated_data.get('driver_payout', 0)
-        settings = FinancialSettings.load()
-        if settings.is_commission_active:
-            zemy_commission = int(driver_payout * (settings.commission_percentage / 100.0))
-            if zemy_commission < settings.min_commission:
-                zemy_commission = settings.min_commission
-            if settings.max_commission and zemy_commission > settings.max_commission:
-                zemy_commission = settings.max_commission
+        fin_settings = FinancialSettings.load()
+        if fin_settings.is_commission_active:
+            zemy_commission = int(driver_payout * (fin_settings.commission_percentage / 100.0))
+            if zemy_commission < fin_settings.min_commission:
+                zemy_commission = fin_settings.min_commission
+            if fin_settings.max_commission and zemy_commission > fin_settings.max_commission:
+                zemy_commission = fin_settings.max_commission
         else:
             zemy_commission = 0
             

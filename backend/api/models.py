@@ -242,6 +242,19 @@ class Ride(models.Model):
     arrival_latitude = models.FloatField(blank=True, null=True)
     arrival_longitude = models.FloatField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+
+    # Distance et durée (calculées depuis le frontend)
+    distance_km = models.FloatField(blank=True, null=True)
+    duration_min = models.IntegerField(blank=True, null=True)
+
+    # Préférences du conducteur pour ce trajet
+    music = models.BooleanField(default=True)
+    smoking = models.BooleanField(default=False)
+    chatty = models.BooleanField(default=True)
+    air_conditioner = models.BooleanField(default=True)
+    pets_allowed = models.BooleanField(default=False)
+    luggage_allowed = models.BooleanField(default=True)
+    stops_allowed = models.BooleanField(default=True)
     
     # Colis
     accepts_parcels = models.BooleanField(default=False)
@@ -560,6 +573,10 @@ class FinancialSettings(models.Model):
     min_commission = models.IntegerField(default=100)
     max_commission = models.IntegerField(default=2000, blank=True, null=True)
     is_commission_active = models.BooleanField(default=True)
+
+    # Tarification conseillée par km
+    price_per_km = models.IntegerField(default=30, help_text="Prix conseillé en FCFA par km")
+    price_margin_percent = models.IntegerField(default=20, help_text="% de marge autorisé autour du prix conseillé (min/max)")
     
     parcel_commission_percentage = models.FloatField(default=8.0)
     min_parcel_commission = models.IntegerField(default=100)
