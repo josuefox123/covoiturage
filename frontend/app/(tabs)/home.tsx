@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const [searchParams, setSearchParams] = useState<SearchParams>({
     departure: '',
     destination: '',
-    vehicleType: 'voiture',
+    vehicleType: 'covoiturage',
     date: new Date(),
     tripType: 'aller',
     passengers: 1,

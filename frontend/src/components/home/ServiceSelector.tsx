@@ -12,7 +12,7 @@ import { CustomAlert } from '../../utils/CustomAlert';
 
 const PRIMARY = '#0066FF';
 
-export type VehicleType = 'moto' | 'tricycle' | 'voiture' | 'bus';
+export type VehicleType = 'covoiturage' | 'bus' | 'colis';
 
 interface Vehicle {
   id: VehicleType;
@@ -25,25 +25,9 @@ interface Vehicle {
 
 const VEHICLES: Vehicle[] = [
   {
-    id: 'moto',
-    label: 'Moto',
-    icon: 'bicycle',
-    emoji: '🏍️',
-    color: PRIMARY,
-    bgColor: '#EEF3FF',
-  },
-  {
-    id: 'tricycle',
-    label: 'Tricycle',
-    icon: 'car-sport',
-    emoji: '🛺',
-    color: PRIMARY,
-    bgColor: '#EEF3FF',
-  },
-  {
-    id: 'voiture',
-    label: 'Voiture',
-    icon: 'car',
+    id: 'covoiturage',
+    label: 'Covoiturage',
+    icon: 'car-outline',
     emoji: '🚗',
     color: PRIMARY,
     bgColor: '#EEF3FF',
@@ -53,6 +37,14 @@ const VEHICLES: Vehicle[] = [
     label: 'Bus',
     icon: 'bus-outline',
     emoji: '🚌',
+    color: PRIMARY,
+    bgColor: '#EEF3FF',
+  },
+  {
+    id: 'colis',
+    label: 'Colis',
+    icon: 'cube-outline',
+    emoji: '📦',
     color: PRIMARY,
     bgColor: '#EEF3FF',
   },
@@ -89,6 +81,14 @@ export default function ServiceSelector({ selected, onSelect }: ServiceSelectorP
       return;
     }
 
+    if (id === 'colis') {
+      CustomAlert.alert(
+        'Bientôt disponible 🚀',
+        'Le service de livraison de colis est en cours de développement et sera disponible très prochainement.'
+      );
+      return;
+    }
+
     onSelect(id);
   };
 
@@ -117,7 +117,17 @@ export default function ServiceSelector({ selected, onSelect }: ServiceSelectorP
                   { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : v.bgColor },
                 ]}
               >
-                <Ionicons name={v.icon} size={24} color={isActive ? '#FFFFFF' : v.color} />
+                {v.id === 'covoiturage' ? (
+                  <View style={styles.covoiturageIcons}>
+                    <Ionicons name="car-outline" size={16} color={isActive ? '#FFFFFF' : v.color} />
+                    <View style={styles.covoiturageSubIcons}>
+                      <Ionicons name="bicycle" size={9} color={isActive ? '#FFFFFF' : v.color} style={{ marginRight: 2 }} />
+                      <Ionicons name="car-sport" size={9} color={isActive ? '#FFFFFF' : v.color} />
+                    </View>
+                  </View>
+                ) : (
+                  <Ionicons name={v.icon} size={18} color={isActive ? '#FFFFFF' : v.color} />
+                )}
               </View>
               <Text style={[styles.label, isActive && styles.labelActive]}>
                 {v.label}
@@ -136,12 +146,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   card: {
     flex: 1,
     borderRadius: 18,
-    paddingVertical: 14,
+    paddingVertical: 10,
     paddingHorizontal: 10,
     alignItems: 'center',
     borderWidth: 1.5,
@@ -153,18 +163,18 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   iconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   emoji: {
-    fontSize: 24,
+    fontSize: 20,
   },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#6B7280',
     textAlign: 'center',
@@ -174,10 +184,21 @@ const styles = StyleSheet.create({
   },
   activeDot: {
     position: 'absolute',
-    bottom: 7,
+    bottom: 5,
     width: 5,
     height: 5,
     borderRadius: 2.5,
     backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  covoiturageIcons: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 30,
+  },
+  covoiturageSubIcons: {
+    flexDirection: 'row',
+    marginTop: -3,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

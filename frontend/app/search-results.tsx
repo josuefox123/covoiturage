@@ -313,7 +313,7 @@ export default function SearchResultsScreen() {
       const qp: string[] = [];
       if (departure)   qp.push(`departure=${encodeURIComponent(departure)}`);
       if (destination) qp.push(`destination=${encodeURIComponent(destination)}`);
-      if (vehicleType) qp.push(`vehicle_type=${encodeURIComponent(vehicleType)}`);
+      if (vehicleType && vehicleType !== 'covoiturage') qp.push(`vehicle_type=${encodeURIComponent(vehicleType)}`);
       if (date)        qp.push(`date=${date}`);
       if (passengers > 1) qp.push(`seats=${passengers}`);
 
