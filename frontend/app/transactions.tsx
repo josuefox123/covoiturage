@@ -48,7 +48,6 @@ export default function TransactionsScreen() {
 
   const getTransactionIcon = useCallback((type: string) => {
     if (type === 'ride') return <Ionicons name="car-sport" size={28} color={theme.colors.primary} />;
-    if (type === 'parcel') return <Ionicons name="cube" size={28} color={theme.colors.primary} />;
     if (type === 'withdrawal') return <Ionicons name="arrow-up-circle" size={28} color={'#EF4444'} />;
     if (type === 'refund') return <Ionicons name="arrow-undo-circle" size={28} color={theme.colors.warning} />;
     return <Ionicons name="wallet" size={28} color={theme.colors.textLight} />;
@@ -56,7 +55,6 @@ export default function TransactionsScreen() {
 
   const getTransactionLabel = useCallback((type: string) => {
     if (type === 'ride') return 'Revenus Trajet';
-    if (type === 'parcel') return 'Revenus Colis';
     if (type === 'withdrawal') return 'Retrait';
     if (type === 'refund') return 'Remboursement';
     return 'Transaction';

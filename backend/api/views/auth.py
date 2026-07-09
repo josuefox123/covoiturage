@@ -171,11 +171,12 @@ def login_user(request):
     if not identifier or not password:
         return Response({'error': 'Veuillez fournir un identifiant et un mot de passe.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = User.objects.filter(phone=identifier).first()
-    if not user and identifier.isdigit():
-        user = User.objects.filter(phone=f'+229{identifier}').first()
+    ident = identifier.strip()
+    user = User.objects.filter(phone__iexact=ident).first()
+    if not user and ident.isdigit():
+        user = User.objects.filter(phone__iexact=f'+229{ident}').first()
     if not user:
-        user = User.objects.filter(email=identifier).first()
+        user = User.objects.filter(email__iexact=ident).first()
 
     if user and getattr(user, 'is_archived', False):
         return Response({
@@ -255,14 +256,20 @@ def verification_status(request):
 
 def get_valid_callback_url(request, path):
     """
-    Construit une URL absolue pour le callback. Si le serveur tourne en local
-    avec une adresse IP privée (ex: 192.168.x.x) ou localhost, on convertit le
-    hôte en utilisant le service DNS nip.io (ex: 192.168.x.x.nip.io) afin que
-    FedaPay accepte l'URL comme valide et qu'elle pointe quand même vers notre machine locale.
+    Construit une URL absolue pour le callback. Si le serveur tourne en local, 
+    utilise nip.io pour tromper FedaPay, sinon retourne l'URL de base dynamique.
     """
+    import os
     import re
     from urllib.parse import urlparse, urlunparse
+    from django.conf import settings
     
+    # Check if a custom backend URL is specified (useful for dev vs prod)
+    custom_backend_url = os.environ.get('BACKEND_URL')
+    
+    if custom_backend_url:
+        return custom_backend_url.rstrip('/') + path
+
     uri = request.build_absolute_uri(path)
     parsed = urlparse(uri)
     netloc = parsed.netloc
@@ -280,6 +287,7 @@ def get_valid_callback_url(request, path):
         new_netloc = f"{new_host}{port_suffix}"
         parsed = parsed._replace(netloc=new_netloc)
     elif host.lower() == 'localhost':
+        # We avoid hardcoding 127.0.0.1 directly, but keeping nip.io fallback for local FedaPay test
         new_host = "127.0.0.1.nip.io"
         new_netloc = f"{new_host}{port_suffix}"
         parsed = parsed._replace(netloc=new_netloc)

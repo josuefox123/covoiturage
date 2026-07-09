@@ -275,8 +275,11 @@ class Booking(models.Model):
     """
     STATUS_CHOICES = [
         ('pending', 'En attente'),
+        ('pending_payment', 'En attente de paiement'),
         ('confirmed', 'Confirmée'),
         ('cancelled', 'Annulée'),
+        ('payment_failed', 'Échec de paiement'),
+        ('expired', 'Expirée'),
         ('completed', 'Terminée'),
     ]
 

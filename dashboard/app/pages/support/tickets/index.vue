@@ -86,7 +86,7 @@
             </tr>
             <tr v-else-if="filteredTickets.length === 0">
               <td colspan="7" class="px-6 py-12 text-center text-textMuted">
-                <Icon name="ph:ticket-slash" class="w-10 h-10 mx-auto text-textMuted/40 mb-2" />
+                <Icon name="ph:x-circle-duotone" class="w-10 h-10 mx-auto text-textMuted/40 mb-2" />
                 <span>Aucun ticket trouvé</span>
               </td>
             </tr>

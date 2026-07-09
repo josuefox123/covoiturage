@@ -73,16 +73,8 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
 
   const driverName = ride.driver_details?.full_name || 'Conducteur';
   
-  // Dynamic price detection
-  const showParcelPrice = ride.price_per_parcel !== undefined && 
-                           ride.price_per_parcel > 0 && 
-                           (!ride.price_per_seat || ride.price_per_seat === 0 || ride.seats_available === 0);
-  
-  const price = showParcelPrice 
-    ? (ride.price_per_parcel?.toLocaleString() || '0') 
-    : (ride.price_per_seat?.toLocaleString() || '0');
-    
-  const priceUnit = showParcelPrice ? 'par colis' : 'par place';
+  const price = ride.price_per_seat?.toLocaleString() || '0';
+  const priceUnit = 'par place';
   const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
   const seatsLeft = ride.seats_available || 0;
 
@@ -188,12 +180,6 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
                         : 'Complet'}
                 </Text>
               </View>
-              {ride.accepts_parcels && (
-                <View style={styles.parcelBadge}>
-                  <Ionicons name="cube-outline" size={13} color="#10B981" />
-                  <Text style={styles.parcelBadgeText}>Colis</Text>
-                </View>
-              )}
             </View>
             <View style={styles.viewButton}>
               <Text style={styles.viewButtonText}>Voir détail</Text>

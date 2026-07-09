@@ -28,6 +28,7 @@ import LocationPicker from '../../src/components/LocationPicker';
 import { AppBottomSheet } from '../../src/components/AppBottomSheet';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CustomAlert } from '../../src/utils/CustomAlert';
+import { getMediaUrl } from '../../src/utils/media';
 
 const { width } = Dimensions.get('window');
 
@@ -105,14 +106,7 @@ export default function PublishScreen() {
   const [optPets, setOptPets] = useState(false);
   const [optStops, setOptStops] = useState(false);
 
-  // Parcel state
-  const [acceptsParcels, setAcceptsParcels] = useState(false);
-  const [maxParcels, setMaxParcels] = useState(1);
-  const [maxWeightPerParcel, setMaxWeightPerParcel] = useState('');
-  const [maxDimensions, setMaxDimensions] = useState('Petit'); // 'Petit', 'Moyen', 'Grand'
-  const [pricePerParcel, setPricePerParcel] = useState('');
-  const [allowedParcelTypes, setAllowedParcelTypes] = useState<string[]>([]);
-  const ALL_PARCEL_TYPES = ['Documents', 'Colis', 'Alimentation', 'Électronique', 'Autres'];
+
 
   // Profile completion modal
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -321,7 +315,7 @@ export default function PublishScreen() {
         total_seats: seats,
         seats_available: seats,
         vehicle: null,
-        accepts_parcels: acceptsParcels,
+        accepts_parcels: false,
         description: description.trim() || null,
       };
 
@@ -332,14 +326,6 @@ export default function PublishScreen() {
       if (arrivalCords) {
         payload.arrival_latitude = arrivalCords.lat;
         payload.arrival_longitude = arrivalCords.lon;
-      }
-
-      if (acceptsParcels) {
-        payload.max_parcels = maxParcels;
-        payload.max_weight_per_parcel = parseFloat(maxWeightPerParcel || '0');
-        payload.max_dimensions = maxDimensions;
-        payload.price_per_parcel = parseInt(pricePerParcel || '0');
-        payload.allowed_parcel_types = allowedParcelTypes;
       }
 
       if (isRecurrent) {
@@ -766,120 +752,7 @@ export default function PublishScreen() {
               <OptionCard label="Animaux acceptés" icon={<Ionicons name="paw-outline" size={20} color={theme.colors.text} />} value={optPets} onChange={setOptPets} />
             </View>
 
-            {/* PARCELS SECTION */}
-            <Text style={styles.sectionTitle}>Transport de colis</Text>
-            <View style={styles.recurrentWrapper}>
-              <View style={styles.recurrentHeader}>
-                <Text style={styles.recurrentHeaderText}>J'accepte de transporter des colis</Text>
-                <Switch
-                  value={acceptsParcels}
-                  onValueChange={setAcceptsParcels}
-                  trackColor={{ false: '#E5E7EB', true: theme.colors.primaryLight }}
-                  thumbColor={acceptsParcels ? theme.colors.primary : '#FFFFFF'}
-                />
-              </View>
 
-              {acceptsParcels && (
-                <View style={styles.recurrentBody}>
-                  <View style={styles.row}>
-                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
-                      <Text style={styles.halfCardLabel}>Max colis</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                        <TouchableOpacity onPress={() => setMaxParcels(Math.max(1, maxParcels - 1))} style={styles.seatStepperBtn}>
-                          <Ionicons name="remove" size={20} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                        <Text style={styles.halfCardValue}>{maxParcels}</Text>
-                        <TouchableOpacity onPress={() => setMaxParcels(Math.min(10, maxParcels + 1))} style={styles.seatStepperBtn}>
-                          <Ionicons name="add" size={20} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
-                      <Text style={styles.halfCardLabel}>Poids max/colis (kg)</Text>
-                      <TextInput
-                        style={[styles.halfCardValue, { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 0, paddingBottom: 4, marginTop: 4 }]}
-                        placeholder="Ex: 5"
-                        placeholderTextColor={theme.colors.textLight}
-                        value={maxWeightPerParcel}
-                        onChangeText={setMaxWeightPerParcel}
-                        keyboardType="numeric"
-                        maxLength={4}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.row}>
-                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
-                      <Text style={styles.halfCardLabel}>Taille max</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 8 }}>
-                        {['Petit', 'Moyen', 'Grand'].map(dim => (
-                          <TouchableOpacity
-                            key={dim}
-                            style={[styles.dayBox, maxDimensions === dim && styles.dayBoxActive, { width: 'auto', paddingHorizontal: 12 }]}
-                            onPress={() => setMaxDimensions(dim)}
-                          >
-                            <Text style={[styles.dayBoxText, maxDimensions === dim && styles.dayBoxTextActive]}>{dim}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-
-                    <View style={[styles.halfCard, { paddingVertical: 12, elevation: 0, shadowOpacity: 0, borderWidth: 1, borderColor: '#E2E8F0' }]}>
-                      <Text style={styles.halfCardLabel}>Prix/colis (FCFA)</Text>
-                      <TextInput
-                        style={[styles.halfCardValue, { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', padding: 0, paddingBottom: 4, marginTop: 4 }]}
-                        placeholder="Ex: 1000"
-                        placeholderTextColor={theme.colors.textLight}
-                        value={pricePerParcel}
-                        onChangeText={setPricePerParcel}
-                        keyboardType="numeric"
-                        maxLength={6}
-                      />
-                    </View>
-                  </View>
-
-                  {pricePerParcel ? (
-                        <View style={[styles.commissionBox, { marginTop: 8 }]}>
-                          <View style={styles.commissionRow}>
-                            <Text style={styles.commissionLabel}>Prix conducteur :</Text>
-                            <Text style={styles.commissionValue}>{parseInt(pricePerParcel)} FCFA</Text>
-                          </View>
-                          <View style={styles.commissionRow}>
-                            <Text style={styles.commissionLabelSub}>Commission Zemy ({financialSettings?.parcel_commission_percentage || 8}%) :</Text>
-                            <Text style={styles.commissionValueSub}>{Math.max(financialSettings?.min_parcel_commission || 100, Math.floor(parseInt(pricePerParcel) * ((financialSettings?.parcel_commission_percentage || 8) / 100)))} FCFA</Text>
-                          </View>
-                          <View style={[styles.commissionRow, { borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 8, marginTop: 4 }]}>
-                            <Text style={styles.commissionLabelTotal}>L'expéditeur paiera :</Text>
-                            <Text style={styles.commissionValueTotal}>{parseInt(pricePerParcel) + Math.max(financialSettings?.min_parcel_commission || 100, Math.floor(parseInt(pricePerParcel) * ((financialSettings?.parcel_commission_percentage || 8) / 100)))} FCFA</Text>
-                          </View>
-                        </View>
-                      ) : null}
-
-                      <Text style={[styles.halfCardLabel, { marginTop: 16, marginBottom: 8 }]}>Types de colis autorisés</Text>
-                  <View style={[styles.daysContainer, { justifyContent: 'flex-start' }]}>
-                    {ALL_PARCEL_TYPES.map(type => {
-                      const isSelected = allowedParcelTypes.includes(type);
-                      return (
-                        <TouchableOpacity
-                          key={type}
-                          style={[styles.dayBox, isSelected && styles.dayBoxActive, { width: 'auto', paddingHorizontal: 12, marginBottom: 8 }]}
-                          onPress={() => {
-                            if (isSelected) {
-                              setAllowedParcelTypes(prev => prev.filter(t => t !== type));
-                            } else {
-                              setAllowedParcelTypes(prev => [...prev, type]);
-                            }
-                          }}
-                        >
-                          <Text style={[styles.dayBoxText, isSelected && styles.dayBoxTextActive]}>{type}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-            </View>
 
             {/* Répétition */}
             <Text style={styles.sectionTitle}>Répétition</Text>

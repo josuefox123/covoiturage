@@ -228,7 +228,7 @@ const saveBranding = async () => {
       'Authorization': `Bearer ${authCookie.value}`
     }
 
-    const apiUrl = configRuntime.public?.apiUrl || 'http://127.0.0.1:8000/api'
+    const apiUrl = configRuntime.public?.apiUrl || 'https://zemy.erika-app.com/api'
 
     await $fetch(`${apiUrl}/branding/`, {
       method: 'PUT',

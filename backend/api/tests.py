@@ -133,3 +133,10 @@ class UserArchiveTestCase(APITestCase):
 
 
 # Create your tests here.
+
+class CheckAvailabilityTestCase(APITestCase):
+    def test_check_availability_email(self):
+        url = reverse('check_availability')
+        response = self.client.get(url, {'email': 'test@example.com'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.json()['email_available'])

@@ -20,16 +20,14 @@ Zemy
 
     <ClientOnly v-else>
       <div class="flex-1 flex flex-col justify-center">
-        <apexchart type="donut" height="250" :options="chartOptions" :series="series"></apexchart>
+        <div ref="chartRef" class="w-full min-h-[250px]"></div>
       </div>
     </ClientOnly>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
-
-const apexchart = defineAsyncComponent(() => import('vue3-apexcharts'))
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 
 const props = defineProps({
   title: { type: String, required: true },
@@ -39,14 +37,19 @@ const props = defineProps({
   loading: { type: Boolean, default: false }
 })
 
-const chartOptions = computed<any>(() => ({
+const chartRef = ref<HTMLElement | null>(null)
+let chart: any = null
+
+const getChartOptions = (labels: any[], series: any[], colors: any[]) => ({
   chart: {
     type: 'donut',
+    height: 250,
     fontFamily: 'inherit',
     animations: { enabled: true, easing: 'easeinout', speed: 800 }
   },
-  labels: props.labels,
-  colors: props.colors,
+  labels,
+  series,
+  colors,
   plotOptions: {
     pie: {
       donut: {
@@ -91,5 +94,48 @@ const chartOptions = computed<any>(() => ({
       formatter: (val: number) => val
     }
   }
-}))
+})
+
+const initChart = async () => {
+  if (!process.client || !chartRef.value) return
+  try {
+    const ApexCharts = (await import('apexcharts')).default
+    if (chart) {
+      chart.destroy()
+    }
+    chart = new ApexCharts(chartRef.value, getChartOptions(props.labels, props.series, props.colors))
+    await chart.render()
+  } catch (e) {
+    console.error('Failed to render chart', e)
+  }
+}
+
+watch(() => [props.labels, props.series, props.colors], ([newLabels, newSeries, newColors]) => {
+  if (chart && process.client) {
+    chart.updateOptions({
+      labels: newLabels,
+      colors: newColors
+    }, false, true)
+    chart.updateSeries(newSeries, true)
+  }
+}, { deep: true })
+
+watch(() => props.loading, (newVal) => {
+  if (!newVal) {
+    setTimeout(initChart, 100)
+  }
+})
+
+onMounted(() => {
+  if (!props.loading) {
+    initChart()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (chart) {
+    chart.destroy()
+    chart = null
+  }
+})
 </script>

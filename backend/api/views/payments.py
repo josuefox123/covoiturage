@@ -111,7 +111,7 @@ def confirm_payment(request):
                 last_verification_at=timezone.now()
             )
             if reservation_id:
-                Booking.objects.filter(id=reservation_id).update(status='cancelled', payment_status='pending')
+                Booking.objects.filter(id=reservation_id).update(status='pending', payment_status='pending')
             elif parcel_id:
                 Parcel.objects.filter(id=parcel_id).update(status='cancelled', payment_status='pending')
                 

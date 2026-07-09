@@ -21,7 +21,8 @@ import * as ExpoLinking from 'expo-linking';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ride, Booking } from '../../src/types';
 import { CustomAlert } from '../../src/utils/CustomAlert';
-
+import { getMediaUrl } from '../../src/utils/media';
+import { useBooking } from '../../src/hooks/useBooking';
 const COLORS = {
   primary: '#2F80ED',
   success: '#16A34A',
@@ -48,6 +49,7 @@ export default function RideDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { authFetch, user } = useAuth();
+  const { createBooking } = useBooking();
 
   const [ride, setRide] = useState<Ride | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +58,6 @@ export default function RideDetailScreen() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [myBooking, setMyBooking] = useState<Booking | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [parcels, setParcels] = useState<any[]>([]);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
 
@@ -78,10 +79,6 @@ export default function RideDetailScreen() {
         if (data.driver_details?.id === user.id) {
           const allBookings: Booking[] = await authFetch(`/bookings/?ride=${id}`);
           setBookings(Array.isArray(allBookings) ? allBookings : (allBookings as any)?.results || []);
-          if (data.accepts_parcels) {
-            const allParcels = await authFetch(`/parcels/?ride=${id}`);
-            setParcels(Array.isArray(allParcels) ? allParcels : allParcels.results || []);
-          }
         } else {
           const passengerBookings: Booking[] = await authFetch(`/bookings/?passenger=${user.id}`);
           const myBooking = passengerBookings.find((b) =>
@@ -200,91 +197,45 @@ export default function RideDetailScreen() {
   };
 
   const performBooking = async () => {
-    let currentBookingId: string | null = null;
     try {
       setBookingLoading(true);
-
-      // 1. Créer la réservation (Pending)
-      const res = await authFetch('/bookings/', {
-        method: 'POST',
-        body: JSON.stringify({ ride: id, seats_booked: 1 })
-      });
-      currentBookingId = res.id;
-
-      // 2. Initialiser le paiement avec FedaPay
-      const callbackUrl = ExpoLinking.createURL(`ride/${id}`, {
-        queryParams: { action: 'payment_complete', booking_id: String(currentBookingId) }
-      });
-      const payRes = await authFetch(`/bookings/${currentBookingId}/pay/`, {
-        method: 'POST',
-        body: JSON.stringify({ callback_url: callbackUrl })
-      });
-
-      if (payRes.url) {
-        setBookingId(currentBookingId);
+      const res = await createBooking(id as string, 1);
+      if (res && res.id) {
+        setBookingId(res.id);
         setHasBooked(true);
+        
+        // Estimer le montant (frais de service en ligne)
+        const commission = ride ? Math.max(100, Math.floor((ride.price_per_seat || 0) * 0.1)) : 100;
+        
         // Rediriger vers l'écran de paiement
         router.push({
           pathname: '/payment',
           params: {
-            url: payRes.url,
-            booking_id: String(currentBookingId),
-            amount: String(payRes.amount || 0)
+            booking_id: String(res.id),
+            amount: String(res.amount_paid_online || commission)
           }
         });
       }
     } catch (error: any) {
-      if (currentBookingId) {
-        CustomAlert.alert(
-          'Paiement initié',
-          'Votre réservation a été créée. Si vous avez payé, vérifiez le statut dans "Mes trajets".',
-          [
-            { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/trips') },
-            { text: 'Fermer', style: 'cancel' }
-          ]
-        );
-      } else {
-        CustomAlert.alert('Erreur', error.message || "Impossible de créer la réservation. Veuillez réessayer.");
-      }
+      CustomAlert.alert('Erreur', error.message || "Impossible de créer la réservation. Veuillez réessayer.");
     } finally {
       setBookingLoading(false);
     }
   };
 
   /**
-   * Reprendre le paiement pour une réservation existante en statut pending.
-   * Appelle /pay/ qui réutilise la transaction FedaPay existante (anti-doublon)
-   * et rouvre le navigateur FedaPay.
+   * Reprendre le paiement pour une réservation existante en statut pending_payment.
    */
   const handleRetryPayment = async () => {
     if (!bookingId) return;
-    try {
-      setBookingLoading(true);
-      const callbackUrl = ExpoLinking.createURL(`ride/${id}`, {
-        queryParams: { action: 'payment_complete', booking_id: String(bookingId) }
-      });
-      const payRes = await authFetch(`/bookings/${bookingId}/pay/`, {
-        method: 'POST',
-        body: JSON.stringify({ callback_url: callbackUrl })
-      });
-      if (payRes.url) {
-        // Rediriger vers l'écran de paiement
-        router.push({
-          pathname: '/payment',
-          params: {
-            url: payRes.url,
-            booking_id: String(bookingId),
-            amount: String(payRes.amount || 0)
-          }
-        });
-      } else if (payRes.error) {
-        CustomAlert.alert('Erreur', payRes.error);
+    const commission = ride ? Math.max(100, Math.floor((ride.price_per_seat || 0) * 0.1)) : 100;
+    router.push({
+      pathname: '/payment',
+      params: {
+        booking_id: String(bookingId),
+        amount: String(myBooking?.amount_paid_online || commission)
       }
-    } catch (error: any) {
-      CustomAlert.alert('Erreur', error.message || 'Impossible de relancer le paiement.');
-    } finally {
-      setBookingLoading(false);
-    }
+    });
   };
 
   const handleBooking = async () => {
@@ -365,19 +316,7 @@ export default function RideDetailScreen() {
   const isCompleted = ride.status === 'completed';
   const isStarted = ride.status === 'started';
 
-  let totalParcelPrice = 0;
-  if (ride && financialSettings) {
-    const driverParcelPrice = ride.price_per_parcel || 0;
-    const commRate = financialSettings.parcel_commission_percentage || 8;
-    const commMin = financialSettings.min_parcel_commission || 100;
-    const parcelCommission = Math.max(commMin, Math.floor(driverParcelPrice * (commRate / 100)));
-    totalParcelPrice = driverParcelPrice + parcelCommission;
-  } else if (ride) {
-    // Default fallback calculation if settings are not loaded yet
-    const driverParcelPrice = ride.price_per_parcel || 0;
-    const parcelCommission = Math.max(100, Math.floor(driverParcelPrice * 0.08));
-    totalParcelPrice = driverParcelPrice + parcelCommission;
-  }
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -413,7 +352,7 @@ export default function RideDetailScreen() {
 
 
 
-      {/* Bouton Fixe Réserver */}
+        {/* Bouton Fixe Réserver */}
         {/* Big Date */}
         <Text style={styles.dateText}>
           {new Date(ride.departure_date).toLocaleDateString('fr-FR', {
@@ -443,7 +382,7 @@ export default function RideDetailScreen() {
             <Ionicons name="location" size={20} color={COLORS.error} style={styles.timelineIconEnd} />
             <View style={styles.timelineContent}>
               <Text style={styles.locationText}>{ride.arrival_location}</Text>
-              <Text style={styles.timeText}>Estimation {ride.distance_km ? '~' + Math.round(ride.distance_km / 60) + 'h' : '--:--'}</Text>
+
             </View>
           </View>
         </View>
@@ -466,36 +405,7 @@ export default function RideDetailScreen() {
           </View>
         </View>
 
-        {/* Parcel Info Card */}
-        {ride.accepts_parcels && (
-          <View style={[styles.card, { borderColor: '#10B981', backgroundColor: '#F0FDF4' }]}>
-            <View style={styles.priceRow}>
-              <View>
-                <Text style={[styles.priceLabel, { color: '#047857', fontWeight: '700' }]}>Transport de Colis</Text>
-                <View style={[styles.seatsBadge, { backgroundColor: '#D1FAE5' }]}>
-                  <Ionicons name="cube" size={16} color="#047857" />
-                  <Text style={[styles.seatsValue, { color: '#047857' }]}>{ride.parcels_available ?? ride.max_parcels} places restantes</Text>
-                </View>
-                <Text style={{ fontSize: 12, color: '#065F46', marginTop: 4 }}>
-                  Poids max: {ride.max_weight_per_parcel}kg • Taille: {ride.max_dimensions}
-                </Text>
-              </View>
-              <View style={styles.priceAmountBlock}>
-                <Text style={[styles.priceValue, { color: '#047857' }]}>{totalParcelPrice.toLocaleString()}</Text>
-                <Text style={[styles.priceCurrency, { color: '#047857' }]}>FCFA</Text>
-                <Text style={[styles.priceUnit, { color: '#065F46' }]}>par colis</Text>
-              </View>
-            </View>
-            {!isOwnRide && !isCompleted && !isStarted && (
-              <TouchableOpacity
-                style={{ backgroundColor: '#10B981', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 12 }}
-                onPress={() => router.push(`/ride/book-parcel?rideId=${id}`)}
-              >
-                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>Envoyer un colis</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+
 
         {/* Description du trajet */}
         {ride.description ? (
@@ -688,56 +598,7 @@ export default function RideDetailScreen() {
               ))
             )}
 
-            {/* Parcels (Driver Side) */}
-            {ride.accepts_parcels && (
-              <>
-                <Text style={styles.sectionTitle}>Colis à transporter ({parcels.length})</Text>
-                {parcels.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Ionicons name="cube" size={40} color={COLORS.border} />
-                    <Text style={styles.emptyText}>Aucun colis pour l'instant</Text>
-                  </View>
-                ) : (
-                  parcels.map((parcel) => (
-                    <View key={parcel.id} style={styles.passengerCard}>
-                      <View style={styles.passengerHeader}>
-                        <View style={[styles.passengerAvatar, { backgroundColor: '#D1FAE5' }]}>
-                          <Ionicons name="cube" size={24} color="#10B981" />
-                        </View>
-                        <View style={styles.passengerDetails}>
-                          <Text style={styles.passengerName}>Colis: {parcel.description}</Text>
-                          <Text style={styles.passengerPhone}>Destinataire: {parcel.receiver_name} ({parcel.receiver_phone})</Text>
-                          <View style={styles.ratingRow}>
-                            <Text style={styles.seatBadge}>{parcel.parcel_type}</Text>
-                            {(() => {
-                              let bg = COLORS.grayLight, color = COLORS.textLight, text = parcel.status;
-                              if (['pending', 'accepted'].includes(text)) { bg = '#F0FDF4'; color = COLORS.success; }
-                              if (text === 'picked_up') { bg = '#EFF6FF'; color = COLORS.primary; }
-                              if (text === 'delivered') { bg = '#F0FDF4'; color = COLORS.success; }
-                              return (
-                                <View style={[styles.statusBadge, { backgroundColor: bg }]}>
-                                  <Text style={[styles.statusBadgeText, { color }]}>{text.toUpperCase()}</Text>
-                                </View>
-                              );
-                            })()}
-                          </View>
-                        </View>
-                      </View>
-                      <View style={styles.passengerActions}>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleCallPassenger(parcel.receiver_phone)}>
-                          <Ionicons name="call-outline" size={20} color={COLORS.success} />
-                          <Text style={[styles.actionBtnText, { color: COLORS.success }]}>Appeler</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.actionBtn, { borderColor: '#10B981' }]} onPress={() => router.push(`/ride/scan-qr?parcelId=${parcel.id}`)}>
-                          <Ionicons name="qr-code-outline" size={20} color="#10B981" />
-                          <Text style={[styles.actionBtnText, { color: '#10B981' }]}>Scanner QR</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))
-                )}
-              </>
-            )}
+
 
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Véhicule & Préférences</Text>
@@ -833,7 +694,7 @@ export default function RideDetailScreen() {
         {!isOwnRide ? (
           hasBooked ? (
             myBooking?.payment_status === 'pending' ? (
-              // Réservation créée mais paiement pas encore validé — relancer le checkout FedaPay
+              // Réservation créée mais paiement pas encore validé — relancer le checkout FeexPay
               <TouchableOpacity
                 style={[styles.bookBtn, { backgroundColor: '#D97706' }, bookingLoading && { opacity: 0.7 }]}
                 onPress={handleRetryPayment}

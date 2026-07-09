@@ -40,15 +40,13 @@ Zemy
     </div>
 
     <ClientOnly v-else>
-      <apexchart type="area" height="300" :options="chartOptions" :series="series"></apexchart>
+      <div ref="chartRef" class="w-full h-[300px]"></div>
     </ClientOnly>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, defineAsyncComponent } from 'vue'
-
-const apexchart = defineAsyncComponent(() => import('vue3-apexcharts'))
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 
 const props = defineProps({
   data: { type: Array, required: true },
@@ -56,20 +54,22 @@ const props = defineProps({
 })
 
 const activeRange = ref('7J')
+const chartRef = ref<HTMLElement | null>(null)
+let chart: any = null
 
-const series = computed(() => [{
-  name: 'Revenus (FCFA)',
-  data: props.data.map((d: any) => d.y)
-}])
-
-const chartOptions = computed<any>(() => ({
+const getChartOptions = (data: any[]) => ({
   chart: {
     type: 'area',
+    height: 300,
     fontFamily: 'inherit',
     toolbar: { show: false },
     zoom: { enabled: false },
     animations: { enabled: true, easing: 'easeinout', speed: 800 }
   },
+  series: [{
+    name: 'Revenus (FCFA)',
+    data: data.map((d: any) => d.y)
+  }],
   colors: ['#4F46E5'], // Primary color
   fill: {
     type: 'gradient',
@@ -83,7 +83,7 @@ const chartOptions = computed<any>(() => ({
   dataLabels: { enabled: false },
   stroke: { curve: 'smooth', width: 3 },
   xaxis: {
-    categories: props.data.map((d: any) => d.x),
+    categories: data.map((d: any) => d.x),
     axisBorder: { show: false },
     axisTicks: { show: false },
     labels: { style: { colors: '#9CA3AF', fontSize: '12px' } }
@@ -111,5 +111,52 @@ const chartOptions = computed<any>(() => ({
       formatter: (val: number) => new Intl.NumberFormat('fr-FR').format(val) + ' FCFA'
     }
   }
-}))
+})
+
+const initChart = async () => {
+  if (!process.client || !chartRef.value) return
+  try {
+    const ApexCharts = (await import('apexcharts')).default
+    if (chart) {
+      chart.destroy()
+    }
+    chart = new ApexCharts(chartRef.value, getChartOptions(props.data))
+    await chart.render()
+  } catch (e) {
+    console.error('Failed to render chart', e)
+  }
+}
+
+watch(() => props.data, (newData) => {
+  if (chart && process.client) {
+    chart.updateOptions({
+      xaxis: {
+        categories: newData.map((d: any) => d.x)
+      }
+    }, false, true)
+    chart.updateSeries([{
+      name: 'Revenus (FCFA)',
+      data: newData.map((d: any) => d.y)
+    }], true)
+  }
+}, { deep: true })
+
+watch(() => props.loading, (newVal) => {
+  if (!newVal) {
+    setTimeout(initChart, 100)
+  }
+})
+
+onMounted(() => {
+  if (!props.loading) {
+    initChart()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (chart) {
+    chart.destroy()
+    chart = null
+  }
+})
 </script>

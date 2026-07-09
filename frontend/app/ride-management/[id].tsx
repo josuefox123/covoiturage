@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ride, Booking } from '../../src/types';
 import { CustomAlert } from '../../src/utils/CustomAlert';
-
+import { getMediaUrl } from '../../src/utils/media';
 const COLORS = {
   primary: '#2D9CDB',
   success: '#16A34A',

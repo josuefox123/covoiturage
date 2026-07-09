@@ -65,8 +65,9 @@ def check_availability(request):
         - email_available  : True si l'email est libre
         - phone_available  : True si le numéro est libre
     """
-    email = request.query_params.get('email', '').strip()
-    phone = request.query_params.get('phone', '').strip()
+    query_params = request.query_params if hasattr(request, 'query_params') else request.GET
+    email = query_params.get('email', '').strip()
+    phone = query_params.get('phone', '').strip()
 
     result = {}
 
@@ -105,8 +106,17 @@ class RideViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related('driver', 'vehicle').prefetch_related('driver__vehicles', 'driver__rides_driven')
+        
+        # Filtres de recherche/filtrage envoyés par le frontend
+        departure = self.request.query_params.get('departure')
+        destination = self.request.query_params.get('destination')
+        vehicle_type = self.request.query_params.get('vehicle_type')
+        date_str = self.request.query_params.get('date')
+        seats_str = self.request.query_params.get('seats')
+        
         driver_id = self.request.query_params.get('driver')
         ride_type = self.request.query_params.get('type')
+        
         if driver_id:
             queryset = queryset.filter(driver_id=driver_id)
         elif getattr(self, 'action', '') == 'list' and not self.request.user.is_staff:
@@ -115,6 +125,27 @@ class RideViewSet(viewsets.ModelViewSet):
             one_hour_ago = now() - timedelta(hours=1)
             queryset = queryset.filter(departure_date__gte=date.today()).exclude(status='cancelled').exclude(status='completed', updated_at__lt=one_hour_ago)
         
+        # Appliquer les filtres de recherche
+        if departure:
+            queryset = queryset.filter(departure_location__icontains=departure.strip())
+        if destination:
+            queryset = queryset.filter(arrival_location__icontains=destination.strip())
+        if vehicle_type:
+            queryset = queryset.filter(vehicle__vehicle_type=vehicle_type)
+        if date_str:
+            try:
+                from datetime import datetime
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                queryset = queryset.filter(departure_date=target_date)
+            except ValueError:
+                pass
+        if seats_str:
+            try:
+                seats_needed = int(seats_str)
+                queryset = queryset.filter(seats_available__gte=seats_needed)
+            except ValueError:
+                pass
+
         if ride_type == 'parcel':
             queryset = queryset.filter(accepts_parcels=True)
             
@@ -468,12 +499,11 @@ class BookingViewSet(viewsets.ModelViewSet):
         ride_id = request.data.get('ride')
         seats_to_book = serializer.validated_data.get('seats_booked', 1)
         
-        from ..services.booking_service import BookingService
+        from ..bookings.services import BookingService
         booking, created = BookingService.create_booking(
             passenger=request.user,
             ride_id=ride_id,
-            seats_booked=seats_to_book,
-            payment_status=serializer.validated_data.get('payment_status', 'pending')
+            seats_booked=seats_to_book
         )
         
         if not created:
@@ -641,7 +671,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             
             # Construire l'URL absolue vers notre page de checkout de paiement
             path = (
-                f"/payments/checkout/"
+                f"/api/payments/checkout/"
                 f"?amount={amount_to_pay}"
                 f"&custom_id={booking.id}"
                 f"&fullname={urllib.parse.quote(booking.passenger.full_name or 'Client Zemy')}"

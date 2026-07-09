@@ -36,10 +36,8 @@ const getBaseUrl = () => {
     return process.env.EXPO_PUBLIC_API_URL;
   }
   
-  const LOCAL_IP = '192.168.100.4';
-  if (Platform.OS === 'android') return `http://${LOCAL_IP}:8000/api`;
-  if (Platform.OS === 'ios') return `http://${LOCAL_IP}:8000/api`;
-  return 'http://localhost:8000/api';
+  // Fallback to production by default if no env var is found
+  return 'https://zemy.erika-app.com/api';
 };
 
 export const API_URL = getBaseUrl();

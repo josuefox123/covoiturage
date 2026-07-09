@@ -912,16 +912,7 @@
       // Fetch dynamic stats from backend
       const fetchDynamicStats = async () => {
         try {
-          let apiUrl = 'http://localhost:8000/api/dashboard/stats/';
-          if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            const currentHost = window.location.hostname;
-            const currentProto = window.location.protocol;
-            if (currentHost.startsWith('dashboard.')) {
-              apiUrl = `${currentProto}//${currentHost.replace('dashboard.', 'api.')}/api/dashboard/stats/`;
-            } else {
-              apiUrl = `${currentProto}//api.${currentHost}/api/dashboard/stats/`;
-            }
-          }
+          let apiUrl = '/api/dashboard/stats/';
           const response = await fetch(apiUrl);
           if (response.ok) {
             const data = await response.json();

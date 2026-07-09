@@ -14,7 +14,6 @@ import { fetchApi } from '../src/services/api';
 
 const CATEGORIES = [
   { key: 'problem_ride', label: 'Problème de trajet', icon: 'car-outline' },
-  { key: 'problem_parcel', label: 'Problème de colis', icon: 'cube-outline' },
   { key: 'payment', label: 'Paiement', icon: 'card-outline' },
   { key: 'account', label: 'Compte', icon: 'person-outline' },
   { key: 'driver', label: 'Conducteur', icon: 'people-outline' },

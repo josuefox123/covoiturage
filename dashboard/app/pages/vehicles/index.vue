@@ -216,7 +216,7 @@ const formData = reactive({ owner: '', vehicle_type: 'voiture', brand_model: '',
 const selectedFile = ref<File | null>(null)
 
 const config = useRuntimeConfig()
-const apiBaseUrl = config.public.apiBase ? (config.public.apiBase as string).replace(/\/api\/?$/, '') : 'http://localhost:8000'
+const apiBaseUrl = config.public.apiBase ? (config.public.apiBase as string).replace(/\/api\/?$/, '') : 'https://zemy.erika-app.com'
 
 function getPhotoUrl(url: string) {
   if (!url) return '/images/logozemy.png'

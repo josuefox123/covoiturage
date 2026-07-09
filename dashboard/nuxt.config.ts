@@ -22,8 +22,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:8000/api',
-      apiUrl: 'http://localhost:8000/api',
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
+      apiUrl: process.env.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
     },
   },
 

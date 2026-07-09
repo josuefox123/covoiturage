@@ -64,9 +64,7 @@ urlpatterns = [
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path('branding/', AppBrandingView.as_view(), name='app_branding'),
     path('mobile-settings/', MobileSettingsView.as_view(), name='mobile_settings'),
-    path('payments/checkout/', payment_checkout, name='payment_checkout'),
-    path('payments/confirm/', confirm_payment, name='confirm_payment'),
-    path('payments/sync/', sync_payments, name='sync_payments'),
+    path('payments/', include('api.payments.urls')),
     path('contact/', contact_view, name='contact'),
     path('', include(router.urls)),
 ]
