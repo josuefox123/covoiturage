@@ -171,6 +171,7 @@ export default function PublishScreen() {
     const durationMin = Math.round((distanceKm / 70) * 60);
     setEstimation({ distanceKm, durationMin });
     setEstimationLoading(false);
+    fetchPriceSuggestion(distanceKm);
   };
 
   const formatDuration = (totalMin: number): string => {
@@ -594,25 +595,46 @@ export default function PublishScreen() {
                 {departure && arrival && (
                   <View style={styles.estimationCard}>
                     {estimationLoading ? (
-                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      <ActivityIndicator size="small" color={theme.colors.primary} style={{ margin: 20 }} />
                     ) : estimation ? (
-                      <>
-                        <View style={styles.estimationItem}>
-                          <Ionicons name="navigate-circle-outline" size={22} color={theme.colors.primary} />
-                          <View style={{ marginLeft: 10 }}>
-                            <Text style={styles.estimationLabel}>Distance estimée</Text>
-                            <Text style={styles.estimationValue}>{estimation.distanceKm.toLocaleString()} km</Text>
+                      <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <View style={styles.estimationItem}>
+                            <Ionicons name="navigate-circle-outline" size={22} color={theme.colors.primary} />
+                            <View style={{ marginLeft: 10 }}>
+                              <Text style={styles.estimationLabel}>Distance</Text>
+                              <Text style={styles.estimationValue}>{estimation.distanceKm.toLocaleString()} km</Text>
+                            </View>
+                          </View>
+                          <View style={styles.estimationDivider} />
+                          <View style={styles.estimationItem}>
+                            <Ionicons name="time-outline" size={22} color={theme.colors.primary} />
+                            <View style={{ marginLeft: 10 }}>
+                              <Text style={styles.estimationLabel}>Durée</Text>
+                              <Text style={styles.estimationValue}>{formatDuration(estimation.durationMin)}</Text>
+                            </View>
                           </View>
                         </View>
-                        <View style={styles.estimationDivider} />
-                        <View style={styles.estimationItem}>
-                          <Ionicons name="time-outline" size={22} color={theme.colors.primary} />
-                          <View style={{ marginLeft: 10 }}>
-                            <Text style={styles.estimationLabel}>Durée estimée</Text>
-                            <Text style={styles.estimationValue}>{formatDuration(estimation.durationMin)}</Text>
-                          </View>
-                        </View>
-                      </>
+                        
+                        <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 12 }} />
+                        
+                        {priceLoading ? (
+                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
+                             <ActivityIndicator size="small" color={theme.colors.primary} />
+                             <Text style={{ marginLeft: 8, fontSize: 13, color: theme.colors.textLight }}>Calcul du prix conseillé...</Text>
+                           </View>
+                        ) : priceSuggestion ? (
+                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                               <Ionicons name="cash-outline" size={22} color={theme.colors.success} />
+                               <Text style={[styles.estimationLabel, { marginLeft: 10, fontSize: 13, color: theme.colors.text }]}>Prix conseillé</Text>
+                             </View>
+                             <Text style={{ fontSize: 18, fontWeight: '800', color: theme.colors.success }}>
+                               {priceSuggestion.suggested_price.toLocaleString()} FCFA
+                             </Text>
+                           </View>
+                        ) : null}
+                      </View>
                     ) : null}
                   </View>
                 )}
