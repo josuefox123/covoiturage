@@ -18,8 +18,8 @@ import ProfileAvatar from './ProfileAvatar';
 
 export interface RideCardProps {
   ride: any;
-  role?: 'passenger' | 'driver' | 'search';
   bookingStatus?: string;
+  paymentStatus?: string;
   isActiveRightNow?: boolean;
   onPressPrimary?: () => void;
   primaryActionLabel?: string;
@@ -39,6 +39,7 @@ export default function RideCard({
   ride,
   role = 'search',
   bookingStatus,
+  paymentStatus,
   isActiveRightNow = false,
   onPressPrimary,
   primaryActionLabel,
@@ -59,6 +60,14 @@ export default function RideCard({
     let bg = theme.colors.grayLight;
     let text = theme.colors.textLight;
     let label = status;
+
+    if (paymentStatus === 'pending' || status === 'pending_payment') {
+      return (
+        <View style={[styles.statusBadge, { backgroundColor: theme.colors.warningLight }]}>
+          <Text style={[styles.statusText, { color: theme.colors.warningDark }]}>Paiement en attente</Text>
+        </View>
+      );
+    }
 
     if (status === 'started') {
       bg = theme.colors.successLight;

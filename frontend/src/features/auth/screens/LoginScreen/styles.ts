@@ -196,9 +196,7 @@ export const styles = StyleSheet.create({
     paddingLeft: 10,
     height: '100%',
   },
-  pickerButtonStyle: {
-    // Neutralise la taille par défaut du composant
-  },
+  pickerButtonStyle: {},
   inputSeparator: {
     width: 1,
     height: 22,
@@ -211,6 +209,63 @@ export const styles = StyleSheet.create({
     color: theme.colors.text,
     marginRight: 2,
     minWidth: 38,
+  },
+
+  // ── Champ téléphone PREMIUM ────────────────────────────────
+  phoneInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    borderRadius: 18,
+    height: 62,
+    backgroundColor: theme.colors.background,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  phoneInputContainerFocused: {
+    borderColor: theme.colors.primary,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 7,
+    backgroundColor: '#fff',
+  },
+  countrySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: '100%',
+    backgroundColor: theme.colors.card,
+    gap: 5,
+    borderRightWidth: 0,
+  },
+  phoneDivider: {
+    width: 1.5,
+    height: 32,
+    backgroundColor: theme.colors.border,
+  },
+  phoneCallingCode: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    paddingHorizontal: 12,
+    letterSpacing: 0.3,
+  },
+  phoneTextInput: {
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '600',
+    height: '100%',
+    paddingVertical: 0,
+    paddingRight: 8,
+    letterSpacing: 1,
   },
 
   // ── Hint ──────────────────────────────────────────────────

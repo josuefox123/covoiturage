@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   container: {
     paddingTop: 16,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 20,
     overflow: 'hidden',
   },
   circle1: {

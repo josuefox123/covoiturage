@@ -24,7 +24,6 @@ import CountryPicker from 'react-native-country-picker-modal';
 
 import { styles } from './styles';
 import { useLoginForm } from './hooks/useLoginForm';
-import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -34,9 +33,6 @@ export default function LoginScreen() {
   const phoneInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-
-  // Forgot Password Modal state
-  const [isResetModalVisible, setIsResetModalVisible] = useState(false);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -119,17 +115,9 @@ export default function LoginScreen() {
 
   const handleForgotPassword = useCallback(() => {
     Keyboard.dismiss();
-    setIsResetModalVisible(true);
-  }, []);
-
-  const handleModalAlert = useCallback((alertConfig: { title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }) => {
-    form.setAlertConfig({
-      visible: true,
-      title: alertConfig.title,
-      message: alertConfig.message,
-      type: alertConfig.type,
-    });
-  }, [form]);
+    const emailParam = form.identifier && form.identifier.includes('@') ? form.identifier : '';
+    router.push({ pathname: '/(auth)/forgot-password', params: { email: emailParam } });
+  }, [form.identifier, router]);
 
   const spin = waveAnim.interpolate({
     inputRange: [-1, 0, 1],
@@ -198,21 +186,8 @@ export default function LoginScreen() {
               >
                 <View style={styles.welcomeRow}>
                   <Text style={styles.welcomeTitle}>
-                    Ravi de vous <Text style={styles.welcomeHighlight}>revoir</Text>
+                    <Text style={styles.welcomeHighlight}>Bienvenue</Text>
                   </Text>
-                  <Animated.Text
-                    style={[
-                      styles.waveEmoji,
-                      {
-                        transform: [
-                          { rotate: spin },
-                          { scale: scale },
-                        ],
-                      },
-                    ]}
-                  >
-                    👋
-                  </Animated.Text>
                 </View>
                 <Text style={styles.welcomeSubtitle}>
                   Connectez-vous pour accéder à votre espace
@@ -229,79 +204,62 @@ export default function LoginScreen() {
                 { opacity: fadeAnim, transform: [{ translateY: formSlideAnim }] },
               ]}
             >
-              {/* ─── Champ Identifiant ─── */}
+              {/* ─── Champ Numéro de téléphone Premium ─── */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Email ou Téléphone</Text>
+                <Text style={styles.fieldLabel}>Numéro de téléphone</Text>
 
                 <View
                   style={[
-                    styles.inputBox,
-                    form.identifierFocused && styles.inputBoxFocused,
+                    styles.phoneInputContainer,
+                    form.identifierFocused && styles.phoneInputContainerFocused,
                   ]}
                 >
-                  {form.isPhoneInput ? (
-                    <TouchableOpacity
-                      style={styles.countryTrigger}
-                      onPress={() => form.setShowCountryPicker(true)}
-                      activeOpacity={0.7}
-                      accessibilityLabel="Choisir le pays"
-                      accessibilityRole="button"
-                    >
-                      <CountryPicker
-                        countryCode={form.countryCode}
-                        withFlag
-                        withCallingCode
-                        withFilter
-                        withAlphaFilter
-                        withEmoji
-                        onSelect={form.handleCountrySelect}
-                        visible={form.showCountryPicker}
-                        onClose={() => form.setShowCountryPicker(false)}
-                        preferredCountries={['BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA', 'NG']}
-                        containerButtonStyle={styles.pickerButtonStyle}
-                      />
-                      <Ionicons name="chevron-down" size={10} color={theme.colors.textMuted} />
-                      <View style={styles.inputSeparator} />
-                      <Text style={styles.callingCode}>+{form.callingCode}</Text>
-                      <View style={styles.inputSeparator} />
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.inputLeadingIcon}>
-                      <Ionicons
-                        name={
-                          !form.identifier.trim()
-                            ? 'person-outline'
-                            : form.identifier.includes('@')
-                            ? 'mail-outline'
-                            : 'call-outline'
-                        }
-                        size={18}
-                        color={form.identifierFocused ? theme.colors.primary : theme.colors.textMuted}
-                      />
-                    </View>
-                  )}
+                  {/* Sélecteur de pays */}
+                  <TouchableOpacity
+                    style={styles.countrySelector}
+                    onPress={() => form.setShowCountryPicker(true)}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Choisir le pays"
+                    accessibilityRole="button"
+                  >
+                    <CountryPicker
+                      countryCode={form.countryCode}
+                      withFlag
+                      withCallingCode
+                      withFilter
+                      withAlphaFilter
+                      withEmoji
+                      onSelect={form.handleCountrySelect}
+                      visible={form.showCountryPicker}
+                      onClose={() => form.setShowCountryPicker(false)}
+                      preferredCountries={['BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA', 'NG']}
+                      containerButtonStyle={styles.pickerButtonStyle}
+                    />
+                    <Ionicons name="chevron-down" size={10} color={theme.colors.textMuted} />
+                  </TouchableOpacity>
 
+                  {/* Divider vertical */}
+                  <View style={styles.phoneDivider} />
+
+                  {/* Indicatif */}
+                  <Text style={styles.phoneCallingCode}>+{form.callingCode}</Text>
+
+                  {/* Champ numéro */}
                   <TextInput
                     ref={phoneInputRef}
-                    style={styles.textInput}
-                    placeholder={
-                      !form.identifier
-                        ? 'Email ou numéro de téléphone'
-                        : form.isPhoneInput
-                        ? '01 95 95 95 95'
-                        : 'jean@mail.com'
-                    }
+                    style={styles.phoneTextInput}
+                    placeholder="ex: 01 95 95 95 95"
                     placeholderTextColor={theme.colors.textMuted}
                     value={form.identifier}
                     onChangeText={form.setIdentifier}
                     onFocus={handleIdentifierFocus}
                     onBlur={() => form.setIdentifierFocused(false)}
                     autoCapitalize="none"
-                    keyboardType={form.identifier.includes('@') ? 'email-address' : 'default'}
+                    keyboardType="phone-pad"
                     returnKeyType="next"
                     onSubmitEditing={() => passwordInputRef.current?.focus()}
                     blurOnSubmit={false}
-                    accessibilityLabel="Email ou numéro de téléphone"
+                    accessibilityLabel="Numéro de téléphone"
                   />
 
                   {form.identifier.length > 0 && (
@@ -310,7 +268,7 @@ export default function LoginScreen() {
                       style={styles.clearBtn}
                       accessibilityLabel="Effacer"
                     >
-                      <Ionicons name="close-circle" size={16} color={theme.colors.textMuted} />
+                      <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -442,13 +400,6 @@ export default function LoginScreen() {
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </KeyboardAvoidingView>
-
-        <ForgotPasswordModal
-          visible={isResetModalVisible}
-          onClose={() => setIsResetModalVisible(false)}
-          initialEmail={form.identifier && form.identifier.includes('@') ? form.identifier : ''}
-          onAlert={handleModalAlert}
-        />
 
         <CustomAlert
           visible={form.alertConfig.visible}

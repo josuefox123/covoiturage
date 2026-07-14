@@ -99,7 +99,7 @@ export default function OnboardingScreen() {
       {/* Image pleine largeur avec dégradé */}
       <View style={styles.imageWrapper}>
         <Image
-          source={require('../assets/images/welcome_car.png')}
+          source={require('../assets/images/welcome_car.webp')}
           style={styles.fullWidthImage}
           resizeMode="cover"
         />

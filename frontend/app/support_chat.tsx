@@ -72,6 +72,7 @@ export default function SupportChatScreen() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [text, setText] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -105,14 +106,17 @@ export default function SupportChatScreen() {
   }, []);
 
   const initChat = async () => {
+    setLoading(true);
+    setInitError(null);
     try {
       const conv = await authFetch('/conversations/support-chat/');
       setConversation(conv);
       await loadMessages(conv.id);
       // Poll every 5 seconds for new messages
+      if (pollRef.current) clearInterval(pollRef.current);
       pollRef.current = setInterval(() => loadMessages(conv.id), 5000);
     } catch (e: any) {
-      CustomAlert.alert('Erreur', e.message || 'Impossible de charger le chat support.');
+      setInitError(e.message || 'Impossible de se connecter au support client.');
     } finally {
       setLoading(false);
     }
@@ -343,6 +347,34 @@ export default function SupportChatScreen() {
       <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Connexion au support…</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (initError) {
+    return (
+      <SafeAreaView style={[styles.centered, { paddingHorizontal: 24 }]}>
+        <Ionicons name="alert-circle-outline" size={64} color={theme.colors.error} />
+        <Text style={[styles.emptyTitle, { color: theme.colors.error, textAlign: 'center', marginTop: 16 }]}>
+          Erreur de connexion
+        </Text>
+        <Text style={[styles.emptySubtitle, { textAlign: 'center', marginTop: 8 }]}>
+          {initError}
+        </Text>
+        <TouchableOpacity 
+          style={styles.retryBtn} 
+          onPress={initChat}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.retryBtnText}>Réessayer</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={{ marginTop: 16 }} 
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>Retour</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -611,4 +643,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.5 },
+  retryBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
+    marginTop: 24,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  retryBtnText: {
+    color: theme.colors.white,
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
 });

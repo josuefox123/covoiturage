@@ -171,7 +171,7 @@ export default function RideManagementScreen() {
   };
 
   const handleContactPassengers = () => {
-    const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'completed'].includes(b.status));
+    const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'pending_payment', 'completed'].includes(b.status));
     if (activeBookings.length === 0) return;
     if (activeBookings.length === 1) {
       const pId = activeBookings[0].passenger_details?.id;
@@ -209,6 +209,8 @@ export default function RideManagementScreen() {
       case 'active':
       case 'pending':
         return { text: 'Confirmée', color: COLORS.success, bg: '#F0FDF4' };
+      case 'pending_payment':
+        return { text: 'Paiement en attente', color: COLORS.warning, bg: '#FFFBEB' };
       case 'completed':
         return { text: 'Arrivé(e)', color: COLORS.primary, bg: '#EFF6FF' };
       case 'cancelled':
@@ -230,7 +232,7 @@ export default function RideManagementScreen() {
 
   if (!ride) return null;
 
-  const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'completed'].includes(b.status));
+  const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'pending_payment', 'completed'].includes(b.status));
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled' || b.status === 'rejected');
   
   const totalRevenue = bookings.filter(b => b.status === 'confirmed' || b.status === 'active').reduce((sum, b) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
@@ -379,9 +381,9 @@ export default function RideManagementScreen() {
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>Paiement:</Text>
                 <Text style={styles.paymentValue}>{(ride.price_per_seat || 0) * (booking.seats_booked || 1)} FCFA</Text>
-                <View style={[styles.paymentBadge, { backgroundColor: ['confirmed', 'active', 'pending', 'completed'].includes(booking.status) ? '#F0FDF4' : '#FFFBEB' }]}>
-                  <Text style={[styles.paymentBadgeText, { color: ['confirmed', 'active', 'pending', 'completed'].includes(booking.status) ? COLORS.success : COLORS.warning }]}>
-                    {['confirmed', 'active', 'pending', 'completed'].includes(booking.status) ? 'Payé' : 'En attente'}
+                <View style={[styles.paymentBadge, { backgroundColor: ['confirmed', 'active', 'completed'].includes(booking.status) ? '#F0FDF4' : '#FFFBEB' }]}>
+                  <Text style={[styles.paymentBadgeText, { color: ['confirmed', 'active', 'completed'].includes(booking.status) ? COLORS.success : COLORS.warning }]}>
+                    {['confirmed', 'active', 'completed'].includes(booking.status) ? 'Payé' : 'En attente'}
                   </Text>
                 </View>
               </View>

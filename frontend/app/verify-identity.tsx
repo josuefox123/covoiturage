@@ -34,7 +34,7 @@ import { CustomAlert } from '../src/utils/CustomAlert';
 const { width } = Dimensions.get('window');
 const PRIMARY = '#2563EB';
 
-type StepId = 'intro' | 'selfie' | 'id_front' | 'id_back' | 'submit';
+type StepId = 'intro' | 'selfie' | 'selfie_id' | 'id_front' | 'id_back' | 'submit';
 
 interface Step {
   id: StepId;
@@ -45,6 +45,7 @@ interface Step {
 const STEPS: Step[] = [
   { id: 'intro', label: 'Bienvenue', icon: 'shield-checkmark' },
   { id: 'selfie', label: 'Selfie', icon: 'camera' },
+  { id: 'selfie_id', label: 'Selfie + Carte', icon: 'person-add' },
   { id: 'id_front', label: 'CNI Recto', icon: 'card' },
   { id: 'id_back', label: 'CNI Verso', icon: 'card' },
   { id: 'submit', label: 'Confirmer', icon: 'checkmark-done' },
@@ -66,6 +67,7 @@ export default function VerifyIdentityScreen() {
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
+  const [selfieIdUri, setSelfieIdUri] = useState<string | null>(null);
   const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
   const [idBackUri, setIdBackUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -128,7 +130,7 @@ export default function VerifyIdentityScreen() {
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!selfieUri || !idFrontUri || !idBackUri) {
+    if (!selfieUri || !selfieIdUri || !idFrontUri || !idBackUri) {
       CustomAlert.alert('Erreur', 'Veuillez fournir toutes les photos requises.');
       return;
     }
@@ -149,6 +151,7 @@ export default function VerifyIdentityScreen() {
       };
 
       appendImage('selfie', selfieUri);
+      appendImage('selfie_id', selfieIdUri);
       appendImage('id_front', idFrontUri);
       appendImage('id_back', idBackUri);
 
@@ -157,7 +160,6 @@ export default function VerifyIdentityScreen() {
         body: formData,
       });
       
-      // Rafraîchir l'utilisateur pour obtenir le nouvel avatar et le statut à jour depuis le backend
       await refreshUser();
       
       setSubmitted(true);
@@ -178,6 +180,7 @@ export default function VerifyIdentityScreen() {
   const canGoNext = () => {
     const step = STEPS[currentStep];
     if (step.id === 'selfie') return !!selfieUri;
+    if (step.id === 'selfie_id') return !!selfieIdUri;
     if (step.id === 'id_front') return !!idFrontUri;
     if (step.id === 'id_back') return !!idBackUri;
     return true;
@@ -281,7 +284,7 @@ export default function VerifyIdentityScreen() {
             {/* ═══ ÉTAPE 0 : Intro ═══ */}
             {step.id === 'intro' && (
               <View style={styles.stepContent}>
-                <Image source={require('../assets/verify.png')} style={styles.introIllustration} resizeMode="contain" />
+                <Image source={require('../assets/verify.webp')} style={styles.introIllustration} resizeMode="contain" />
                 <Text style={styles.stepTitle}>Vérifiez votre identité</Text>
                 <Text style={styles.stepDesc}>
                   Pour la sécurité de notre communauté, nous avons besoin de vérifier votre identité avant que vous puissiez réserver des courses.
@@ -324,9 +327,58 @@ export default function VerifyIdentityScreen() {
                   placeholder="Prendre un selfie"
                   placeholderIcon="person"
                   onCamera={() => pickImage('camera', setSelfieUri, true)}
-                  onGallery={() => pickImage('gallery', setSelfieUri, true)}
+                  onGallery={() => {}}
                   onContinue={goNext}
                   onView={() => setFullscreenUri(selfieUri)}
+                  loading={loadingImage}
+                />
+              </View>
+            )}
+
+            {/* ═══ ÉTAPE 1.5 : Selfie avec Carte au Menton ═══ */}
+            {step.id === 'selfie_id' && (
+              <View style={styles.stepContent}>
+                {!selfieIdUri && (
+                  <>
+                    <View style={styles.miniBadge}>
+                      <Ionicons name="person-add" size={20} color={PRIMARY} />
+                    </View>
+                    <Text style={styles.stepTitle}>Selfie avec votre pièce</Text>
+                    <Text style={styles.stepDesc}>
+                      Tenez votre pièce d'identité sous votre menton comme illustré ci-dessous. Veillez à ne pas masquer votre visage ni les détails de la carte.
+                    </Text>
+
+                    {/* Illustrative Image */}
+                    <View style={{
+                      width: '100%',
+                      height: 150,
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginBottom: 16,
+                      borderWidth: 1.5,
+                      borderColor: '#E5E7EB',
+                      overflow: 'hidden'
+                    }}>
+                      <Image
+                        source={require('../assets/images/selfie_with_id.webp')}
+                        style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+                      />
+                    </View>
+                  </>
+                )}
+                {selfieIdUri && (
+                  <Text style={styles.stepTitlePreview}>Photo de votre selfie avec pièce</Text>
+                )}
+                <PhotoCapture
+                  uri={selfieIdUri}
+                  placeholder="Prendre le selfie avec pièce"
+                  placeholderIcon="person-add"
+                  onCamera={() => pickImage('camera', setSelfieIdUri, true)}
+                  onGallery={() => {}}
+                  onContinue={goNext}
+                  onView={() => setFullscreenUri(selfieIdUri)}
                   loading={loadingImage}
                 />
               </View>
@@ -406,8 +458,9 @@ export default function VerifyIdentityScreen() {
                 {/* Récap photos */}
                 <View style={styles.recapGrid}>
                   <RecapThumb label="Selfie" uri={selfieUri} />
-                  <RecapThumb label="CNI Recto" uri={idFrontUri} />
-                  <RecapThumb label="CNI Verso" uri={idBackUri} />
+                  <RecapThumb label="Selfie + ID" uri={selfieIdUri} />
+                  <RecapThumb label="Recto" uri={idFrontUri} />
+                  <RecapThumb label="Verso" uri={idBackUri} />
                 </View>
 
                 {/* Bouton submit */}
@@ -553,11 +606,7 @@ function PhotoCapture({
           <View style={pcStyles.btnRow}>
             <TouchableOpacity style={pcStyles.btn} onPress={onCamera} activeOpacity={0.85}>
               <Ionicons name="camera" size={18} color="#FFFFFF" />
-              <Text style={pcStyles.btnText}>Caméra</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={pcStyles.btnOutline} onPress={onGallery} activeOpacity={0.85}>
-              <Ionicons name="images" size={18} color="#1F2937" />
-              <Text style={pcStyles.btnOutlineText}>Galerie</Text>
+              <Text style={pcStyles.btnText}>Prendre une photo (Caméra)</Text>
             </TouchableOpacity>
           </View>
         </>

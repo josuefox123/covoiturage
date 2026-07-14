@@ -221,6 +221,7 @@ export default function TripsScreen() {
                       ride={ride}
                       role="passenger"
                       bookingStatus={booking.status}
+                      paymentStatus={booking.payment_status}
                       isActiveRightNow={isActiveRightNow}
                       primaryActionLabel="Contacter"
                       onPressPrimary={() => contactDriver(ride.id)}

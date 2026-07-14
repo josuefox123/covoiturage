@@ -496,6 +496,7 @@ class VerificationRequest(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='verification_request')
     selfie = models.ImageField(upload_to='verifications/selfies/')
+    selfie_id = models.ImageField(upload_to='verifications/selfie_ids/', blank=True, null=True)
     id_front = models.ImageField(upload_to='verifications/id_fronts/')
     id_back = models.ImageField(upload_to='verifications/id_backs/')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

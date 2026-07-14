@@ -104,6 +104,26 @@ Zemy
 
         <div class="my-8 border-t border-gray-200"></div>
 
+        <!-- ESTIMATION PRIX (TRAJETS) -->
+        <h2 class="text-lg font-bold text-text">Recommandation de Prix (Trajets)</h2>
+        <div class="bg-gray-50 rounded-xl border border-gray-100 p-6 space-y-4">
+          <div class="space-y-2 max-w-sm">
+            <label class="block text-sm font-semibold text-text">Prix par kilomètre (FCFA/km)</label>
+            <div class="relative">
+              <input
+                v-model="settings.price_per_km"
+                type="number"
+                min="0"
+                class="w-full bg-white border border-border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              />
+              <span class="absolute right-4 top-3 text-textLight">FCFA</span>
+            </div>
+            <p class="text-xs text-textMuted">Valeur utilisée pour recommander un prix au conducteur lors de la publication d'un trajet.</p>
+          </div>
+        </div>
+
+        <div class="my-8 border-t border-gray-200"></div>
+
         <!-- COLIS -->
         <h2 class="text-lg font-bold text-text">Commissions sur les Colis</h2>
         <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
@@ -217,6 +237,7 @@ interface FinSettings {
   parcel_commission_percentage: number;
   min_parcel_commission: number;
   max_parcel_commission: number | null;
+  price_per_km: number;
 }
 
 const settings = ref<FinSettings | null>(null)
@@ -238,7 +259,8 @@ onMounted(async () => {
         is_parcel_commission_active: true,
         parcel_commission_percentage: 8,
         min_parcel_commission: 100,
-        max_parcel_commission: null
+        max_parcel_commission: null,
+        price_per_km: 30
       }
     } else {
       error.value = "Impossible de charger les paramètres financiers."

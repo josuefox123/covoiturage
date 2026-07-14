@@ -155,24 +155,70 @@ export default function PublishScreen() {
     fetchSettings();
   }, []);
 
-  // ─── Helpers ─────────────────────────────────────────────────────
-  const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  // ─── Estimation via Valhalla (routes réelles, OpenStreetMap) ────────
+  const computeEstimation = async (dep: { lat: number; lon: number }, arr: { lat: number; lon: number }) => {
+    setEstimationLoading(true);
+    setEstimation(null);
+
+    const haversineFallback = () => {
+      const R = 6371;
+      const dLat = ((arr.lat - dep.lat) * Math.PI) / 180;
+      const dLon = ((arr.lon - dep.lon) * Math.PI) / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos((dep.lat * Math.PI) / 180) * Math.cos((arr.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      const straightKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distanceKm = Math.round(straightKm * 1.35);
+      const durationMin = Math.round((distanceKm / 45) * 60);
+      setEstimation({ distanceKm, durationMin });
+      fetchPriceSuggestion(distanceKm);
+      setEstimationLoading(false);
+    };
+
+    try {
+      // Valhalla routing — OpenStreetMap Germany (gratuit, sans clé API)
+      const body = JSON.stringify({
+        locations: [
+          { lon: dep.lon, lat: dep.lat },
+          { lon: arr.lon, lat: arr.lat },
+        ],
+        costing: 'auto',
+        directions_options: { units: 'kilometers' },
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch('https://valhalla1.openstreetmap.de/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        haversineFallback();
+        return;
+      }
+
+      const json = await res.json();
+
+      if (json?.trip?.summary) {
+        const distanceKm = Math.round(json.trip.summary.length);  // déjà en km
+        const durationMin = Math.round(json.trip.summary.time / 60); // secondes → minutes
+        setEstimation({ distanceKm, durationMin });
+        fetchPriceSuggestion(distanceKm);
+        setEstimationLoading(false);
+      } else {
+        haversineFallback();
+      }
+    } catch {
+      haversineFallback();
+    } finally {
+      setEstimationLoading(false);
+    }
   };
 
-  const computeEstimation = (dep: { lat: number; lon: number }, arr: { lat: number; lon: number }) => {
-    setEstimationLoading(true);
-    const straightKm = haversineKm(dep.lat, dep.lon, arr.lat, arr.lon);
-    const distanceKm = Math.round(straightKm * 1.25);
-    const durationMin = Math.round((distanceKm / 70) * 60);
-    setEstimation({ distanceKm, durationMin });
-    setEstimationLoading(false);
-    fetchPriceSuggestion(distanceKm);
-  };
+
 
   const formatDuration = (totalMin: number): string => {
     const h = Math.floor(totalMin / 60);
@@ -598,6 +644,11 @@ export default function PublishScreen() {
                       <ActivityIndicator size="small" color={theme.colors.primary} style={{ margin: 20 }} />
                     ) : estimation ? (
                       <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                          <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontStyle: 'italic' }}>
+                            📍 Calcul basé sur les routes réelles
+                          </Text>
+                        </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <View style={styles.estimationItem}>
                             <Ionicons name="navigate-circle-outline" size={22} color={theme.colors.primary} />
@@ -993,12 +1044,19 @@ export default function PublishScreen() {
           title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
           onLocationSelected={(loc) => {
             const cords = { lat: loc.latitude, lon: loc.longitude };
+            let newDep = departure;
+            let newArr = arrival;
             if (pickingLocationFor === 'departure') {
               setDeparture(loc.name); setDepartureCords(cords);
+              newDep = loc.name;
               if (arrivalCords) computeEstimation(cords, arrivalCords);
             } else {
               setArrival(loc.name); setArrivalCords(cords);
+              newArr = loc.name;
               if (departureCords) computeEstimation(departureCords, cords);
+            }
+            if (newDep && newArr && !description) {
+              setDescription(`Départ de ${newDep} et arrivée à ${newArr}`);
             }
             setPickingLocationFor(null);
           }}

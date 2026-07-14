@@ -212,11 +212,12 @@ def request_verification(request):
         return Response({'error': 'Une demande est déjà en cours de traitement.'}, status=status.HTTP_400_BAD_REQUEST)
 
     selfie = request.FILES.get('selfie')
+    selfie_id = request.FILES.get('selfie_id')
     id_front = request.FILES.get('id_front')
     id_back = request.FILES.get('id_back')
 
-    if not all([selfie, id_front, id_back]):
-        return Response({'error': 'Tous les documents (selfie, recto, verso) sont requis.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not all([selfie, selfie_id, id_front, id_back]):
+        return Response({'error': 'Tous les documents (selfie, selfie avec carte, recto, verso) sont requis.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Par défaut, utiliser le selfie comme photo de profil (avatar)
     user.avatar = selfie
@@ -227,6 +228,7 @@ def request_verification(request):
         user=user,
         defaults={
             'selfie': selfie,
+            'selfie_id': selfie_id,
             'id_front': id_front,
             'id_back': id_back,
             'status': 'pending'

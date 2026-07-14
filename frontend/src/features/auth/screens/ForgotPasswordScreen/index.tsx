@@ -1,38 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Modal,
-  TouchableWithoutFeedback,
-  KeyboardAvoidingView,
   View,
-  TouchableOpacity,
-  Animated,
   Text,
   TextInput,
+  TouchableOpacity,
   ActivityIndicator,
+  Animated,
+  KeyboardAvoidingView,
   Platform,
+  TouchableWithoutFeedback,
   Keyboard,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../../../../../styles/theme';
-import { styles } from '../styles';
-import { fetchApi } from '../../../../../services/api';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { theme } from '../../../../styles/theme';
+import { styles } from './styles';
+import { fetchApi } from '../../../../services/api';
+import CustomAlert from '../../../../components/CustomAlert';
 
-interface ForgotPasswordModalProps {
-  visible: boolean;
-  onClose: () => void;
-  initialEmail: string;
-  onAlert: (config: { title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }) => void;
-}
-
-export function ForgotPasswordModal({
-  visible,
-  onClose,
-  initialEmail,
-  onAlert,
-}: ForgotPasswordModalProps) {
+export default function ForgotPasswordScreen() {
+  const router = useRouter();
+  const { email: initialEmail } = useLocalSearchParams<{ email?: string }>();
+  
   const [resetStep, setResetStep] = useState(1);
-  const [resetEmail, setResetEmail] = useState('');
+  const [resetEmail, setResetEmail] = useState(initialEmail || '');
   const [resetOtp, setResetOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -41,43 +35,38 @@ export function ForgotPasswordModal({
   const [resetLoading, setResetLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
-  const otpInputRef = useRef<TextInput>(null);
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'error' | 'success' | 'warning' | 'info',
+  });
 
+  const otpInputRef = useRef<TextInput>(null);
   const stepOpacity = useRef(new Animated.Value(1)).current;
   const stepTranslateX = useRef(new Animated.Value(0)).current;
 
-  // Initialize email when modal opens
-  useEffect(() => {
-    if (visible) {
-      setResetEmail(initialEmail || '');
-      setResetStep(1);
-      setResetOtp('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setShowNewPassword(false);
-      setShowConfirmPassword(false);
-    }
-  }, [visible, initialEmail]);
-
-  // Resend Timer Interval
   useEffect(() => {
     let interval: any;
-    if (visible && resetStep === 2 && resendTimer > 0) {
+    if (resetStep === 2 && resendTimer > 0) {
       interval = setInterval(() => {
         setResendTimer((prev) => prev - 1);
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [visible, resetStep, resendTimer]);
+  }, [resetStep, resendTimer]);
 
-  // Auto-focus OTP input on Step 2
   useEffect(() => {
-    if (resetStep === 2 && visible) {
+    if (resetStep === 2) {
       setTimeout(() => {
         otpInputRef.current?.focus();
       }, 300);
     }
-  }, [resetStep, visible]);
+  }, [resetStep]);
+
+  const onAlert = (config: { title: string; message: string; type: 'error' | 'success' | 'warning' | 'info' }) => {
+    setAlertConfig({ ...config, visible: true });
+  };
 
   const animateStepTransition = useCallback((nextStep: number) => {
     Animated.parallel([
@@ -145,7 +134,7 @@ export function ForgotPasswordModal({
     } finally {
       setResetLoading(false);
     }
-  }, [getResetEmailError, resetEmail, animateStepTransition, onAlert]);
+  }, [getResetEmailError, resetEmail, animateStepTransition]);
 
   const handleResendResetCode = useCallback(async () => {
     if (resendTimer > 0) return;
@@ -171,7 +160,7 @@ export function ForgotPasswordModal({
     } finally {
       setResetLoading(false);
     }
-  }, [resendTimer, resetEmail, onAlert]);
+  }, [resendTimer, resetEmail]);
 
   const handleVerifyResetCode = useCallback(async () => {
     Keyboard.dismiss();
@@ -201,7 +190,7 @@ export function ForgotPasswordModal({
     } finally {
       setResetLoading(false);
     }
-  }, [resetOtp, resetEmail, animateStepTransition, onAlert]);
+  }, [resetOtp, resetEmail, animateStepTransition]);
 
   const handleResetPassword = useCallback(async () => {
     Keyboard.dismiss();
@@ -251,7 +240,7 @@ export function ForgotPasswordModal({
     } finally {
       setResetLoading(false);
     }
-  }, [newPassword, confirmPassword, resetOtp, resetEmail, animateStepTransition, onAlert]);
+  }, [newPassword, confirmPassword, resetOtp, resetEmail, animateStepTransition]);
 
   const renderOtpBoxes = useCallback(() => {
     const boxes = [];
@@ -284,18 +273,17 @@ export function ForgotPasswordModal({
 
   const renderStep1 = () => (
     <View style={styles.stepWrapper}>
-      <Text style={styles.modalTitle}>Mot de passe oublié</Text>
-      <Text style={styles.modalSubtitle}>
+      <Text style={styles.title}>Mot de passe oublié</Text>
+      <Text style={styles.subtitle}>
         Saisissez votre adresse email. Nous vous enverrons un code de validation OTP à 6 chiffres.
       </Text>
 
-      <View style={styles.modalFieldGroup}>
+      <View style={styles.fieldGroup}>
         <Text style={styles.fieldLabel}>Adresse email</Text>
-        <View style={[styles.inputBox, styles.modalInputBox]}>
+        <View style={styles.inputBox}>
           <View style={styles.inputLeadingIcon}>
             <Ionicons name="mail-outline" size={18} color={theme.colors.primary} />
           </View>
-
           <TextInput
             style={styles.textInput}
             placeholder="Votre adresse email"
@@ -305,7 +293,6 @@ export function ForgotPasswordModal({
             autoCapitalize="none"
             keyboardType="email-address"
           />
-
           {resetEmail.length > 0 && (
             <TouchableOpacity onPress={() => setResetEmail('')} style={styles.clearBtn}>
               <Ionicons name="close-circle" size={16} color={theme.colors.textMuted} />
@@ -315,7 +302,7 @@ export function ForgotPasswordModal({
       </View>
 
       <TouchableOpacity
-        style={[styles.modalButton, resetLoading && styles.disabledButton]}
+        style={[styles.button, resetLoading && styles.disabledButton]}
         onPress={handleSendResetCode}
         disabled={resetLoading || !resetEmail.trim()}
         activeOpacity={0.9}
@@ -324,12 +311,12 @@ export function ForgotPasswordModal({
           colors={[theme.colors.primary, theme.colors.primaryDark || '#1A4FC8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={styles.modalGradientButton}
+          style={styles.gradientButton}
         >
           {resetLoading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.modalButtonText}>Envoyer le code</Text>
+            <Text style={styles.buttonText}>Envoyer le code</Text>
           )}
         </LinearGradient>
       </TouchableOpacity>
@@ -338,10 +325,10 @@ export function ForgotPasswordModal({
 
   const renderStep2 = () => (
     <View style={styles.stepWrapper}>
-      <Text style={styles.modalTitle}>Vérification</Text>
-      <Text style={styles.modalSubtitle}>
+      <Text style={styles.title}>Vérification</Text>
+      <Text style={styles.subtitle}>
         Entrez le code OTP à 6 chiffres envoyé à{' '}
-        <Text style={styles.modalHighlightText}>{resetEmail.trim().toLowerCase()}</Text>.
+        <Text style={styles.highlightText}>{resetEmail.trim().toLowerCase()}</Text>.
       </Text>
 
       <View style={styles.otpContainer}>
@@ -370,7 +357,7 @@ export function ForgotPasswordModal({
       </View>
 
       <TouchableOpacity
-        style={[styles.modalButton, (resetLoading || resetOtp.length !== 6) && styles.disabledButton]}
+        style={[styles.button, (resetLoading || resetOtp.length !== 6) && styles.disabledButton]}
         onPress={handleVerifyResetCode}
         disabled={resetLoading || resetOtp.length !== 6}
         activeOpacity={0.9}
@@ -383,14 +370,14 @@ export function ForgotPasswordModal({
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={styles.modalGradientButton}
+          style={styles.gradientButton}
         >
           {resetLoading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <Text
               style={[
-                styles.modalButtonText,
+                styles.buttonText,
                 resetOtp.length !== 6 && { color: theme.colors.textMuted },
               ]}
             >
@@ -404,14 +391,14 @@ export function ForgotPasswordModal({
 
   const renderStep3 = () => (
     <View style={styles.stepWrapper}>
-      <Text style={styles.modalTitle}>Nouveau mot de passe</Text>
-      <Text style={styles.modalSubtitle}>
+      <Text style={styles.title}>Nouveau mot de passe</Text>
+      <Text style={styles.subtitle}>
         Créez un nouveau mot de passe sécurisé pour votre compte.
       </Text>
 
-      <View style={styles.modalFieldGroup}>
+      <View style={styles.fieldGroup}>
         <Text style={styles.fieldLabel}>Nouveau mot de passe</Text>
-        <View style={[styles.inputBox, styles.modalInputBox]}>
+        <View style={styles.inputBox}>
           <View style={styles.inputLeadingIcon}>
             <Ionicons name="lock-closed-outline" size={18} color={theme.colors.primary} />
           </View>
@@ -433,9 +420,9 @@ export function ForgotPasswordModal({
         </View>
       </View>
 
-      <View style={styles.modalFieldGroup}>
+      <View style={styles.fieldGroup}>
         <Text style={styles.fieldLabel}>Confirmez le mot de passe</Text>
-        <View style={[styles.inputBox, styles.modalInputBox]}>
+        <View style={styles.inputBox}>
           <View style={styles.inputLeadingIcon}>
             <Ionicons name="lock-closed-outline" size={18} color={theme.colors.primary} />
           </View>
@@ -458,7 +445,7 @@ export function ForgotPasswordModal({
       </View>
 
       <TouchableOpacity
-        style={[styles.modalButton, (resetLoading || !newPassword || !confirmPassword) && styles.disabledButton]}
+        style={[styles.button, (resetLoading || !newPassword || !confirmPassword) && styles.disabledButton]}
         onPress={handleResetPassword}
         disabled={resetLoading || !newPassword || !confirmPassword}
         activeOpacity={0.9}
@@ -471,14 +458,14 @@ export function ForgotPasswordModal({
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={styles.modalGradientButton}
+          style={styles.gradientButton}
         >
           {resetLoading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <Text
               style={[
-                styles.modalButtonText,
+                styles.buttonText,
                 (!newPassword || !confirmPassword) && { color: theme.colors.textMuted },
               ]}
             >
@@ -495,74 +482,85 @@ export function ForgotPasswordModal({
       <View style={styles.successIconWrapper}>
         <Ionicons name="checkmark-circle" size={80} color={theme.colors.success || '#4CAF50'} />
       </View>
-      <Text style={styles.modalTitle}>Mot de passe modifié !</Text>
-      <Text style={styles.modalSubtitle}>
+      <Text style={styles.successTitle}>Mot de passe modifié !</Text>
+      <Text style={styles.successSubtitle}>
         Votre mot de passe a été modifié avec succès. Vous pouvez maintenant vous connecter à votre compte.
       </Text>
 
       <TouchableOpacity
-        style={styles.modalButton}
-        onPress={onClose}
+        style={[styles.button, { width: '100%' }]}
+        onPress={() => router.back()}
         activeOpacity={0.9}
       >
         <LinearGradient
           colors={[theme.colors.primary, theme.colors.primaryDark || '#1A4FC8']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={styles.modalGradientButton}
+          style={styles.gradientButton}
         >
-          <Text style={styles.modalButtonText}>Retour à la connexion</Text>
+          <Text style={styles.buttonText}>Retour à la connexion</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => {
-        if (resetStep < 4 && !resetLoading) {
-          onClose();
-        }
-      }}
-    >
+    <SafeAreaView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalKeyboardAvoiding}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <View style={styles.modalContent}>
+            <View style={styles.headerSection}>
               {resetStep < 4 && (
                 <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={onClose}
+                  style={styles.backButton}
+                  onPress={() => {
+                    if (!resetLoading) {
+                      if (resetStep > 1) {
+                        animateStepTransition(resetStep - 1);
+                      } else {
+                        router.back();
+                      }
+                    }
+                  }}
                   disabled={resetLoading}
                 >
-                  <Ionicons name="close" size={20} color={theme.colors.text} />
+                  <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
                 </TouchableOpacity>
               )}
-
-              <Animated.View
-                style={[
-                  styles.modalStepContainer,
-                  {
-                    opacity: stepOpacity,
-                    transform: [{ translateX: stepTranslateX }],
-                  },
-                ]}
-              >
-                {resetStep === 1 && renderStep1()}
-                {resetStep === 2 && renderStep2()}
-                {resetStep === 3 && renderStep3()}
-                {resetStep === 4 && renderStep4()}
-              </Animated.View>
             </View>
-          </KeyboardAvoidingView>
-        </View>
+
+            <Animated.View
+              style={[
+                styles.stepContainer,
+                {
+                  opacity: stepOpacity,
+                  transform: [{ translateX: stepTranslateX }],
+                },
+              ]}
+            >
+              {resetStep === 1 && renderStep1()}
+              {resetStep === 2 && renderStep2()}
+              {resetStep === 3 && renderStep3()}
+              {resetStep === 4 && renderStep4()}
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
-    </Modal>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+      />
+    </SafeAreaView>
   );
 }

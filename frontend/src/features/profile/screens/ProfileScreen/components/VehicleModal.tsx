@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -179,7 +179,7 @@ export function VehicleModal({
         <Text style={styles.modalTitle}>Mon véhicule</Text>
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={{ paddingBottom: 60 }}>
         <View style={styles.vehicleIconContainer}>
           <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
             <Ionicons name="car-sport" size={48} color={theme.colors.white} />
@@ -199,6 +199,12 @@ export function VehicleModal({
             onPress={() => setVehicleType('moto')}
           >
             <Text style={[styles.vehicleTypeText, vehicleType === 'moto' && styles.vehicleTypeTextActive]}>Moto</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.vehicleTypeBtn, vehicleType === 'tricycle' && styles.vehicleTypeBtnActive]}
+            onPress={() => setVehicleType('tricycle')}
+          >
+            <Text style={[styles.vehicleTypeText, vehicleType === 'tricycle' && styles.vehicleTypeTextActive]}>Tricycle</Text>
           </TouchableOpacity>
         </View>
 
@@ -248,8 +254,10 @@ export function VehicleModal({
         </View>
 
         {vehicleType === 'voiture' && (
-          <>
-            <View style={styles.inputWrapper}>
+          <View style={{ marginTop: 10, padding: 16, backgroundColor: theme.colors.grayLight, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginBottom: 12 }}>Informations du Permis (Voiture)</Text>
+            
+            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.white }]}>
               <Ionicons name="card-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.modalInputModern}
@@ -260,7 +268,7 @@ export function VehicleModal({
               />
             </View>
 
-            <TouchableOpacity style={[styles.inputWrapper, licenseExpirationError ? { borderColor: theme.colors.error } : null]} onPress={() => setShowDatePicker(true)}>
+            <TouchableOpacity style={[styles.inputWrapper, { backgroundColor: theme.colors.white }, licenseExpirationError ? { borderColor: theme.colors.error } : null]} onPress={() => setShowDatePicker(true)}>
               <Ionicons name="calendar-outline" size={20} color={licenseExpirationError ? theme.colors.error : theme.colors.textMuted} style={styles.inputIcon} />
               <Text style={[styles.modalInputModern, { paddingTop: Platform.OS === 'ios' ? 16 : 14, color: licenseExpiration ? theme.colors.text : theme.colors.textMuted }]}>
                 {licenseExpiration || "Date d'expiration (Obligatoire)"}
@@ -299,17 +307,17 @@ export function VehicleModal({
               />
             )}
 
-            <TouchableOpacity 
-              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 24, gap: 12 }}
-              onPress={pickLicensePhoto}
-            >
-              <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
-              <Text style={{ flex: 1, color: theme.colors.text, fontSize: 14 }}>
-                {driverLicensePhoto ? 'Photo sélectionnée' : 'Ajouter une photo du permis'}
-              </Text>
-              {driverLicensePhoto && <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />}
+            <TouchableOpacity style={[styles.imagePickerBtn, { backgroundColor: theme.colors.white }]} onPress={pickLicensePhoto}>
+              {driverLicensePhoto ? (
+                <Text style={styles.imagePickerTextSuccess}>Photo du permis ajoutée ✅</Text>
+              ) : (
+                <>
+                  <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
+                  <Text style={styles.imagePickerText}>Ajouter la photo du permis</Text>
+                </>
+              )}
             </TouchableOpacity>
-          </>
+          </View>
         )}
 
         <TouchableOpacity onPress={handleSaveVehicle} disabled={isSaving} activeOpacity={0.8}>

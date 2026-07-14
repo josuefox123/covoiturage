@@ -14,7 +14,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList,
   ActivityIndicator, StatusBar, Platform, Keyboard, Dimensions,
-  Animated, Modal,
+  Animated, Modal, KeyboardAvoidingView
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,20 +63,21 @@ export default function LocationPicker({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  
+
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(initialLocation || null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
-  
+
   const [mapReady, setMapReady] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [customLocationName, setCustomLocationName] = useState('');
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   const bottomSheetAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Abort controllers for network requests
   const abortRef = useRef<AbortController | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
@@ -126,6 +127,7 @@ export default function LocationPicker({
       setUserLocation(location);
 
       if (!initialLocation) {
+        setCustomLocationName('');
         setSelectedLocation({ latitude: location.lat, longitude: location.lon, name: 'Position actuelle' });
       }
     } catch (error) {
@@ -196,6 +198,7 @@ export default function LocationPicker({
         const city = address.city || address.town || address.village;
         const country = address.country;
 
+        setCustomLocationName('');
         setSelectedLocation({
           latitude: lat,
           longitude: lon,
@@ -206,6 +209,7 @@ export default function LocationPicker({
         });
       } else if (data.display_name) {
         const parts = data.display_name.split(',');
+        setCustomLocationName('');
         setSelectedLocation({
           latitude: lat,
           longitude: lon,
@@ -359,16 +363,16 @@ export default function LocationPicker({
     Keyboard.dismiss();
 
     if (item.latitude !== undefined && item.longitude !== undefined) {
-      const selected = {
+      setCustomLocationName('');
+      setSelectedLocation({
         latitude: Number(item.latitude),
         longitude: Number(item.longitude),
         name: item.name,
         address: item.city ? `${item.city}, Bénin` : 'Bénin',
         city: item.city || '',
         country: 'Bénin'
-      };
-      setSelectedLocation(selected);
-      sendToMap({ type: 'setView', lat: selected.latitude, lon: selected.longitude, zoom: 16 });
+      });
+      sendToMap({ type: 'setView', lat: item.latitude, lon: item.longitude, zoom: 16 });
       return;
     }
 
@@ -382,6 +386,7 @@ export default function LocationPicker({
     const city = parts[2]?.trim();
     const country = parts[parts.length - 1]?.trim();
 
+    setCustomLocationName('');
     setSelectedLocation({
       latitude: lat,
       longitude: lon,
@@ -403,20 +408,26 @@ export default function LocationPicker({
   }, [userLocation, sendToMap]);
 
   const handleConfirmPress = () => {
+    setCustomLocationName('');
     setShowConfirmModal(true);
   };
 
   const confirmLocation = useCallback(() => {
     setShowConfirmModal(false);
 
-    onLocationSelected(
-      selectedLocation || {
+    if (selectedLocation) {
+      onLocationSelected({
+        ...selectedLocation,
+        name: customLocationName.trim() || selectedLocation.name,
+      });
+    } else {
+      onLocationSelected({
         latitude: DEFAULT_LAT,
         longitude: DEFAULT_LON,
-        name: 'Position choisie',
-      }
-    );
-  }, [selectedLocation, onLocationSelected]);
+        name: customLocationName.trim() || 'Position choisie',
+      });
+    }
+  }, [selectedLocation, customLocationName, onLocationSelected]);
 
   const zoomIn = useCallback(() => {
     sendToMap({ type: 'zoomIn' });
@@ -433,7 +444,7 @@ export default function LocationPicker({
       if (data.type === 'centerChanged') {
         const currentLat = selectedLocation?.latitude ?? DEFAULT_LAT;
         const currentLon = selectedLocation?.longitude ?? DEFAULT_LON;
-        
+
         const latDiff = Math.abs(data.lat - currentLat);
         const lonDiff = Math.abs(data.lon - currentLon);
 
@@ -450,7 +461,7 @@ export default function LocationPicker({
           city: prev?.city,
           country: prev?.country,
         }));
-        
+
         setIsDragging(true);
 
         if (dragTimeoutRef.current) {
@@ -642,59 +653,7 @@ export default function LocationPicker({
     }],
   };
 
-  const ConfirmModal = () => (
-    <Modal
-      visible={showConfirmModal}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setShowConfirmModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalIcon}>
-            <Ionicons name="location" size={48} color={theme.colors.primary} />
-          </View>
 
-          <Text style={styles.modalTitle}>Confirmer l'emplacement</Text>
-
-          <View style={styles.modalLocationInfo}>
-            <Ionicons name="navigate-circle" size={20} color={theme.colors.primary} />
-            <Text style={styles.modalLocationName} numberOfLines={2}>
-              {selectedLocation?.name || 'Chargement...'}
-            </Text>
-          </View>
-
-          {selectedLocation?.address && (
-            <Text style={styles.modalLocationAddress} numberOfLines={2}>
-              {selectedLocation.address}
-            </Text>
-          )}
-
-          {selectedLocation?.city && (
-            <Text style={styles.modalLocationCity}>
-              {[selectedLocation.city, selectedLocation.country].filter(Boolean).join(', ')}
-            </Text>
-          )}
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonCancel]}
-              onPress={() => setShowConfirmModal(false)}
-            >
-              <Text style={styles.modalButtonCancelText}>Annuler</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonConfirm]}
-              onPress={confirmLocation}
-            >
-              <Text style={styles.modalButtonConfirmText}>Confirmer</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
 
   return (
     <View style={styles.container}>
@@ -771,11 +730,11 @@ export default function LocationPicker({
             initialNumToRender={8}
             removeClippedSubviews={true}
             keyboardShouldPersistTaps="handled"
-             keyExtractor={(item) => item.id || item.place_id?.toString() || (item.latitude !== undefined ? `${item.latitude}-${item.longitude}` : `${item.lat}-${item.lon}`)}
+            keyExtractor={(item) => item.id || item.place_id?.toString() || (item.latitude !== undefined ? `${item.latitude}-${item.longitude}` : `${item.lat}-${item.lon}`)}
             renderItem={({ item, index }) => {
               let title = '';
               let subtitle = '';
-              
+
               if (item.latitude !== undefined) {
                 // Local popular place match
                 title = item.name;
@@ -787,7 +746,7 @@ export default function LocationPicker({
                 title = parts[0] || 'Lieu sans nom';
                 subtitle = parts.slice(1, 4).join(',').trim();
               }
-              
+
               return (
                 <TouchableOpacity
                   style={[
@@ -863,7 +822,72 @@ export default function LocationPicker({
         </TouchableOpacity>
       </Animated.View>
 
-      <ConfirmModal />
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalIcon}>
+              <Ionicons name="location" size={48} color={theme.colors.primary} />
+            </View>
+
+            <Text style={styles.modalTitle}>Confirmer l'emplacement</Text>
+
+            <View style={styles.modalLocationInfo}>
+              <Ionicons name="navigate-circle" size={20} color={theme.colors.primary} />
+              <Text style={styles.modalLocationName} numberOfLines={2}>
+                {selectedLocation?.name || 'Chargement...'}
+              </Text>
+            </View>
+
+            <View style={[styles.modalLocationInfo, { marginTop: -4, backgroundColor: theme.colors.white, borderWidth: 1, borderColor: theme.colors.border }]}>
+              <Ionicons name="pencil" size={16} color={theme.colors.textMuted} />
+              <TextInput
+                style={[styles.modalLocationName, { padding: 0, margin: 0, height: 40 }]}
+                value={customLocationName}
+                onChangeText={setCustomLocationName}
+                placeholder="Description suplemantaire"
+                placeholderTextColor={theme.colors.textMuted}
+                returnKeyType="done"
+              />
+            </View>
+
+            {selectedLocation?.address && (
+              <Text style={styles.modalLocationAddress} numberOfLines={2}>
+                {selectedLocation.address}
+              </Text>
+            )}
+
+            {selectedLocation?.city && (
+              <Text style={styles.modalLocationCity}>
+                {[selectedLocation.city, selectedLocation.country].filter(Boolean).join(', ')}
+              </Text>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.modalButtonCancelText}>Annuler</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={confirmLocation}
+              >
+                <Text style={styles.modalButtonConfirmText}>Confirmer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }

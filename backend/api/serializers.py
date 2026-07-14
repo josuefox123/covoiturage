@@ -257,9 +257,9 @@ class ConversationSerializer(serializers.ModelSerializer):
     Sérialiseur pour les conversations (Messagerie et Support).
     Expose le dernier message, le nombre de non-lus et l'urgence.
     """
-    participant_1_details = UserSerializer(source='participant_1', read_only=True)
-    participant_2_details = UserSerializer(source='participant_2', read_only=True)
-    ride_details = RideSerializer(source='ride', read_only=True)
+    participant_1_details = UserSerializer(source='participant_1', read_only=True, allow_null=True)
+    participant_2_details = UserSerializer(source='participant_2', read_only=True, allow_null=True)
+    ride_details = RideSerializer(source='ride', read_only=True, allow_null=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     has_urgent_unread = serializers.SerializerMethodField()

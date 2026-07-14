@@ -123,6 +123,7 @@ export default function RegisterScreen() {
     message: '',
     type: 'error' as any,
   });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Refs pour les timers debounce
   const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,8 +277,13 @@ export default function RegisterScreen() {
     return digits.length >= (COUNTRY_MIN_DIGITS[countryCode] ?? 6);
   };
 
+  const isPasswordLengthValid = password.length >= 6;
+  const hasPasswordLetter = /[a-zA-Z]/.test(password);
+  const hasPasswordNumber = /[0-9]/.test(password);
+  const isPasswordValid = isPasswordLengthValid && hasPasswordLetter && hasPasswordNumber;
+
   const isFormValid =
-    !!(lastName && firstName && email && phoneLocal && password && confirmPassword);
+    !!(lastName && firstName && email && phoneLocal && isPasswordValid && confirmPassword === password && acceptedTerms);
 
   const handleRegister = async () => {
     if (!lastName || !firstName || !email || !phoneLocal || !password) {
@@ -629,6 +635,40 @@ export default function RegisterScreen() {
                   />
                 </TouchableOpacity>
               </View>
+              {password.length > 0 && (
+                <View style={styles.passwordRulesContainer}>
+                  <View style={styles.ruleItem}>
+                    <Ionicons
+                      name={isPasswordLengthValid ? "checkmark-circle" : "ellipse-outline"}
+                      size={14}
+                      color={isPasswordLengthValid ? theme.colors.success : theme.colors.textMuted}
+                    />
+                    <Text style={[styles.ruleText, isPasswordLengthValid && styles.ruleTextValid]}>
+                      Au moins 6 caractères
+                    </Text>
+                  </View>
+                  <View style={styles.ruleItem}>
+                    <Ionicons
+                      name={hasPasswordLetter ? "checkmark-circle" : "ellipse-outline"}
+                      size={14}
+                      color={hasPasswordLetter ? theme.colors.success : theme.colors.textMuted}
+                    />
+                    <Text style={[styles.ruleText, hasPasswordLetter && styles.ruleTextValid]}>
+                      Au moins une lettre (a-z, A-Z)
+                    </Text>
+                  </View>
+                  <View style={styles.ruleItem}>
+                    <Ionicons
+                      name={hasPasswordNumber ? "checkmark-circle" : "ellipse-outline"}
+                      size={14}
+                      color={hasPasswordNumber ? theme.colors.success : theme.colors.textMuted}
+                    />
+                    <Text style={[styles.ruleText, hasPasswordNumber && styles.ruleTextValid]}>
+                      Au moins un chiffre (0-9)
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* Confirmer le mot de passe */}
@@ -673,6 +713,22 @@ export default function RegisterScreen() {
                 </Text>
               )}
             </View>
+
+            {/* Checkbox Conditions d'utilisation */}
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xl, marginTop: theme.spacing.sm }}
+              onPress={() => setAcceptedTerms(!acceptedTerms)}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={acceptedTerms ? 'checkbox' : 'square-outline'} 
+                size={24} 
+                color={acceptedTerms ? theme.colors.primary : theme.colors.textMuted} 
+              />
+              <Text style={{ marginLeft: 10, color: theme.colors.text, flex: 1, fontSize: 14 }}>
+                J'accepte les <Text style={{ color: theme.colors.primary, fontWeight: '600' }} onPress={() => router.push('/terms')}>Conditions d'utilisation</Text> de Zemy.
+              </Text>
+            </TouchableOpacity>
 
             {/* Bouton d'inscription */}
             <TouchableOpacity
@@ -880,5 +936,22 @@ const styles = StyleSheet.create({
     ...theme.typography.bodyMedium,
     color: theme.colors.primary,
     fontWeight: '700',
+  },
+  passwordRulesContainer: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+    gap: 6,
+  },
+  ruleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  ruleText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textMuted,
+  },
+  ruleTextValid: {
+    color: theme.colors.success,
   },
 });

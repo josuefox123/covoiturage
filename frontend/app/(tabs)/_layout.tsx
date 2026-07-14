@@ -14,6 +14,7 @@ import { Tabs } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SupportBubble from '../../src/components/SupportBubble';
 import { useEffect } from 'react';
 import { useAuth } from '../../src/context/AuthContext';
@@ -26,8 +27,10 @@ import { useAuth } from '../../src/context/AuthContext';
  */
 export default function TabsLayout() {
   const { authFetch, user } = useAuth();
+  const insets = useSafeAreaInsets();
 
-
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 20 : 16);
+  const tabBarHeight = 56 + bottomPadding;
 
   return (
     <View style={{ flex: 1 }}>
@@ -40,8 +43,8 @@ export default function TabsLayout() {
             backgroundColor: theme.colors.card,
             borderTopWidth: 1,
             borderTopColor: theme.colors.border,
-            height: Platform.OS === 'ios' ? 88 : 68,
-            paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+            height: tabBarHeight,
+            paddingBottom: bottomPadding,
             paddingTop: 10,
             ...theme.shadows.md,
           },

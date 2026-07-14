@@ -82,9 +82,9 @@ export function useLoginForm() {
 
   const getIdentifierError = useCallback((): string | null => {
     const value = identifier.trim();
-    if (!value) return 'Veuillez saisir votre email ou numéro.';
+    if (!value) return 'Veuillez saisir votre numéro de téléphone.';
     if (isEmail(value)) {
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Adresse email invalide.';
+      return 'Veuillez utiliser votre numéro de téléphone pour vous connecter.';
     }
     if (isInternational(value)) {
       return value.replace(/\D/g, '').length < 7 ? 'Numéro international trop court.' : null;
@@ -95,8 +95,7 @@ export function useLoginForm() {
   }, [identifier, countryCode]);
 
   const isPhoneInput = useMemo(() => {
-    if (!identifier.trim()) return false;
-    return !identifier.includes('@') && !isInternational(identifier);
+    return true; // Always true since we only accept phone numbers now
   }, [identifier]);
 
   const phoneFormatHint = useMemo((): string | null => {

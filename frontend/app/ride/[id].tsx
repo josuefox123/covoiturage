@@ -21,6 +21,7 @@ import * as ExpoLinking from 'expo-linking';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ride, Booking } from '../../src/types';
 import { CustomAlert } from '../../src/utils/CustomAlert';
+import { WebView } from 'react-native-webview';
 import { getMediaUrl } from '../../src/utils/media';
 import { useBooking } from '../../src/hooks/useBooking';
 const COLORS = {
@@ -197,6 +198,7 @@ export default function RideDetailScreen() {
   };
 
   const performBooking = async () => {
+    if (bookingLoading || hasBooked) return;
     try {
       setBookingLoading(true);
       const res = await createBooking(id as string, 1);
@@ -239,6 +241,8 @@ export default function RideDetailScreen() {
   };
 
   const handleBooking = async () => {
+    if (bookingLoading || hasBooked) return;
+    
     if (!user?.is_verified) {
       CustomAlert.alert('Compte non vérifié', 'Votre compte doit être vérifié pour effectuer une réservation.');
       return;
@@ -316,14 +320,167 @@ export default function RideDetailScreen() {
   const isCompleted = ride.status === 'completed';
   const isStarted = ride.status === 'started';
 
+  const mapHtml = (ride.departure_latitude && ride.departure_longitude && ride.arrival_latitude && ride.arrival_longitude) ? `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body, html, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #f3f4f6; }
+    .loading-overlay {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(249, 250, 251, 0.9); display: flex;
+      align-items: center; justify-content: center; z-index: 9999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px; color: #4b5563; font-weight: 500;
+      flex-direction: column; gap: 10px;
+    }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid #e5e7eb;
+      border-top-color: #0066FF; border-radius: 50%;
+      animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Leaflet customized zoom buttons */
+    .leaflet-bar { border: none !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
+    .leaflet-bar a { background-color: #ffffff !important; color: #1f2937 !important; border-bottom: 1px solid #f3f4f6 !important; width: 34px !important; height: 34px !important; line-height: 34px !important; font-size: 18px !important; }
+    .leaflet-bar a:first-child { border-top-left-radius: 8px !important; border-top-right-radius: 8px !important; }
+    .leaflet-bar a:last-child { border-bottom-left-radius: 8px !important; border-bottom-right-radius: 8px !important; border-bottom: none !important; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="loading-overlay" id="loader">
+    <div class="spinner"></div>
+    <span>Chargement de l'itinéraire...</span>
+  </div>
+  <script>
+    const depLat = ${ride.departure_latitude};
+    const depLon = ${ride.departure_longitude};
+    const arrLat = ${ride.arrival_latitude};
+    const arrLon = ${ride.arrival_longitude};
 
+    // ZoomControl enabled so user can manually adjust zoom
+    const map = L.map('map', { zoomControl: true, attributionControl: false });
+    
+    // Position zoom control in bottom-right
+    map.zoomControl.setPosition('bottomright');
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 18
+    }).addTo(map);
+
+    // Initial center bounds with maxZoom cap to avoid empty maps
+    const bounds = L.latLngBounds([[depLat, depLon], [arrLat, arrLon]]);
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+
+    // === Custom Marker Icons ===
+    const depIcon = L.divIcon({
+      className: '',
+      html: \`<div style="
+        width: 24px; height: 24px;
+        background: #0066FF;
+        border: 4px solid white; border-radius: 50%;
+        box-shadow: 0 4px 10px rgba(0,102,255,0.45);
+        display: flex; align-items: center; justify-content: center;
+      "><div style="width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>\`,
+      iconSize: [24, 24], iconAnchor: [12, 12]
+    });
+
+    const arrIcon = L.divIcon({
+      className: '',
+      html: \`<div style="
+        width: 24px; height: 24px;
+        background: #EF4444;
+        border: 4px solid white; border-radius: 50%;
+        box-shadow: 0 4px 10px rgba(239,68,68,0.45);
+        display: flex; align-items: center; justify-content: center;
+      "><div style="width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>\`,
+      iconSize: [24, 24], iconAnchor: [12, 12]
+    });
+
+    const depMarker = L.marker([depLat, depLon], { icon: depIcon }).addTo(map);
+    const arrMarker = L.marker([arrLat, arrLon], { icon: arrIcon }).addTo(map);
+
+    // === Fetch Route from Valhalla ===
+    async function fetchRoute() {
+      try {
+        const body = JSON.stringify({
+          locations: [
+            { lon: depLon, lat: depLat },
+            { lon: arrLon, lat: arrLat }
+          ],
+          costing: 'auto',
+          shape_format: 'geojson',
+          directions_options: { units: 'kilometers' }
+        });
+
+        const res = await fetch('https://valhalla1.openstreetmap.de/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        });
+
+        if (!res.ok) throw new Error('API error');
+        const json = await res.json();
+
+        const legs = json?.trip?.legs;
+        if (legs && legs.length > 0) {
+          const coords = legs[0].shape;
+          if (coords && coords.length >= 2) {
+            const latLngs = coords.map(c => [c[1], c[0]]);
+
+            // Outer route line shadow
+            L.polyline(latLngs, {
+              color: '#0066FF', weight: 8, opacity: 0.18
+            }).addTo(map);
+
+            // Inner route line
+            L.polyline(latLngs, {
+              color: '#0066FF', weight: 4, opacity: 0.9,
+              lineJoin: 'round', lineCap: 'round'
+            }).addTo(map);
+
+            // Zoom bounds and prevent zooming in too much (maxZoom: 13)
+            map.fitBounds(L.polyline(latLngs).getBounds(), { padding: [50, 50], maxZoom: 13 });
+            document.getElementById('loader').style.display = 'none';
+            return;
+          }
+        }
+        throw new Error('No route shape');
+      } catch (e) {
+        drawFallback();
+      }
+    }
+
+    function drawFallback() {
+      L.polyline([[depLat, depLon], [arrLat, arrLon]], {
+        color: '#0066FF', weight: 3, opacity: 0.8, dashArray: '8, 8'
+      }).addTo(map);
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+      document.getElementById('loader').style.display = 'none';
+    }
+
+    fetchRoute();
+  </script>
+</body>
+</html>
+  ` : null;
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Modal top drag handler for visuals */}
+      <View style={{ alignItems: 'center', paddingTop: 8, backgroundColor: COLORS.white, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+        <View style={{ width: 44, height: 5, borderRadius: 2.5, backgroundColor: '#E5E7EB' }} />
+      </View>
+
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }]}>
         <TouchableOpacity activeOpacity={0.85} style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          <Ionicons name="close" size={26} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Détails du trajet</Text>
         <View style={{ width: 44 }} />
@@ -336,6 +493,96 @@ export default function RideDetailScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
         }
       >
+        {mapHtml && (
+          <View style={{ marginBottom: 20 }}>
+            <View style={{
+              height: 250,
+              width: '100%',
+              borderRadius: 20,
+              overflow: 'hidden',
+              backgroundColor: COLORS.white,
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 3,
+              position: 'relative'
+            }}>
+              <WebView
+                originWhitelist={['*']}
+                source={{ html: mapHtml }}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+                style={{ flex: 1 }}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                mixedContentMode="always"
+              />
+              {/* Floating Itinerary Pill overlay */}
+              <View style={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: 'rgba(229, 231, 235, 0.8)',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 4,
+                elevation: 2,
+                gap: 6
+              }}>
+                <Ionicons name="map" size={14} color={COLORS.primary} />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.text, letterSpacing: 0.3 }}>
+                  Aperçu de la route
+                </Text>
+              </View>
+            </View>
+
+            {/* Google Maps Button */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1.5,
+                borderColor: COLORS.border,
+                borderRadius: 14,
+                paddingVertical: 12,
+                marginTop: 10,
+                gap: 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.02,
+                shadowRadius: 4,
+                elevation: 1
+              }}
+              onPress={() => {
+                const url = `https://www.google.com/maps/dir/?api=1&origin=${ride.departure_latitude},${ride.departure_longitude}&destination=${ride.arrival_latitude},${ride.arrival_longitude}&travelmode=driving`;
+                Linking.openURL(url).catch(() => {
+                  CustomAlert.alert("Erreur", "Impossible d'ouvrir Google Maps.");
+                });
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-google" size={16} color="#4285F4" />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.text }}>
+                Ouvrir l'itinéraire dans Google Maps
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {isCompleted && (
           <View style={styles.completedBadge}>
             <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
@@ -453,29 +700,41 @@ export default function RideDetailScreen() {
               <View style={styles.divider} />
 
               {/* Real-time Vehicle Info from driver profile */}
-              <Text style={styles.subSectionTitle}>Véhicule</Text>
               {ride.driver_details?.vehicles && ride.driver_details.vehicles.length > 0 ? (
-                <View style={styles.vehicleDetailsRow}>
-                  <Ionicons name="car-sport-outline" size={24} color={COLORS.primary} />
-                  <View style={styles.vehicleTextContainer}>
-                    <Text style={styles.vehicleModelText}>
-                      {ride.driver_details.vehicles[0].brand_model}
-                    </Text>
-                    <Text style={styles.vehiclePlateText}>
-                      Couleur : {ride.driver_details.vehicles[0].color} • Immatriculation : {ride.driver_details.vehicles[0].license_plate}
-                    </Text>
-                    <Text style={styles.vehicleTypeText}>
-                      Type : {ride.driver_details.vehicles[0].vehicle_type.toUpperCase()}
-                    </Text>
+                <>
+                  <Text style={styles.subSectionTitle}>
+                    {ride.driver_details.vehicles[0].vehicle_type.charAt(0).toUpperCase() + ride.driver_details.vehicles[0].vehicle_type.slice(1)}
+                  </Text>
+                  <View style={styles.vehicleDetailsRow}>
+                    <Ionicons 
+                      name={
+                        ride.driver_details.vehicles[0].vehicle_type === 'moto' ? 'bicycle-outline' :
+                        ride.driver_details.vehicles[0].vehicle_type === 'tricycle' ? 'car-outline' :
+                        'car-sport-outline'
+                      } 
+                      size={24} 
+                      color={COLORS.primary} 
+                    />
+                    <View style={styles.vehicleTextContainer}>
+                      <Text style={styles.vehicleModelText}>
+                        {ride.driver_details.vehicles[0].brand_model}
+                      </Text>
+                      <Text style={styles.vehiclePlateText}>
+                        Couleur : {ride.driver_details.vehicles[0].color} • Immatriculation : {ride.driver_details.vehicles[0].license_plate}
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                </>
               ) : (
-                <View style={styles.vehicleDetailsRow}>
-                  <Ionicons name="car-outline" size={24} color={COLORS.textLight} />
-                  <View style={styles.vehicleTextContainer}>
-                    <Text style={styles.noVehicleText}>Aucun véhicule enregistré dans le profil.</Text>
+                <>
+                  <Text style={styles.subSectionTitle}>Véhicule</Text>
+                  <View style={styles.vehicleDetailsRow}>
+                    <Ionicons name="car-outline" size={24} color={COLORS.textLight} />
+                    <View style={styles.vehicleTextContainer}>
+                      <Text style={styles.noVehicleText}>Aucun véhicule enregistré dans le profil.</Text>
+                    </View>
                   </View>
-                </View>
+                </>
               )}
 
               <View style={styles.divider} />
