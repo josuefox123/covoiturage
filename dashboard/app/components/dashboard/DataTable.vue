@@ -17,8 +17,8 @@ Zemy
       <button class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">Tout voir</button>
     </div>
     
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm text-text">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left text-sm text-text whitespace-nowrap">
         <thead class="bg-background text-textMuted uppercase text-xs font-semibold">
           <tr>
             <th v-for="col in columns" :key="col.key" class="px-6 py-4">{{ col.label }}</th>

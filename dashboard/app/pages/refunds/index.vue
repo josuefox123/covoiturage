@@ -65,8 +65,8 @@ Zemy
     </div>
 
     <div class="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-sm whitespace-nowrap">
           <thead class="bg-gray-50/50 border-b border-border text-textMuted font-semibold">
             <tr>
               <th class="px-6 py-4">ID</th>

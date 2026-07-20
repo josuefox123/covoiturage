@@ -66,7 +66,8 @@ Zemy
         <svg class="w-12 h-12 mx-auto mb-3 text-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" /></svg>
         <p>Aucune demande de vérification pour ce statut.</p>
       </div>
-      <table v-else class="w-full text-sm text-left">
+      <div v-else class="overflow-x-auto w-full">
+        <table class="w-full text-sm text-left whitespace-nowrap">
         <thead class="text-xs text-textMuted uppercase bg-background/50 border-b border-border">
           <tr>
             <th class="px-6 py-4 font-medium">Utilisateur</th>
@@ -112,6 +113,7 @@ Zemy
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>

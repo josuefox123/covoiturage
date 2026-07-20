@@ -29,7 +29,7 @@ Zemy
       </button>
     </div>
 
-    <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+    <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto" @click="$emit('close')">
       <div class="text-xs font-semibold text-textMuted uppercase tracking-wider mb-2 mt-4 px-2">Menu Principal</div>
       <NuxtLink to="/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" active-class="bg-primary/10 text-primary font-medium">
         <Icon name="ph:squares-four" class="w-5 h-5" />

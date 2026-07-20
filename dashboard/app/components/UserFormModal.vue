@@ -19,11 +19,11 @@ Zemy
     >
       <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="$emit('close')"></div>
 
-      <div class="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg z-10 overflow-hidden">
+      <div class="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg z-10 max-h-[90vh] flex flex-col overflow-hidden my-auto">
         <!-- Blue top bar -->
         <div class="h-1.5 bg-gradient-to-r from-primary to-secondary w-full"></div>
 
-        <div class="p-6">
+        <div class="p-4 sm:p-6 overflow-y-auto">
           <!-- Header -->
           <div class="flex items-center justify-between mb-6">
             <div class="flex items-center space-x-3">

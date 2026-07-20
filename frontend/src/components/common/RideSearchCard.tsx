@@ -99,14 +99,14 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
           <View style={styles.rideHeader}>
             <View style={styles.driverSection}>
               <ProfileAvatar name={driverName} url={ride.driver_details?.avatar} size={48} showBorder={false} />
-              <View style={{ marginLeft: 12 }}>
-                <Text style={styles.driverName}>{driverName}</Text>
+              <View style={styles.driverMeta}>
+                <Text style={styles.driverName} numberOfLines={1}>{driverName}</Text>
                 <View style={styles.ratingContainer}>
                   <Ionicons name="star" size={12} color="#F59E0B" />
                   <Text style={styles.ratingText}>
                     {ride.driver_details?.rating ? Number(ride.driver_details.rating).toFixed(1) : '5.0'}
                   </Text>
-                  <Text style={styles.reviewCount}>
+                  <Text style={styles.reviewCount} numberOfLines={1}>
                     • {ride.driver_details?.rides_count ?? 0} trajet{(ride.driver_details?.rides_count ?? 0) > 1 ? 's' : ''}
                   </Text>
                 </View>
@@ -161,7 +161,7 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
             </View>
           </View>
 
-          {/* Footer avec places dispo */}
+          {/* Footer avec places dispo et type de véhicule */}
           <View style={styles.rideFooter}>
             <View style={styles.badgesContainer}>
               <View style={styles.seatsContainer}>
@@ -180,6 +180,19 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
                         : 'Complet'}
                 </Text>
               </View>
+
+              {/* Badge type de véhicule (Voiture, Moto, Tricycle) */}
+              {(() => {
+                const vType = (ride.driver_details?.vehicles?.[0]?.vehicle_type || (ride as any).vehicle_type || 'voiture').toLowerCase();
+                const label = vType === 'moto' ? 'Moto' : vType === 'tricycle' ? 'Tricycle' : 'Voiture';
+                const icon = vType === 'moto' ? 'bicycle-outline' : vType === 'tricycle' ? 'car-sport-outline' : 'car-outline';
+                return (
+                  <View style={styles.vehicleBadgeContainer}>
+                    <Ionicons name={icon} size={13} color="#4B5563" />
+                    <Text style={styles.vehicleBadgeText}>{label}</Text>
+                  </View>
+                );
+              })()}
             </View>
             <View style={styles.viewButton}>
               <Text style={styles.viewButtonText}>Voir détail</Text>
@@ -218,9 +231,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 8,
+  },
+  driverMeta: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 4,
   },
   driverName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 2,
@@ -230,22 +249,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ratingText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#374151',
-    marginLeft: 4,
+    marginLeft: 3,
   },
   reviewCount: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
-    marginLeft: 4,
+    marginLeft: 3,
+    flexShrink: 1,
   },
   priceSection: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingLeft: 4,
   },
   priceValue: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: PRIMARY_COLOR,
   },
   priceUnit: {
@@ -372,6 +394,20 @@ const styles = StyleSheet.create({
     color: '#10B981',
     marginLeft: 4,
     fontWeight: '700',
+  },
+  vehicleBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  vehicleBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
   },
   viewButton: {
     flexDirection: 'row',

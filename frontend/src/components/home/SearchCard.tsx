@@ -17,6 +17,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import LocationPicker from '../LocationPicker';
 import { VehicleType } from './ServiceSelector';
 
+import { CustomAlert } from '../../utils/CustomAlert';
+
 const PRIMARY = '#0066FF';
 
 export interface SearchParams {
@@ -32,16 +34,24 @@ interface SearchCardProps {
   params: SearchParams;
   onChange: (p: Partial<SearchParams>) => void;
   onSearch: () => void;
+  onPickLocation: (type: 'departure' | 'arrival') => void;
 }
 const formatDate = (d: Date) =>
   d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 
-export default function SearchCard({ params, onChange, onSearch }: SearchCardProps) {
-  const [pickingFor, setPickingFor] = useState<'departure' | 'arrival' | null>(null);
+export default function SearchCard({ params, onChange, onSearch, onPickLocation }: SearchCardProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const btnScale = useRef(new Animated.Value(1)).current;
 
   const handleSearchPress = () => {
+    if (!params.departure.trim() && !params.destination.trim()) {
+      CustomAlert.alert(
+        'Lieu requis',
+        'Veuillez renseigner au moins un lieu de départ ou une destination pour lancer la recherche.'
+      );
+      return;
+    }
+
     Animated.sequence([
       Animated.timing(btnScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.spring(btnScale, { toValue: 1, tension: 200, friction: 10, useNativeDriver: true }),
@@ -99,7 +109,7 @@ export default function SearchCard({ params, onChange, onSearch }: SearchCardPro
         {/* ── Départ ── */}
         <TouchableOpacity
           style={styles.inputRow}
-          onPress={() => setPickingFor('departure')}
+          onPress={() => onPickLocation('departure')}
           activeOpacity={0.8}
         >
           <View style={styles.dotFrom} />
@@ -132,7 +142,7 @@ export default function SearchCard({ params, onChange, onSearch }: SearchCardPro
         {/* ── Destination ── */}
         <TouchableOpacity
           style={styles.inputRow}
-          onPress={() => setPickingFor('arrival')}
+          onPress={() => onPickLocation('arrival')}
           activeOpacity={0.8}
         >
           <View style={styles.dotTo} />
@@ -207,24 +217,6 @@ export default function SearchCard({ params, onChange, onSearch }: SearchCardPro
           </TouchableOpacity>
         </Animated.View>
       </View>
-
-      {/* ── Location picker modal ── */}
-      <Modal
-        visible={pickingFor !== null}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setPickingFor(null)}
-      >
-        <LocationPicker
-          title={pickingFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
-          onLocationSelected={(loc) => {
-            if (pickingFor === 'departure') onChange({ departure: loc.name });
-            else onChange({ destination: loc.name });
-            setPickingFor(null);
-          }}
-          onCancel={() => setPickingFor(null)}
-        />
-      </Modal>
 
       {/* ── Date picker ── */}
       {showDatePicker && (

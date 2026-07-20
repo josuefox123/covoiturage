@@ -76,8 +76,8 @@ Zemy
 
     <!-- Table -->
     <div class="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-sm whitespace-nowrap">
           <thead class="bg-background/60 text-textLight">
             <tr>
               <th class="px-5 py-3 font-semibold">ID Transaction</th>

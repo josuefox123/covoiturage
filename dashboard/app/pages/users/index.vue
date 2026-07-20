@@ -123,10 +123,10 @@ Zemy
     </div>
 
     <!-- Tabs -->
-    <div class="flex border-b border-border mb-6">
+    <div class="flex overflow-x-auto border-b border-border mb-6 whitespace-nowrap scrollbar-none">
       <button
         @click="activeTab = 'active'"
-        class="px-5 py-3 font-medium text-sm border-b-2 transition-all flex items-center gap-1.5"
+        class="px-5 py-3 font-medium text-sm border-b-2 transition-all flex items-center gap-1.5 flex-shrink-0"
         :class="activeTab === 'active' ? 'border-primary text-primary font-semibold' : 'border-transparent text-textLight hover:text-text'"
       >
         <span class="w-2 h-2 rounded-full bg-success"></span>
@@ -134,7 +134,7 @@ Zemy
       </button>
       <button
         @click="activeTab = 'archived'"
-        class="px-5 py-3 font-medium text-sm border-b-2 transition-all flex items-center gap-1.5"
+        class="px-5 py-3 font-medium text-sm border-b-2 transition-all flex items-center gap-1.5 flex-shrink-0"
         :class="activeTab === 'archived' ? 'border-warning text-warning-dark font-semibold' : 'border-transparent text-textLight hover:text-text'"
       >
         <span class="w-2 h-2 rounded-full bg-warning"></span>
@@ -142,7 +142,7 @@ Zemy
       </button>
       <button
         @click="activeTab = 'admins'"
-        class="px-5 py-3 font-medium text-sm border-b-2 transition-all flex items-center gap-1.5"
+        class="px-5 py-3 font-medium text-sm border-b-2 transition-all flex items-center gap-1.5 flex-shrink-0"
         :class="activeTab === 'admins' ? 'border-primary text-primary font-semibold' : 'border-transparent text-textLight hover:text-text'"
       >
         <span class="w-2 h-2 rounded-full bg-primary"></span>
@@ -174,8 +174,8 @@ Zemy
       </div>
 
       <!-- Table -->
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-sm whitespace-nowrap">
           <!-- Table Header -->
           <thead class="bg-background/60 text-textLight">
             <tr v-if="activeTab === 'active' || activeTab === 'admins'">

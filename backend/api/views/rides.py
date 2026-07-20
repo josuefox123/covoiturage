@@ -118,38 +118,92 @@ class RideViewSet(viewsets.ModelViewSet):
         driver_id = self.request.query_params.get('driver')
         ride_type = self.request.query_params.get('type')
         
+        user = getattr(self.request, 'user', None)
+        is_staff = getattr(user, 'is_staff', False)
+
         if driver_id:
             queryset = queryset.filter(driver_id=driver_id)
-        elif getattr(self, 'action', '') == 'list' and not self.request.user.is_staff:
+        elif getattr(self, 'action', '') == 'list' and not is_staff:
             from datetime import date, timedelta
             from django.utils.timezone import now
             one_hour_ago = now() - timedelta(hours=1)
             queryset = queryset.filter(departure_date__gte=date.today()).exclude(status='cancelled').exclude(status='completed', updated_at__lt=one_hour_ago)
         
         # Appliquer les filtres de recherche
-        if departure:
-            queryset = queryset.filter(departure_location__icontains=departure.strip())
-        if destination:
-            queryset = queryset.filter(arrival_location__icontains=destination.strip())
         if vehicle_type:
             queryset = queryset.filter(vehicle__vehicle_type=vehicle_type)
-        if date_str:
-            try:
-                from datetime import datetime
-                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-                queryset = queryset.filter(departure_date=target_date)
-            except ValueError:
-                pass
         if seats_str:
             try:
                 seats_needed = int(seats_str)
                 queryset = queryset.filter(seats_available__gte=seats_needed)
             except ValueError:
                 pass
-
         if ride_type == 'parcel':
             queryset = queryset.filter(accepts_parcels=True)
+
+        # ── Smart Location & Compatibility Matching ──
+        if departure or destination:
+            def extract_city(loc_str):
+                if not loc_str:
+                    return ""
+                parts = [p.strip() for p in loc_str.replace('/', ',').split(',') if p.strip()]
+                if not parts:
+                    return loc_str.strip().lower()
+                ignore = {'bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france'}
+                clean_parts = [p for p in parts if p.lower() not in ignore]
+                return clean_parts[-1] if clean_parts else parts[0]
+
+            dep_clean = departure.strip() if departure else ""
+            dest_clean = destination.strip() if destination else ""
+            dep_city = extract_city(dep_clean).lower()
+            dest_city = extract_city(dest_clean).lower()
+
+            from django.db.models import Q
             
+            query_cond = Q()
+
+            if dep_clean:
+                dep_words = [w for w in dep_clean.replace(',', ' ').split() if len(w) > 2]
+                dep_q = Q(departure_location__icontains=dep_clean) | Q(departure_location__icontains=dep_city)
+                for w in dep_words:
+                    dep_q |= Q(departure_location__icontains=w)
+                query_cond &= dep_q
+
+            if dest_clean:
+                dest_words = [w for w in dest_clean.replace(',', ' ').split() if len(w) > 2]
+                dest_q = Q(arrival_location__icontains=dest_clean) | Q(arrival_location__icontains=dest_city)
+                for w in dest_words:
+                    dest_q |= Q(arrival_location__icontains=w)
+                query_cond &= dest_q
+
+            matched_qs = queryset.filter(query_cond)
+
+            if matched_qs.exists():
+                queryset = matched_qs
+            else:
+                flexible_cond = Q()
+                if dep_city:
+                    flexible_cond &= (Q(departure_location__icontains=dep_city) | Q(arrival_location__icontains=dep_city))
+                if dest_city:
+                    flexible_cond &= (Q(departure_location__icontains=dest_city) | Q(arrival_location__icontains=dest_city))
+                
+                flex_qs = queryset.filter(flexible_cond)
+                if flex_qs.exists():
+                    queryset = flex_qs
+
+        # ── Date filtering with smart fallback if 0 rides on exact date ──
+        if date_str:
+            try:
+                from datetime import datetime
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                date_qs = queryset.filter(departure_date=target_date)
+                if date_qs.exists():
+                    queryset = date_qs
+                else:
+                    queryset = queryset.filter(departure_date__gte=target_date)
+            except ValueError:
+                pass
+
         return queryset
 
     @action(detail=False, methods=['get'], url_path='suggest-price', permission_classes=[permissions.IsAuthenticated])

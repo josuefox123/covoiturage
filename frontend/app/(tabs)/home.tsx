@@ -23,12 +23,14 @@ import ServiceSelector, { VehicleType } from '../../src/components/home/ServiceS
 import SearchCard, { SearchParams } from '../../src/components/home/SearchCard';
 import PromoCard from '../../src/components/home/PromoCard';
 import TodayTrips from '../../src/components/home/TodayTrips';
-import BottomSpacing from '../../src/components/home/BottomSpacing';
+import LocationPicker from '../../src/components/LocationPicker';
+import { CustomAlert } from '../../src/utils/CustomAlert';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user, refreshUser, hasStartedVerification, setHasStartedVerification } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [pickingFor, setPickingFor] = useState<'departure' | 'arrival' | null>(null);
 
   // ── Search state ─────────────────────────────────────────────────────────
   const [searchParams, setSearchParams] = useState<SearchParams>({
@@ -74,6 +76,14 @@ export default function HomeScreen() {
 
   // ── Navigate to search results ───────────────────────────────────────────
   const handleSearch = () => {
+    if (!searchParams.departure.trim() && !searchParams.destination.trim()) {
+      CustomAlert.alert(
+        'Lieu requis',
+        'Veuillez renseigner au moins un lieu de départ ou une destination pour lancer la recherche.'
+      );
+      return;
+    }
+
     router.push({
       pathname: '/search-results',
       params: {
@@ -133,6 +143,7 @@ export default function HomeScreen() {
             params={searchParams}
             onChange={updateSearch}
             onSearch={handleSearch}
+            onPickLocation={(type) => setPickingFor(type)}
           />
 
           <PromoCard />
@@ -140,9 +151,28 @@ export default function HomeScreen() {
             onTripPress={(id) => router.push(`/ride/${id}` as any)}
             onSeeAll={handleSeeAll}
           />
-          <BottomSpacing />
         </View>
       </Animated.ScrollView>
+
+      {/* ── Location Picker Overlay (Racine écran pour saisie et clavier 100% fluides) ── */}
+      {pickingFor !== null && (
+        <LocationPicker
+          title={pickingFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
+          initialLocation={
+            pickingFor === 'departure' && searchParams.departure
+              ? { latitude: 6.3703, longitude: 2.3912, name: searchParams.departure }
+              : pickingFor === 'arrival' && searchParams.destination
+              ? { latitude: 6.3703, longitude: 2.3912, name: searchParams.destination }
+              : undefined
+          }
+          onLocationSelected={(loc) => {
+            if (pickingFor === 'departure') updateSearch({ departure: loc.name });
+            else updateSearch({ destination: loc.name });
+            setPickingFor(null);
+          }}
+          onCancel={() => setPickingFor(null)}
+        />
+      )}
 
       <VerificationModal
         visible={showVerifModal}

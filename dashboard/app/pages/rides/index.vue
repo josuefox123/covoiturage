@@ -32,8 +32,8 @@ Zemy
       @confirm="confirmDelete"
     />
 
-    <div v-if="formModal.show" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-      <div class="bg-card w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden my-8" @click.stop>
+    <div v-if="formModal.show" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div class="bg-card w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-xl overflow-hidden my-auto" @click.stop>
         <div class="px-6 py-4 border-b border-border flex justify-between items-center bg-background">
           <h3 class="text-lg font-bold text-text">{{ formModal.isEdit ? 'Modifier le trajet' : 'Ajouter un trajet' }}</h3>
           <button @click="formModal.show = false" class="text-textMuted hover:text-text">
@@ -138,8 +138,8 @@ Zemy
         </div>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-sm whitespace-nowrap">
           <thead class="bg-background/50 text-textLight">
             <tr>
               <th class="px-6 py-3 font-semibold">Itinéraire</th>

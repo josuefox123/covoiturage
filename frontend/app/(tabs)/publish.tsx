@@ -78,8 +78,80 @@ export default function PublishScreen() {
     `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
   );
   const [seats, setSeats] = useState(3);
-  const [pickingLocationFor, setPickingLocationFor] = useState<'departure' | 'arrival' | null>(null);
+  const [pickingLocationFor, setPickingLocationFor] = useState<string | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Villes et points d'arrêt (Stopovers)
+  const [stopovers, setStopovers] = useState<{ id: string; name: string; coords?: { lat: number; lon: number }; stopDurationMin: number }[]>([]);
+
+  const addStopover = (city = '', coords = undefined, duration = 15) => {
+    setStopovers((prev) => [
+      ...prev,
+      {
+        id: Math.random().toString(),
+        name: city,
+        coords: coords,
+        stopDurationMin: duration,
+      },
+    ]);
+  };
+
+  const updateStopover = (id: string, updates: Partial<{ name: string; coords?: { lat: number; lon: number }; stopDurationMin: number }>) => {
+    setStopovers((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+    );
+  };
+
+  const removeStopover = (id: string) => {
+    setStopovers((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const autoSuggestStopovers = () => {
+    const depLower = departure.toLowerCase();
+    const arrLower = arrival.toLowerCase();
+
+    let suggestions: { name: string; duration: number }[] = [];
+
+    if (
+      (depLower.includes('cotonou') || depLower.includes('calavi') || depLower.includes('godomey')) &&
+      (arrLower.includes('parakou') || arrLower.includes('djougou') || arrLower.includes('natitingou'))
+    ) {
+      suggestions = [
+        { name: 'Allada (Gare/Carrefour)', duration: 10 },
+        { name: 'Bohicon (Carrefour Carrefour)', duration: 15 },
+        { name: 'Dassa-Zoumè (Carrefour)', duration: 15 },
+        { name: 'Savè', duration: 10 },
+      ];
+    } else if (
+      (depLower.includes('cotonou') || depLower.includes('calavi')) &&
+      (arrLower.includes('bohicon') || arrLower.includes('abomey'))
+    ) {
+      suggestions = [
+        { name: 'Allada', duration: 10 },
+        { name: 'Zogbodomey', duration: 10 },
+      ];
+    } else if (
+      (depLower.includes('cotonou') || depLower.includes('calavi')) &&
+      (arrLower.includes('porto') || arrLower.includes('pobe'))
+    ) {
+      suggestions = [
+        { name: 'Sèmè-Kpodji', duration: 10 },
+      ];
+    } else {
+      suggestions = [
+        { name: 'Ville d\'étape 1', duration: 10 },
+        { name: 'Ville d\'étape 2', duration: 15 },
+      ];
+    }
+
+    setStopovers(
+      suggestions.map((s) => ({
+        id: Math.random().toString(),
+        name: s.name,
+        stopDurationMin: s.duration,
+      }))
+    );
+  };
 
   // Recurrent rides
   const [isRecurrent, setIsRecurrent] = useState(false);
@@ -103,11 +175,16 @@ export default function PublishScreen() {
   const [airCond, setAirCond] = useState(true);
   const [petsAllowed, setPetsAllowed] = useState(false);
   const [luggageAllowed, setLuggageAllowed] = useState(true);
+  const [luggageSize, setLuggageSize] = useState<'petit' | 'moyen' | 'grand'>('moyen');
+  const [luggageType, setLuggageType] = useState<'per_passenger' | 'total'>('per_passenger');
+  const [luggageMaxWeightKg, setLuggageMaxWeightKg] = useState('15');
+  const [drivingRelay, setDrivingRelay] = useState(false);
   const [stopsAllowed, setStopsAllowed] = useState(true);
   const [description, setDescription] = useState('');
 
   // Publish
   const [loading, setLoading] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [financialSettings, setFinancialSettings] = useState<any>(null);
 
   // ─── Profile completion modal ────────────────────────────────────
@@ -154,6 +231,47 @@ export default function PublishScreen() {
     };
     fetchSettings();
   }, []);
+
+  // ─── Estimation du prix conseillé ────────────────────────────────
+  const fetchPriceSuggestion = async (distanceKm: number) => {
+    setPriceLoading(true);
+    try {
+      const data = await authFetch(`/rides/suggest-price/?distance_km=${distanceKm}`);
+      if (data && data.suggested_price) {
+        setPriceSuggestion(data);
+      } else {
+        const baseRate = 30; // 30 FCFA/km
+        const calculatedPrice = Math.max(1000, Math.round((distanceKm * baseRate) / 100) * 100);
+        const minPrice = Math.max(500, Math.round((calculatedPrice * 0.8) / 100) * 100);
+        const maxPrice = Math.round((calculatedPrice * 1.2) / 100) * 100;
+
+        const fallbackData = {
+          suggested_price: calculatedPrice,
+          min_price: minPrice,
+          max_price: maxPrice,
+          price_per_km: baseRate,
+          margin_percent: 20,
+        };
+        setPriceSuggestion(fallbackData);
+      }
+    } catch (_) {
+      const baseRate = 30;
+      const calculatedPrice = Math.max(1000, Math.round((distanceKm * baseRate) / 100) * 100);
+      const minPrice = Math.max(500, Math.round((calculatedPrice * 0.8) / 100) * 100);
+      const maxPrice = Math.round((calculatedPrice * 1.2) / 100) * 100;
+
+      const fallbackData = {
+        suggested_price: calculatedPrice,
+        min_price: minPrice,
+        max_price: maxPrice,
+        price_per_km: baseRate,
+        margin_percent: 20,
+      };
+      setPriceSuggestion(fallbackData);
+    } finally {
+      setPriceLoading(false);
+    }
+  };
 
   // ─── Estimation via Valhalla (routes réelles, OpenStreetMap) ────────
   const computeEstimation = async (dep: { lat: number; lon: number }, arr: { lat: number; lon: number }) => {
@@ -272,23 +390,9 @@ export default function PublishScreen() {
           if (expDate < today) { setHasVehicle(false); setShowExpiredLicenseWarning(true); return; }
         }
         setHasVehicle(true);
-      } else {
-        setHasVehicle(false); setShowVehicleWarning(true);
       }
     } catch (e) { console.error(e); }
     finally { setCheckingVehicle(false); }
-  };
-
-  const fetchPriceSuggestion = async (distanceKm: number) => {
-    if (distanceKm <= 0) return;
-    setPriceLoading(true);
-    try {
-      const data = await authFetch(`/rides/suggest-price/?distance_km=${distanceKm}`);
-      if (data && data.suggested_price) {
-        setPriceSuggestion(data);
-        if (!price) setPrice(String(data.suggested_price));
-      }
-    } catch (_) { } finally { setPriceLoading(false); }
   };
 
   // ─── Step validation ─────────────────────────────────────────────
@@ -341,7 +445,7 @@ export default function PublishScreen() {
     } else if (!hasVehicle) {
       setShowVehicleWarning(true);
     } else {
-      handlePublish();
+      setShowSummaryModal(true);
     }
   };
 
@@ -637,55 +741,116 @@ export default function PublishScreen() {
                   </TouchableOpacity>
                 </View>
 
+                {/* ── Section Villes et points d'arrêt (Optionnel) ── */}
+                <View style={styles.stopoversHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="location-outline" size={18} color={theme.colors.primary} />
+                    <Text style={styles.stopoversTitle}>Villes et points d'arrêt (Optionnel)</Text>
+                  </View>
+                </View>
+
+                {stopovers.length > 0 && (
+                  <View style={styles.stopoversCard}>
+                    {stopovers.map((s, idx) => (
+                      <View key={s.id} style={styles.stopoverItemRow}>
+                        <View style={styles.stopoverIndexBadge}>
+                          <Text style={styles.stopoverIndexText}>{idx + 1}</Text>
+                        </View>
+
+                        <TouchableOpacity
+                          style={styles.stopoverNameBox}
+                          onPress={() => setPickingLocationFor(s.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.stopoverNameLabel}>Ville / Point d'arrêt</Text>
+                          <Text style={[styles.stopoverNameValue, !s.name && { color: theme.colors.textMuted }]} numberOfLines={1}>
+                            {s.name || "Choisir sur la carte / rechercher"}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.stopoverDurationBox}>
+                          <Text style={styles.stopoverDurationLabel}>Arrêt</Text>
+                          <View style={styles.stopoverDurationPicker}>
+                            <TouchableOpacity
+                              onPress={() => updateStopover(s.id, { stopDurationMin: Math.max(5, (s.stopDurationMin || 15) - 5) })}
+                              style={styles.stopoverBtnStep}
+                            >
+                              <Text style={styles.stopoverBtnStepText}>-</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.stopoverDurationText}>{s.stopDurationMin} m</Text>
+                            <TouchableOpacity
+                              onPress={() => updateStopover(s.id, { stopDurationMin: (s.stopDurationMin || 15) + 5 })}
+                              style={styles.stopoverBtnStep}
+                            >
+                              <Text style={styles.stopoverBtnStepText}>+</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        <TouchableOpacity
+                          onPress={() => removeStopover(s.id)}
+                          style={styles.stopoverDeleteBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.addStopoverBtn}
+                  onPress={() => addStopover()}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add-circle" size={18} color={theme.colors.primary} />
+                  <Text style={styles.addStopoverBtnText}>+ Ajouter une ville d'arrêt sur le trajet</Text>
+                </TouchableOpacity>
+
                 {/* Distance / Duration info */}
                 {departure && arrival && (
                   <View style={styles.estimationCard}>
                     {estimationLoading ? (
                       <ActivityIndicator size="small" color={theme.colors.primary} style={{ margin: 20 }} />
                     ) : estimation ? (
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                          <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontStyle: 'italic' }}>
-                            📍 Calcul basé sur les routes réelles
-                          </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <View style={styles.estimationItem}>
-                            <Ionicons name="navigate-circle-outline" size={22} color={theme.colors.primary} />
-                            <View style={{ marginLeft: 10 }}>
-                              <Text style={styles.estimationLabel}>Distance</Text>
-                              <Text style={styles.estimationValue}>{estimation.distanceKm.toLocaleString()} km</Text>
+                      (() => {
+                        const baseDrivingMin = estimation.durationMin || 0;
+                        const totalStopoversMin = stopovers.reduce((acc, s) => acc + (Number(s.stopDurationMin) || 0), 0);
+                        const totalDurationMin = baseDrivingMin + totalStopoversMin;
+
+                        return (
+                          <View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                              <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontStyle: 'italic' }}>
+                                📍 Calcul basé sur les routes réelles
+                              </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <View style={styles.estimationItem}>
+                                <Ionicons name="navigate-circle-outline" size={22} color={theme.colors.primary} />
+                                <View style={{ marginLeft: 10 }}>
+                                  <Text style={styles.estimationLabel}>Distance</Text>
+                                  <Text style={styles.estimationValue}>{estimation.distanceKm.toLocaleString()} km</Text>
+                                </View>
+                              </View>
+                              <View style={styles.estimationDivider} />
+                              <View style={styles.estimationItem}>
+                                <Ionicons name="time-outline" size={22} color={theme.colors.primary} />
+                                <View style={{ marginLeft: 10 }}>
+                                  <Text style={styles.estimationLabel}>Durée {totalStopoversMin > 0 ? 'totale' : ''}</Text>
+                                  <Text style={styles.estimationValue}>{formatDuration(totalDurationMin)}</Text>
+                                  {totalStopoversMin > 0 && (
+                                    <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: '600', marginTop: 1 }}>
+                                      (dont {totalStopoversMin} min d'arrêt{totalStopoversMin > 1 ? 's' : ''})
+                                    </Text>
+                                  )}
+                                </View>
+                              </View>
                             </View>
                           </View>
-                          <View style={styles.estimationDivider} />
-                          <View style={styles.estimationItem}>
-                            <Ionicons name="time-outline" size={22} color={theme.colors.primary} />
-                            <View style={{ marginLeft: 10 }}>
-                              <Text style={styles.estimationLabel}>Durée</Text>
-                              <Text style={styles.estimationValue}>{formatDuration(estimation.durationMin)}</Text>
-                            </View>
-                          </View>
-                        </View>
-                        
-                        <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 12 }} />
-                        
-                        {priceLoading ? (
-                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}>
-                             <ActivityIndicator size="small" color={theme.colors.primary} />
-                             <Text style={{ marginLeft: 8, fontSize: 13, color: theme.colors.textLight }}>Calcul du prix conseillé...</Text>
-                           </View>
-                        ) : priceSuggestion ? (
-                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                               <Ionicons name="cash-outline" size={22} color={theme.colors.success} />
-                               <Text style={[styles.estimationLabel, { marginLeft: 10, fontSize: 13, color: theme.colors.text }]}>Prix conseillé</Text>
-                             </View>
-                             <Text style={{ fontSize: 18, fontWeight: '800', color: theme.colors.success }}>
-                               {priceSuggestion.suggested_price.toLocaleString()} FCFA
-                             </Text>
-                           </View>
-                        ) : null}
-                      </View>
+                        );
+                      })()
                     ) : null}
                   </View>
                 )}
@@ -864,7 +1029,7 @@ export default function PublishScreen() {
             {formStep === 3 && (
               <>
                 <Text style={styles.stepTitle}>Combien souhaitez-vous gagner ?</Text>
-                <Text style={styles.stepSubtitle}>Entrez le montant que vous souhaitez recevoir par place</Text>
+                <Text style={styles.stepSubtitle}>Fixez le montant que vous souhaitez recevoir par place</Text>
 
                 {/* Price suggestion banner */}
                 {priceLoading ? (
@@ -896,14 +1061,21 @@ export default function PublishScreen() {
                       </View>
                     </View>
                     <View style={styles.suggestBtnRow}>
-                      {[priceSuggestion.min_price, priceSuggestion.suggested_price, priceSuggestion.max_price].map((val, i) => (
+                      {[
+                        { label: 'Min', val: priceSuggestion.min_price },
+                        { label: 'Conseillé', val: priceSuggestion.suggested_price },
+                        { label: 'Max', val: priceSuggestion.max_price },
+                      ].map((item, i) => (
                         <TouchableOpacity
                           key={i}
-                          style={[styles.suggestPresetBtn, price === String(val) && styles.suggestPresetBtnActive]}
-                          onPress={() => setPrice(String(val))}
+                          style={[styles.suggestPresetBtn, price === String(item.val) && styles.suggestPresetBtnActive]}
+                          onPress={() => setPrice(String(item.val))}
                         >
-                          <Text style={[styles.suggestPresetText, price === String(val) && styles.suggestPresetTextActive]}>
-                            {val.toLocaleString()}
+                          <Text style={[styles.suggestPresetLabel, price === String(item.val) && styles.suggestPresetLabelActive]}>
+                            {item.label}
+                          </Text>
+                          <Text style={[styles.suggestPresetText, price === String(item.val) && styles.suggestPresetTextActive]}>
+                            {item.val.toLocaleString()} F
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -911,28 +1083,93 @@ export default function PublishScreen() {
                   </View>
                 )}
 
-                {/* Price input */}
+                {/* Saisie directe du Prix (Saisie libre + Steppers -/+ 500) */}
                 <View style={styles.priceInputCard}>
-                  <Text style={styles.priceInputLabel}>Mon prix (FCFA)</Text>
-                  <View style={styles.priceInputRow}>
-                    <TextInput
-                      style={styles.priceInputField}
-                      value={price}
-                      onChangeText={setPrice}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor="#C4C4C4"
-                      maxLength={7}
-                    />
-                    <Text style={styles.priceInputCurrency}>FCFA</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={styles.priceInputLabel}>MON PRIX PAR PLACE (FCFA)</Text>
+                    <TouchableOpacity onPress={() => setPrice('0')}>
+                      <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '700' }}>Effacer / Mettre à 0</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.priceStepperRow}>
+                    {/* Bouton Moins (-) */}
+                    <TouchableOpacity
+                      style={styles.priceStepBtn}
+                      onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 500)))}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="remove" size={24} color={theme.colors.primary} />
+                    </TouchableOpacity>
+
+                    {/* Zone d'écriture directe avec curseur clignotant */}
+                    <View style={styles.priceInputWrapper}>
+                      <TextInput
+                        style={styles.priceInputField}
+                        value={price}
+                        onChangeText={(txt) => {
+                          const cleaned = txt.replace(/[^0-9]/g, '');
+                          setPrice(cleaned);
+                        }}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#9CA3AF"
+                        selectTextOnFocus
+                        maxLength={7}
+                      />
+                      <Text style={styles.priceInputCurrency}>FCFA</Text>
+                    </View>
+
+                    {/* Bouton Plus (+) */}
+                    <TouchableOpacity
+                      style={styles.priceStepBtn}
+                      onPress={() => setPrice(String((parseInt(price, 10) || 0) + 500))}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="add" size={24} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Boutons d'ajustement rapide (+500 / +1000 / -500 / -1000) */}
+                  <View style={styles.quickAdjustRow}>
+                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 1000)))}>
+                      <Text style={styles.quickAdjustText}>-1000</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 500)))}>
+                      <Text style={styles.quickAdjustText}>-500</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String((parseInt(price, 10) || 0) + 500))}>
+                      <Text style={styles.quickAdjustText}>+500</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String((parseInt(price, 10) || 0) + 1000))}>
+                      <Text style={styles.quickAdjustText}>+1000</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Commission preview */}
+                {/* Total estimé pour TOUTES les places */}
+                {priceNum > 0 && (
+                  <View style={styles.totalEarningsCard}>
+                    <View style={styles.totalEarningsHeader}>
+                      <Ionicons name="wallet" size={24} color="#059669" />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.totalEarningsTitle}>VOTRE GAIN TOTAL ESTIMÉ</Text>
+                        <Text style={styles.totalEarningsSub}>
+                          Si les <Text style={{ fontWeight: '800' }}>{seats} places</Text> sont réservées ({priceNum.toLocaleString()} F × {seats})
+                        </Text>
+                      </View>
+                      <Text style={styles.totalEarningsAmount}>
+                        {(priceNum * seats).toLocaleString()} FCFA
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Commission & prix passager */}
                 {priceNum > 0 && (
                   <View style={styles.commissionCard}>
                     <View style={styles.commissionRow}>
-                      <Text style={styles.commissionLabel}>Vous recevrez</Text>
+                      <Text style={styles.commissionLabel}>Vous recevrez par place</Text>
                       <Text style={styles.commissionValue}>{priceNum.toLocaleString()} FCFA</Text>
                     </View>
                     <View style={styles.commissionRow}>
@@ -941,7 +1178,7 @@ export default function PublishScreen() {
                     </View>
                     <View style={styles.commissionDivider} />
                     <View style={styles.commissionRow}>
-                      <Text style={styles.commissionLabelTotal}>Le passager paiera</Text>
+                      <Text style={styles.commissionLabelTotal}>Le passager paiera par place</Text>
                       <Text style={styles.commissionValueTotal}>{totalPassenger.toLocaleString()} FCFA</Text>
                     </View>
                   </View>
@@ -969,7 +1206,72 @@ export default function PublishScreen() {
                   <PrefToggle label="Musique autorisée" icon="musical-notes-outline" value={music} onToggle={() => setMusic(!music)} />
                   <PrefToggle label="Discussion appréciée" icon="chatbubbles-outline" value={chatty} onToggle={() => setChatty(!chatty)} />
                   <PrefToggle label="Climatisation" icon="snow-outline" value={airCond} onToggle={() => setAirCond(!airCond)} />
+                  
+                  {/* Luggage toggle & detailed sub-options */}
                   <PrefToggle label="Bagages autorisés" icon="briefcase-outline" value={luggageAllowed} onToggle={() => setLuggageAllowed(!luggageAllowed)} />
+                  {luggageAllowed && (
+                    <View style={styles.luggageSubCard}>
+                      <Text style={styles.luggageSubTitle}>🧳 Configuration des bagages</Text>
+
+                      {/* Size selector */}
+                      <Text style={styles.luggageSubLabel}>Taille max acceptée par sac</Text>
+                      <View style={styles.luggageOptionsRow}>
+                        {[
+                          { key: 'petit', label: '🎒 Petit' },
+                          { key: 'moyen', label: '🧳 Moyen (Cabine)' },
+                          { key: 'grand', label: '🧳 Grand' },
+                        ].map((item) => (
+                          <TouchableOpacity
+                            key={item.key}
+                            style={[styles.luggageOptBtn, luggageSize === item.key && styles.luggageOptBtnActive]}
+                            onPress={() => setLuggageSize(item.key as any)}
+                          >
+                            <Text style={[styles.luggageOptText, luggageSize === item.key && styles.luggageOptTextActive]}>
+                              {item.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      {/* Limit mode: Per passenger vs Total */}
+                      <Text style={styles.luggageSubLabel}>Limite de poids/volume</Text>
+                      <View style={styles.luggageOptionsRow}>
+                        {[
+                          { key: 'per_passenger', label: '👤 Par passager' },
+                          { key: 'total', label: '🚗 Au total (coffre)' },
+                        ].map((item) => (
+                          <TouchableOpacity
+                            key={item.key}
+                            style={[styles.luggageOptBtn, luggageType === item.key && styles.luggageOptBtnActive]}
+                            onPress={() => setLuggageType(item.key as any)}
+                          >
+                            <Text style={[styles.luggageOptText, luggageType === item.key && styles.luggageOptTextActive]}>
+                              {item.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      {/* Weight limit in kg */}
+                      <View style={styles.weightInputRow}>
+                        <Text style={styles.luggageSubLabel}>Poids max ({luggageType === 'per_passenger' ? 'par passager' : 'au total'})</Text>
+                        <View style={styles.weightInputBox}>
+                          <TextInput
+                            style={styles.weightInputField}
+                            value={luggageMaxWeightKg}
+                            onChangeText={setLuggageMaxWeightKg}
+                            keyboardType="numeric"
+                            placeholder="15"
+                            maxLength={3}
+                          />
+                          <Text style={styles.weightInputUnit}>kg</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Driving relay in case of fatigue */}
+                  <PrefToggle label="Relais de conduite accepté (si fatigue)" icon="car-sport-outline" value={drivingRelay} onToggle={() => setDrivingRelay(!drivingRelay)} />
                   <PrefToggle label="Animaux acceptés" icon="paw-outline" value={petsAllowed} onToggle={() => setPetsAllowed(!petsAllowed)} />
                   <PrefToggle label="Non fumeur" icon="ban-outline" value={!smoking} onToggle={() => setSmoking(!smoking)} />
                   <PrefToggle label="Pauses acceptées" icon="pause-circle-outline" value={stopsAllowed} onToggle={() => setStopsAllowed(!stopsAllowed)} />
@@ -1038,23 +1340,44 @@ export default function PublishScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* ── Location Picker Modal ── */}
-      <Modal visible={pickingLocationFor !== null} animationType="slide" transparent={false} onRequestClose={() => setPickingLocationFor(null)}>
+      {/* ── Location Picker Overlay ── */}
+      {pickingLocationFor !== null && (
         <LocationPicker
-          title={pickingLocationFor === 'departure' ? 'Lieu de départ' : "Lieu d'arrivée"}
+          title={
+            pickingLocationFor === 'departure'
+              ? 'Lieu de départ'
+              : pickingLocationFor === 'arrival'
+              ? "Lieu d'arrivée"
+              : "Ville / Point d'arrêt"
+          }
+          initialLocation={
+            pickingLocationFor === 'departure' && departureCords && departure
+              ? { latitude: departureCords.lat, longitude: departureCords.lon, name: departure }
+              : pickingLocationFor === 'arrival' && arrivalCords && arrival
+              ? { latitude: arrivalCords.lat, longitude: arrivalCords.lon, name: arrival }
+              : undefined
+          }
           onLocationSelected={(loc) => {
             const cords = { lat: loc.latitude, lon: loc.longitude };
             let newDep = departure;
             let newArr = arrival;
+
             if (pickingLocationFor === 'departure') {
               setDeparture(loc.name); setDepartureCords(cords);
               newDep = loc.name;
               if (arrivalCords) computeEstimation(cords, arrivalCords);
-            } else {
+            } else if (pickingLocationFor === 'arrival') {
               setArrival(loc.name); setArrivalCords(cords);
               newArr = loc.name;
               if (departureCords) computeEstimation(departureCords, cords);
+            } else {
+              // Location selection for stopover item
+              updateStopover(pickingLocationFor, {
+                name: loc.name,
+                coords: cords,
+              });
             }
+
             if (newDep && newArr && !description) {
               setDescription(`Départ de ${newDep} et arrivée à ${newArr}`);
             }
@@ -1062,7 +1385,192 @@ export default function PublishScreen() {
           }}
           onCancel={() => setPickingLocationFor(null)}
         />
-      </Modal>
+      )}
+
+      {/* ── Summary / Recap Modal before Publication ── */}
+      <AppBottomSheet
+        visible={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        snapPoints={['85%', '95%']}
+        initialIndex={0}
+      >
+        <View style={styles.summaryModalContainer}>
+          <Text style={styles.summaryModalTitle}>Récapitulatif de votre trajet</Text>
+          <Text style={styles.summaryModalSubtitle}>Vérifiez les détails avant la publication officielle</Text>
+
+          {/* 1. Itinéraire */}
+          <View style={styles.summarySectionCard}>
+            <View style={styles.summarySectionHeader}>
+              <Ionicons name="map-outline" size={18} color={theme.colors.primary} />
+              <Text style={styles.summarySectionTitle}>ITINÉRAIRE</Text>
+            </View>
+
+            <View style={styles.summaryRouteBox}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.dotGreen} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontWeight: '600' }}>DÉPART</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>{departure}</Text>
+                </View>
+              </View>
+
+              {stopovers.length > 0 && (
+                <View style={{ marginVertical: 8, paddingLeft: 18 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary, marginBottom: 4 }}>
+                    📍 {stopovers.length} ville(s) / point(s) d'arrêt :
+                  </Text>
+                  {stopovers.map((s, idx) => (
+                    <Text key={s.id} style={{ fontSize: 12, color: theme.colors.text, marginLeft: 8 }}>
+                      • {s.name || `Étape ${idx + 1}`} ({s.stopDurationMin} min d'arrêt)
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 8 }} />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.dotRed} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontWeight: '600' }}>ARRIVÉE</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>{arrival}</Text>
+                </View>
+              </View>
+
+              {estimation && (
+                <View style={styles.summaryRouteMetrics}>
+                  <Text style={styles.summaryMetricText}>📏 {estimation.distanceKm} km</Text>
+                  <Text style={styles.summaryMetricText}>
+                    ⏱️ {formatDuration(estimation.durationMin + stopovers.reduce((sum, s) => sum + (Number(s.stopDurationMin) || 0), 0))}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* 2. Date & Places */}
+          <View style={styles.summarySectionCard}>
+            <View style={styles.summarySectionHeader}>
+              <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} />
+              <Text style={styles.summarySectionTitle}>DATE & PLACES</Text>
+            </View>
+
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryGridItem}>
+                <Text style={styles.summaryGridLabel}>Date de départ</Text>
+                <Text style={styles.summaryGridValue}>
+                  {selectedDateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} à {time}
+                </Text>
+              </View>
+              <View style={styles.summaryGridItem}>
+                <Text style={styles.summaryGridLabel}>Places disponibles</Text>
+                <Text style={styles.summaryGridValue}>{seats} place(s)</Text>
+              </View>
+            </View>
+
+            {isRecurrent && (
+              <View style={styles.summaryRecurrentBadge}>
+                <Ionicons name="repeat-outline" size={14} color={theme.colors.primary} />
+                <Text style={styles.summaryRecurrentText}>
+                  Trajet récurrent : {getEstimatedRides()} départ(s) programmé(s)
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* 3. Tarification & Payout */}
+          <View style={styles.summarySectionCard}>
+            <View style={styles.summarySectionHeader}>
+              <Ionicons name="cash-outline" size={18} color="#059669" />
+              <Text style={[styles.summarySectionTitle, { color: '#059669' }]}>TARIFICATION</Text>
+            </View>
+
+            <View style={styles.summaryPriceRow}>
+              <Text style={{ fontSize: 13, color: theme.colors.text }}>Prix par place (votre gain)</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: theme.colors.text }}>{priceNum.toLocaleString()} FCFA</Text>
+            </View>
+
+            <View style={styles.summaryPriceRow}>
+              <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Prix payé par le passager</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.primary }}>{totalPassenger.toLocaleString()} FCFA</Text>
+            </View>
+
+            <View style={styles.summaryTotalCard}>
+              <View style={styles.summaryTotalHeader}>
+                <Ionicons name="wallet-outline" size={18} color="#059669" />
+                <Text style={styles.summaryTotalTitle}>GAIN TOTAL POTENTIEL ({seats} place{seats > 1 ? 's' : ''})</Text>
+              </View>
+              <Text style={styles.summaryTotalAmount}>{(priceNum * seats).toLocaleString()} FCFA</Text>
+            </View>
+          </View>
+
+          {/* 4. Preference badges */}
+          <View style={styles.summarySectionCard}>
+            <View style={styles.summarySectionHeader}>
+              <Ionicons name="options-outline" size={18} color={theme.colors.primary} />
+              <Text style={styles.summarySectionTitle}>PRÉFÉRENCES</Text>
+            </View>
+
+            <View style={styles.summaryBadgesRow}>
+              {music && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🎵 Musique autorisée</Text></View>}
+              {chatty && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>💬 Discussion appréciée</Text></View>}
+              {airCond && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>❄️ Climatisation</Text></View>}
+              {luggageAllowed && (
+                <View style={styles.summaryChip}>
+                  <Text style={styles.summaryChipText}>
+                    🧳 Bagages: {luggageSize === 'petit' ? 'Petit' : luggageSize === 'moyen' ? 'Moyen' : 'Grand'} ({luggageMaxWeightKg || 15}kg {luggageType === 'per_passenger' ? '/passager' : 'au total'})
+                  </Text>
+                </View>
+              )}
+              {drivingRelay && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🚘 Relais conduite accepté</Text></View>}
+              {petsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🐾 Animaux acceptés</Text></View>}
+              {!smoking && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🚭 Non-fumeur</Text></View>}
+              {stopsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>⏸️ Pauses acceptées</Text></View>}
+            </View>
+
+            {description.trim() ? (
+              <View style={{ marginTop: 10, backgroundColor: '#F8FAFC', padding: 10, borderRadius: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textMuted }}>NOTE PASSAGERS :</Text>
+                <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2, fontStyle: 'italic' }}>"{description.trim()}"</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Action buttons */}
+          <View style={styles.summaryActionsRow}>
+            <TouchableOpacity
+              style={styles.summaryEditBtn}
+              onPress={() => setShowSummaryModal(false)}
+            >
+              <Ionicons name="create-outline" size={18} color={theme.colors.text} />
+              <Text style={styles.summaryEditBtnText}>Modifier</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.summaryConfirmBtn}
+              onPress={() => {
+                setShowSummaryModal(false);
+                handlePublish();
+              }}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.primaryDark]}
+                style={styles.summaryConfirmGradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                    <Text style={styles.summaryConfirmBtnText}>Confirmer & Publier</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </AppBottomSheet>
 
       {/* ── Profile completion BottomSheet ── */}
       <AppBottomSheet visible={profileModalVisible} onClose={() => setProfileModalVisible(false)} snapPoints={['75%', '95%']} initialIndex={0}>
@@ -1292,6 +1800,142 @@ const styles = StyleSheet.create({
   seatBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' },
   seatValue: { fontSize: 22, fontWeight: '800', color: theme.colors.text, minWidth: 30, textAlign: 'center' },
 
+  /* Stopovers (Villes et points d'arrêt) */
+  stopoversHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  stopoversTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  autoSuggestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  autoSuggestText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  stopoversCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+    gap: 10,
+  },
+  stopoverItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFF',
+    padding: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  stopoverIndexBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stopoverIndexText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  stopoverNameBox: {
+    flex: 1,
+  },
+  stopoverNameLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  stopoverNameValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  stopoverDurationBox: {
+    alignItems: 'center',
+  },
+  stopoverDurationLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  stopoverDurationPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 4,
+    height: 28,
+    gap: 4,
+  },
+  stopoverBtnStep: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  stopoverBtnStepText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  stopoverDurationText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  stopoverDeleteBtn: {
+    padding: 4,
+  },
+  addStopoverBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    borderStyle: 'dashed',
+    marginBottom: 16,
+    gap: 6,
+  },
+  addStopoverBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+
   recurrentCard: {
     backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
@@ -1333,15 +1977,27 @@ const styles = StyleSheet.create({
   suggestRangeBar: { flex: 1, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2 },
   suggestRangeBarFill: { width: '50%', height: '100%', backgroundColor: theme.colors.primary, borderRadius: 2 },
   suggestBtnRow: { flexDirection: 'row', gap: 8 },
-  suggestPresetBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#F5F6FA', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
+  suggestPresetBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   suggestPresetBtnActive: { backgroundColor: `${theme.colors.primary}15`, borderColor: theme.colors.primary },
-  suggestPresetText: { fontSize: 13, fontWeight: '700', color: theme.colors.textLight },
+  suggestPresetLabel: { fontSize: 10, fontWeight: '700', color: theme.colors.textLight, textTransform: 'uppercase', marginBottom: 2 },
+  suggestPresetLabelActive: { color: theme.colors.primary },
+  suggestPresetText: { fontSize: 13, fontWeight: '800', color: theme.colors.text },
   suggestPresetTextActive: { color: theme.colors.primary },
-  priceInputCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  priceInputLabel: { fontSize: 12, fontWeight: '700', color: theme.colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  priceInputRow: { flexDirection: 'row', alignItems: 'center' },
-  priceInputField: { flex: 1, fontSize: 40, fontWeight: '900', color: theme.colors.text },
-  priceInputCurrency: { fontSize: 18, fontWeight: '700', color: theme.colors.textLight, marginLeft: 8 },
+  priceInputCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  priceInputLabel: { fontSize: 11, fontWeight: '800', color: theme.colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5 },
+  priceStepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 8 },
+  priceStepBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' },
+  priceInputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', borderRadius: 14, paddingHorizontal: 14, borderWidth: 1.5, borderColor: '#CBD5E1', height: 52 },
+  priceInputField: { flex: 1, fontSize: 24, fontWeight: '900', color: theme.colors.text, textAlign: 'center' },
+  priceInputCurrency: { fontSize: 14, fontWeight: '800', color: theme.colors.textLight, marginLeft: 6 },
+  quickAdjustRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  quickAdjustBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  quickAdjustText: { fontSize: 12, fontWeight: '800', color: '#475569' },
+  totalEarningsCard: { backgroundColor: '#ECFDF5', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: '#A7F3D0', marginBottom: 14 },
+  totalEarningsHeader: { flexDirection: 'row', alignItems: 'center' },
+  totalEarningsTitle: { fontSize: 11, fontWeight: '800', color: '#065F46', letterSpacing: 0.5 },
+  totalEarningsSub: { fontSize: 12, color: '#047857', marginTop: 2 },
+  totalEarningsAmount: { fontSize: 20, fontWeight: '900', color: '#047857' },
   commissionCard: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
   commissionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   commissionLabel: { fontSize: 14, fontWeight: '600', color: theme.colors.text },
@@ -1368,6 +2024,86 @@ const styles = StyleSheet.create({
   prefToggleBadgeOn: { backgroundColor: `${theme.colors.primary}15` },
   prefToggleBadgeOff: { backgroundColor: '#F3F4F6' },
   prefToggleBadgeText: { fontSize: 12, fontWeight: '700', color: theme.colors.textLight },
+
+  /* Luggage Subcard */
+  luggageSubCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: -4,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  luggageSubTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: theme.colors.text,
+    textTransform: 'uppercase',
+  },
+  luggageSubLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+    marginTop: 4,
+  },
+  luggageOptionsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  luggageOptBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  luggageOptBtnActive: {
+    backgroundColor: `${theme.colors.primary}15`,
+    borderColor: theme.colors.primary,
+  },
+  luggageOptText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+  },
+  luggageOptTextActive: {
+    color: theme.colors.primary,
+  },
+  weightInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  weightInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 10,
+    height: 36,
+  },
+  weightInputField: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.text,
+    width: 40,
+    textAlign: 'center',
+  },
+  weightInputUnit: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+    marginLeft: 2,
+  },
+
   descriptionCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   descriptionInput: { fontSize: 14, color: theme.colors.text, minHeight: 90, textAlignVertical: 'top', lineHeight: 22 },
   descriptionCounter: { fontSize: 11, color: theme.colors.textLight, textAlign: 'right', marginTop: 4 },
@@ -1424,4 +2160,188 @@ const styles = StyleSheet.create({
   prefBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8 },
   prefBadgeInactive: { backgroundColor: '#E5E7EB' },
   prefBadgeActive: { backgroundColor: theme.colors.primary },
+
+  /* Summary / Recap Modal */
+  summaryModalContainer: {
+    paddingBottom: 50,
+  },
+  summaryModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  summaryModalSubtitle: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  summarySectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summarySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  summarySectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    letterSpacing: 0.5,
+  },
+  summaryRouteBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+  },
+  summaryRouteMetrics: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  summaryMetricText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  summaryGridItem: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+  },
+  summaryGridLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  summaryGridValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginTop: 2,
+  },
+  summaryRecurrentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+  },
+  summaryRecurrentText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  summaryPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  summaryTotalCard: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+  },
+  summaryTotalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  summaryTotalTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#065F46',
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  summaryTotalAmount: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#047857',
+  },
+  summaryBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  summaryChip: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  summaryChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  summaryActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  summaryEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  summaryEditBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  summaryConfirmBtn: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  summaryConfirmGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  summaryConfirmBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
 });

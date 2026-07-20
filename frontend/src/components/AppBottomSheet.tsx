@@ -97,7 +97,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
       enablePanDownToClose
       backgroundStyle={styles.bottomSheetBackground}
       handleIndicatorStyle={styles.handleIndicator}
-      keyboardBehavior="interactive"
+      keyboardBehavior="extend"
       keyboardBlurBehavior="restore"
     >
       {useScrollView ? (

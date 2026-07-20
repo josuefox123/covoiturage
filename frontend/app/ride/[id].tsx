@@ -1031,7 +1031,7 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'flex-start' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
 
-  scrollContent: { padding: 16, paddingBottom: 120 },
+  scrollContent: { padding: 16, paddingBottom: 160 },
 
   completedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', padding: 12, borderRadius: 12, marginBottom: 16, justifyContent: 'center', gap: 8 },
   completedText: { color: COLORS.success, fontSize: 16, fontWeight: '700' },

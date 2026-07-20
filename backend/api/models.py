@@ -246,6 +246,7 @@ class Ride(models.Model):
     # Distance et durée (calculées depuis le frontend)
     distance_km = models.FloatField(blank=True, null=True)
     duration_min = models.IntegerField(blank=True, null=True)
+    stopovers = models.JSONField(blank=True, null=True)
 
     # Préférences du conducteur pour ce trajet
     music = models.BooleanField(default=True)

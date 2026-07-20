@@ -305,6 +305,11 @@ export default function SearchResultsScreen() {
   const [error,      setError]      = useState<string | null>(null);
   const [filters,    setFilters]    = useState<FilterState>(DEFAULT_FILTERS);
   const [showFilter, setShowFilter] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<string>(
+    vehicleType && ['voiture', 'moto', 'tricycle'].includes(vehicleType.toLowerCase())
+      ? vehicleType.toLowerCase()
+      : 'all'
+  );
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchRides = useCallback(async () => {
@@ -346,6 +351,15 @@ export default function SearchResultsScreen() {
   // ── Filter + sort (client-side) ───────────────────────────────────────────
   const displayed = useMemo(() => {
     let list = [...rides];
+
+    // Filtrage par type de véhicule (Voiture, Moto, Tricycle)
+    if (selectedVehicle !== 'all') {
+      list = list.filter((r) => {
+        const vt = (r.driver_details?.vehicles?.[0]?.vehicle_type || (r as any).vehicle_type || 'voiture').toLowerCase();
+        return vt === selectedVehicle;
+      });
+    }
+
     if (filters.timeSlots.length)  list = list.filter((r) => matchesSlot(r, filters.timeSlots));
     if (filters.verifiedOnly)       list = list.filter((r) => r.driver_details?.is_verified);
     if (filters.minSeats > 1)       list = list.filter((r) => (r.seats_available ?? 0) >= filters.minSeats);
@@ -357,22 +371,30 @@ export default function SearchResultsScreen() {
       default:           list.sort((a, b) => (a.departure_time || '').localeCompare(b.departure_time || '')); break;
     }
     return list;
-  }, [rides, filters]);
+  }, [rides, selectedVehicle, filters]);
 
   const activeCount = useMemo(() => {
     let c = 0;
+    if (selectedVehicle !== 'all')        c++;
     if (filters.sort !== 'earliest')     c++;
     if (filters.timeSlots.length)         c++;
     if (filters.verifiedOnly)             c++;
     if (filters.minSeats > 1)             c++;
     return c;
-  }, [filters]);
+  }, [selectedVehicle, filters]);
 
   const headerSub = [
     date ? fmtDate(date) : "Aujourd'hui",
     `${passengers} passager${passengers > 1 ? 's' : ''}`,
     vehicleType ? vehicleType.charAt(0).toUpperCase() + vehicleType.slice(1) : '',
   ].filter(Boolean).join(' · ');
+
+  const VEHICLE_CAT_FILTERS = [
+    { id: 'all', label: 'Tous', icon: 'grid-outline' },
+    { id: 'voiture', label: 'Voiture', icon: 'car-outline' },
+    { id: 'moto', label: 'Moto', icon: 'bicycle-outline' },
+    { id: 'tricycle', label: 'Tricycle', icon: 'car-sport-outline' },
+  ];
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -403,6 +425,49 @@ export default function SearchResultsScreen() {
             Filtrer{activeCount > 0 ? ` · ${activeCount}` : ''}
           </Text>
         </TouchableOpacity>
+      </View>
+
+      {/* ── Barre de filtrage rapide par Véhicule (Voiture, Moto, Tricycle) ── */}
+      <View style={styles.vehicleFilterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.vehicleFilterScroll}
+        >
+          {VEHICLE_CAT_FILTERS.map((cat) => {
+            const isActive = selectedVehicle === cat.id;
+            const count = cat.id === 'all'
+              ? rides.length
+              : rides.filter((r) => {
+                  const vt = (r.driver_details?.vehicles?.[0]?.vehicle_type || (r as any).vehicle_type || 'voiture').toLowerCase();
+                  return vt === cat.id;
+                }).length;
+
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.vehicleChip, isActive && styles.vehicleChipActive]}
+                onPress={() => setSelectedVehicle(cat.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={cat.icon as any}
+                  size={15}
+                  color={isActive ? '#FFFFFF' : '#4B5563'}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.vehicleChipText, isActive && styles.vehicleChipTextActive]}>
+                  {cat.label}
+                </Text>
+                <View style={[styles.vehicleCountBadge, isActive && styles.vehicleCountBadgeActive]}>
+                  <Text style={[styles.vehicleCountText, isActive && styles.vehicleCountTextActive]}>
+                    {count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* ── Body ── */}
@@ -443,7 +508,7 @@ export default function SearchResultsScreen() {
                 {displayed.length} trajet{displayed.length !== 1 ? 's' : ''}
               </Text>
               {activeCount > 0 && (
-                <TouchableOpacity onPress={() => setFilters(DEFAULT_FILTERS)}>
+                <TouchableOpacity onPress={() => { setFilters(DEFAULT_FILTERS); setSelectedVehicle('all'); }}>
                   <Text style={styles.resetTxt}>Réinitialiser</Text>
                 </TouchableOpacity>
               )}
@@ -518,6 +583,64 @@ const styles = StyleSheet.create({
   filterBtnOn:    { backgroundColor: PRIMARY, borderColor: PRIMARY },
   filterBtnTxt:   { fontSize: 12, fontWeight: '700', color: PRIMARY },
   filterBtnTxtOn: { color: '#FFFFFF' },
+
+  /* vehicle filter bar */
+  vehicleFilterBar: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  vehicleFilterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  vehicleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  vehicleChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+    shadowColor: PRIMARY,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  vehicleChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  vehicleChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  vehicleCountBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  vehicleCountBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  vehicleCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4B5563',
+  },
+  vehicleCountTextActive: {
+    color: '#FFFFFF',
+  },
 
   /* list */
   listContent: { padding: 14, paddingBottom: 60 },
