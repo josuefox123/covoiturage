@@ -75,7 +75,11 @@ def payment_checkout(request):
         "email": email,
         "phone": phone,
     }
-    return render(request, 'api/payment_checkout.html', context)
+    response = render(request, 'api/payment_checkout.html', context)
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 
 @api_view(['POST'])
@@ -163,16 +167,17 @@ def confirm_payment(request):
                     booking.save()
                     
                     # Créer l'écriture financière (Transaction historique)
+                    amount_paid = int(booking.amount_paid_online)
                     amount_due = int(booking.amount_due_to_driver)
-                    commission = int(booking.amount_paid_online)
+                    zemy_commission = int(booking.zemy_commission)
                     
                     Transaction.objects.create(
                         user=booking.passenger,
                         ride=booking.ride,
                         transaction_type='ride',
-                        amount=commission,
+                        amount=amount_paid,
                         driver_payout=amount_due,
-                        zemy_commission=commission,
+                        zemy_commission=zemy_commission,
                         total_price=booking.total_amount,
                         status='completed'
                     )
@@ -181,7 +186,7 @@ def confirm_payment(request):
                     create_and_send_notification(
                         user=booking.passenger,
                         title="Réservation confirmée ✅",
-                        message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+                        message=f"Paiement de {booking.total_amount} FCFA validé. Votre réservation est confirmée pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
                         data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                     )
                     
@@ -189,7 +194,7 @@ def confirm_payment(request):
                         create_and_send_notification(
                             user=booking.ride.driver,
                             title="Nouvelle Réservation 🚗",
-                            message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Il/Elle vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                            message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
                             data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
                         )
                         
@@ -291,12 +296,10 @@ def sync_payments(request):
                             booking.save()
                             
                             amount_due = int(booking.amount_due_to_driver)
-                            commission = int(booking.amount_paid_online)
-                            
                             create_and_send_notification(
                                 user=booking.passenger,
                                 title="Réservation confirmée ✅",
-                                message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur.",
+                                message=f"Paiement de {booking.total_amount} FCFA validé. Votre réservation est confirmée.",
                                 data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                             )
                             
@@ -304,7 +307,7 @@ def sync_payments(request):
                                 create_and_send_notification(
                                     user=booking.ride.driver,
                                     title="Nouvelle Réservation 🚗",
-                                    message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s).",
+                                    message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
                                     data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
                                 )
                                 
@@ -585,5 +588,170 @@ class PaymentViewSet(viewsets.ModelViewSet):
         doc.build(elements)
         return response
 
+    @action(detail=False, methods=['get'], url_path='my-history', permission_classes=[permissions.IsAuthenticated])
+    def my_history(self, request):
+        """
+        Retourne l'historique des paiements réussis de l'utilisateur connecté.
+        """
+        from ..models import Payment
+        from ..serializers import UserPaymentSerializer
+        payments = Payment.objects.filter(
+            user=request.user, status='SUCCESS'
+        ).select_related('booking__ride', 'parcel').order_by('-created_at')
+        serializer = UserPaymentSerializer(payments, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='receipt', permission_classes=[permissions.IsAuthenticated])
+    def receipt(self, request, pk=None):
+        """
+        Génère un reçu PDF au format Zemy pour un paiement réussi de l'utilisateur.
+        """
+        from ..models import Payment
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from django.http import HttpResponse
+        import io
+
+        try:
+            payment = Payment.objects.select_related('user', 'booking__ride', 'parcel').get(pk=pk)
+        except Payment.DoesNotExist:
+            return Response({"error": "Paiement introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        if payment.user != request.user and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+
+        if payment.status != 'SUCCESS':
+            return Response({"error": "Ce paiement n'a pas été complété."}, status=status.HTTP_400_BAD_REQUEST)
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            rightMargin=20*mm, leftMargin=20*mm,
+            topMargin=20*mm, bottomMargin=20*mm
+        )
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Color palette
+        PRIMARY = colors.HexColor('#16A34A')  # Zemy green
+        PRIMARY_DARK = colors.HexColor('#15803D')
+        LIGHT_BG = colors.HexColor('#F0FDF4')
+        MUTED = colors.HexColor('#6B7280')
+        DARK = colors.HexColor('#111827')
+
+        # --- HEADER ---
+        header_style = ParagraphStyle('Header', fontSize=32, textColor=PRIMARY, fontName='Helvetica-Bold',
+                                       alignment=1, spaceAfter=2)
+        sub_style = ParagraphStyle('Sub', fontSize=10, textColor=MUTED, fontName='Helvetica',
+                                    alignment=1, spaceAfter=14)
+        elements.append(Paragraph("ZEMY", header_style))
+        elements.append(Paragraph("Reçu de paiement officiel", sub_style))
+        elements.append(HRFlowable(width="100%", thickness=2, color=PRIMARY, spaceAfter=14))
+
+        # --- STATUS BADGE ---
+        status_style = ParagraphStyle('Status', fontSize=14, textColor=PRIMARY_DARK,
+                                       fontName='Helvetica-Bold', alignment=1, spaceAfter=12,
+                                       backColor=LIGHT_BG, borderPadding=(8, 14, 8, 14))
+        elements.append(Paragraph("✓ PAIEMENT CONFIRMÉ", status_style))
+        elements.append(Spacer(1, 8*mm))
+
+        # --- AMOUNT ---
+        amount_style = ParagraphStyle('Amount', fontSize=28, textColor=DARK,
+                                       fontName='Helvetica-Bold', alignment=1, spaceAfter=2)
+        currency_style = ParagraphStyle('Currency', fontSize=12, textColor=MUTED,
+                                         fontName='Helvetica', alignment=1, spaceAfter=16)
+        elements.append(Paragraph(f"{payment.amount:,} XOF".replace(",", " "), amount_style))
+        elements.append(Paragraph("Montant total payé", currency_style))
+        elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E5E7EB'), spaceAfter=12))
+
+        # --- TRANSACTION DETAILS ---
+        section_style = ParagraphStyle('Section', fontSize=11, textColor=PRIMARY_DARK,
+                                        fontName='Helvetica-Bold', spaceAfter=8, spaceBefore=12)
+        cell_style = ParagraphStyle('Cell', fontSize=10, textColor=DARK, fontName='Helvetica')
+        cell_muted = ParagraphStyle('CellMuted', fontSize=10, textColor=MUTED, fontName='Helvetica')
+
+        elements.append(Paragraph("Détails de la transaction", section_style))
+
+        service = "Trajet" if payment.booking else ("Colis" if payment.parcel else "Service")
+        if payment.booking and payment.booking.ride:
+            ride = payment.booking.ride
+            service_detail = f"Trajet — {ride.departure_location} → {ride.arrival_location}"
+            date_trajet = ride.departure_date.strftime('%d/%m/%Y') if ride.departure_date else "—"
+        elif payment.parcel:
+            service_detail = f"Colis — {payment.parcel.id}"
+            date_trajet = "—"
+        else:
+            service_detail = "Service Zemy"
+            date_trajet = "—"
+
+        details_data = [
+            [Paragraph("Référence", cell_muted), Paragraph(payment.transaction_id, cell_style)],
+            [Paragraph("Service", cell_muted), Paragraph(service_detail, cell_style)],
+            [Paragraph("Date du trajet", cell_muted), Paragraph(date_trajet, cell_style)],
+            [Paragraph("Date du paiement", cell_muted), Paragraph(
+                payment.created_at.strftime('%d/%m/%Y à %H:%M') if payment.created_at else "—",
+                cell_style
+            )],
+            [Paragraph("Moyen de paiement", cell_muted), Paragraph("Mobile Money (FeexPay)", cell_style)],
+            [Paragraph("Statut", cell_muted), Paragraph("✓ Payé", ParagraphStyle(
+                'Paid', fontSize=10, textColor=PRIMARY, fontName='Helvetica-Bold'
+            ))],
+        ]
+
+        details_table = Table(details_data, colWidths=[55*mm, 110*mm])
+        details_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F9FAFB')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(details_table)
+        elements.append(Spacer(1, 10*mm))
+
+        # --- USER INFO ---
+        user_obj = payment.user
+        if user_obj:
+            elements.append(Paragraph("Informations du payeur", section_style))
+            user_data = [
+                [Paragraph("Nom complet", cell_muted), Paragraph(user_obj.full_name or "—", cell_style)],
+                [Paragraph("Téléphone", cell_muted), Paragraph(user_obj.phone or "—", cell_style)],
+                [Paragraph("Email", cell_muted), Paragraph(user_obj.email or "—", cell_style)],
+            ]
+            user_table = Table(user_data, colWidths=[55*mm, 110*mm])
+            user_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F9FAFB')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ]))
+            elements.append(user_table)
+
+        # --- FOOTER ---
+        elements.append(Spacer(1, 12*mm))
+        elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E5E7EB'), spaceAfter=8))
+        footer_style = ParagraphStyle('Footer', fontSize=8, textColor=MUTED,
+                                       fontName='Helvetica', alignment=1)
+        elements.append(Paragraph("Ce reçu est un document officiel généré automatiquement par Zemy.", footer_style))
+        elements.append(Paragraph("Pour toute réclamation : zemy@sinustic.com | www.zemy.bj", footer_style))
+        elements.append(Paragraph(
+            f"Généré le {payment.created_at.strftime('%d/%m/%Y à %H:%M') if payment.created_at else ''}",
+            footer_style
+        ))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        tx_short = payment.transaction_id[:12] if payment.transaction_id else "recu"
+        http_response = HttpResponse(buffer.read(), content_type='application/pdf')
+        http_response['Content-Disposition'] = f'attachment; filename=recu_zemy_{tx_short}.pdf'
+        return http_response
 
 

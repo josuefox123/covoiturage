@@ -32,12 +32,21 @@ class PaymentService:
         if booking.status not in ['pending_payment', 'pending']:
             raise ValidationError({"error": f"Cette réservation ne peut pas être payée. Statut actuel: {booking.status}"})
 
+        # Vérifier que le trajet n'est pas terminé ou annulé
+        if booking.ride and booking.ride.status in ['completed', 'cancelled']:
+            raise ValidationError({"error": "Ce trajet est terminé ou annulé. Le paiement n'est plus possible."})
+
         with transaction.atomic():
             # Rechercher si une transaction PENDING existe déjà pour cette réservation
             existing_payment = Payment.objects.filter(booking=booking, status='PENDING').first()
             
             if existing_payment:
-                # Si oui, on la renvoie pour éviter le double paiement
+                # Si le montant a changé entre-temps (ex: passage au cashless), on met à jour le montant du paiement
+                current_amount = max(100, int(booking.amount_paid_online))
+                if existing_payment.amount != current_amount:
+                    existing_payment.amount = current_amount
+                    existing_payment.save()
+                
                 transaction_reference = existing_payment.transaction_id
             else:
                 # Sinon, on crée une nouvelle référence de transaction unique
@@ -53,8 +62,9 @@ class PaymentService:
 
             # Construire les paramètres pour l'URL de checkout
             amount_to_pay = existing_payment.amount
-            description = f"Commission Zemy - Trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}"
+            description = f"Paiement Zemy - Trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}"
             
+            import time
             query_params = (
                 f"?amount={amount_to_pay}"
                 f"&custom_id={booking.id}"
@@ -63,6 +73,7 @@ class PaymentService:
                 f"&email={urllib.parse.quote(user.email or 'client@zemy.bj')}"
                 f"&phone={urllib.parse.quote(user.phone or '')}"
                 f"&description={urllib.parse.quote(description)}"
+                f"&_t={int(time.time())}"
             )
             
             return existing_payment, query_params
@@ -120,15 +131,20 @@ class PaymentService:
                 # Créer le ticket
                 ticket_number = f"T-{booking.id.hex[:8].upper()}"
                 
-                # Envoi de la notification
                 amount_due = int(booking.amount_due_to_driver)
-                commission = int(booking.amount_paid_online)
                 create_and_send_notification(
                     user=booking.passenger,
                     title="Réservation confirmée ✅",
-                    message=f"Ticket {ticket_number} généré. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur.",
+                    message=f"Ticket {ticket_number} généré. Votre paiement de {booking.total_amount} FCFA est validé.",
                     data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
+                if booking.ride.driver:
+                    create_and_send_notification(
+                        user=booking.ride.driver,
+                        title="Nouvelle Réservation 🚗",
+                        message=f"{booking.passenger.full_name or booking.passenger.phone} a réservé {booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
+                        data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
+                    )
                 
                 return payment, "Paiement validé avec succès."
         

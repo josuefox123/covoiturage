@@ -433,3 +433,51 @@ class PaymentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class UserPaymentSerializer(serializers.ModelSerializer):
+    """
+    Serializer enrichi pour l'historique de paiements côté utilisateur mobile.
+    Expose les détails du trajet ou du colis associé.
+    """
+    service_type = serializers.SerializerMethodField()
+    service_label = serializers.SerializerMethodField()
+    departure_location = serializers.SerializerMethodField()
+    arrival_location = serializers.SerializerMethodField()
+    departure_date = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Payment
+        fields = [
+            'id', 'transaction_id', 'amount', 'status', 'provider',
+            'service_type', 'service_label', 'departure_location',
+            'arrival_location', 'departure_date', 'created_at',
+        ]
+
+    def get_service_type(self, obj):
+        if obj.booking:
+            return 'ride'
+        if obj.parcel:
+            return 'parcel'
+        return 'other'
+
+    def get_service_label(self, obj):
+        if obj.booking and obj.booking.ride:
+            ride = obj.booking.ride
+            return f"{ride.departure_location} → {ride.arrival_location}"
+        if obj.parcel:
+            return "Livraison de colis"
+        return "Service Zemy"
+
+    def get_departure_location(self, obj):
+        if obj.booking and obj.booking.ride:
+            return obj.booking.ride.departure_location
+        return None
+
+    def get_arrival_location(self, obj):
+        if obj.booking and obj.booking.ride:
+            return obj.booking.ride.arrival_location
+        return None
+
+    def get_departure_date(self, obj):
+        if obj.booking and obj.booking.ride:
+            return obj.booking.ride.departure_date
+        return None

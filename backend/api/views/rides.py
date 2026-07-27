@@ -126,8 +126,11 @@ class RideViewSet(viewsets.ModelViewSet):
         elif getattr(self, 'action', '') == 'list' and not is_staff:
             from datetime import date, timedelta
             from django.utils.timezone import now
+            from django.db.models import Q
             one_hour_ago = now() - timedelta(hours=1)
-            queryset = queryset.filter(departure_date__gte=date.today()).exclude(status='cancelled').exclude(status='completed', updated_at__lt=one_hour_ago)
+            queryset = queryset.filter(
+                Q(departure_date__gte=date.today()) | Q(status='started')
+            ).exclude(status='cancelled').exclude(status='completed')
         
         # Appliquer les filtres de recherche
         if vehicle_type:
@@ -222,7 +225,8 @@ class RideViewSet(viewsets.ModelViewSet):
             - margin_percent : marge appliquée
         """
         try:
-            distance_km = float(request.query_params.get('distance_km', 0))
+            query_params = request.query_params if hasattr(request, 'query_params') else request.GET
+            distance_km = float(query_params.get('distance_km', 0))
         except (ValueError, TypeError):
             return Response({'error': 'distance_km invalide.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -597,7 +601,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         if not user.is_staff:
             from django.db.models import Q
-            queryset = queryset.filter(Q(passenger=user) | Q(ride__driver=user))
+            # Le passager voit ses réservations (y compris en attente pour régulariser le paiement)
+            # Le conducteur ne voit QUE les réservations ayant réellement payé (payment_status != 'pending')
+            queryset = queryset.filter(
+                Q(passenger=user) | 
+                (Q(ride__driver=user) & ~Q(payment_status='pending') & Q(status__in=['confirmed', 'active', 'completed']))
+            )
             
         passenger_id = self.request.query_params.get('passenger')
         ride_driver_id = self.request.query_params.get('ride_driver')
@@ -783,12 +792,17 @@ class BookingViewSet(viewsets.ModelViewSet):
             
         if booking.payment_status in ['escrow', 'paid']:
             return Response({"error": "Cette réservation est déjà payée."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Bloquer si le trajet est terminé ou annulé
+        if booking.ride and booking.ride.status in ['completed', 'cancelled']:
+            return Response({"error": "Ce trajet est terminé. Le paiement n'est plus possible."}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
             import urllib.parse
             amount_to_pay = max(100, int(booking.amount_paid_online))
             description = f"Commission Zemy - Trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}"
             
+            import time
             # Construire l'URL absolue vers notre page de checkout de paiement
             path = (
                 f"/api/payments/checkout/"
@@ -798,6 +812,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 f"&email={urllib.parse.quote(booking.passenger.email or 'client@zemy.bj')}"
                 f"&phone={urllib.parse.quote(booking.passenger.phone or '')}"
                 f"&description={urllib.parse.quote(description)}"
+                f"&_t={int(time.time())}"
             )
             url = request.build_absolute_uri(path)
             
