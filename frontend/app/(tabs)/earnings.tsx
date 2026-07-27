@@ -59,8 +59,8 @@ interface Summary {
 
 const PAYOUT_STATUS_CONFIG = {
   pending: { label: 'En attente', color: '#F59E0B', bg: '#FFFBEB', icon: 'time-outline' as const },
-  processing: { label: 'En cours', color: '#3B82F6', bg: '#EFF6FF', icon: 'sync-outline' as const },
-  paid: { label: 'Versé ✓', color: '#16A34A', bg: '#F0FDF4', icon: 'checkmark-circle' as const },
+  processing: { label: 'En cours', color: '#2563EB', bg: '#EFF6FF', icon: 'sync-outline' as const },
+  paid: { label: 'Versé ✓', color: '#2563EB', bg: '#EFF6FF', icon: 'checkmark-circle' as const },
   failed: { label: 'Échoué', color: '#DC2626', bg: '#FEF2F2', icon: 'close-circle-outline' as const },
 };
 
@@ -172,7 +172,7 @@ export default function EarningsScreen() {
       <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
         {/* Header trajet */}
         <View style={styles.cardHeader}>
-          <LinearGradient colors={['#16A34A', '#15803D']} style={styles.rideIcon}>
+          <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.rideIcon}>
             <Ionicons name="car-sport" size={20} color="white" />
           </LinearGradient>
           <View style={styles.rideInfo}>
@@ -209,7 +209,7 @@ export default function EarningsScreen() {
               onPress={() => openClaimModal(item)}
               activeOpacity={0.8}
             >
-              <LinearGradient colors={['#16A34A', '#15803D']} style={styles.claimBtnGrad}>
+              <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.claimBtnGrad}>
                 <Ionicons name="cash-outline" size={15} color="white" />
                 <Text style={styles.claimBtnText}>Réclamer</Text>
               </LinearGradient>
@@ -235,13 +235,13 @@ export default function EarningsScreen() {
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#2563EB" />
           <Text style={styles.loadingText}>Chargement de vos revenus…</Text>
         </View>
       ) : (
         <>
           {/* Summary bar */}
-          <LinearGradient colors={['#16A34A', '#15803D']} style={styles.summaryCard}>
+          <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.summaryCard}>
             <View style={styles.summaryRow}>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryValue}>{summary.total_earned.toLocaleString('fr-FR')} F</Text>
@@ -262,8 +262,8 @@ export default function EarningsScreen() {
 
           {earnings.length === 0 ? (
             <View style={styles.centered}>
-              <LinearGradient colors={['#F0FDF4', '#DCFCE7']} style={styles.emptyIcon}>
-                <Ionicons name="cash-outline" size={48} color="#16A34A" />
+              <LinearGradient colors={['#EFF6FF', '#DBEAFE']} style={styles.emptyIcon}>
+                <Ionicons name="cash-outline" size={48} color="#2563EB" />
               </LinearGradient>
               <Text style={styles.emptyTitle}>Aucun revenu disponible</Text>
               <Text style={styles.emptyText}>
@@ -302,7 +302,7 @@ export default function EarningsScreen() {
             ]}
           >
             {/* Modal header */}
-            <LinearGradient colors={['#16A34A', '#15803D']} style={styles.modalHeader}>
+            <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.modalHeader}>
               <Ionicons name="cash-outline" size={32} color="white" />
               <Text style={styles.modalTitle}>Réclamer votre paiement</Text>
               {selectedRide && (
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   payoutLabel: { fontSize: 12, fontWeight: '600' },
   payoutPhone: { fontSize: 11, color: '#6B7280' },
-  claimableHint: { fontSize: 13, color: '#16A34A', fontWeight: '600' },
+  claimableHint: { fontSize: 13, color: '#FFAA00', fontWeight: '600' },
 
   claimBtn: { borderRadius: 10, overflow: 'hidden' },
   claimBtnGrad: {
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
 
   confirmBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#2563EB',
     paddingVertical: 16, borderRadius: 14, marginBottom: 10,
   },
   confirmBtnDisabled: { opacity: 0.5 },

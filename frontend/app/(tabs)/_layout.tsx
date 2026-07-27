@@ -93,7 +93,6 @@ export default function TabsLayout() {
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? 'cash' : 'cash-outline'} size={24} color={color} />
             ),
-            tabBarActiveTintColor: '#16A34A',
           }}
         />
         <Tabs.Screen
