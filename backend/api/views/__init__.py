@@ -29,6 +29,8 @@ from .payments import (
     RefundRequestViewSet,
     TransactionViewSet,
     PaymentViewSet,
+    DriverEarningsView,
+    DriverClaimPayoutView,
 )
 from .chat import (
     ConversationViewSet,

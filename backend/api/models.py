@@ -333,7 +333,7 @@ class Booking(models.Model):
         return self.seats_booked * self.ride.price_per_seat
 
     @property
-    def amount_paid_online(self):
+    def zemy_commission(self):
         settings = FinancialSettings.objects.first()
         if not settings:
             return 0
@@ -341,8 +341,12 @@ class Booking(models.Model):
         return max(commission_zemy, settings.min_commission)
 
     @property
+    def amount_paid_online(self):
+        return self.total_amount
+
+    @property
     def amount_due_to_driver(self):
-        return self.total_amount - self.amount_paid_online
+        return self.total_amount - self.zemy_commission
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -918,8 +922,41 @@ class SupportTicket(models.Model):
 
         super().save(*args, **kwargs)
 
+
     def __str__(self):
         return f"{self.ticket_number} - {self.name} ({self.get_status_display()})"
 
 
+class DriverPayout(models.Model):
+    """
+    Modèle représentant une demande de virement du conducteur.
 
+    Rôle :
+        Permet au conducteur de réclamer son paiement après la confirmation
+        d'un trajet terminé. L'admin traite ensuite le virement via Mobile Money.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('processing', 'En cours de traitement'),
+        ('paid', 'Versé'),
+        ('failed', 'Échoué'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    driver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='driver_payouts')
+    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='driver_payouts')
+    amount = models.IntegerField(help_text="Montant net dû au conducteur en XOF")
+    phone_number = models.CharField(max_length=30, help_text="Numéro Mobile Money du conducteur")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_note = models.TextField(blank=True, null=True, help_text="Note de l'admin lors du traitement")
+    requested_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Demande de virement conducteur"
+        verbose_name_plural = "Demandes de virement conducteurs"
+        ordering = ['-requested_at']
+        unique_together = [('driver', 'ride')]
+
+    def __str__(self):
+        return f"Payout {self.driver} - Trajet {self.ride_id} - {self.amount} XOF ({self.status})"

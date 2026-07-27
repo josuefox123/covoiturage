@@ -87,6 +87,16 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="earnings"
+          options={{
+            title: 'Revenus',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'cash' : 'cash-outline'} size={24} color={color} />
+            ),
+            tabBarActiveTintColor: '#16A34A',
+          }}
+        />
+        <Tabs.Screen
           name="messages"
           options={{
             title: 'Messages',

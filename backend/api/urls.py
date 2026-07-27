@@ -26,7 +26,8 @@ from .views import (
     FinancialSettingsViewSet, RefundRequestViewSet, TransactionViewSet, ParcelViewSet,
     PopularPlaceViewSet, send_reset_code, verify_reset_code, reset_password,
     update_profile, change_password,
-    contact_view, SupportTicketViewSet
+    contact_view, SupportTicketViewSet,
+    DriverEarningsView, DriverClaimPayoutView,
 )
 
 router = DefaultRouter()
@@ -66,5 +67,7 @@ urlpatterns = [
     path('mobile-settings/', MobileSettingsView.as_view(), name='mobile_settings'),
     path('payments/', include('api.payments.urls')),
     path('contact/', contact_view, name='contact'),
+    path('driver/earnings/', DriverEarningsView.as_view(), name='driver_earnings'),
+    path('driver/claim/', DriverClaimPayoutView.as_view(), name='driver_claim_payout'),
     path('', include(router.urls)),
 ]
