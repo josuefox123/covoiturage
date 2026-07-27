@@ -172,9 +172,6 @@ export default function EarningsScreen() {
       <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
         {/* Header trajet */}
         <View style={styles.cardHeader}>
-          <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.rideIcon}>
-            <Ionicons name="car-sport" size={20} color="white" />
-          </LinearGradient>
           <View style={styles.rideInfo}>
             <Text style={styles.rideRoute} numberOfLines={1}>
               {item.departure_location} → {item.arrival_location}
@@ -200,7 +197,7 @@ export default function EarningsScreen() {
               ) : null}
             </View>
           ) : (
-            <Text style={styles.claimableHint}>💰 Disponible à réclamer</Text>
+            <Text style={styles.claimableHint}>Disponible à réclamer</Text>
           )}
 
           {isClaimable && (
@@ -225,7 +222,7 @@ export default function EarningsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>💰 Mes Revenus</Text>
+          <Text style={styles.headerTitle}>Mes Revenus</Text>
           <Text style={styles.headerSub}>Réclamez vos gains de conducteur</Text>
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={() => fetchEarnings(true)} activeOpacity={0.7}>
