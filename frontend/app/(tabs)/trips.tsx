@@ -102,23 +102,40 @@ export default function TripsScreen() {
       const ride = role === 'passenger' ? item.ride_details : item;
       if (!ride) return false;
 
-      // Construire le datetime exact de départ (date + heure)
-      let departureDateTime: Date;
-      if (ride.departure_date && ride.departure_time) {
-        const [h, m] = (ride.departure_time as string).split(':').map(Number);
-        departureDateTime = new Date(ride.departure_date);
-        departureDateTime.setHours(h, m, 0, 0);
-      } else {
-        departureDateTime = new Date(ride.departure_date);
-        departureDateTime.setHours(23, 59, 59, 999);
+      // Masquer les réservations passager dont le paiement n'est pas encore complété
+      if (role === 'passenger' && item.status === 'pending_payment') {
+        return false;
       }
 
-      if (filterTab === 'active') {
-        // Actif = départ dans le futur ET statut non terminé
-        return departureDateTime > now && ride.status !== 'completed' && ride.status !== 'cancelled';
+      // Status completed ou cancelled -> toujours dans Archives
+      if (ride.status === 'completed' || ride.status === 'cancelled') {
+        return filterTab === 'archived';
+      }
+
+      // Trajet explicitement démarré par le conducteur -> toujours Actif
+      if (ride.status === 'started') {
+        return filterTab === 'active';
+      }
+
+      // Calcul de l'heure d'arrivée estimée (départ + durée + 2h de marge)
+      let endDateTime: Date;
+      if (ride.departure_date && ride.departure_time) {
+        const [h, m] = (ride.departure_time as string).split(':').map(Number);
+        const dep = new Date(ride.departure_date);
+        dep.setHours(h, m, 0, 0);
+        const durationMin = ride.duration_min || 240; // 4h par défaut si non spécifié
+        endDateTime = new Date(dep.getTime() + (durationMin + 120) * 60 * 1000);
       } else {
-        // Archivé = départ passé OU statut terminé/annulé
-        return departureDateTime <= now || ride.status === 'completed' || ride.status === 'cancelled';
+        endDateTime = new Date(ride.departure_date);
+        endDateTime.setHours(23, 59, 59, 999);
+      }
+
+      const isActiveTrip = now <= endDateTime;
+
+      if (filterTab === 'active') {
+        return isActiveTrip;
+      } else {
+        return !isActiveTrip;
       }
     });
   };

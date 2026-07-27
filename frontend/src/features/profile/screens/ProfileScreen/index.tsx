@@ -318,7 +318,7 @@ export default function ProfileScreen() {
             <MenuItem
               icon="person-outline"
               title="Informations personnelles"
-              subtitle={user.full_name || '⚠️ À remplir'}
+              subtitle={user.full_name || 'À remplir'}
               onPress={() => setInfoModalVisible(true)}
             />
             <View style={styles.menuDivider} />
@@ -337,10 +337,10 @@ export default function ProfileScreen() {
             />
             <View style={styles.menuDivider} />
             <MenuItem
-              icon="wallet-outline"
-              title="Portefeuille & Transactions"
-              subtitle="Historique de vos paiements"
-              onPress={() => router.push('/transactions')}
+              icon="receipt-outline"
+              title="Historique des paiements"
+              subtitle="Reçus et transactions"
+              onPress={() => router.push('/payment-history')}
             />
           </View>
         </View>
@@ -372,12 +372,12 @@ export default function ProfileScreen() {
             <MenuItem
               icon="shield-checkmark-outline"
               title="Vérification d'identité"
-              subtitle={user.is_verified ? "Identité vérifiée ✅" : "Non vérifié — À compléter"}
+              subtitle={user.is_verified ? "Identité vérifiée" : "Non vérifié — À compléter"}
               iconColor={user.is_verified ? '#10B981' : theme.colors.primary}
               onPress={() => {
                 if (user.is_verified) {
                   CustomAlert.alert(
-                    '✅ Compte vérifié',
+                    'Compte vérifié',
                     'Votre identité a été vérifiée avec succès. Vous pouvez utiliser toutes les fonctionnalités de l\'application, notamment publier des trajets.',
                     [{ text: 'Super !' }]
                   );
