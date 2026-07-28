@@ -1,17 +1,16 @@
-/**
+﻿/**
  * ==============================================================
  * Fichier :
  * earnings.tsx
  *
  * Description :
- * Onglet Revenus — permet au conducteur de voir ses gains
- * et de réclamer son paiement après un trajet terminé.
+ * Onglet Revenus -- design fintech inspire banking UI.
  *
  * Projet :
  * Zemy
  * ==============================================================
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -19,23 +18,29 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Animated,
   Alert,
   Modal,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../../src/context/AuthContext';
-import { theme } from '../../src/styles/theme';
+  Dimensions,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../../src/context/AuthContext";
+
+const { width } = Dimensions.get("window");
+
+const PRIMARY = "#2563EB";
+const PRIMARY_DARK = "#1D4ED8";
+const ACCENT = "#FFAA00";
+const BG_BLUE = "#D6E8FF";
+const SUCCESS = "#10B981";
 
 interface Payout {
   id: string;
-  status: 'pending' | 'processing' | 'paid' | 'failed';
+  status: "pending" | "processing" | "paid" | "failed";
   phone_number: string;
   requested_at: string;
   paid_at: string | null;
@@ -57,11 +62,11 @@ interface Summary {
   total_paid_out: number;
 }
 
-const PAYOUT_STATUS_CONFIG = {
-  pending: { label: 'En attente', color: '#F59E0B', bg: '#FFFBEB', icon: 'time-outline' as const },
-  processing: { label: 'En cours', color: '#2563EB', bg: '#EFF6FF', icon: 'sync-outline' as const },
-  paid: { label: 'Versé ✓', color: '#2563EB', bg: '#EFF6FF', icon: 'checkmark-circle' as const },
-  failed: { label: 'Échoué', color: '#DC2626', bg: '#FEF2F2', icon: 'close-circle-outline' as const },
+const STATUS_CFG: Record<string, { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  pending:    { label: "En attente", color: "#F59E0B", icon: "time-outline" },
+  processing: { label: "En cours",   color: PRIMARY,   icon: "sync-outline" },
+  paid:       { label: "Verse",      color: SUCCESS,   icon: "checkmark-circle" },
+  failed:     { label: "Echoue",     color: "#EF4444", icon: "close-circle-outline" },
 };
 
 export default function EarningsScreen() {
@@ -70,300 +75,273 @@ export default function EarningsScreen() {
   const [summary, setSummary] = useState<Summary>({ total_earned: 0, total_claimable: 0, total_paid_out: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<"all" | "claimable" | "paid">("all");
 
-  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [selectedRide, setSelectedRide] = useState<EarningItem | null>(null);
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [claiming, setClaiming] = useState(false);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const modalAnim = useRef(new Animated.Value(0)).current;
-
-  const fetchEarnings = useCallback(async (isRefresh = false) => {
+  const fetchEarnings = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true); else setLoading(true);
     try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      const data = await authFetch('/driver/earnings/');
-      setEarnings(data?.earnings ?? []);
-      setSummary(data?.summary ?? { total_earned: 0, total_claimable: 0, total_paid_out: 0 });
-    } catch (e) {
-      console.error('Erreur chargement revenus:', e);
+      const data = await authFetch("/driver/earnings/");
+      setEarnings(data.earnings || []);
+      setSummary(data.summary || { total_earned: 0, total_claimable: 0, total_paid_out: 0 });
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message || "Impossible de charger vos revenus.");
     } finally {
       setLoading(false);
       setRefreshing(false);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
     }
   }, [authFetch]);
 
-  useEffect(() => {
-    fetchEarnings();
-  }, [fetchEarnings]);
+  useEffect(() => { fetchEarnings(); }, [fetchEarnings]);
 
   const openClaimModal = (item: EarningItem) => {
     setSelectedRide(item);
-    setPhoneNumber('');
+    setPhoneNumber("");
     setShowModal(true);
-    Animated.spring(modalAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 65,
-      friction: 8,
-    }).start();
-  };
-
-  const closeModal = () => {
-    Animated.timing(modalAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowModal(false);
-      setSelectedRide(null);
-    });
   };
 
   const handleClaim = async () => {
-    if (!selectedRide) return;
-    const cleaned = phoneNumber.replace(/\s/g, '');
-    if (cleaned.length < 8) {
-      Alert.alert('Numéro invalide', 'Veuillez saisir un numéro Mobile Money valide (min 8 chiffres).');
+    const phone = phoneNumber.replace(/\s/g, "");
+    if (phone.length < 8) {
+      Alert.alert("Numero invalide", "Veuillez entrer un numero Mobile Money valide.");
       return;
     }
-
+    setClaiming(true);
     try {
-      setClaiming(true);
-      await authFetch('/driver/claim/', {
-        method: 'POST',
-        body: JSON.stringify({ ride_id: selectedRide.ride_id, phone_number: cleaned }),
+      await authFetch("/driver/claim/", {
+        method: "POST",
+        body: JSON.stringify({ ride_id: selectedRide?.ride_id, phone_number: phone }),
       });
-
-      closeModal();
+      setShowModal(false);
       Alert.alert(
-        '✅ Demande soumise',
-        `Votre demande de virement de ${selectedRide.amount_due.toLocaleString('fr-FR')} XOF a été soumise.\n\nVous recevrez votre argent sous 24h sur le ${cleaned}.`,
-        [{ text: 'OK', onPress: () => fetchEarnings(true) }]
+        "Demande envoyee !",
+        `Votre demande de ${selectedRide?.amount_due.toLocaleString("fr-FR")} FCFA sera traitee sous 24h.`,
+        [{ text: "OK", onPress: () => fetchEarnings(true) }]
       );
     } catch (e: any) {
-      const msg = e?.message || 'Une erreur est survenue. Veuillez réessayer.';
-      Alert.alert('Erreur', msg);
+      Alert.alert("Erreur", e?.message || "Une erreur est survenue.");
     } finally {
       setClaiming(false);
     }
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (d: string) => {
     try {
-      return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return dateStr; }
+      return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    } catch { return d; }
   };
 
-  const renderItem = ({ item }: { item: EarningItem }) => {
+  const filteredEarnings = earnings.filter(item => {
+    if (filter === "claimable") return !item.payout;
+    if (filter === "paid") return item.payout?.status === "paid";
+    return true;
+  });
+
+  const renderTransaction = ({ item }: { item: EarningItem }) => {
     const hasPayout = !!item.payout;
-    const payoutCfg = item.payout ? PAYOUT_STATUS_CONFIG[item.payout.status] : null;
+    const cfg = item.payout ? STATUS_CFG[item.payout.status] : null;
     const isClaimable = !hasPayout;
 
     return (
-      <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
-        {/* Header trajet */}
-        <View style={styles.cardHeader}>
-          <View style={styles.rideInfo}>
-            <Text style={styles.rideRoute} numberOfLines={1}>
-              {item.departure_location} → {item.arrival_location}
-            </Text>
-            <Text style={styles.rideDate}>{formatDate(item.departure_date)}</Text>
-          </View>
-          <View style={styles.amountBadge}>
-            <Text style={styles.amountValue}>{item.amount_due.toLocaleString('fr-FR')} F</Text>
-            <Text style={styles.amountLabel}>{item.confirmed_passengers} passager{item.confirmed_passengers > 1 ? 's' : ''}</Text>
-          </View>
+      <TouchableOpacity
+        style={styles.txRow}
+        activeOpacity={isClaimable ? 0.7 : 1}
+        onPress={() => isClaimable && openClaimModal(item)}
+      >
+        {/* Icon carré */}
+        <View style={[styles.txIcon, { backgroundColor: isClaimable ? "#EFF6FF" : (cfg ? cfg.color + "18" : "#F3F4F6") }]}>
+          <Ionicons
+            name={hasPayout ? (cfg?.icon ?? "card-outline") : "car-outline"}
+            size={20}
+            color={isClaimable ? PRIMARY : (cfg?.color ?? "#9CA3AF")}
+          />
         </View>
 
-        <View style={styles.cardDivider} />
+        {/* Infos */}
+        <View style={styles.txInfo}>
+          <Text style={styles.txTitle} numberOfLines={1}>
+            {item.departure_location} -- {item.arrival_location}
+          </Text>
+          <Text style={styles.txDate}>
+            {formatDate(item.departure_date)}
+            {hasPayout && cfg ? `  ·  ${cfg.label}` : "  ·  Appuyer pour reclamer"}
+          </Text>
+        </View>
 
-        {/* Footer statut + bouton */}
-        <View style={styles.cardFooter}>
-          {hasPayout && payoutCfg ? (
-            <View style={[styles.payoutBadge, { backgroundColor: payoutCfg.bg }]}>
-              <Ionicons name={payoutCfg.icon} size={14} color={payoutCfg.color} />
-              <Text style={[styles.payoutLabel, { color: payoutCfg.color }]}>{payoutCfg.label}</Text>
-              {item.payout?.phone_number ? (
-                <Text style={styles.payoutPhone}> · {item.payout.phone_number}</Text>
-              ) : null}
-            </View>
-          ) : (
-            <Text style={styles.claimableHint}>Disponible à réclamer</Text>
-          )}
-
+        {/* Montant */}
+        <View style={styles.txAmount}>
+          <Text style={[styles.txAmountText, { color: hasPayout && item.payout?.status === "paid" ? SUCCESS : PRIMARY }]}>
+            +{item.amount_due.toLocaleString("fr-FR")} F
+          </Text>
           {isClaimable && (
-            <TouchableOpacity
-              style={styles.claimBtn}
-              onPress={() => openClaimModal(item)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.claimBtnGrad}>
-                <Ionicons name="cash-outline" size={15} color="white" />
-                <Text style={styles.claimBtnText}>Réclamer</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            <View style={styles.claimDot} />
           )}
         </View>
-      </Animated.View>
+      </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Mes Revenus</Text>
-          <Text style={styles.headerSub}>Réclamez vos gains de conducteur</Text>
-        </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={() => fetchEarnings(true)} activeOpacity={0.7}>
-          <Ionicons name="refresh-outline" size={22} color={theme.colors.text} />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.root} edges={["top"]}>
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={styles.loadingText}>Chargement de vos revenus…</Text>
-        </View>
-      ) : (
-        <>
-          {/* Summary bar */}
-          <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{summary.total_earned.toLocaleString('fr-FR')} F</Text>
-                <Text style={styles.summaryLabel}>Total gagné</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{summary.total_claimable.toLocaleString('fr-FR')} F</Text>
-                <Text style={styles.summaryLabel}>À réclamer</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{summary.total_paid_out.toLocaleString('fr-FR')} F</Text>
-                <Text style={styles.summaryLabel}>Déjà versé</Text>
-              </View>
-            </View>
-          </LinearGradient>
-
-          {earnings.length === 0 ? (
-            <View style={styles.centered}>
-              <LinearGradient colors={['#EFF6FF', '#DBEAFE']} style={styles.emptyIcon}>
-                <Ionicons name="cash-outline" size={48} color="#2563EB" />
-              </LinearGradient>
-              <Text style={styles.emptyTitle}>Aucun revenu disponible</Text>
-              <Text style={styles.emptyText}>
-                Vos revenus apparaîtront ici une fois{'\n'}que vous aurez terminé des trajets.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={earnings}
-              keyExtractor={item => item.ride_id}
-              renderItem={renderItem}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-              onRefresh={() => fetchEarnings(true)}
-              refreshing={refreshing}
-            />
-          )}
-        </>
-      )}
-
-      {/* Modal de saisie du numéro */}
-      <Modal visible={showModal} transparent animationType="none" onRequestClose={closeModal}>
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={closeModal} />
-          <Animated.View
-            style={[
-              styles.modalContainer,
-              {
-                transform: [{ scale: modalAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
-                opacity: modalAnim,
-              },
-            ]}
-          >
-            {/* Modal header */}
-            <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.modalHeader}>
-              <Ionicons name="cash-outline" size={32} color="white" />
-              <Text style={styles.modalTitle}>Réclamer votre paiement</Text>
-              {selectedRide && (
-                <Text style={styles.modalSubtitle}>
-                  {selectedRide.amount_due.toLocaleString('fr-FR')} FCFA
-                </Text>
-              )}
-            </LinearGradient>
-
-            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
-              {selectedRide && (
-                <View style={styles.rideRecap}>
-                  <Ionicons name="navigate-outline" size={16} color="#6B7280" />
-                  <Text style={styles.rideRecapText} numberOfLines={2}>
-                    {selectedRide.departure_location} → {selectedRide.arrival_location}
-                  </Text>
-                </View>
-              )}
-
-              <Text style={styles.inputLabel}>Numéro Mobile Money (MTN, Moov…)</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="phone-portrait-outline" size={20} color="#6B7280" style={{ marginLeft: 12 }} />
-                <TextInput
-                  style={styles.phoneInput}
-                  placeholder="Ex: 22961000000"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
-                  maxLength={20}
-                  returnKeyType="done"
-                  onSubmitEditing={handleClaim}
-                />
-              </View>
-
-              <View style={styles.infoBox}>
-                <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
-                <Text style={styles.infoText}>
-                  L'argent sera envoyé sur ce numéro sous 24h après validation par notre équipe.
-                </Text>
-              </View>
-
-              {/* Actions */}
+      {/* ====== HEADER BLEU PASTEL ====== */}
+      <View style={styles.heroSection}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <View style={styles.pills}>
+            {(["all", "claimable", "paid"] as const).map(f => (
               <TouchableOpacity
-                style={[styles.confirmBtn, (!phoneNumber.replace(/\s/g, '') || claiming) && styles.confirmBtnDisabled]}
-                onPress={handleClaim}
-                disabled={!phoneNumber.replace(/\s/g, '') || claiming}
+                key={f}
+                style={[styles.pill, filter === f && styles.pillActive]}
+                onPress={() => setFilter(f)}
                 activeOpacity={0.8}
               >
-                {claiming ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <>
-                    <Ionicons name="send-outline" size={18} color="white" />
-                    <Text style={styles.confirmBtnText}>Envoyer la demande</Text>
-                  </>
-                )}
+                <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>
+                  {f === "all" ? "Tous" : f === "claimable" ? "A reclamer" : "Verses"}
+                </Text>
               </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => fetchEarnings(true)} activeOpacity={0.7}>
+            <Ionicons name="refresh" size={20} color={PRIMARY_DARK} />
+          </TouchableOpacity>
+        </View>
 
-              <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
-                <Text style={styles.cancelText}>Annuler</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </Animated.View>
+        {/* Solde */}
+        <Text style={styles.balanceLabel}>Total gagné</Text>
+        <Text style={styles.balanceValue}>
+          {loading ? "---" : summary.total_earned.toLocaleString("fr-FR")} FCFA
+        </Text>
+      </View>
+
+      {/* ====== CONTENU ====== */}
+      <View style={styles.content}>
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={PRIMARY} />
+            <Text style={styles.loadingText}>Chargement de vos revenus...</Text>
+          </View>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} refreshing={refreshing}
+            onScrollBeginDrag={() => {}} contentContainerStyle={{ paddingBottom: 40 }}>
+
+            {/* Carte transactions */}
+            <View style={styles.card}>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle}>Mes dernieres courses</Text>
+                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+              </View>
+
+              {filteredEarnings.length === 0 ? (
+                <View style={styles.emptyBox}>
+                  <Ionicons name="car-outline" size={36} color="#D1D5DB" />
+                  <Text style={styles.emptyText}>Aucun trajet pour ce filtre.</Text>
+                </View>
+              ) : (
+                filteredEarnings.map((item, i) => (
+                  <View key={item.ride_id}>
+                    {renderTransaction({ item })}
+                    {i < filteredEarnings.length - 1 && <View style={styles.txSeparator} />}
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Carte statistiques */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Votre solde</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statsItem}>
+                  <Text style={styles.statsLabel}>A reclamer</Text>
+                  <Text style={[styles.statsValue, { color: ACCENT }]}>
+                    {summary.total_claimable.toLocaleString("fr-FR")}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.arrowCircle}
+                  onPress={() => {
+                    const claimable = earnings.find(e => !e.payout);
+                    if (claimable) openClaimModal(claimable);
+                    else Alert.alert("Aucun trajet", "Aucune course a reclamer pour l instant.");
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="arrow-forward" size={20} color="white" />
+                </TouchableOpacity>
+                <View style={styles.statsItem}>
+                  <Text style={styles.statsLabel}>Deja verse</Text>
+                  <Text style={[styles.statsValue, { color: SUCCESS }]}>
+                    {summary.total_paid_out.toLocaleString("fr-FR")}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+          </ScrollView>
+        )}
+      </View>
+
+      {/* ====== MODAL ====== */}
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowModal(false)} />
+          <View style={styles.modalSheet}>
+
+            {/* Handle */}
+            <View style={styles.handle} />
+
+            <Text style={styles.modalTitle}>Reclamer votre gain</Text>
+            {selectedRide && (
+              <Text style={styles.modalAmount}>
+                {selectedRide.amount_due.toLocaleString("fr-FR")} FCFA
+              </Text>
+            )}
+            {selectedRide && (
+              <Text style={styles.modalRoute}>
+                {selectedRide.departure_location} -- {selectedRide.arrival_location}
+              </Text>
+            )}
+
+            <Text style={styles.inputLabel}>Numero Mobile Money</Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="phone-portrait-outline" size={20} color="#9CA3AF" />
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 22961000000"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                maxLength={20}
+              />
+            </View>
+
+            <View style={styles.infoRow}>
+              <Ionicons name="information-circle-outline" size={16} color={PRIMARY} />
+              <Text style={styles.infoText}>Le virement sera effectue sous 24h ouvrables.</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.sendBtn, (!phoneNumber.replace(/\s/g, "") || claiming) && { opacity: 0.5 }]}
+              onPress={handleClaim}
+              disabled={!phoneNumber.replace(/\s/g, "") || claiming}
+              activeOpacity={0.8}
+            >
+              {claiming ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.sendBtnText}>Envoyer la demande</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowModal(false)}>
+              <Text style={styles.cancelText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -371,151 +349,117 @@ export default function EarningsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  root: { flex: 1, backgroundColor: BG_BLUE },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  // ---- HERO ----
+  heroSection: {
+    backgroundColor: BG_BLUE,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 32,
   },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  headerSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  refreshBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center', alignItems: 'center',
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
+  pills: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 20, padding: 3, gap: 2 },
+  pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 17 },
+  pillActive: { backgroundColor: PRIMARY_DARK },
+  pillText: { fontSize: 13, fontWeight: "600", color: PRIMARY_DARK },
+  pillTextActive: { color: "white" },
+  settingsBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    justifyContent: "center", alignItems: "center",
   },
+  balanceLabel: { fontSize: 14, color: PRIMARY_DARK, fontWeight: "500", marginBottom: 4 },
+  balanceValue: { fontSize: 36, fontWeight: "800", color: "#0F172A", letterSpacing: -1 },
 
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 12 },
-  loadingText: { color: '#6B7280', fontSize: 14, marginTop: 12 },
-
-  // Summary card
-  summaryCard: { marginHorizontal: 16, marginTop: 16, borderRadius: 16, padding: 18 },
-  summaryRow: { flexDirection: 'row', alignItems: 'center' },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryValue: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
-  summaryLabel: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  summaryDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: 8 },
-
-  // Empty state
-  emptyIcon: {
-    width: 96, height: 96, borderRadius: 48,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+  // ---- CONTENT ----
+  content: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -8,
+    paddingTop: 8,
   },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#111827' },
-  emptyText: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, paddingTop: 80 },
+  loadingText: { color: "#6B7280", fontSize: 14 },
 
-  // List
-  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 },
-
-  // Card
+  // ---- CARD ----
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
+    backgroundColor: "white",
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
-  rideIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  rideInfo: { flex: 1, gap: 3 },
-  rideRoute: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  rideDate: { fontSize: 12, color: '#6B7280' },
-  amountBadge: { alignItems: 'flex-end', gap: 2 },
-  amountValue: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  amountLabel: { fontSize: 11, color: '#9CA3AF' },
+  cardTitleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: "#111827" },
 
-  cardDivider: { height: 1, backgroundColor: '#F3F4F6', marginHorizontal: 16 },
+  // ---- TRANSACTIONS ----
+  txRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
+  txIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  txInfo: { flex: 1 },
+  txTitle: { fontSize: 14, fontWeight: "600", color: "#111827" },
+  txDate: { fontSize: 12, color: "#9CA3AF", marginTop: 2 },
+  txAmount: { alignItems: "flex-end", gap: 4 },
+  txAmountText: { fontSize: 15, fontWeight: "700" },
+  claimDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: ACCENT },
+  txSeparator: { height: 1, backgroundColor: "#F3F4F6", marginVertical: 2 },
 
-  cardFooter: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-  },
-  payoutBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
-  },
-  payoutLabel: { fontSize: 12, fontWeight: '600' },
-  payoutPhone: { fontSize: 11, color: '#6B7280' },
-  claimableHint: { fontSize: 13, color: '#FFAA00', fontWeight: '600' },
+  emptyBox: { alignItems: "center", paddingVertical: 24, gap: 8 },
+  emptyText: { fontSize: 13, color: "#9CA3AF" },
 
-  claimBtn: { borderRadius: 10, overflow: 'hidden' },
-  claimBtnGrad: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 9,
+  // ---- STATS ----
+  statsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+  statsItem: { alignItems: "center", flex: 1 },
+  statsLabel: { fontSize: 12, color: "#9CA3AF", marginBottom: 4 },
+  statsValue: { fontSize: 20, fontWeight: "800" },
+  arrowCircle: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: PRIMARY,
+    justifyContent: "center", alignItems: "center",
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
   },
-  claimBtnText: { color: 'white', fontWeight: '700', fontSize: 13 },
 
-  // Modal
-  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    alignItems: 'center',
-    paddingTop: 28,
-    paddingBottom: 20,
+  // ---- MODAL ----
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
+  modalSheet: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     paddingHorizontal: 24,
-    gap: 8,
+    paddingTop: 12,
+    paddingBottom: 36,
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: 'white' },
-  modalSubtitle: { fontSize: 28, fontWeight: '900', color: 'white' },
-
-  modalBody: { paddingHorizontal: 20, paddingTop: 20 },
-
-  rideRecap: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    backgroundColor: '#F9FAFB',
-    padding: 12, borderRadius: 10, marginBottom: 20,
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E5E7EB", alignSelf: "center", marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: "#111827", marginBottom: 6 },
+  modalAmount: { fontSize: 32, fontWeight: "900", color: PRIMARY, marginBottom: 4 },
+  modalRoute: { fontSize: 13, color: "#6B7280", marginBottom: 24 },
+  inputLabel: { fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 },
+  inputRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderWidth: 1.5, borderColor: "#E5E7EB",
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 14,
+    backgroundColor: "#F9FAFB", marginBottom: 12,
   },
-  rideRecapText: { flex: 1, fontSize: 13, color: '#374151', lineHeight: 18 },
-
-  inputLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  inputWrapper: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#E5E7EB',
-    borderRadius: 12, backgroundColor: '#FAFAFA',
+  input: { flex: 1, fontSize: 16, color: "#111827", fontWeight: "500" },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 24 },
+  infoText: { flex: 1, fontSize: 12, color: PRIMARY },
+  sendBtn: {
+    backgroundColor: PRIMARY, paddingVertical: 16, borderRadius: 14,
+    alignItems: "center", justifyContent: "center", marginBottom: 10,
   },
-  phoneInput: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '500',
-  },
-
-  infoBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    backgroundColor: '#EFF6FF',
-    padding: 12, borderRadius: 10, marginTop: 12, marginBottom: 20,
-  },
-  infoText: { flex: 1, fontSize: 12, color: '#2563EB', lineHeight: 17 },
-
-  confirmBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#2563EB',
-    paddingVertical: 16, borderRadius: 14, marginBottom: 10,
-  },
-  confirmBtnDisabled: { opacity: 0.5 },
-  confirmBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
-
-  cancelBtn: { alignItems: 'center', paddingVertical: 12, marginBottom: 16 },
-  cancelText: { color: '#6B7280', fontSize: 14, fontWeight: '500' },
+  sendBtnText: { color: "white", fontWeight: "700", fontSize: 16 },
+  cancelBtn: { alignItems: "center", paddingVertical: 10 },
+  cancelText: { color: "#9CA3AF", fontSize: 14 },
 });
