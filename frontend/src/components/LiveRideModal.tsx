@@ -521,155 +521,284 @@ export default function LiveRideModal() {
     }
   };
 
-  const leafletHtml = useMemo(() => `
+  const googleMapHtml = useMemo(() => `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.marker.slideto@0.2.0/Leaflet.Marker.SlideTo.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html, #map { width: 100%; height: 100%; }
-    .user-dot {
+
+    .pulse-user {
       width: 18px; height: 18px;
       background: #4285F4;
       border-radius: 50%;
       border: 3px solid white;
-      box-shadow: 0 2px 6px rgba(66,133,244,0.5);
+      box-shadow: 0 2px 8px rgba(66,133,244,0.6);
+      position: relative;
     }
-    .pulse-ring {
-      width: 40px; height: 40px;
-      background: rgba(66,133,244,0.25);
-      border-radius: 50%;
+    .pulse-user::after {
+      content: '';
       position: absolute;
-      top: -11px; left: -11px;
-      animation: pulse 2s infinite;
+      top: -9px; left: -9px;
+      width: 36px; height: 36px;
+      background: rgba(66,133,244,0.2);
+      border-radius: 50%;
+      animation: pulse 2s ease-out infinite;
     }
-    @keyframes pulse {
-      0% { transform: scale(0.5); opacity: 1; }
-      100% { transform: scale(1.5); opacity: 0; }
-    }
-    .depart-marker { background: #22C55E; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
-    .dest-marker { background: #EF4444; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.3); }
-    .driver-dot {
+    .pulse-driver {
       width: 18px; height: 18px;
       background: #10B981;
       border-radius: 50%;
       border: 3px solid white;
-      box-shadow: 0 2px 6px rgba(16,185,129,0.5);
+      box-shadow: 0 2px 8px rgba(16,185,129,0.6);
+      position: relative;
     }
-    .driver-pulse-ring {
-      width: 40px; height: 40px;
-      background: rgba(16,185,129,0.25);
-      border-radius: 50%;
+    .pulse-driver::after {
+      content: '';
       position: absolute;
-      top: -11px; left: -11px;
-      animation: pulse 2s infinite;
+      top: -9px; left: -9px;
+      width: 36px; height: 36px;
+      background: rgba(16,185,129,0.2);
+      border-radius: 50%;
+      animation: pulse 2s ease-out infinite;
     }
-    .leaflet-control-attribution { display: none !important; }
+    .depart-pin {
+      width: 14px; height: 14px;
+      background: #22C55E;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .dest-pin {
+      width: 14px; height: 14px;
+      background: #EF4444;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.4); opacity: 1; }
+      100% { transform: scale(1.8); opacity: 0; }
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { 
-      zoomControl: true,
-      preferCanvas: true 
-    }).setView([${DEFAULT_LAT}, ${DEFAULT_LON}], ${DEFAULT_ZOOM});
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, detectRetina: true
-    }).addTo(map);
-
+    var map;
     var userMarker = null;
     var driverMarker = null;
     var departMarker = null;
     var destMarker = null;
-    var routeLine = null;
+    var directionsRenderer = null;
+    var directionsService = null;
+    var departPos = null;
+    var destPos = null;
 
-    function makeIcon(cls) {
-      return L.divIcon({ className: '', html: '<div class="' + cls + '"></div>', iconSize: [14,14], iconAnchor: [7,7] });
+    function makeDivMarker(htmlContent, anchorX, anchorY) {
+      return {
+        url: 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>'),
+        scaledSize: new google.maps.Size(1, 1)
+      };
     }
-    function makeUserIcon() {
-      return L.divIcon({ className: '', html: '<div style="position:relative"><div class="pulse-ring"></div><div class="user-dot"></div></div>', iconSize: [18,18], iconAnchor: [9,9] });
+
+    function createOverlayMarker(position, cls, title) {
+      var div = document.createElement('div');
+      div.className = cls;
+      div.title = title || '';
+
+      var overlay = new google.maps.OverlayView();
+      overlay.onAdd = function() {
+        this.getPanes().overlayMouseTarget.appendChild(div);
+      };
+      overlay.draw = function() {
+        var point = this.getProjection().fromLatLngToDivPixel(this.position);
+        if (point) {
+          div.style.position = 'absolute';
+          div.style.left = (point.x - 9) + 'px';
+          div.style.top = (point.y - 9) + 'px';
+        }
+      };
+      overlay.onRemove = function() {
+        if (div.parentNode) div.parentNode.removeChild(div);
+      };
+      overlay.position = position;
+      overlay.setPosition = function(pos) {
+        this.position = pos;
+        this.draw();
+      };
+      overlay.setMap(map);
+      return overlay;
     }
-    function makeDriverIcon() {
-      return L.divIcon({ className: '', html: '<div style="position:relative"><div class="driver-pulse-ring"></div><div class="driver-dot"></div></div>', iconSize: [18,18], iconAnchor: [9,9] });
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        zoom: ${DEFAULT_ZOOM},
+        center: { lat: ${DEFAULT_LAT}, lng: ${DEFAULT_LON} },
+        disableDefaultUI: true,
+        zoomControl: true,
+        zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
+        styles: [
+          { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
+          { "featureType": "transit", "stylers": [{ "visibility": "off" }] },
+          { "featureType": "road", "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] }
+        ]
+      });
+
+      directionsService = new google.maps.DirectionsService();
+      directionsRenderer = new google.maps.DirectionsRenderer({
+        map: map,
+        suppressMarkers: true,
+        polylineOptions: {
+          strokeColor: '#3B82F6',
+          strokeOpacity: 0.9,
+          strokeWeight: 5
+        }
+      });
+
+      map.addListener('tilesloaded', function() {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+        }
+      });
+    }
+
+    function drawRoute() {
+      if (!departPos || !destPos || !directionsService) return;
+      directionsService.route({
+        origin: departPos,
+        destination: destPos,
+        travelMode: google.maps.TravelMode.DRIVING
+      }, function(response, status) {
+        if (status === 'OK') {
+          directionsRenderer.setDirections(response);
+        } else {
+          // Fallback straight line
+          var line = new google.maps.Polyline({
+            path: [departPos, destPos],
+            strokeColor: '#3B82F6',
+            strokeOpacity: 0.8,
+            strokeWeight: 4,
+            map: map
+          });
+        }
+      });
     }
 
     window.handleMessage = function(msg) {
       if (msg.type === 'setView') {
-        map.setView([msg.lat, msg.lon], msg.zoom || 14, { animate: true });
-      } else if (msg.type === 'updateUserPosition') {
-        if (!userMarker) {
-          userMarker = L.marker([msg.lat, msg.lon], { icon: makeUserIcon(), zIndexOffset: 1000 }).addTo(map);
-        } else {
-          if (userMarker.slideTo) {
-            userMarker.slideTo([msg.lat, msg.lon], { duration: 1500 });
-          } else {
-            userMarker.setLatLng([msg.lat, msg.lon]);
-          }
-        }
-      } else if (msg.type === 'updateDriverPosition') {
-        if (!driverMarker) {
-          driverMarker = L.marker([msg.lat, msg.lon], { icon: makeDriverIcon(), zIndexOffset: 1100 })
-            .bindTooltip('Conducteur', { permanent: false, direction: 'top' }).addTo(map);
-        } else {
-          if (driverMarker.slideTo) {
-            driverMarker.slideTo([msg.lat, msg.lon], { duration: 1500 });
-          } else {
-            driverMarker.setLatLng([msg.lat, msg.lon]);
-          }
-        }
-      } else if (msg.type === 'setDepartMarker') {
-        if (!departMarker) {
-          departMarker = L.marker([msg.lat, msg.lon], { icon: makeIcon('depart-marker') })
-            .bindTooltip('Départ', { permanent: true, direction: 'top', offset:[0,-8] }).addTo(map);
-        }
-      } else if (msg.type === 'setDestMarker') {
-        if (!destMarker) {
-          destMarker = L.marker([msg.lat, msg.lon], { icon: makeIcon('dest-marker') })
-            .bindTooltip('Arrivée', { permanent: true, direction: 'top', offset:[0,-8] }).addTo(map);
-        }
-      } else if (msg.type === 'drawRoutes') {
-        if (window.routeLines) {
-          window.routeLines.forEach(function(line) {
-            map.removeLayer(line);
-          });
-        }
-        window.routeLines = [];
+        map.setCenter({ lat: msg.lat, lng: msg.lon });
+        map.setZoom(msg.zoom || 14);
 
-        msg.routes.forEach(function(r, index) {
-          var color = index === msg.activeIndex ? '#3B82F6' : '#9CA3AF';
-          var weight = index === msg.activeIndex ? 6 : 4;
-          var opacity = index === msg.activeIndex ? 0.9 : 0.4;
-          
-          var line = L.polyline(r.coords, {
-            color: color,
-            weight: weight,
-            opacity: opacity,
-            lineJoin: 'round',
-            smoothFactor: 2,
-            renderer: L.canvas()
-          }).addTo(map);
-          
-          line.on('click', function() {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'selectRoute', index: index }));
+      } else if (msg.type === 'updateUserPosition') {
+        var pos = { lat: msg.lat, lng: msg.lon };
+        if (!userMarker) {
+          var el = document.createElement('div');
+          el.className = 'pulse-user';
+          userMarker = new google.maps.marker.AdvancedMarkerElement
+            ? new google.maps.marker.AdvancedMarkerElement({ position: pos, map: map, content: el })
+            : new google.maps.Marker({
+                position: pos,
+                map: map,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 8,
+                  fillColor: '#4285F4',
+                  fillOpacity: 1,
+                  strokeColor: 'white',
+                  strokeWeight: 3
+                },
+                title: 'Votre position',
+                zIndex: 1000
+              });
+        } else {
+          userMarker.setPosition ? userMarker.setPosition(pos) : (userMarker.position = pos);
+        }
+
+      } else if (msg.type === 'updateDriverPosition') {
+        var pos = { lat: msg.lat, lng: msg.lon };
+        if (!driverMarker) {
+          driverMarker = new google.maps.Marker({
+            position: pos,
+            map: map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 9,
+              fillColor: '#10B981',
+              fillOpacity: 1,
+              strokeColor: 'white',
+              strokeWeight: 3
+            },
+            title: 'Conducteur',
+            zIndex: 1100
           });
-          
-          window.routeLines.push(line);
-        });
+        } else {
+          driverMarker.setPosition(pos);
+        }
+
+      } else if (msg.type === 'setDepartMarker') {
+        var pos = { lat: msg.lat, lng: msg.lon };
+        departPos = pos;
+        if (!departMarker) {
+          departMarker = new google.maps.Marker({
+            position: pos,
+            map: map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: '#22C55E',
+              fillOpacity: 1,
+              strokeColor: 'white',
+              strokeWeight: 3
+            },
+            title: 'Départ',
+            zIndex: 500
+          });
+        }
+        drawRoute();
+
+      } else if (msg.type === 'setDestMarker') {
+        var pos = { lat: msg.lat, lng: msg.lon };
+        destPos = pos;
+        if (!destMarker) {
+          destMarker = new google.maps.Marker({
+            position: pos,
+            map: map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: '#EF4444',
+              fillOpacity: 1,
+              strokeColor: 'white',
+              strokeWeight: 3
+            },
+            title: 'Arrivée',
+            zIndex: 500
+          });
+        }
+        drawRoute();
+
+      } else if (msg.type === 'drawRoutes') {
+        // With Google Maps DirectionsService we draw the main route only
+        // Route is already drawn when both markers are set
+        drawRoute();
+
       } else if (msg.type === 'fitBounds') {
-        map.fitBounds(msg.points, { padding: [40, 40] });
+        if (msg.points && msg.points.length >= 2) {
+          var bounds = new google.maps.LatLngBounds();
+          msg.points.forEach(function(p) {
+            bounds.extend({ lat: p[0], lng: p[1] });
+          });
+          map.fitBounds(bounds, { top: 60, right: 40, bottom: 60, left: 40 });
+        }
       }
     };
-
-    map.whenReady(function() {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
-    });
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc&callback=initMap">
   </script>
 </body>
 </html>`, []);
@@ -732,7 +861,7 @@ export default function LiveRideModal() {
                 <WebView
                   ref={webviewRef}
                   originWhitelist={['*']}
-                  source={{ html: leafletHtml }}
+                  source={{ html: googleMapHtml }}
                   onMessage={onMapMessage}
                   javaScriptEnabled
                   domStorageEnabled

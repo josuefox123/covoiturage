@@ -326,8 +326,6 @@ export default function RideDetailScreen() {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     body, html, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #f3f4f6; }
     .loading-overlay {
@@ -344,11 +342,6 @@ export default function RideDetailScreen() {
       animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    /* Leaflet customized zoom buttons */
-    .leaflet-bar { border: none !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
-    .leaflet-bar a { background-color: #ffffff !important; color: #1f2937 !important; border-bottom: 1px solid #f3f4f6 !important; width: 34px !important; height: 34px !important; line-height: 34px !important; font-size: 18px !important; }
-    .leaflet-bar a:first-child { border-top-left-radius: 8px !important; border-top-right-radius: 8px !important; }
-    .leaflet-bar a:last-child { border-bottom-left-radius: 8px !important; border-bottom-right-radius: 8px !important; border-bottom: none !important; }
   </style>
 </head>
 <body>
@@ -363,108 +356,99 @@ export default function RideDetailScreen() {
     const arrLat = ${ride.arrival_latitude};
     const arrLon = ${ride.arrival_longitude};
 
-    // ZoomControl enabled so user can manually adjust zoom
-    const map = L.map('map', { zoomControl: true, attributionControl: false });
-    
-    // Position zoom control in bottom-right
-    map.zoomControl.setPosition('bottomright');
+    var map;
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 18
-    }).addTo(map);
+    function initMap() {
+      var mapOptions = {
+        zoom: 12,
+        center: { lat: depLat, lng: depLon },
+        disableDefaultUI: true,
+        zoomControl: false,
+        styles: [
+          { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "visibility": "off" }] },
+          { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
+          { "featureType": "road", "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+          { "featureType": "transit", "stylers": [{ "visibility": "off" }] }
+        ]
+      };
 
-    // Initial center bounds with maxZoom cap to avoid empty maps
-    const bounds = L.latLngBounds([[depLat, depLon], [arrLat, arrLon]]);
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+      map = new google.maps.Map(document.getElementById('map'), mapOptions);
 
-    // === Custom Marker Icons ===
-    const depIcon = L.divIcon({
-      className: '',
-      html: \`<div style="
-        width: 24px; height: 24px;
-        background: #0066FF;
-        border: 4px solid white; border-radius: 50%;
-        box-shadow: 0 4px 10px rgba(0,102,255,0.45);
-        display: flex; align-items: center; justify-content: center;
-      "><div style="width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>\`,
-      iconSize: [24, 24], iconAnchor: [12, 12]
-    });
-
-    const arrIcon = L.divIcon({
-      className: '',
-      html: \`<div style="
-        width: 24px; height: 24px;
-        background: #EF4444;
-        border: 4px solid white; border-radius: 50%;
-        box-shadow: 0 4px 10px rgba(239,68,68,0.45);
-        display: flex; align-items: center; justify-content: center;
-      "><div style="width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>\`,
-      iconSize: [24, 24], iconAnchor: [12, 12]
-    });
-
-    const depMarker = L.marker([depLat, depLon], { icon: depIcon }).addTo(map);
-    const arrMarker = L.marker([arrLat, arrLon], { icon: arrIcon }).addTo(map);
-
-    // === Fetch Route from Valhalla ===
-    async function fetchRoute() {
-      try {
-        const body = JSON.stringify({
-          locations: [
-            { lon: depLon, lat: depLat },
-            { lon: arrLon, lat: arrLat }
-          ],
-          costing: 'auto',
-          shape_format: 'geojson',
-          directions_options: { units: 'kilometers' }
-        });
-
-        const res = await fetch('https://valhalla1.openstreetmap.de/route', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body
-        });
-
-        if (!res.ok) throw new Error('API error');
-        const json = await res.json();
-
-        const legs = json?.trip?.legs;
-        if (legs && legs.length > 0) {
-          const coords = legs[0].shape;
-          if (coords && coords.length >= 2) {
-            const latLngs = coords.map(c => [c[1], c[0]]);
-
-            // Outer route line shadow
-            L.polyline(latLngs, {
-              color: '#0066FF', weight: 8, opacity: 0.18
-            }).addTo(map);
-
-            // Inner route line
-            L.polyline(latLngs, {
-              color: '#0066FF', weight: 4, opacity: 0.9,
-              lineJoin: 'round', lineCap: 'round'
-            }).addTo(map);
-
-            // Zoom bounds and prevent zooming in too much (maxZoom: 13)
-            map.fitBounds(L.polyline(latLngs).getBounds(), { padding: [50, 50], maxZoom: 13 });
-            document.getElementById('loader').style.display = 'none';
-            return;
-          }
+      // Custom markers
+      var depMarker = new google.maps.Marker({
+        position: { lat: depLat, lng: depLon },
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#0066FF',
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 3
         }
-        throw new Error('No route shape');
-      } catch (e) {
-        drawFallback();
-      }
+      });
+
+      var arrMarker = new google.maps.Marker({
+        position: { lat: arrLat, lng: arrLon },
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#EF4444',
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 3
+        }
+      });
+
+      // Directions Service
+      var directionsService = new google.maps.DirectionsService();
+      var directionsRenderer = new google.maps.DirectionsRenderer({
+        map: map,
+        suppressMarkers: true,
+        polylineOptions: {
+          strokeColor: '#0066FF',
+          strokeOpacity: 0.9,
+          strokeWeight: 4
+        }
+      });
+
+      directionsService.route({
+        origin: { lat: depLat, lng: depLon },
+        destination: { lat: arrLat, lng: arrLon },
+        travelMode: google.maps.TravelMode.DRIVING
+      }, function(response, status) {
+        if (status === 'OK') {
+          directionsRenderer.setDirections(response);
+          document.getElementById('loader').style.display = 'none';
+        } else {
+          drawFallback();
+        }
+      });
     }
 
     function drawFallback() {
-      L.polyline([[depLat, depLon], [arrLat, arrLon]], {
-        color: '#0066FF', weight: 3, opacity: 0.8, dashArray: '8, 8'
-      }).addTo(map);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+      var flightPath = new google.maps.Polyline({
+        path: [
+          { lat: depLat, lng: depLon },
+          { lat: arrLat, lng: arrLon }
+        ],
+        strokeColor: '#0066FF',
+        strokeOpacity: 0.8,
+        strokeWeight: 3
+      });
+      flightPath.setMap(map);
+
+      var bounds = new google.maps.LatLngBounds();
+      bounds.extend({ lat: depLat, lng: depLon });
+      bounds.extend({ lat: arrLat, lng: arrLon });
+      map.fitBounds(bounds);
+
       document.getElementById('loader').style.display = 'none';
     }
-
-    fetchRoute();
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc&callback=initMap">
   </script>
 </body>
 </html>
@@ -494,20 +478,13 @@ export default function RideDetailScreen() {
         }
       >
         {mapHtml && (
-          <View style={{ marginBottom: 20 }}>
+          <View style={{ marginBottom: 0 }}>
+            {/* Full-width map container – edge to edge like BlaBlaCar */}
             <View style={{
-              height: 250,
+              height: 300,
               width: '100%',
-              borderRadius: 20,
               overflow: 'hidden',
-              backgroundColor: COLORS.white,
-              borderWidth: 1,
-              borderColor: COLORS.border,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              elevation: 3,
+              backgroundColor: '#e8eaed',
               position: 'relative'
             }}>
               <WebView
@@ -521,67 +498,89 @@ export default function RideDetailScreen() {
                 domStorageEnabled={true}
                 mixedContentMode="always"
               />
-              {/* Floating Itinerary Pill overlay */}
+
+              {/* Top-left label pill */}
               <View style={{
                 position: 'absolute',
                 top: 12,
                 left: 12,
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
+                backgroundColor: 'rgba(255,255,255,0.95)',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
                 borderRadius: 20,
-                borderWidth: 1,
-                borderColor: 'rgba(229, 231, 235, 0.8)',
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
+                shadowOpacity: 0.12,
                 shadowRadius: 4,
-                elevation: 2,
-                gap: 6
+                elevation: 3,
+                gap: 5
               }}>
-                <Ionicons name="map" size={14} color={COLORS.primary} />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.text, letterSpacing: 0.3 }}>
-                  Aperçu de la route
+                <Ionicons name="navigate" size={13} color={COLORS.primary} />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.text }}>
+                  Itinéraire
                 </Text>
               </View>
+
+              {/* Bottom-right: Open in Google Maps floating button */}
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  bottom: 12,
+                  right: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#FFFFFF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 6,
+                  elevation: 5,
+                  gap: 6
+                }}
+                onPress={() => {
+                  const url = `https://www.google.com/maps/dir/?api=1&origin=${ride.departure_latitude},${ride.departure_longitude}&destination=${ride.arrival_latitude},${ride.arrival_longitude}&travelmode=driving`;
+                  Linking.openURL(url).catch(() => {
+                    CustomAlert.alert("Erreur", "Impossible d'ouvrir Google Maps.");
+                  });
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="logo-google" size={14} color="#4285F4" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.text }}>Google Maps</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Google Maps Button */}
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#FFFFFF',
-                borderWidth: 1.5,
-                borderColor: COLORS.border,
-                borderRadius: 14,
-                paddingVertical: 12,
-                marginTop: 10,
-                gap: 8,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.02,
-                shadowRadius: 4,
-                elevation: 1
-              }}
-              onPress={() => {
-                const url = `https://www.google.com/maps/dir/?api=1&origin=${ride.departure_latitude},${ride.departure_longitude}&destination=${ride.arrival_latitude},${ride.arrival_longitude}&travelmode=driving`;
-                Linking.openURL(url).catch(() => {
-                  CustomAlert.alert("Erreur", "Impossible d'ouvrir Google Maps.");
-                });
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-google" size={16} color="#4285F4" />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.text }}>
-                Ouvrir l'itinéraire dans Google Maps
+            {/* Route strip bar below map */}
+            <View style={{
+              backgroundColor: COLORS.white,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 20,
+              paddingVertical: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: COLORS.border,
+              gap: 8
+            }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary }} />
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: COLORS.text }} numberOfLines={1}>
+                {ride.departure_location || 'Départ'}
               </Text>
-            </TouchableOpacity>
+              <Ionicons name="arrow-forward" size={14} color={COLORS.textLight} />
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: COLORS.text, textAlign: 'right' }} numberOfLines={1}>
+                {ride.arrival_location || 'Arrivée'}
+              </Text>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' }} />
+            </View>
           </View>
         )}
+
+        {/* Padded content area below map */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
 
         {isCompleted && (
           <View style={styles.completedBadge}>
@@ -596,8 +595,6 @@ export default function RideDetailScreen() {
             <Text style={[styles.completedText, { color: COLORS.primary }]}>Trajet en cours</Text>
           </View>
         )}
-
-
 
         {/* Bouton Fixe Réserver */}
         {/* Big Date */}
@@ -925,6 +922,7 @@ export default function RideDetailScreen() {
             </View>
           </>
         )}
+        </View>{/* end padded content area */}
       </ScrollView>
 
       {/* Modern Footer Action Block */}
@@ -1031,7 +1029,7 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'flex-start' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
 
-  scrollContent: { padding: 16, paddingBottom: 160 },
+  scrollContent: { paddingBottom: 160 },
 
   completedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', padding: 12, borderRadius: 12, marginBottom: 16, justifyContent: 'center', gap: 8 },
   completedText: { color: COLORS.success, fontSize: 16, fontWeight: '700' },
