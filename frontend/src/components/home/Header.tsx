@@ -16,12 +16,14 @@ const PRIMARY = '#0066FF';
 interface HeaderProps {
   userName: string;
   onNotifPress: () => void;
+  onProfilePress?: () => void;
   scrollY: Animated.Value;
 }
 
 export default function Header({
   userName,
   onNotifPress,
+  onProfilePress,
   scrollY,
 }: HeaderProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -79,6 +81,11 @@ export default function Header({
             <Ionicons name="notifications-outline" size={22} color="#fff" />
             <View style={styles.notifDot} />
           </TouchableOpacity>
+          {onProfilePress && (
+            <TouchableOpacity style={styles.iconBtn} onPress={onProfilePress} activeOpacity={0.8}>
+              <Ionicons name="person-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Animated.View>

@@ -54,6 +54,7 @@ export default function TabsLayout() {
           },
         }}
       >
+        {/* 1 - Accueil */}
         <Tabs.Screen
           name="home"
           options={{
@@ -63,21 +64,17 @@ export default function TabsLayout() {
             ),
           }}
         />
+        {/* 2 - Publier */}
         <Tabs.Screen
           name="publish"
           options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="trips"
-          options={{
-            title: 'Trajets',
+            title: 'Publier',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'car' : 'car-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={24} color={color} />
             ),
           }}
         />
+        {/* 3 - Revenus (centre, bouton circulaire mis en évidence) */}
         <Tabs.Screen
           name="earnings"
           options={{
@@ -115,6 +112,17 @@ export default function TabsLayout() {
             ),
           }}
         />
+        {/* 4 - Trajets */}
+        <Tabs.Screen
+          name="trips"
+          options={{
+            title: 'Trajets',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'car' : 'car-outline'} size={24} color={color} />
+            ),
+          }}
+        />
+        {/* 5 - Messages */}
         <Tabs.Screen
           name="messages"
           options={{
@@ -124,13 +132,11 @@ export default function TabsLayout() {
             ),
           }}
         />
+        {/* Profil - caché de la barre, accessible via l'accueil */}
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profil',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
-            ),
+            href: null,
           }}
         />
       </Tabs>

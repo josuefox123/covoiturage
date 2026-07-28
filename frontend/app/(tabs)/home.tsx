@@ -61,16 +61,20 @@ export default function HomeScreen() {
   // ── Scroll ────────────────────────────────────────────────────────────────
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useFocusEffect(
     useCallback(() => {
       refreshUser();
       setShowVerifModal(shouldShowVerif);
-    }, [shouldShowVerif])
+      setRefreshKey((k) => k + 1);
+    }, [shouldShowVerif, refreshUser])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refreshUser();
+    setRefreshKey((k) => k + 1);
     setRefreshing(false);
   }, [refreshUser]);
 
@@ -130,6 +134,7 @@ export default function HomeScreen() {
             userName={userName}
             scrollY={scrollY}
             onNotifPress={() => router.push('/notifications')}
+            onProfilePress={() => router.push('/(tabs)/profile')}
           />
         </SafeAreaView>
 
