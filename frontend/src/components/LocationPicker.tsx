@@ -293,22 +293,36 @@ export default function LocationPicker({
     );
   }, []);
 
+  const hasCenteredRef = useRef(false);
+
   useEffect(() => {
     if (!mapReady) return;
 
-    if (selectedLocation) {
+    if (userLocation) {
+      sendToMap({ type: 'setUserMarker', lat: userLocation.lat, lon: userLocation.lon });
+    }
+
+    if (hasCenteredRef.current) return;
+
+    if (initialLocation) {
       sendToMap({
         type: 'setView',
-        lat: selectedLocation.latitude,
-        lon: selectedLocation.longitude,
+        lat: initialLocation.latitude,
+        lon: initialLocation.longitude,
         zoom: 15,
       });
+      hasCenteredRef.current = true;
     } else if (userLocation) {
-      sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 14 });
-      sendToMap({ type: 'setUserMarker', lat: userLocation.lat, lon: userLocation.lon });
+      sendToMap({
+        type: 'setView',
+        lat: userLocation.lat,
+        lon: userLocation.lon,
+        zoom: 15,
+      });
       reverseGeocode(userLocation.lat, userLocation.lon);
+      hasCenteredRef.current = true;
     }
-  }, [mapReady, sendToMap]);
+  }, [mapReady, userLocation, initialLocation, sendToMap]);
 
   const reverseGeocode = async (lat: number, lon: number) => {
     if (
