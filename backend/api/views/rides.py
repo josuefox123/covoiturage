@@ -194,16 +194,12 @@ class RideViewSet(viewsets.ModelViewSet):
                 if flex_qs.exists():
                     queryset = flex_qs
 
-        # ── Date filtering with smart fallback if 0 rides on exact date ──
+        # ── Date filtering (strict matching) ──
         if date_str:
             try:
                 from datetime import datetime
                 target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-                date_qs = queryset.filter(departure_date=target_date)
-                if date_qs.exists():
-                    queryset = date_qs
-                else:
-                    queryset = queryset.filter(departure_date__gte=target_date)
+                queryset = queryset.filter(departure_date=target_date)
             except ValueError:
                 pass
 
