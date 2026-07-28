@@ -25,7 +25,17 @@ export interface RideSearchCardProps {
   onPress: () => void;
   index?: number;
   animated?: boolean;
+  searchedDeparture?: string;
+  searchedDestination?: string;
 }
+
+const extractCity = (locStr: string | undefined): string => {
+  if (!locStr) return '';
+  const parts = locStr.replace(/\//g, ',').split(',').map((p) => p.trim());
+  const ignore = new Set(['bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france']);
+  const cleanParts = parts.filter((p) => p && !ignore.has(p.toLowerCase()));
+  return cleanParts.length ? cleanParts[cleanParts.length - 1].toLowerCase() : (parts[0] || '').toLowerCase();
+};
 
 const formatFullDate = (dateString: string | undefined) => {
   if (!dateString) return 'Date inconnue';
@@ -49,7 +59,14 @@ const formatFullDate = (dateString: string | undefined) => {
  * Responsabilités :
  * - Affichage et gestion de l'état lié à RideSearchCard.
  */
-export default function RideSearchCard({ ride, onPress, index = 0, animated = true }: RideSearchCardProps) {
+export default function RideSearchCard({
+  ride,
+  onPress,
+  index = 0,
+  animated = true,
+  searchedDeparture,
+  searchedDestination,
+}: RideSearchCardProps) {
   const fadeAnim = useRef(new Animated.Value(animated ? 0 : 1)).current;
   const translateY = useRef(new Animated.Value(animated ? 30 : 0)).current;
 
@@ -77,6 +94,30 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
   const priceUnit = 'par place';
   const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
   const seatsLeft = ride.seats_available || 0;
+
+  // Déterminer si le départ recherché est un arrêt intermédiaire dans une autre ville
+  let displayDeparture = ride.departure_location || 'Départ';
+  let isIntermediatePickup = false;
+  if (searchedDeparture) {
+    const searchDepCity = extractCity(searchedDeparture);
+    const rideDepCity = extractCity(ride.departure_location);
+    if (searchDepCity && rideDepCity && searchDepCity !== rideDepCity) {
+      displayDeparture = searchedDeparture;
+      isIntermediatePickup = true;
+    }
+  }
+
+  // Déterminer si l'arrivée recherchée est un arrêt intermédiaire dans une autre ville
+  let displayArrival = ride.arrival_location || 'Arrivée';
+  let isIntermediateDropoff = false;
+  if (searchedDestination) {
+    const searchDestCity = extractCity(searchedDestination);
+    const rideDestCity = extractCity(ride.arrival_location);
+    if (searchDestCity && rideDestCity && searchDestCity !== rideDestCity) {
+      displayArrival = searchedDestination;
+      isIntermediateDropoff = true;
+    }
+  }
 
   return (
     <Animated.View
@@ -139,7 +180,7 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
                 <View style={{ flex: 1 }}>
                   <Text style={styles.locationLabel}>DÉPART</Text>
                   <Text style={styles.locationName} numberOfLines={1}>
-                    {ride.departure_location || 'Départ'}
+                    {displayDeparture}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -154,12 +195,26 @@ export default function RideSearchCard({ ride, onPress, index = 0, animated = tr
                 <View style={{ flex: 1 }}>
                   <Text style={styles.locationLabel}>ARRIVÉE</Text>
                   <Text style={styles.locationName} numberOfLines={1}>
-                    {ride.arrival_location || 'Arrivée'}
+                    {displayArrival}
                   </Text>
                 </View>
               </View>
             </View>
           </View>
+
+          {/* Bannière d'arrêt intermédiaire */}
+          {(isIntermediatePickup || isIntermediateDropoff) && (
+            <View style={styles.intermediateBanner}>
+              <Ionicons name="information-circle" size={14} color="#D97706" style={{ marginRight: 6 }} />
+              <Text style={styles.intermediateBannerText} numberOfLines={1}>
+                {isIntermediatePickup && isIntermediateDropoff
+                  ? `Arrêts sur trajet ${ride.departure_location} ➔ ${ride.arrival_location}`
+                  : isIntermediatePickup
+                    ? `Prise en charge (Départ initial: ${ride.departure_location})`
+                    : `Dépose intermédiaire (Destination finale: ${ride.arrival_location})`}
+              </Text>
+            </View>
+          )}
 
           {/* Footer avec places dispo et type de véhicule */}
           <View style={styles.rideFooter}>
@@ -419,5 +474,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: PRIMARY_COLOR,
     marginRight: 4,
+  },
+  intermediateBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  intermediateBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
+    flex: 1,
   },
 });

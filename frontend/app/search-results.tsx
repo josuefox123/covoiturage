@@ -528,6 +528,8 @@ export default function SearchResultsScreen() {
               ride={item}
               onPress={() => router.push(`/ride/${item.id}` as any)}
               index={index}
+              searchedDeparture={departure}
+              searchedDestination={destination}
             />
           )}
           ListEmptyComponent={
