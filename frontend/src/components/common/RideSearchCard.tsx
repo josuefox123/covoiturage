@@ -27,6 +27,7 @@ export interface RideSearchCardProps {
   animated?: boolean;
   searchedDeparture?: string;
   searchedDestination?: string;
+  searchedSeats?: number;
 }
 
 const extractCity = (locStr: string | undefined): string => {
@@ -66,6 +67,7 @@ export default function RideSearchCard({
   animated = true,
   searchedDeparture,
   searchedDestination,
+  searchedSeats,
 }: RideSearchCardProps) {
   const fadeAnim = useRef(new Animated.Value(animated ? 0 : 1)).current;
   const translateY = useRef(new Animated.Value(animated ? 30 : 0)).current;
@@ -219,22 +221,31 @@ export default function RideSearchCard({
           {/* Footer avec places dispo et type de véhicule */}
           <View style={styles.rideFooter}>
             <View style={styles.badgesContainer}>
-              <View style={styles.seatsContainer}>
-                <Ionicons 
-                  name={ride.status === 'started' || ride.status === 'completed' ? "car-sport-outline" : "people-outline"} 
-                  size={14} 
-                  color={PRIMARY_COLOR} 
-                />
-                <Text style={styles.seatsText}>
-                  {ride.status === 'started' 
-                    ? 'En cours' 
-                    : ride.status === 'completed' 
-                      ? 'Terminé' 
-                      : seatsLeft > 0 
-                        ? `${seatsLeft} place${seatsLeft > 1 ? 's' : ''}` 
-                        : 'Complet'}
-                </Text>
-              </View>
+              {searchedSeats && seatsLeft < searchedSeats ? (
+                <View style={styles.warningSeatsBadge}>
+                  <Ionicons name="warning-outline" size={13} color="#DC2626" />
+                  <Text style={styles.warningSeatsText}>
+                    {seatsLeft} place{seatsLeft > 1 ? 's' : ''} dispo.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.seatsContainer}>
+                  <Ionicons 
+                    name={ride.status === 'started' || ride.status === 'completed' ? "car-sport-outline" : "people-outline"} 
+                    size={14} 
+                    color={PRIMARY_COLOR} 
+                  />
+                  <Text style={styles.seatsText}>
+                    {ride.status === 'started' 
+                      ? 'En cours' 
+                      : ride.status === 'completed' 
+                        ? 'Terminé' 
+                        : seatsLeft > 0 
+                          ? `${seatsLeft} place${seatsLeft > 1 ? 's' : ''}` 
+                          : 'Complet'}
+                  </Text>
+                </View>
+              )}
 
               {/* Badge type de véhicule (Voiture, Moto, Tricycle) */}
               {(() => {
@@ -491,5 +502,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#92400E',
     flex: 1,
+  },
+  warningSeatsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  warningSeatsText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
   },
 });

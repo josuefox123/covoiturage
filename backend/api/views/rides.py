@@ -138,8 +138,8 @@ class RideViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(vehicle__vehicle_type=vehicle_type)
         if seats_str:
             try:
-                seats_needed = int(seats_str)
-                queryset = queryset.filter(seats_available__gte=seats_needed)
+                # We filter for rides with at least 1 seat available, and warn on frontend if insufficient
+                queryset = queryset.filter(seats_available__gte=1)
             except ValueError:
                 pass
         if ride_type == 'parcel':
@@ -194,6 +194,8 @@ class RideViewSet(viewsets.ModelViewSet):
                 flex_qs = queryset.filter(flexible_cond)
                 if flex_qs.exists():
                     queryset = flex_qs
+                else:
+                    queryset = queryset.none()
 
         # ── Date filtering (strict matching) ──
         if date_str:

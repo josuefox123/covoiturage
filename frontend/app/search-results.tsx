@@ -327,7 +327,7 @@ export default function SearchResultsScreen() {
       const list: Ride[] = Array.isArray(data) ? data : data?.results ?? [];
       const now = new Date();
       const valid = list.filter((r) => {
-        if ((r.seats_available ?? 1) < passengers) return false;
+        if ((r.seats_available ?? 0) <= 0) return false;
         if (r.status === 'completed' || r.status === 'cancelled') return false;
 
         // Si le trajet est 'started', il est toujours disponible pour réservation en cours de route
@@ -530,6 +530,7 @@ export default function SearchResultsScreen() {
               index={index}
               searchedDeparture={departure}
               searchedDestination={destination}
+              searchedSeats={passengers}
             />
           )}
           ListEmptyComponent={
