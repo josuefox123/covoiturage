@@ -98,7 +98,7 @@ export default function LocationPicker({
   const [mapReady, setMapReady] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [customLocationName, setCustomLocationName] = useState('');
+  const [customLocationName, setCustomLocationName] = useState(initialLocation?.name || '');
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -324,51 +324,53 @@ export default function LocationPicker({
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
+    const GOOGLE_API_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
+
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=fr`,
-        {
-          signal: abortRef.current.signal,
-          headers: { 'User-Agent': 'CovoitBeninApp/1.0' },
-        }
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${GOOGLE_API_KEY}&language=fr`,
+        { signal: abortRef.current.signal }
       );
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
 
-      if (data?.address) {
-        const address = data.address;
+      if (data.status === 'OK' && data.results?.length > 0) {
+        const result = data.results[0];
+        const components: any[] = result.address_components || [];
+
+        const getComp = (type: string) =>
+          components.find((c: any) => c.types.includes(type))?.long_name || '';
+
+        const streetNumber = getComp('street_number');
+        const route = getComp('route');
+        const neighborhood =
+          getComp('neighborhood') ||
+          getComp('sublocality_level_1') ||
+          getComp('sublocality');
+        const city =
+          getComp('locality') ||
+          getComp('administrative_area_level_2') ||
+          getComp('administrative_area_level_1');
+        const country = getComp('country') || 'Bénin';
+
         let name = '';
-        if (address.road) name = address.road;
-        else if (address.pedestrian) name = address.pedestrian;
-        else if (address.footway) name = address.footway;
-        else if (address.neighbourhood) name = address.neighbourhood;
-        else if (address.suburb) name = address.suburb;
-        else name = 'Position choisie';
-
-        if (address.house_number) name = `${address.house_number} ${name}`;
-
-        const city = address.city || address.town || address.village || '';
-        const country = address.country || 'Bénin';
+        if (route) name = streetNumber ? `${streetNumber} ${route}` : route;
+        else if (neighborhood) name = neighborhood;
+        else name = result.formatted_address?.split(',')[0] || 'Position choisie';
 
         setSelectedLocation({
           latitude: lat,
           longitude: lon,
-          name: name,
-          address: [address.suburb, address.district].filter(Boolean).join(', '),
-          city: city,
-          country: country,
+          name,
+          address:
+            neighborhood ||
+            result.formatted_address?.split(',').slice(1, 3).join(',').trim() ||
+            '',
+          city,
+          country,
         });
-      } else if (data.display_name) {
-        const parts = data.display_name.split(',');
-        setSelectedLocation({
-          latitude: lat,
-          longitude: lon,
-          name: parts[0],
-          address: parts.slice(1, 3).join(',').trim(),
-          city: parts[2]?.trim(),
-          country: parts[parts.length - 1]?.trim(),
-        });
+        setCustomLocationName(name);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
@@ -398,34 +400,27 @@ export default function LocationPicker({
         localResults = Array.isArray(localData) ? localData : localData?.results || [];
       } catch (err) {}
 
-      const photonResponse = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(`${query} Benin`)}&limit=15`,
+      const GOOGLE_SEARCH_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
+      const googleResponse = await fetch(
+        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${query} Bénin`)}&key=${GOOGLE_SEARCH_KEY}&language=fr&region=bj`,
         { signal: searchAbort.current.signal }
       );
 
-      if (!photonResponse.ok) throw new Error(`HTTP ${photonResponse.status}`);
-      const photonData = await photonResponse.json();
+      if (!googleResponse.ok) throw new Error(`HTTP ${googleResponse.status}`);
+      const googleData = await googleResponse.json();
 
-      const photonResults =
-        photonData?.features?.map((feature: any) => ({
-          id: feature.properties.osm_id,
-          lat: feature.geometry.coordinates[1],
-          lon: feature.geometry.coordinates[0],
-          name: feature.properties.name || feature.properties.street || 'Lieu',
-          city: feature.properties.city || feature.properties.county || '',
-          country: feature.properties.country || '',
-          display_name: [feature.properties.name, feature.properties.city, feature.properties.country]
-            .filter(Boolean)
-            .join(', '),
+      const googleResults =
+        googleData?.results?.map((place: any) => ({
+          id: place.place_id,
+          lat: place.geometry?.location?.lat,
+          lon: place.geometry?.location?.lng,
+          name: place.name || 'Lieu',
+          city: place.formatted_address?.split(',')[1]?.trim() || '',
+          country: 'Bénin',
+          display_name: place.formatted_address || place.name,
         })) || [];
 
-      photonResults.sort((a: any, b: any) => {
-        const aBenin = a.country?.toLowerCase().includes('benin') ? 1 : 0;
-        const bBenin = b.country?.toLowerCase().includes('benin') ? 1 : 0;
-        return bBenin - aBenin;
-      });
-
-      const combinedResults = [...localResults, ...photonResults];
+      const combinedResults = [...localResults, ...googleResults];
       const fuse = new Fuse(combinedResults, {
         keys: ['name', 'display_name', 'city'],
         threshold: 0.3,
@@ -463,6 +458,7 @@ export default function LocationPicker({
       setIsSearchFocused(false);
       setSearchQuery(loc.name);
       setSelectedLocation(loc);
+      setCustomLocationName(loc.name);
 
       sendToMap({
         type: 'setView',
@@ -490,6 +486,7 @@ export default function LocationPicker({
         };
         setSearchQuery(loc.name);
         setSelectedLocation(loc);
+        setCustomLocationName(loc.name);
         sendToMap({ type: 'setView', lat: loc.latitude, lon: loc.longitude, zoom: 16 });
         return;
       }
@@ -511,6 +508,7 @@ export default function LocationPicker({
       };
       setSearchQuery(loc.name);
       setSelectedLocation(loc);
+      setCustomLocationName(name);
       sendToMap({ type: 'setView', lat, lon, zoom: 16 });
     },
     [sendToMap]
@@ -582,36 +580,34 @@ export default function LocationPicker({
     }
   };
 
-  const leafletHtml = useMemo(
+  const googleMapsHtml = useMemo(
     () => `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html, #map { width: 100%; height: 100%; background: #f0f4f8; }
     .center-marker {
       position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%); z-index: 1000;
-      pointer-events: none; transition: transform 0.2s ease;
+      transform: translate(-50%, -50%);
+      z-index: 1000; pointer-events: none; transition: transform 0.18s ease;
     }
-    .center-marker.dragging { transform: translate(-50%, -50%) scale(0.85); }
+    .center-marker.dragging { transform: translate(-50%, -60%) scale(1.12); }
     .marker-pin {
       width: 36px; height: 36px; border-radius: 50% 50% 50% 0;
       background: #0066FF; position: absolute; transform: rotate(-45deg);
       left: 50%; top: 50%; margin: -18px 0 0 -18px;
-      box-shadow: 0 4px 14px rgba(0,102,255,0.4); border: 3px solid white;
+      box-shadow: 0 4px 14px rgba(0,102,255,0.45); border: 3px solid white;
     }
     .marker-pin::after {
       content: ''; width: 12px; height: 12px; margin: 9px 0 0 9px;
       background: white; position: absolute; border-radius: 50%;
     }
     .pulse {
-      width: 64px; height: 64px; background: rgba(0,102,255,0.25);
+      width: 64px; height: 64px; background: rgba(0,102,255,0.2);
       border-radius: 50%; position: absolute; left: 50%; top: 50%;
       margin: -32px 0 0 -32px; animation: pulse 1.6s infinite;
     }
@@ -619,11 +615,6 @@ export default function LocationPicker({
       0% { transform: scale(0.4); opacity: 1; }
       100% { transform: scale(1.6); opacity: 0; }
     }
-    .user-marker {
-      width: 18px; height: 18px; background: #10B981;
-      border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-    .leaflet-control-attribution, .leaflet-control-zoom { display: none !important; }
   </style>
 </head>
 <body>
@@ -633,46 +624,73 @@ export default function LocationPicker({
     <div class="pulse"></div>
   </div>
   <script>
-    var map = L.map('map', { zoomControl: false }).setView([${DEFAULT_LAT}, ${DEFAULT_LON}], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '© OpenStreetMap', detectRetina: true, crossOrigin: true
-    }).addTo(map);
-    var userMarker = null;
-    var markerElement = document.getElementById('centerMarker');
-    map.on('movestart', function() {
-      if (markerElement) markerElement.classList.add('dragging');
-    });
-    map.on('moveend', function() {
-      setTimeout(function() {
-        if (markerElement) markerElement.classList.remove('dragging');
-        var center = map.getCenter();
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'centerChanged', lat: center.lat, lon: center.lng
-        }));
-      }, 120);
-    });
-    map.whenReady(function() {
+    var map, userMarker, moveTimeout;
+    var markerEl = document.getElementById('centerMarker');
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: ${DEFAULT_LAT}, lng: ${DEFAULT_LON} },
+        zoom: 13,
+        disableDefaultUI: true,
+        gestureHandling: 'greedy',
+        mapTypeId: 'roadmap',
+        styles: [
+          { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] }
+        ]
+      });
+
+      map.addListener('dragstart', function() {
+        if (markerEl) markerEl.classList.add('dragging');
+        clearTimeout(moveTimeout);
+      });
+
+      map.addListener('idle', function() {
+        clearTimeout(moveTimeout);
+        moveTimeout = setTimeout(function() {
+          if (markerEl) markerEl.classList.remove('dragging');
+          var c = map.getCenter();
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'centerChanged', lat: c.lat(), lon: c.lng()
+          }));
+        }, 120);
+      });
+
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
-    });
+    }
+
     window.handleMessage = function(msg) {
+      if (!map) return;
       if (msg.type === 'setView') {
-        map.flyTo([msg.lat, msg.lon], msg.zoom || 15, { animate: true, duration: 0.6 });
+        map.panTo({ lat: msg.lat, lng: msg.lon });
+        if (msg.zoom) map.setZoom(msg.zoom);
       } else if (msg.type === 'setUserMarker') {
-        var userIcon = L.divIcon({
-          className: '', html: '<div class="user-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9]
-        });
-        if (userMarker) userMarker.setLatLng([msg.lat, msg.lon]);
-        else userMarker = L.marker([msg.lat, msg.lon], { icon: userIcon, zIndexOffset: 200 }).addTo(map);
-      } else if (msg.type === 'zoomIn') { map.zoomIn(); }
-      else if (msg.type === 'zoomOut') { map.zoomOut(); }
+        var pos = { lat: msg.lat, lng: msg.lon };
+        if (userMarker) { userMarker.setPosition(pos); }
+        else {
+          userMarker = new google.maps.Marker({
+            position: pos, map: map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8, fillColor: '#10B981', fillOpacity: 1,
+              strokeColor: 'white', strokeWeight: 3
+            },
+            zIndex: 200
+          });
+        }
+      } else if (msg.type === 'zoomIn') { map.setZoom(map.getZoom() + 1); }
+      else if (msg.type === 'zoomOut') { map.setZoom(map.getZoom() - 1); }
     };
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc&callback=initMap">
   </script>
 </body>
 </html>`,
     []
   );
 
-  const showSuggestions = isSearchFocused || searchQuery.length > 0;
+  const showSuggestions = isSearchFocused;
   const isQueryEmpty = searchQuery.trim().length === 0;
 
   const cardTopMargin = Math.max(insets.top + 10, Platform.OS === 'ios' ? 44 : 24);
@@ -923,7 +941,7 @@ export default function LocationPicker({
               <WebView
                 ref={webviewRef}
                 originWhitelist={['*']}
-                source={{ html: leafletHtml }}
+                source={{ html: googleMapsHtml }}
                 onMessage={onMapMessage}
                 javaScriptEnabled
                 domStorageEnabled
@@ -980,7 +998,7 @@ export default function LocationPicker({
                 <Ionicons name="create-outline" size={16} color="#6B7280" />
                 <TextInput
                   style={styles.customNoteInput}
-                  placeholder="Précision ou repère (ex: devant la pharmacie)"
+                  placeholder="Nom du lieu ou repère (ex: Carrefour, Gare, Pharmacie...)"
                   placeholderTextColor="#9CA3AF"
                   value={customLocationName}
                   onChangeText={setCustomLocationName}
