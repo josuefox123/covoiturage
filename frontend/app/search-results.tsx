@@ -325,15 +325,24 @@ export default function SearchResultsScreen() {
       const qs   = qp.length ? `?${qp.join('&')}` : '';
       const data = await authFetch(`/rides/${qs}`);
       const list: Ride[] = Array.isArray(data) ? data : data?.results ?? [];
-
-      const now   = new Date();
+      const now = new Date();
       const valid = list.filter((r) => {
         if ((r.seats_available ?? 1) < passengers) return false;
+        if (r.status === 'completed' || r.status === 'cancelled') return false;
+
+        // Si le trajet est 'started', il est toujours disponible pour réservation en cours de route
+        if (r.status === 'started') return true;
+
         if (r.departure_date && r.departure_time) {
           const [h, m] = (r.departure_time as string).split(':').map(Number);
           const dep = new Date(r.departure_date);
           dep.setHours(h, m, 0, 0);
-          if (dep < now) return false;
+
+          const durationMin = r.duration_min || 240; // 4h par défaut si non spécifié
+          const estimatedArrival = new Date(dep.getTime() + (durationMin + 120) * 60 * 1000);
+
+          // Ne pas masquer si l'heure d'arrivée estimée n'est pas encore dépassée
+          if (now > estimatedArrival) return false;
         }
         return true;
       });

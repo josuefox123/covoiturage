@@ -25,7 +25,7 @@ class FeexPayClient:
                 "reason": None
             }
 
-        url = f"https://api.feexpay.me/api/transactions/getrequesttopay/integration/{transaction_id}"
+        url = f"https://api-v2.feexpay.me/api/transactions/public/single/status/{transaction_id}"
         
         try:
             headers = {

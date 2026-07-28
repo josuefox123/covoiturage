@@ -3,6 +3,7 @@
  * Affiche les 3 prochains trajets disponibles depuis le backend.
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -109,17 +110,21 @@ export default function TodayTrips({ onTripPress, onSeeAll }: TodayTripsProps) {
 
   const fetchRides = useCallback(async () => {
     try {
-      const data = await authFetch('/rides/');
+      const data = await authFetch(`/rides/?_t=${Date.now()}`);
       const list: Ride[] = Array.isArray(data) ? data : data?.results || [];
       const now = new Date();
       const available = list
         .filter((r) => {
           if ((r.seats_available ?? 1) <= 0) return false;
+          if (r.status === 'completed' || r.status === 'cancelled') return false;
+          if (r.status === 'started') return true;
           if (r.departure_date && r.departure_time) {
             const [h, m] = (r.departure_time as string).split(':').map(Number);
             const dep = new Date(r.departure_date);
             dep.setHours(h, m, 0, 0);
-            if (dep < now) return false;
+            const durationMin = r.duration_min || 240;
+            const estimatedArrival = new Date(dep.getTime() + (durationMin + 120) * 60 * 1000);
+            if (now > estimatedArrival) return false;
           }
           return true;
         })
@@ -131,9 +136,11 @@ export default function TodayTrips({ onTripPress, onSeeAll }: TodayTripsProps) {
     }
   }, [authFetch]);
 
-  useEffect(() => {
-    fetchRides();
-  }, [fetchRides]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchRides();
+    }, [fetchRides])
+  );
 
   if (loading) {
     return (

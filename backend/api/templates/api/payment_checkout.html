@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Paiement Sécurisé - Zemy</title>
     
-    <!-- FeexPay React SDK CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/@feexpay/react-sdk@1.5.8/dist/style.css">
+    <!-- FeexPay V2 React SDK does not require a separate stylesheet -->
     
     <style>
         body {
@@ -73,6 +72,31 @@
             font-weight: 500;
             margin: 10px 0;
         }
+        .feexpay-btn {
+            width: 100%;
+            background-color: #2563EB;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 700;
+            padding: 14px 20px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+            display: block;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1);
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+            margin-top: 16px;
+        }
+        .feexpay-btn:hover {
+            background-color: #1D4ED8;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 8px -1px rgba(37, 99, 235, 0.3), 0 3px 6px -1px rgba(37, 99, 235, 0.15);
+        }
+        .feexpay-btn:active {
+            transform: translateY(1px);
+        }
     </style>
 </head>
 <body>
@@ -91,7 +115,7 @@
         // We use ?deps=react@18.3.1,react-dom@18.3.1 to force esm.sh to use the single shared React instance
         import React from 'https://esm.sh/react@18.3.1';
         import ReactDOM from 'https://esm.sh/react-dom@18.3.1/client';
-        import { FeexPayProvider, FeexPayButton } from 'https://esm.sh/@feexpay/react-sdk@1.5.8?deps=react@18.3.1,react-dom@18.3.1';
+        import FeexPay from 'https://esm.sh/react-sdk-feexpay?deps=react@18.3.1,react-dom@18.3.1';
 
         // Log handler for debugging inside webview
         window.onerror = function(message, source, lineno, colno, error) {
@@ -116,10 +140,27 @@
             const urlParams = new URLSearchParams(window.location.search);
             const amount = parseInt(urlParams.get('amount') || '0', 10);
             const customId = urlParams.get('custom_id') || '';
-            const description = urlParams.get('description') || 'Paiement Zemy';
-            const fullname = urlParams.get('fullname') || 'Client Zemy';
+            const rawDescription = urlParams.get('description') || 'Paiement Zemy';
+            // Clean description to remove accents, limit special characters and truncate to 40 chars for FeexPay compatibility
+            const description = rawDescription
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9\s-_]/g, " ")
+                .trim()
+                .substring(0, 40);
+
+            const rawFullname = urlParams.get('fullname') || 'Client Zemy';
+            // Clean fullname to remove accents and special characters
+            const fullname = rawFullname
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z\s-]/g, " ")
+                .trim();
+
             const email = urlParams.get('email') || 'client@zemy.bj';
-            const phone = urlParams.get('phone') || '';
+            const rawPhone = urlParams.get('phone') || '';
+            // Keep only digits (remove + prefix and other non-digits)
+            const phone = rawPhone.replace(/\D/g, "");
 
             // Identifiants serveur injectés par Django
             const merchantId = "{{ merchant_id }}";
@@ -167,30 +208,26 @@
                     }
                 };
 
-                return React.createElement(
-                    FeexPayProvider,
-                    null,
-                    React.createElement(FeexPayButton, {
-                        amount: amount,
+                return React.createElement(FeexPay, {
+                    amount: amount,
+                    description: description,
+                    id: merchantId,
+                    token: apiToken,
+                    reference: customId,
+                    callback_url: urlParams.get('callback_url') || 'zemy://payments',
+                    callback_info: {
                         description: description,
-                        id: merchantId,
-                        token: apiToken,
-                        customId: customId,
-                        callback_url: urlParams.get('callback_url') || 'zemy://payments',
-                        callback_info: {
-                            description: description,
-                            fullname: fullname,
-                            email: email,
-                            phone: phone
-                        },
-                        mode: mode,
-                        currency: "XOF",
-                        buttonText: `Payer ${amount} FCFA`,
-                        buttonClass: "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md text-center block",
-                        callback: handleCallback,
-                        error_callback_url: urlParams.get('error_callback_url') || ''
-                    })
-                );
+                        fullname: fullname,
+                        email: email,
+                        phone: phone
+                    },
+                    mode: mode.toLowerCase(),
+                    currency: "XOF",
+                    buttonText: `Payer ${amount} FCFA`,
+                    buttonClass: "feexpay-btn",
+                    callback: handleCallback,
+                    error_callback_url: urlParams.get('error_callback_url') || ''
+                });
             }
 
             console.log('Rendering FeexPayButton component...');

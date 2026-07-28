@@ -75,11 +75,11 @@ export default function ConversationCard({ item, currentUserId, onArchive, onDel
     let content = lastMessage.content || '';
     
     // Check for message types
-    if (lastMessage.message_type === 'image') return `${prefix}📷 Photo`;
-    if (lastMessage.message_type === 'audio') return `${prefix}🎤 Vocal`;
-    if (lastMessage.message_type === 'location') return `${prefix}📍 Position`;
-    if (lastMessage.message_type === 'document') return `${prefix}📄 Document`;
-    if (lastMessage.message_type === 'video') return `${prefix}🎥 Vidéo`;
+    if (lastMessage.message_type === 'image') return `${prefix}Photo`;
+    if (lastMessage.message_type === 'audio') return `${prefix}Vocal`;
+    if (lastMessage.message_type === 'location') return `${prefix}Position`;
+    if (lastMessage.message_type === 'document') return `${prefix}Document`;
+    if (lastMessage.message_type === 'video') return `${prefix}Vidéo`;
     
     return `${prefix}${content}`;
   };

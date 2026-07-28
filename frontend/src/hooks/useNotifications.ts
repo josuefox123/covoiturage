@@ -24,22 +24,23 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { CustomAlert } from '../utils/CustomAlert';
 
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-// Import conditionnel pour éviter les crashs sur web/Expo Go (SDK 53/54 rejettent les pushs dans Expo Go)
+// Import conditionnel de expo-notifications pour mobile (Expo Go & Dev Build & Standalone)
 let Notifications: any = null;
 let Device: any = null;
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-if (!isExpoGo && Platform.OS !== 'web') {
+if (Platform.OS !== 'web' && !isExpoGo) {
   try {
     Notifications = require('expo-notifications');
     Device = require('expo-device');
   } catch (e) {
+    console.warn('[Notifications] Module expo-notifications non disponible:', e);
   }
-} else {
 }
 
 // Configuration de l'affichage des notifications en premier plan
@@ -97,37 +98,37 @@ export function useNotifications() {
 
     setPermissionGranted(true);
 
-    // Canal Android
+    // Canal Android haute priorité Zemy
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'Zemy Notifications',
+        name: 'Alertes Zemy',
         importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#2563EB',
-        sound: true,
+        vibrationPattern: [0, 500, 250, 500, 250, 500],
+        lightColor: '#0066FF',
+        sound: 'default',
         enableVibrate: true,
+        enableLights: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
     }
 
-    // Récupérer le token Expo Push (encapsule le FCM token)
+    // Dans Expo Go (SDK 53+), Expo neutralise getExpoPushTokenAsync et lève une erreur rouge.
+    // En mode Standalone APK ou Dev Build, le token push est généré normalement.
+    if (isExpoGo) {
+      return null;
+    }
+
+    // Récupérer le token Expo Push (uniquement sur Dev Build / Build APK)
     try {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId || "7befcd51-2b86-4b54-a963-80ffb264a743";
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: undefined, // Utilisera le projectId de app.json si défini
+        projectId: projectId,
       });
       const pushToken = tokenData.data;
       setExpoPushToken(pushToken);
       return pushToken;
     } catch (e) {
-      console.error('[Notifications] Erreur récupération token:', e);
-      // Fallback: essayer de récupérer le FCM token natif directement
-      try {
-        const nativeToken = await Notifications.getDevicePushTokenAsync();
-        setExpoPushToken(nativeToken.data);
-        return nativeToken.data;
-      } catch (e2) {
-        console.error('[Notifications] Erreur FCM token natif:', e2);
-        return null;
-      }
+      return null;
     }
   }, []);
 
@@ -190,6 +191,39 @@ export function useNotifications() {
       responseListener.current?.remove();
     };
   }, [router]);
+
+  // Polling silencieux pour afficher les nouvelles notifications directement dans l'app en temps réel
+  const lastSeenNotifId = useRef<string | number | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const notifs = await authFetch(`/notifications/?_t=${Date.now()}`);
+        const list = Array.isArray(notifs) ? notifs : notifs?.results || [];
+        if (list.length > 0 && isMounted) {
+          const latest = list[0];
+          if (lastSeenNotifId.current === null) {
+            lastSeenNotifId.current = latest.id;
+          } else if (latest.id !== lastSeenNotifId.current && !latest.is_read) {
+            lastSeenNotifId.current = latest.id;
+            CustomAlert.alert(
+              latest.title || 'Nouvelle notification 🔔',
+              latest.message || ''
+            );
+          }
+        }
+      } catch (e) {
+      }
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [token, authFetch]);
 
   return {
     expoPushToken,

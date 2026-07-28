@@ -157,7 +157,7 @@ export default function PaymentSuccessScreen() {
                         <Text style={styles.detailsValSub}>{driver.phone || ''}</Text>
                     </View>
                     <View style={styles.detailsCol}>
-                        <Text style={styles.detailsLabel}>Frais de service payés</Text>
+                        <Text style={styles.detailsLabel}>Montant total payé</Text>
                         <Text style={styles.detailsValAmount}>{amount} FCFA</Text>
                     </View>
                 </View>

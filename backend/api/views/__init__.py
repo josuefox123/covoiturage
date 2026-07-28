@@ -31,6 +31,7 @@ from .payments import (
     PaymentViewSet,
     DriverEarningsView,
     DriverClaimPayoutView,
+    DriverPayoutViewSet,
 )
 from .chat import (
     ConversationViewSet,

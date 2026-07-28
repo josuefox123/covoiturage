@@ -171,7 +171,7 @@ export default function RideManagementScreen() {
   };
 
   const handleContactPassengers = () => {
-    const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'pending_payment', 'completed'].includes(b.status));
+    const activeBookings = bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status));
     if (activeBookings.length === 0) return;
     if (activeBookings.length === 1) {
       const pId = activeBookings[0].passenger_details?.id;
@@ -232,10 +232,10 @@ export default function RideManagementScreen() {
 
   if (!ride) return null;
 
-  const activeBookings = bookings.filter(b => ['confirmed', 'active', 'pending', 'pending_payment', 'completed'].includes(b.status));
+  const activeBookings = bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status));
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled' || b.status === 'rejected');
   
-  const totalRevenue = bookings.filter(b => b.status === 'confirmed' || b.status === 'active').reduce((sum, b) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
+  const totalRevenue = bookings.filter(b => b.payment_status !== 'pending' && (b.status === 'confirmed' || b.status === 'active' || b.status === 'completed')).reduce((sum, b) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
   const seatsBooked = ride.total_seats - ride.seats_available;
 
   const getStatusDisplay = () => {
@@ -478,25 +478,25 @@ export default function RideManagementScreen() {
               <Text style={styles.subSectionTitle}>Préférences de voyage</Text>
               <View style={styles.prefTagsContainer}>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>🎵 {ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "🚬 Fumeur" : "Non-fumeur"}</Text>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "Fumeur" : "Non-fumeur"}</Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>💬 {ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>❄️ {ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>🐾 {ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>💼 {ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>📍 {ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
+                  <Text style={styles.prefTagText}>{ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
                 </View>
               </View>
               {ride.driver_details.preference.notes ? (

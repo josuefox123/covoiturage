@@ -82,7 +82,7 @@ export default function TabsLayout() {
             tabBarLabel: () => null,
             tabBarButton: (props) => (
               <TouchableOpacity
-                {...props}
+                {...(props as any)}
                 style={{
                   top: -16,
                   justifyContent: 'center',

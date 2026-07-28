@@ -27,7 +27,7 @@ from .views import (
     PopularPlaceViewSet, send_reset_code, verify_reset_code, reset_password,
     update_profile, change_password,
     contact_view, SupportTicketViewSet,
-    DriverEarningsView, DriverClaimPayoutView,
+    DriverEarningsView, DriverClaimPayoutView, DriverPayoutViewSet,
 )
 
 router = DefaultRouter()
@@ -48,6 +48,7 @@ router.register(r'parcels', ParcelViewSet, basename='parcel')
 router.register(r'popular-places', PopularPlaceViewSet, basename='popular_place')
 router.register(r'support-tickets', SupportTicketViewSet, basename='support_ticket')
 router.register(r'payments', PaymentViewSet, basename='payments')
+router.register(r'driver-payouts', DriverPayoutViewSet, basename='driver_payouts')
 
 urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),

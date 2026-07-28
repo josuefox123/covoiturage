@@ -442,10 +442,8 @@ export default function LiveRideModal() {
             // Fetch updated ride details
             const resp = await authFetch(`/rides/${activeRide?.id}/`);
             if (!isMountedRef.current) return;
-            const updatedRide = resp.results || resp;
-            setActiveRide(updatedRide);
             await startTracking();
-            CustomAlert.alert('✅ Trajet démarré', 'Le trajet a commencé. Bonne route !');
+            CustomAlert.alert('Trajet démarré', 'Le trajet a commencé. Bonne route !');
           } catch (error: any) {
             CustomAlert.alert('Erreur', error.message || 'Impossible de démarrer le trajet.');
           }
@@ -465,7 +463,7 @@ export default function LiveRideModal() {
             if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
-            CustomAlert.alert('✅ Trajet terminé', 'Merci pour ce trajet !');
+            CustomAlert.alert('Trajet terminé', 'Merci pour ce trajet !');
           } catch (error: any) {
             CustomAlert.alert('Erreur', error.message || 'Impossible de terminer le trajet.');
           }
@@ -487,7 +485,7 @@ export default function LiveRideModal() {
             if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
-            CustomAlert.alert('✅ Arrivé(e) !', 'Votre trajet est terminé. Merci d\'avoir voyagé avec nous !');
+            CustomAlert.alert('Arrivé(e) !', 'Votre trajet est terminé. Merci d\'avoir voyagé avec nous !');
           } catch (error: any) {
             CustomAlert.alert('Erreur', error.message || 'Impossible de terminer la réservation.');
           }
@@ -515,7 +513,7 @@ export default function LiveRideModal() {
       if (!isMountedRef.current) return;
       setShowReportModal(false);
       setProblemText('');
-      CustomAlert.alert('✅ Envoyé', "Votre problème a été signalé. L'administration vous contactera.");
+      CustomAlert.alert('Envoyé', "Votre problème a été signalé. L'administration vous contactera.");
     } catch (error: any) {
       CustomAlert.alert('Erreur', error.message || 'Impossible de signaler le problème.');
     } finally {
@@ -870,7 +868,7 @@ export default function LiveRideModal() {
       <Modal visible={showReportModal} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.reportOverlay}>
           <View style={styles.reportCard}>
-            <Text style={styles.reportTitle}>🚨 Signaler un problème</Text>
+            <Text style={styles.reportTitle}>Signaler un problème</Text>
             <Text style={styles.reportSubtitle}>Décrivez le problème. Votre position GPS sera automatiquement envoyée à l'administration.</Text>
             <TextInput
               style={styles.reportInput}

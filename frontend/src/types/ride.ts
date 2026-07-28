@@ -26,6 +26,7 @@ export interface Ride {
   status: string;
   description?: string;
   distance_km?: number;
+  duration_min?: number;
   driver_latitude?: number | null;
   driver_longitude?: number | null;
   departure_latitude?: number | null;

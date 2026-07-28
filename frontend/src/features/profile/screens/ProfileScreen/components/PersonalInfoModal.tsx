@@ -140,7 +140,7 @@ export function PersonalInfoModal({
         avatar: avatarUri,
       });
 
-      CustomAlert.alert('Succès ✅', 'Informations personnelles mises à jour !');
+      CustomAlert.alert('Succès', 'Informations personnelles mises à jour !');
       onClose();
     } catch (e: any) {
       CustomAlert.alert('Erreur', e.message || 'Impossible de mettre à jour.');

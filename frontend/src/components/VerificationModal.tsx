@@ -135,12 +135,12 @@ export default function VerificationModal({ visible, onDismiss, onVerify, userNa
 
             {/* Titre */}
             <Text style={styles.headerTitle}>
-              {isRejected ? "Vérification rejetée ❌" : `Vérification requise${dots}`}
+              {isRejected ? "Vérification rejetée" : `Vérification requise${dots}`}
             </Text>
             <Text style={styles.headerSub}>
               {isRejected 
                 ? "Vos documents n'ont pas pu être validés." 
-                : `Bonjour ${userName ? userName : 'là'} ! 👋`
+                : `Bonjour ${userName ? userName : ''}`
               }
             </Text>
 

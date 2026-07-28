@@ -67,6 +67,27 @@ class NotificationViewSet(viewsets.ModelViewSet):
         # Clients voient uniquement leurs propres notifications (pas les globales user=None)
         return Notification.objects.filter(user=user).order_by('-created_at')
 
+    def perform_create(self, serializer):
+        notif = serializer.save()
+        title = notif.title or "Nouvelle notification"
+        message = notif.message or ""
+        
+        if notif.user:
+            # Envoi Push direct à l'utilisateur ciblé
+            send_fcm_to_user(
+                user=notif.user,
+                title=title,
+                body=message,
+                data={'screen': 'notifications', 'notif_id': str(notif.id)}
+            )
+        else:
+            # Envoi Push broadcast à tous les utilisateurs
+            send_fcm_to_all_users(
+                title=title,
+                body=message,
+                data={'screen': 'notifications', 'notif_id': str(notif.id)}
+            )
+
     @action(detail=False, methods=['post'], url_path='mark-read')
     def mark_all_read(self, request):
         if not request.user.is_authenticated:

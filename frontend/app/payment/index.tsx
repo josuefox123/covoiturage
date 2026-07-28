@@ -181,6 +181,8 @@ export default function PaymentScreen() {
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 startInLoadingState={true}
+                cacheEnabled={false}
+                incognito={true}
                 renderLoading={() => (
                     <View style={styles.webViewLoading}>
                         <ActivityIndicator size="large" color="#2F80ED" />

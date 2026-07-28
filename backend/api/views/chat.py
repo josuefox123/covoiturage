@@ -306,7 +306,24 @@ class MessageViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         msg = serializer.save(sender=self.request.user)
         # Mark conversation as updated
-        msg.conversation.save()  # triggers updated_at
+        conv = msg.conversation
+        conv.save()  # triggers updated_at
+
+        # Envoyer une notification push au destinataire
+        recipient = conv.participant_2 if conv.participant_1 == self.request.user else conv.participant_1
+        if recipient and recipient != self.request.user:
+            sender_name = self.request.user.full_name or "Un utilisateur"
+            content_preview = msg.content if msg.message_type == 'text' else f"[{msg.message_type.capitalize()}]"
+            create_and_send_notification(
+                user=recipient,
+                title=f"Nouveau message de {sender_name}",
+                message=content_preview,
+                data={
+                    'type': 'new_message',
+                    'conversation_id': str(conv.id),
+                    'screen': 'chat'
+                }
+            )
 
     @action(detail=True, methods=['post'], url_path='mark-read')
     def mark_read(self, request, pk=None):

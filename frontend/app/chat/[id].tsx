@@ -263,7 +263,7 @@ export default function ChatScreen() {
             <Text style={styles.headerName}>{partnerName}</Text>
             {rideInfo && (
               <Text style={styles.rideInfoText} numberOfLines={1}>
-                🚗 {rideInfo.departure_location} → {rideInfo.arrival_location}
+                {rideInfo.departure_location} → {rideInfo.arrival_location}
               </Text>
             )}
           </View>
@@ -288,7 +288,7 @@ export default function ChatScreen() {
           <View style={styles.warningBanner}>
             <Ionicons name="warning" size={18} color={theme.colors.warningDark} />
             <Text style={styles.warningText}>
-              ⚠️ Sécurité : Ne partagez pas de numéro de téléphone. Ce message sera bloqué.
+              Sécurité : Ne partagez pas de numéro de téléphone. Ce message sera bloqué.
             </Text>
           </View>
         )}

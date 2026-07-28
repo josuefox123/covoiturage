@@ -27,11 +27,11 @@ class BookingService:
             if ride.driver == passenger:
                 raise ValidationError({"error": "Vous ne pouvez pas réserver votre propre trajet."})
                 
-            if ride.departure_date < date.today():
+            if ride.departure_date < date.today() and ride.status != 'started':
                 raise ValidationError({"error": "Ce trajet est déjà passé (archivé)."})
                 
-            if ride.status in ['started', 'completed', 'cancelled']:
-                raise ValidationError({"error": "Ce trajet n'est plus disponible pour la réservation."})
+            if ride.status in ['completed', 'cancelled']:
+                raise ValidationError({"error": "Ce trajet est terminé ou annulé et n'est plus disponible pour la réservation."})
                 
             # Vérifier les réservations existantes pour éviter les doublons
             existing_booking = Booking.objects.filter(ride=ride, passenger=passenger).exclude(status='cancelled').first()
@@ -51,18 +51,17 @@ class BookingService:
                                 ride.save()
                                 
                                 amount_due = int(existing_booking.amount_due_to_driver)
-                                commission = int(existing_booking.amount_paid_online)
                                 create_and_send_notification(
                                     user=existing_booking.passenger,
                                     title="Réservation confirmée ✅",
-                                    message=f"Commission de {commission} FCFA payée. Prévoyez {amount_due} FCFA en espèces à remettre au conducteur.",
+                                    message=f"Paiement de {existing_booking.total_amount} FCFA validé. Votre réservation est confirmée.",
                                     data={'type': 'payment_confirmed', 'booking_id': str(existing_booking.id), 'screen': 'trips'}
                                 )
                                 if ride.driver:
                                     create_and_send_notification(
                                         user=ride.driver,
                                         title="Nouvelle réservation 🚗",
-                                        message=f"{existing_booking.passenger.full_name or existing_booking.passenger.phone} vous paiera {amount_due} FCFA en espèces lors du trajet.",
+                                        message=f"{existing_booking.passenger.full_name or existing_booking.passenger.phone} a réservé {existing_booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
                                         data={'type': 'new_booking', 'booking_id': str(existing_booking.id), 'screen': 'rides'}
                                     )
                                 raise ValidationError({"error": "Vous avez déjà une réservation confirmée suite à votre paiement."})

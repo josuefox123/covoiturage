@@ -497,7 +497,7 @@ export default function PublishScreen() {
       const res = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(payload) });
       const message = isRecurrent && res.message ? res.message : `Votre trajet de ${departure} vers ${arrival} a été publié !`;
 
-      CustomAlert.alert('Félicitations ! 🎉', message, [
+      CustomAlert.alert('Félicitations !', message, [
         { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
       ]);
 
@@ -823,7 +823,7 @@ export default function PublishScreen() {
                           <View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                               <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontStyle: 'italic' }}>
-                                📍 Calcul basé sur les routes réelles
+                                Calcul basé sur les routes réelles
                               </Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1211,15 +1211,15 @@ export default function PublishScreen() {
                   <PrefToggle label="Bagages autorisés" icon="briefcase-outline" value={luggageAllowed} onToggle={() => setLuggageAllowed(!luggageAllowed)} />
                   {luggageAllowed && (
                     <View style={styles.luggageSubCard}>
-                      <Text style={styles.luggageSubTitle}>🧳 Configuration des bagages</Text>
+                      <Text style={styles.luggageSubTitle}>Configuration des bagages</Text>
 
                       {/* Size selector */}
                       <Text style={styles.luggageSubLabel}>Taille max acceptée par sac</Text>
                       <View style={styles.luggageOptionsRow}>
                         {[
-                          { key: 'petit', label: '🎒 Petit' },
-                          { key: 'moyen', label: '🧳 Moyen (Cabine)' },
-                          { key: 'grand', label: '🧳 Grand' },
+                          { key: 'petit', label: 'Petit' },
+                          { key: 'moyen', label: 'Moyen (Cabine)' },
+                          { key: 'grand', label: 'Grand' },
                         ].map((item) => (
                           <TouchableOpacity
                             key={item.key}
@@ -1237,8 +1237,8 @@ export default function PublishScreen() {
                       <Text style={styles.luggageSubLabel}>Limite de poids/volume</Text>
                       <View style={styles.luggageOptionsRow}>
                         {[
-                          { key: 'per_passenger', label: '👤 Par passager' },
-                          { key: 'total', label: '🚗 Au total (coffre)' },
+                          { key: 'per_passenger', label: 'Par passager' },
+                          { key: 'total', label: 'Au total (coffre)' },
                         ].map((item) => (
                           <TouchableOpacity
                             key={item.key}
@@ -1417,7 +1417,7 @@ export default function PublishScreen() {
               {stopovers.length > 0 && (
                 <View style={{ marginVertical: 8, paddingLeft: 18 }}>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary, marginBottom: 4 }}>
-                    📍 {stopovers.length} ville(s) / point(s) d'arrêt :
+                    {stopovers.length} ville(s) / point(s) d'arrêt :
                   </Text>
                   {stopovers.map((s, idx) => (
                     <Text key={s.id} style={{ fontSize: 12, color: theme.colors.text, marginLeft: 8 }}>
@@ -1439,9 +1439,9 @@ export default function PublishScreen() {
 
               {estimation && (
                 <View style={styles.summaryRouteMetrics}>
-                  <Text style={styles.summaryMetricText}>📏 {estimation.distanceKm} km</Text>
+                  <Text style={styles.summaryMetricText}>{estimation.distanceKm} km</Text>
                   <Text style={styles.summaryMetricText}>
-                    ⏱️ {formatDuration(estimation.durationMin + stopovers.reduce((sum, s) => sum + (Number(s.stopDurationMin) || 0), 0))}
+                    {formatDuration(estimation.durationMin + stopovers.reduce((sum, s) => sum + (Number(s.stopDurationMin) || 0), 0))}
                   </Text>
                 </View>
               )}
@@ -1512,20 +1512,20 @@ export default function PublishScreen() {
             </View>
 
             <View style={styles.summaryBadgesRow}>
-              {music && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🎵 Musique autorisée</Text></View>}
-              {chatty && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>💬 Discussion appréciée</Text></View>}
-              {airCond && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>❄️ Climatisation</Text></View>}
+              {music && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Musique autorisée</Text></View>}
+              {chatty && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Discussion appréciée</Text></View>}
+              {airCond && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Climatisation</Text></View>}
               {luggageAllowed && (
                 <View style={styles.summaryChip}>
                   <Text style={styles.summaryChipText}>
-                    🧳 Bagages: {luggageSize === 'petit' ? 'Petit' : luggageSize === 'moyen' ? 'Moyen' : 'Grand'} ({luggageMaxWeightKg || 15}kg {luggageType === 'per_passenger' ? '/passager' : 'au total'})
+                    Bagages: {luggageSize === 'petit' ? 'Petit' : luggageSize === 'moyen' ? 'Moyen' : 'Grand'} ({luggageMaxWeightKg || 15}kg {luggageType === 'per_passenger' ? '/passager' : 'au total'})
                   </Text>
                 </View>
               )}
-              {drivingRelay && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🚘 Relais conduite accepté</Text></View>}
-              {petsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🐾 Animaux acceptés</Text></View>}
-              {!smoking && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>🚭 Non-fumeur</Text></View>}
-              {stopsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>⏸️ Pauses acceptées</Text></View>}
+              {drivingRelay && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Relais conduite accepté</Text></View>}
+              {petsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Animaux acceptés</Text></View>}
+              {!smoking && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Non-fumeur</Text></View>}
+              {stopsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Pauses acceptées</Text></View>}
             </View>
 
             {description.trim() ? (
@@ -1693,7 +1693,7 @@ export default function PublishScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.modalBtn, { flex: 1 }]} onPress={handleSavePrefs} disabled={isSavingProfile}>
                   <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Terminer 🚀</Text>}
+                    {isSavingProfile ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.modalBtnText}>Terminer</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

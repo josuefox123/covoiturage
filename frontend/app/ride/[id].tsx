@@ -206,15 +206,15 @@ export default function RideDetailScreen() {
         setBookingId(res.id);
         setHasBooked(true);
         
-        // Estimer le montant (frais de service en ligne)
-        const commission = ride ? Math.max(100, Math.floor((ride.price_per_seat || 0) * 0.1)) : 100;
+        // Estimer le montant (prix total du trajet en ligne)
+        const totalSeatPrice = ride ? (ride.price_per_seat || 0) : 0;
         
         // Rediriger vers l'écran de paiement
         router.push({
           pathname: '/payment',
           params: {
             booking_id: String(res.id),
-            amount: String(res.amount_paid_online || commission)
+            amount: String(res.amount_paid_online || totalSeatPrice)
           }
         });
       }
@@ -230,12 +230,12 @@ export default function RideDetailScreen() {
    */
   const handleRetryPayment = async () => {
     if (!bookingId) return;
-    const commission = ride ? Math.max(100, Math.floor((ride.price_per_seat || 0) * 0.1)) : 100;
+    const totalSeatPrice = ride ? (ride.price_per_seat || 0) : 0;
     router.push({
       pathname: '/payment',
       params: {
         booking_id: String(bookingId),
-        amount: String(myBooking?.amount_paid_online || commission)
+        amount: String(myBooking?.amount_paid_online || totalSeatPrice)
       }
     });
   };
@@ -745,25 +745,25 @@ export default function RideDetailScreen() {
                   <Text style={styles.subSectionTitle}>Préférences de voyage</Text>
                   <View style={styles.prefTagsContainer}>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>🎵 {ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "🚬 Fumeur" : "Non-fumeur"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "Fumeur" : "Non-fumeur"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>💬 {ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>❄️ {ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>🐾 {ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>💼 {ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>📍 {ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
                     </View>
                   </View>
                   {ride.driver_details.preference.notes ? (
@@ -802,14 +802,14 @@ export default function RideDetailScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Passagers ({bookings.filter(b => ['confirmed', 'active', 'pending', 'completed'].includes(b.status)).length})</Text>
-            {bookings.filter(b => ['confirmed', 'active', 'pending', 'completed'].includes(b.status)).length === 0 ? (
+            <Text style={styles.sectionTitle}>Passagers ({bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).length})</Text>
+            {bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="people" size={40} color={COLORS.border} />
                 <Text style={styles.emptyText}>Aucun passager pour l'instant</Text>
               </View>
             ) : (
-              bookings.filter(b => ['confirmed', 'active', 'pending', 'completed'].includes(b.status)).map((booking) => (
+              bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).map((booking) => (
                 <View key={booking.id} style={styles.passengerCard}>
                   <View style={styles.passengerHeader}>
                     {booking.passenger_details?.avatar ? (
@@ -893,25 +893,25 @@ export default function RideDetailScreen() {
                   <Text style={styles.subSectionTitle}>Préférences de voyage</Text>
                   <View style={styles.prefTagsContainer}>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>🎵 {ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "🚬 Fumeur" : "Non-fumeur"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "Fumeur" : "Non-fumeur"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>💬 {ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>❄️ {ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>🐾 {ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>💼 {ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
                     </View>
                     <View style={styles.prefTagItem}>
-                      <Text style={styles.prefTagText}>📍 {ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
+                      <Text style={styles.prefTagText}>{ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
                     </View>
                   </View>
                   {ride.driver_details.preference.notes ? (
@@ -989,7 +989,7 @@ export default function RideDetailScreen() {
               <View style={[styles.bookBtn, styles.bookedBtn, { opacity: 0.8 }]}>
                 <View style={styles.btnRow}>
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
-                  <Text style={styles.bookBtnText}>Place Réservée ✅</Text>
+                  <Text style={styles.bookBtnText}>Place Réservée</Text>
                 </View>
               </View>
             )

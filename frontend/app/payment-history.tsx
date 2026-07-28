@@ -90,7 +90,7 @@ export default function PaymentHistoryScreen() {
 
       const storedToken = await SecureStore.getItemAsync('zemy_access_token');
       const receiptUrl = `${API_BASE}/payments/${payment.id}/receipt/`;
-      const localUri = FileSystem.documentDirectory + `recu_zemy_${payment.transaction_id.substring(0, 12)}.pdf`;
+      const localUri = (((FileSystem as any).documentDirectory) ?? '') + `recu_zemy_${payment.transaction_id.substring(0, 12)}.pdf`;
 
       const downloadResult = await FileSystem.downloadAsync(receiptUrl, localUri, {
         headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},

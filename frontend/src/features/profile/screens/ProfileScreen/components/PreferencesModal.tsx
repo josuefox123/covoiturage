@@ -77,7 +77,7 @@ export function PreferencesModal({
           notes: notes.trim(),
         }),
       });
-      CustomAlert.alert('Succès ✅', 'Préférences sauvegardées !');
+      CustomAlert.alert('Succès', 'Préférences sauvegardées !');
       onClose();
     } catch (e: any) {
       CustomAlert.alert('Erreur', e.message || 'Impossible de sauvegarder les préférences.');

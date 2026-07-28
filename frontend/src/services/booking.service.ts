@@ -6,6 +6,7 @@ export interface BookingResponse {
     status: string;
     payment_status: string;
     created_at: string;
+    amount_paid_online?: number;
 }
 
 export const BookingService = {

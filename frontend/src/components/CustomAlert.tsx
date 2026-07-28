@@ -19,7 +19,7 @@ interface CustomAlertProps {
   visible: boolean;
   title: string;
   message: string;
-  type?: 'error' | 'success' | 'info';
+  type?: 'error' | 'success' | 'info' | 'warning';
   onClose: () => void;
   buttonText?: string;
 }

@@ -151,14 +151,14 @@ export function VehicleModal({
           method: 'PATCH',
           body: formData,
         });
-        CustomAlert.alert('Succès ✅', 'Véhicule mis à jour !');
+        CustomAlert.alert('Succès', 'Véhicule mis à jour !');
         onSaveSuccess({ id: vehicleId, brand: brand.trim(), model: model.trim(), plate: plate.trim() });
       } else {
         const res = await authFetch('/vehicles/', {
           method: 'POST',
           body: formData,
         });
-        CustomAlert.alert('Succès ✅', 'Véhicule ajouté !');
+        CustomAlert.alert('Succès', 'Véhicule ajouté !');
         onSaveSuccess({ id: res.id, brand: brand.trim(), model: model.trim(), plate: plate.trim() });
       }
       onClose();
@@ -309,7 +309,7 @@ export function VehicleModal({
 
             <TouchableOpacity style={[styles.imagePickerBtn, { backgroundColor: theme.colors.white }]} onPress={pickLicensePhoto}>
               {driverLicensePhoto ? (
-                <Text style={styles.imagePickerTextSuccess}>Photo du permis ajoutée ✅</Text>
+                <Text style={styles.imagePickerTextSuccess}>Photo du permis ajoutée</Text>
               ) : (
                 <>
                   <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />

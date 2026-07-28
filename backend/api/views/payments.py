@@ -33,7 +33,8 @@ from ..serializers import (
     UserSerializer, AdminUserSerializer, VehicleSerializer, UserPreferenceSerializer, 
     RideSerializer, BookingSerializer, ConversationSerializer, MessageSerializer, NotificationSerializer, AppBrandingSerializer,
     VerificationRequestSerializer, PromotionSerializer, MobileSettingsSerializer,
-    FinancialSettingsSerializer, RefundRequestSerializer, TransactionSerializer, ParcelSerializer, PopularPlaceSerializer
+    FinancialSettingsSerializer, RefundRequestSerializer, TransactionSerializer, ParcelSerializer, PopularPlaceSerializer,
+    DriverPayoutSerializer
 )
 from ..fcm import send_fcm_to_user, send_fcm_to_all_users, create_and_send_notification
 
@@ -904,3 +905,62 @@ class DriverClaimPayoutView(APIView):
             'status': payout.status,
             'message': f'Votre demande de virement de {amount_due} XOF a été soumise avec succès. Vous recevrez votre argent sous 24h sur le {phone_number}.'
         }, status=status.HTTP_201_CREATED)
+
+
+class DriverPayoutViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour la gestion des demandes de virement conducteur par l'administrateur.
+    """
+    queryset = DriverPayout.objects.all().order_by('-requested_at')
+    serializer_class = DriverPayoutSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        payout = self.get_object()
+        if payout.status != 'pending':
+            return Response({"error": "La demande n'est plus en attente."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        payout.status = 'paid'
+        payout.paid_at = timezone.now()
+        admin_note = request.data.get('admin_note', '')
+        if admin_note:
+            payout.admin_note = admin_note
+        payout.save()
+        
+        # Mettre à jour le statut des réservations du trajet pour ce conducteur en "paid"
+        confirmed_bookings = payout.ride.bookings.filter(
+            status='completed',
+            payment_status='escrow'
+        )
+        for booking in confirmed_bookings:
+            booking.payment_status = 'paid'
+            booking.save()
+            
+        create_and_send_notification(
+            user=payout.driver,
+            title="Virement effectué 💰",
+            message=f"Votre virement de {payout.amount} FCFA a été versé sur le numéro {payout.phone_number}.",
+            data={'type': 'payout_completed', 'payout_id': str(payout.id)}
+        )
+        return Response({"status": "Demande de virement marquée comme payée."})
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        payout = self.get_object()
+        if payout.status != 'pending':
+            return Response({"error": "La demande n'est plus en attente."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        payout.status = 'failed'
+        admin_note = request.data.get('admin_note', '')
+        if admin_note:
+            payout.admin_note = admin_note
+        payout.save()
+        
+        create_and_send_notification(
+            user=payout.driver,
+            title="Échec du virement ❌",
+            message=f"Votre demande de virement de {payout.amount} FCFA a été rejetée. Note: {admin_note or 'Veuillez contacter le support.'}",
+            data={'type': 'payout_failed', 'payout_id': str(payout.id)}
+        )
+        return Response({"status": "Demande de virement marquée comme échouée."})

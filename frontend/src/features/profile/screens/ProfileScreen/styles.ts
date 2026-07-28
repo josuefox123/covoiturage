@@ -480,4 +480,27 @@ export const styles = StyleSheet.create({
   modalStepContainer: {
     width: '100%',
   },
+  imagePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+    marginTop: 8,
+  },
+  imagePickerText: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  imagePickerTextSuccess: {
+    fontSize: 14,
+    color: theme.colors.success ?? '#10B981',
+    fontWeight: '700',
+  },
 });

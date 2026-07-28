@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ==============================================================
  * Fichier :
  * earnings.tsx
@@ -226,8 +226,8 @@ export default function EarningsScreen() {
             <Text style={styles.loadingText}>Chargement de vos revenus...</Text>
           </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} refreshing={refreshing}
-            onScrollBeginDrag={() => {}} contentContainerStyle={{ paddingBottom: 40 }}>
+          <ScrollView showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}>
 
             {/* Carte transactions */}
             <View style={styles.card}>

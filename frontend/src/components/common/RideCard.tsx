@@ -18,6 +18,7 @@ import ProfileAvatar from './ProfileAvatar';
 
 export interface RideCardProps {
   ride: any;
+  role?: string;
   bookingStatus?: string;
   paymentStatus?: string;
   isActiveRightNow?: boolean;
@@ -121,8 +122,10 @@ export default function RideCard({
         ) : (
           <View style={styles.driverInfo}>
             <ProfileAvatar name={driver?.full_name} url={driver?.photo} size={40} />
-            <View>
-              <Text style={styles.driverName}>{driver?.full_name || driver?.phone || 'Inconnu'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.driverName} numberOfLines={1} ellipsizeMode="tail">
+                {driver?.full_name || driver?.phone || 'Inconnu'}
+              </Text>
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={14} color={theme.colors.warning} />
                 <Text style={styles.ratingText}>{driver?.rating || '4.0'}</Text>
@@ -225,6 +228,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.sm,
+    flex: 1,
+    marginRight: 8,
   },
   driverName: {
     ...theme.typography.h3,

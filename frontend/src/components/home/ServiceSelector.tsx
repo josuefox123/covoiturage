@@ -18,7 +18,6 @@ interface Vehicle {
   id: VehicleType;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
-  emoji: string;
   color: string;
   bgColor: string;
 }
@@ -28,7 +27,6 @@ const VEHICLES: Vehicle[] = [
     id: 'covoiturage',
     label: 'Covoiturage',
     icon: 'car-outline',
-    emoji: '🚗',
     color: PRIMARY,
     bgColor: '#EEF3FF',
   },
@@ -36,7 +34,6 @@ const VEHICLES: Vehicle[] = [
     id: 'bus',
     label: 'Bus',
     icon: 'bus-outline',
-    emoji: '🚌',
     color: PRIMARY,
     bgColor: '#EEF3FF',
   },
@@ -44,7 +41,6 @@ const VEHICLES: Vehicle[] = [
     id: 'colis',
     label: 'Colis',
     icon: 'cube-outline',
-    emoji: '📦',
     color: PRIMARY,
     bgColor: '#EEF3FF',
   },
@@ -75,7 +71,7 @@ export default function ServiceSelector({ selected, onSelect }: ServiceSelectorP
 
     if (id === 'bus') {
       CustomAlert.alert(
-        'Bientôt disponible 🚀',
+        'Bientôt disponible',
         'Le service de réservation de bus est en cours de développement et sera disponible très prochainement.'
       );
       return;
@@ -83,7 +79,7 @@ export default function ServiceSelector({ selected, onSelect }: ServiceSelectorP
 
     if (id === 'colis') {
       CustomAlert.alert(
-        'Bientôt disponible 🚀',
+        'Bientôt disponible',
         'Le service de livraison de colis est en cours de développement et sera disponible très prochainement.'
       );
       return;

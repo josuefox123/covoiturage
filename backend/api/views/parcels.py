@@ -142,6 +142,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
             amount_to_pay = max(100, int(parcel.zemy_commission))
             description = f"Commission Zemy colis {parcel.ride.departure_location} -> {parcel.ride.arrival_location}"
             
+            import time
             # Construire l'URL absolue vers notre page de checkout de paiement
             path = (
                 f"/payments/checkout/"
@@ -151,6 +152,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
                 f"&email={urllib.parse.quote(parcel.sender_user.email or 'client@zemy.bj')}"
                 f"&phone={urllib.parse.quote(parcel.sender_user.phone or '')}"
                 f"&description={urllib.parse.quote(description)}"
+                f"&_t={int(time.time())}"
             )
             url = request.build_absolute_uri(path)
             

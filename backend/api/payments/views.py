@@ -112,4 +112,8 @@ def payment_checkout(request):
         "phone": phone,
         "transaction_id": transaction_id,
     }
-    return render(request, 'api/payment_checkout.html', context)
+    response = render(request, 'api/payment_checkout.html', context)
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response

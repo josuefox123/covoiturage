@@ -5,7 +5,6 @@ Fichier :
 serializers.py
 
 Description :
-
 Module de l'application Zemy.
 
 Projet :
@@ -16,7 +15,7 @@ Zemy
 from api.models import Payment
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, FinancialSettings, RefundRequest, Transaction, Parcel, SupportTicket
+from .models import User, Vehicle, UserPreference, Ride, Booking, Conversation, Message, Notification, FinancialSettings, RefundRequest, Transaction, Parcel, SupportTicket, DriverPayout
 
 class UserPreferenceSerializer(serializers.ModelSerializer):
     """
@@ -481,3 +480,26 @@ class UserPaymentSerializer(serializers.ModelSerializer):
         if obj.booking and obj.booking.ride:
             return obj.booking.ride.departure_date
         return None
+
+
+class DriverPayoutSerializer(serializers.ModelSerializer):
+    """
+    Serializer pour les demandes de virement conducteur (dashboard admin).
+    """
+    driver_name = serializers.ReadOnlyField(source='driver.full_name')
+    driver_email = serializers.ReadOnlyField(source='driver.email')
+    ride_route = serializers.SerializerMethodField()
+    ride_date = serializers.ReadOnlyField(source='ride.departure_date')
+
+    class Meta:
+        model = DriverPayout
+        fields = [
+            'id', 'driver', 'driver_name', 'driver_email', 'ride', 'ride_route', 
+            'ride_date', 'amount', 'phone_number', 'status', 'admin_note', 
+            'requested_at', 'paid_at'
+        ]
+
+    def get_ride_route(self, obj):
+        if obj.ride:
+            return f"{obj.ride.departure_location} → {obj.ride.arrival_location}"
+        return ""
