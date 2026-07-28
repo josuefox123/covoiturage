@@ -34,7 +34,7 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import Fuse from 'fuse.js';
+
 
 import { fetchApi } from '../services/api';
 
@@ -397,6 +397,31 @@ export default function LocationPicker({
     }
   };
 
+  const GOOGLE_API_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
+
+  const fetchPlaceDetails = async (placeId: string): Promise<{ lat: number; lon: number; address: string; city: string } | null> => {
+    try {
+      const resp = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry,address_components,formatted_address&key=${GOOGLE_API_KEY}&language=fr`
+      );
+      const data = await resp.json();
+      if (data.status === 'OK' && data.result?.geometry?.location) {
+        const loc = data.result.geometry.location;
+        const components: any[] = data.result.address_components || [];
+        const getComp = (type: string) =>
+          components.find((c: any) => c.types.includes(type))?.long_name || '';
+        const city =
+          getComp('locality') ||
+          getComp('administrative_area_level_2') ||
+          getComp('administrative_area_level_1') ||
+          '';
+        const address = data.result.formatted_address || '';
+        return { lat: loc.lat, lon: loc.lng, address, city };
+      }
+    } catch (e) {}
+    return null;
+  };
+
   const searchPlaces = async (query: string) => {
     if (query.trim().length < 2) {
       setSearchResults([]);
@@ -408,6 +433,7 @@ export default function LocationPicker({
     searchAbort.current = new AbortController();
 
     try {
+      // Local popular places from backend
       let localResults: any[] = [];
       try {
         const localData = await fetchApi(
@@ -416,34 +442,49 @@ export default function LocationPicker({
         localResults = Array.isArray(localData) ? localData : localData?.results || [];
       } catch (err) {}
 
-      const GOOGLE_SEARCH_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
-      const googleResponse = await fetch(
-        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${query} Bénin`)}&key=${GOOGLE_SEARCH_KEY}&language=fr&region=bj`,
+      // Google Places Autocomplete — fast, route-aware, precise
+      const locationBias = userLocation
+        ? `&location=${userLocation.lat},${userLocation.lon}&radius=500000`
+        : '&location=6.3703,2.3912&radius=600000';
+
+      const acResp = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_API_KEY}&language=fr&components=country:bj${locationBias}&types=geocode|establishment`,
         { signal: searchAbort.current.signal }
       );
 
-      if (!googleResponse.ok) throw new Error(`HTTP ${googleResponse.status}`);
-      const googleData = await googleResponse.json();
+      if (!acResp.ok) throw new Error(`HTTP ${acResp.status}`);
+      const acData = await acResp.json();
 
-      const googleResults =
-        googleData?.results?.map((place: any) => ({
-          id: place.place_id,
-          lat: place.geometry?.location?.lat,
-          lon: place.geometry?.location?.lng,
-          name: place.name || 'Lieu',
-          city: place.formatted_address?.split(',')[1]?.trim() || '',
-          country: 'Bénin',
-          display_name: place.formatted_address || place.name,
-        })) || [];
+      const googleResults: any[] =
+        (acData?.predictions || []).map((pred: any) => ({
+          id: pred.place_id,
+          place_id: pred.place_id,
+          name: pred.structured_formatting?.main_text || pred.description?.split(',')[0] || pred.description,
+          city: pred.structured_formatting?.secondary_text?.split(',')[0]?.trim() || '',
+          display_name: pred.description,
+          // lat/lon not yet resolved — will be fetched on selection
+          lat: null,
+          lon: null,
+        }));
 
-      const combinedResults = [...localResults, ...googleResults];
-      const fuse = new Fuse(combinedResults, {
-        keys: ['name', 'display_name', 'city'],
-        threshold: 0.3,
+      // Merge: local (with known coords) + Google Autocomplete (place_id-based)
+      const combined: any[] = [];
+
+      // Local results first (already have lat/lon)
+      localResults.forEach((r: any) => {
+        if (!combined.some((c) => c.name?.toLowerCase() === r.name?.toLowerCase())) {
+          combined.push({ ...r, _source: 'local' });
+        }
       });
 
-      const fuzzyResults = fuse.search(query);
-      setSearchResults(fuzzyResults.map((r) => r.item));
+      // Google autocomplete results
+      googleResults.forEach((r) => {
+        if (!combined.some((c) => c.name?.toLowerCase() === r.name?.toLowerCase())) {
+          combined.push({ ...r, _source: 'google' });
+        }
+      });
+
+      setSearchResults(combined);
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Search error:', error);
@@ -465,8 +506,8 @@ export default function LocationPicker({
 
     searchTimeoutRef.current = setTimeout(() => {
       searchPlaces(text);
-    }, 350);
-  }, []);
+    }, 300);
+  }, [userLocation]);
 
   const handleSelectSuggestion = useCallback(
     (loc: LocationData) => {
@@ -488,10 +529,11 @@ export default function LocationPicker({
   );
 
   const handleSelectSearchResult = useCallback(
-    (item: any) => {
+    async (item: any) => {
       Keyboard.dismiss();
       setIsSearchFocused(false);
 
+      // Case 1: local result with known coordinates
       if (item.latitude !== undefined && item.longitude !== undefined) {
         const loc: LocationData = {
           latitude: Number(item.latitude),
@@ -509,28 +551,50 @@ export default function LocationPicker({
         return;
       }
 
+      // Case 2: Google Autocomplete result — resolve place_id for exact coords
+      if (item.place_id) {
+        setIsLoadingAddress(true);
+        setSearchQuery(item.name);
+        try {
+          const details = await fetchPlaceDetails(item.place_id);
+          if (details) {
+            const loc: LocationData = {
+              latitude: details.lat,
+              longitude: details.lon,
+              name: item.name,
+              address: details.address,
+              city: details.city,
+              country: 'Bénin',
+            };
+            setSelectedLocation(loc);
+            setCustomLocationName(item.name);
+            isProgrammaticPanningRef.current = true;
+            sendToMap({ type: 'setView', lat: details.lat, lon: details.lon, zoom: 16 });
+          }
+        } finally {
+          setIsLoadingAddress(false);
+        }
+        return;
+      }
+
+      // Case 3: fallback with raw lat/lon
       const lat = Number(item.lat);
       const lon = Number(item.lon);
+      if (!lat || !lon) return;
+
       const parts = (item.display_name || '').split(',');
       const name = item.name || parts[0] || 'Lieu choisi';
       const address = parts.slice(1, 3).join(',').trim();
       const city = item.city || parts[2]?.trim() || '';
 
-      const loc: LocationData = {
-        latitude: lat,
-        longitude: lon,
-        name,
-        address,
-        city,
-        country: 'Bénin',
-      };
+      const loc: LocationData = { latitude: lat, longitude: lon, name, address, city, country: 'Bénin' };
       setSearchQuery(loc.name);
       setSelectedLocation(loc);
       setCustomLocationName(name);
       isProgrammaticPanningRef.current = true;
       sendToMap({ type: 'setView', lat, lon, zoom: 16 });
     },
-    [sendToMap]
+    [sendToMap, fetchPlaceDetails]
   );
 
   const goToMyLocation = useCallback(() => {
