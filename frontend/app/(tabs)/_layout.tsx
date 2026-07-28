@@ -13,7 +13,7 @@
 import { Tabs } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, View } from 'react-native';
+import { Platform, View, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SupportBubble from '../../src/components/SupportBubble';
 import { useEffect } from 'react';
