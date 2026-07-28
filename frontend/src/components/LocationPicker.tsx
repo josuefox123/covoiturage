@@ -648,7 +648,7 @@ export default function LocationPicker({
     <div class="pulse"></div>
   </div>
   <script>
-    var map, userMarker, moveTimeout;
+    var map, userMarker, previewMarker, moveTimeout;
     var markerEl = document.getElementById('centerMarker');
 
     function initMap() {
@@ -688,12 +688,31 @@ export default function LocationPicker({
       if (msg.type === 'setView') {
         map.panTo({ lat: msg.lat, lng: msg.lon });
         if (msg.zoom) map.setZoom(msg.zoom);
-      } else if (msg.type === 'setUserMarker') {
+      } else if (msg.type === 'previewLocation') {
         var pos = { lat: msg.lat, lng: msg.lon };
-        if (userMarker) { userMarker.setPosition(pos); }
+        if (previewMarker) {
+          previewMarker.setPosition(pos);
+        } else {
+          previewMarker = new google.maps.Marker({
+            position: pos, map: map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 11, fillColor: '#FFAA00', fillOpacity: 0.9,
+              strokeColor: 'white', strokeWeight: 2.5
+            },
+            animation: google.maps.Animation.DROP,
+            zIndex: 150
+          });
+        }
+        map.panTo(pos);
+      } else if (msg.type === 'clearPreview') {
+        if (previewMarker) { previewMarker.setMap(null); previewMarker = null; }
+      } else if (msg.type === 'setUserMarker') {
+        var uPos = { lat: msg.lat, lng: msg.lon };
+        if (userMarker) { userMarker.setPosition(uPos); }
         else {
           userMarker = new google.maps.Marker({
-            position: pos, map: map,
+            position: uPos, map: map,
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               scale: 8, fillColor: '#10B981', fillOpacity: 1,
@@ -716,6 +735,22 @@ export default function LocationPicker({
 
   const showSuggestions = isSearchFocused;
   const isQueryEmpty = searchQuery.trim().length === 0;
+
+  // ── Preview dynamique: 1er résultat affiché sur la carte au fur et à mesure ──
+  useEffect(() => {
+    if (!mapReady) return;
+    if (searchResults.length === 0) {
+      sendToMap({ type: 'clearPreview' });
+      return;
+    }
+    const first = searchResults[0];
+    const lat = first.lat ?? first.latitude;
+    const lon = first.lon ?? first.longitude;
+    if (lat && lon) {
+      isProgrammaticPanningRef.current = true;
+      sendToMap({ type: 'previewLocation', lat, lon });
+    }
+  }, [searchResults, mapReady, sendToMap]);
 
   const cardTopMargin = Math.max(insets.top + 10, Platform.OS === 'ios' ? 44 : 24);
 
@@ -801,196 +836,176 @@ export default function LocationPicker({
           </View>
         </View>
 
-        {/* 3. CORPS DYNAMIQUE : SUGGESTIONS OU CARTE INTERACTIVE */}
-        {showSuggestions ? (
-          /* MODE SUGGESTIONS (S'AFFICHE DIRECTEMENT SOUS LA RECHERCHE) */
-          <View style={styles.suggestionsFullBody}>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-            >
-              {/* Départs récents */}
-              {recentLocations.length > 0 && isQueryEmpty && (
-                <View style={styles.dropdownSection}>
-                  <View style={styles.dropdownSectionHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="time-outline" size={16} color="#0066FF" style={{ marginRight: 6 }} />
-                      <Text style={styles.dropdownSectionTitle}>Départs récents</Text>
-                    </View>
-                    <TouchableOpacity onPress={clearRecentLocations} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Text style={styles.clearHistoryText}>Effacer</Text>
-                    </TouchableOpacity>
-                  </View>
+        {/* 3. CARTE TOUJOURS VISIBLE + suggestions flottantes par-dessus */}
+        <View style={{ flex: 1 }}>
+          <View style={styles.mapFullContainer}>
+            <WebView
+              ref={webviewRef}
+              originWhitelist={['*']}
+              source={{ html: googleMapsHtml }}
+              onMessage={onMapMessage}
+              javaScriptEnabled
+              domStorageEnabled
+              cacheEnabled
+              style={styles.mapWebView}
+              scrollEnabled={false}
+              androidLayerType="hardware"
+              mixedContentMode="compatibility"
+              allowsInlineMediaPlayback
+            />
 
-                  {recentLocations.map((item, index) => (
-                    <TouchableOpacity
-                      key={`recent-${index}-${item.name}`}
-                      style={[
-                        styles.suggestionItem,
-                        index === recentLocations.length - 1 && styles.suggestionItemLast,
-                      ]}
-                      onPress={() => handleSelectSuggestion(item)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.recentIconBadge}>
-                        <Ionicons name="time" size={16} color="#0066FF" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.suggestionTitle} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        {item.address || item.city ? (
-                          <Text style={styles.suggestionSubtitle} numberOfLines={1}>
-                            {item.address || item.city}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+            {!mapReady && (
+              <View style={styles.mapLoadingOverlay}>
+                <ActivityIndicator size="large" color="#0066FF" />
+                <Text style={styles.mapLoadingText}>Chargement de la carte...</Text>
+              </View>
+            )}
 
-              {/* Lieux populaires au Bénin */}
-              {isQueryEmpty && (
-                <View style={styles.dropdownSection}>
-                  <View style={styles.dropdownSectionHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="sparkles-outline" size={16} color="#F59E0B" style={{ marginRight: 6 }} />
-                      <Text style={styles.dropdownSectionTitle}>Lieux populaires au Bénin</Text>
-                    </View>
-                  </View>
-
-                  {popularPlaces.map((item, index) => (
-                    <TouchableOpacity
-                      key={`popular-${index}-${item.name}`}
-                      style={[
-                        styles.suggestionItem,
-                        index === popularPlaces.length - 1 && styles.suggestionItemLast,
-                      ]}
-                      onPress={() => handleSelectSuggestion(item)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.popularIconBadge}>
-                        <Ionicons name="location-sharp" size={16} color="#0066FF" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.suggestionTitle} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        {item.address || item.city ? (
-                          <Text style={styles.suggestionSubtitle} numberOfLines={1}>
-                            {item.address || item.city}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Résultats en direct lors de la saisie */}
-              {!isQueryEmpty && (
-                <View>
-                  {searchResults.map((item, index) => {
-                    let itemTitle = '';
-                    let itemSubtitle = '';
-
-                    if (item.latitude !== undefined) {
-                      itemTitle = item.name;
-                      itemSubtitle = item.city ? `${item.city}, Bénin` : 'Bénin';
-                    } else {
-                      const displayName = item.display_name || '';
-                      const parts = displayName.split(',');
-                      itemTitle = item.name || parts[0] || 'Lieu';
-                      itemSubtitle = parts.slice(1, 4).join(',').trim();
-                    }
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id || item.place_id?.toString() || `search-${index}`}
-                        style={[
-                          styles.suggestionItem,
-                          index === searchResults.length - 1 && styles.suggestionItemLast,
-                        ]}
-                        onPress={() => handleSelectSearchResult(item)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.searchIconBadge}>
-                          <Ionicons name="navigate-outline" size={16} color="#0066FF" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.suggestionTitle} numberOfLines={1}>
-                            {itemTitle}
-                          </Text>
-                          {itemSubtitle ? (
-                            <Text style={styles.suggestionSubtitle} numberOfLines={1}>
-                              {itemSubtitle}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {!isSearching && searchResults.length === 0 && (
-                    <View style={styles.emptySearchContainer}>
-                      <Ionicons name="search-outline" size={36} color="#9CA3AF" />
-                      <Text style={styles.emptySearchTitle}>Aucun résultat trouvé</Text>
-                      <Text style={styles.emptySearchSubtitle}>
-                        Vérifiez l'orthographe ou choisissez sur la carte.
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Bouton pour fermer les suggestions et voir la carte */}
-              <TouchableOpacity
-                style={styles.seeMapBtn}
-                onPress={() => { Keyboard.dismiss(); setIsSearchFocused(false); }}
-              >
-                <Ionicons name="map-outline" size={18} color="#0066FF" style={{ marginRight: 6 }} />
-                <Text style={styles.seeMapBtnText}>Voir la carte en grand</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        ) : (
-          /* MODE CARTE INTERACTIVE */
-          <View style={{ flex: 1 }}>
-            <View style={styles.mapFullContainer}>
-              <WebView
-                ref={webviewRef}
-                originWhitelist={['*']}
-                source={{ html: googleMapsHtml }}
-                onMessage={onMapMessage}
-                javaScriptEnabled
-                domStorageEnabled
-                cacheEnabled
-                style={styles.mapWebView}
-                scrollEnabled={false}
-                androidLayerType="hardware"
-                mixedContentMode="compatibility"
-                allowsInlineMediaPlayback
-              />
-
-              {!mapReady && (
-                <View style={styles.mapLoadingOverlay}>
-                  <ActivityIndicator size="large" color="#0066FF" />
-                  <Text style={styles.mapLoadingText}>Chargement de la carte...</Text>
-                </View>
-              )}
-
-              {/* Bouton Ma Position Flottant */}
+            {/* Bouton Ma Position Flottant */}
+            {!isSearchFocused && (
               <TouchableOpacity style={styles.myLocationFloatingBtn} onPress={goToMyLocation} activeOpacity={0.8}>
                 <Ionicons name="locate" size={22} color="#1F2937" />
               </TouchableOpacity>
-            </View>
+            )}
 
-            {/* Footer de Confirmation au Bas de la Carte */}
+            {/* ── PANEL SUGGESTIONS FLOTTANT PAR-DESSUS LA CARTE ── */}
+            {showSuggestions && (
+              <View style={styles.floatingSuggestionsPanel}>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 16 }}
+                >
+                  {/* Départs récents */}
+                  {recentLocations.length > 0 && isQueryEmpty && (
+                    <View style={styles.dropdownSection}>
+                      <View style={styles.dropdownSectionHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="time-outline" size={15} color="#0066FF" style={{ marginRight: 5 }} />
+                          <Text style={styles.dropdownSectionTitle}>Départs récents</Text>
+                        </View>
+                        <TouchableOpacity onPress={clearRecentLocations} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Text style={styles.clearHistoryText}>Effacer</Text>
+                        </TouchableOpacity>
+                      </View>
+                      {recentLocations.map((item, index) => (
+                        <TouchableOpacity
+                          key={`recent-${index}-${item.name}`}
+                          style={[styles.suggestionItem, index === recentLocations.length - 1 && styles.suggestionItemLast]}
+                          onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSuggestion(item); }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.recentIconBadge}>
+                            <Ionicons name="time" size={15} color="#0066FF" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
+                            {(item.address || item.city) ? (
+                              <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.address || item.city}</Text>
+                            ) : null}
+                          </View>
+                          <Ionicons name="chevron-forward" size={15} color="#D1D5DB" />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Lieux populaires */}
+                  {isQueryEmpty && (
+                    <View style={styles.dropdownSection}>
+                      <View style={styles.dropdownSectionHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="sparkles-outline" size={15} color="#F59E0B" style={{ marginRight: 5 }} />
+                          <Text style={styles.dropdownSectionTitle}>Lieux populaires au Bénin</Text>
+                        </View>
+                      </View>
+                      {popularPlaces.map((item, index) => (
+                        <TouchableOpacity
+                          key={`popular-${index}-${item.name}`}
+                          style={[styles.suggestionItem, index === popularPlaces.length - 1 && styles.suggestionItemLast]}
+                          onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSuggestion(item); }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.popularIconBadge}>
+                            <Ionicons name="location-sharp" size={15} color="#0066FF" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
+                            {(item.address || item.city) ? (
+                              <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.address || item.city}</Text>
+                            ) : null}
+                          </View>
+                          <Ionicons name="chevron-forward" size={15} color="#D1D5DB" />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Résultats de recherche en direct */}
+                  {!isQueryEmpty && (
+                    <View>
+                      {isSearching && searchResults.length === 0 && (
+                        <View style={styles.searchingRow}>
+                          <ActivityIndicator size="small" color="#0066FF" />
+                          <Text style={styles.searchingText}>Recherche en cours...</Text>
+                        </View>
+                      )}
+                      {searchResults.map((item, index) => {
+                        let itemTitle = '';
+                        let itemSubtitle = '';
+                        if (item.latitude !== undefined) {
+                          itemTitle = item.name;
+                          itemSubtitle = item.city ? `${item.city}, Bénin` : 'Bénin';
+                        } else {
+                          const displayName = item.display_name || '';
+                          const parts = displayName.split(',');
+                          itemTitle = item.name || parts[0] || 'Lieu';
+                          itemSubtitle = parts.slice(1, 4).join(',').trim();
+                        }
+                        return (
+                          <TouchableOpacity
+                            key={item.id || item.place_id?.toString() || `search-${index}`}
+                            style={[
+                              styles.suggestionItem,
+                              index === 0 && styles.suggestionItemFirst,
+                              index === searchResults.length - 1 && styles.suggestionItemLast,
+                            ]}
+                            onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSearchResult(item); }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.searchIconBadge, index === 0 && styles.searchIconBadgeTop]}>
+                              <Ionicons name={index === 0 ? 'location' : 'navigate-outline'} size={15} color={index === 0 ? '#0066FF' : '#6B7280'} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.suggestionTitle, index === 0 && styles.suggestionTitleTop]} numberOfLines={1}>{itemTitle}</Text>
+                              {itemSubtitle ? (
+                                <Text style={styles.suggestionSubtitle} numberOfLines={1}>{itemSubtitle}</Text>
+                              ) : null}
+                            </View>
+                            {index === 0 && (
+                              <View style={styles.previewBadge}>
+                                <Text style={styles.previewBadgeText}>Aperçu</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {!isSearching && searchResults.length === 0 && (
+                        <View style={styles.emptySearchContainer}>
+                          <Ionicons name="search-outline" size={30} color="#9CA3AF" />
+                          <Text style={styles.emptySearchTitle}>Aucun résultat</Text>
+                          <Text style={styles.emptySearchSubtitle}>Essayez un autre terme ou glissez la carte.</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* Footer de Confirmation (caché pendant la recherche) */}
+          {!isSearchFocused && (
             <View style={styles.floatingFooterCard}>
               <View style={styles.locationSummaryCard}>
                 <View style={styles.locationIconCircle}>
@@ -1040,8 +1055,8 @@ export default function LocationPicker({
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
             </View>
-          </View>
-        )}
+          )}
+        </View>
       </Animated.View>
     </View>
   );
@@ -1146,16 +1161,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
   },
-  suggestionsFullBody: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: 8,
+  // ── Panel suggestions flottant par-dessus la carte ──
+  floatingSuggestionsPanel: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    maxHeight: '78%',
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 12,
+    zIndex: 50,
+    paddingTop: 6,
   },
   dropdownSection: {
-    marginBottom: 14,
+    marginBottom: 10,
     backgroundColor: '#F8FAFF',
-    borderRadius: 16,
-    padding: 10,
+    borderRadius: 14,
+    padding: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -1163,14 +1191,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 3,
     paddingHorizontal: 2,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   dropdownSectionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#1F2937',
   },
@@ -1188,72 +1216,90 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
     gap: 10,
   },
+  suggestionItemFirst: {
+    backgroundColor: '#F0F7FF',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    marginBottom: 2,
+  },
   suggestionItemLast: {
     borderBottomWidth: 0,
   },
   recentIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   popularIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   searchIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  searchIconBadgeTop: {
+    backgroundColor: '#DBEAFE',
+  },
   suggestionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  suggestionTitleTop: {
+    fontSize: 14,
+    color: '#1D4ED8',
   },
   suggestionSubtitle: {
     fontSize: 11,
     color: '#6B7280',
     marginTop: 1,
   },
-  seeMapBtn: {
+  previewBadge: {
+    backgroundColor: '#FFAA00',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  previewBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  searchingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    marginTop: 8,
+    gap: 10,
   },
-  seeMapBtnText: {
+  searchingText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#0066FF',
+    color: '#6B7280',
   },
   emptySearchContainer: {
-    paddingVertical: 30,
+    paddingVertical: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptySearchTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#374151',
-    marginTop: 8,
+    marginTop: 6,
   },
   emptySearchSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
     textAlign: 'center',
     marginTop: 2,
@@ -1379,5 +1425,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  // suggestionsFullBody kept for backward compat (unused)
+  suggestionsFullBody: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 8,
+  },
+  seeMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginTop: 8,
+  },
+  seeMapBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0066FF',
   },
 });
