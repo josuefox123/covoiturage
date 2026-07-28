@@ -171,9 +171,27 @@ export default function TripsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mes trajets</Text>
-        <Text style={styles.headerSubtitle}>Gérez vos réservations</Text>
+      <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+        <View>
+          <Text style={styles.headerTitle}>Mes trajets</Text>
+          <Text style={styles.headerSubtitle}>Gérez vos réservations</Text>
+        </View>
+        {activeTab === 'driver' && (
+          <TouchableOpacity
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            onPress={() => router.push('/publish')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.tabContainer}>
@@ -253,7 +271,27 @@ export default function TripsScreen() {
           ) : (
             <View style={styles.listContainer}>
               {filteredDriverTrips.length === 0 ? (
-                <Text style={styles.emptyText}>Aucun trajet {filterTab === 'active' ? 'actif' : 'archivé'} en tant que conducteur.</Text>
+                <View style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
+                  <Text style={styles.emptyText}>Aucun trajet {filterTab === 'active' ? 'actif' : 'archivé'} en tant que conducteur.</Text>
+                  {filterTab === 'active' && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: theme.colors.primary,
+                        paddingHorizontal: 20,
+                        paddingVertical: 12,
+                        borderRadius: 12,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                      onPress={() => router.push('/publish')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="add-circle-outline" size={20} color="white" />
+                      <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>Créer un trajet</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               ) : (
                 filteredDriverTrips.map((ride: any) => {
                   const isActiveRightNow = (ride.status === 'active' || ride.status === 'started') &&

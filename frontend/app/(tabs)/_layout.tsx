@@ -66,16 +66,8 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="publish"
           options={{
-            title: 'Publier',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={24} color={color} />
-            ),
+            href: null,
           }}
-          listeners={({ navigation }) => ({
-            tabPress: (e) => {
-              // Optionnel : on peut émettre un event pour vider le formulaire si déjà sur l'écran
-            },
-          })}
         />
         <Tabs.Screen
           name="trips"
@@ -90,8 +82,36 @@ export default function TabsLayout() {
           name="earnings"
           options={{
             title: 'Revenus',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'cash' : 'cash-outline'} size={24} color={color} />
+            tabBarLabel: () => null,
+            tabBarButton: (props) => (
+              <TouchableOpacity
+                {...props}
+                style={{
+                  top: -16,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  height: 64,
+                }}
+                activeOpacity={0.85}
+              >
+                <View
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 29,
+                    backgroundColor: theme.colors.primary,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    shadowColor: theme.colors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    elevation: 5,
+                  }}
+                >
+                  <Ionicons name="cash" size={25} color="white" />
+                </View>
+              </TouchableOpacity>
             ),
           }}
         />
