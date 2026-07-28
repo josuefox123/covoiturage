@@ -294,6 +294,7 @@ export default function LocationPicker({
   }, []);
 
   const hasCenteredRef = useRef(false);
+  const isProgrammaticPanningRef = useRef(false);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -305,6 +306,7 @@ export default function LocationPicker({
     if (hasCenteredRef.current) return;
 
     if (initialLocation) {
+      isProgrammaticPanningRef.current = true;
       sendToMap({
         type: 'setView',
         lat: initialLocation.latitude,
@@ -474,6 +476,7 @@ export default function LocationPicker({
       setSelectedLocation(loc);
       setCustomLocationName(loc.name);
 
+      isProgrammaticPanningRef.current = true;
       sendToMap({
         type: 'setView',
         lat: loc.latitude,
@@ -501,6 +504,7 @@ export default function LocationPicker({
         setSearchQuery(loc.name);
         setSelectedLocation(loc);
         setCustomLocationName(loc.name);
+        isProgrammaticPanningRef.current = true;
         sendToMap({ type: 'setView', lat: loc.latitude, lon: loc.longitude, zoom: 16 });
         return;
       }
@@ -523,6 +527,7 @@ export default function LocationPicker({
       setSearchQuery(loc.name);
       setSelectedLocation(loc);
       setCustomLocationName(name);
+      isProgrammaticPanningRef.current = true;
       sendToMap({ type: 'setView', lat, lon, zoom: 16 });
     },
     [sendToMap]
@@ -559,6 +564,11 @@ export default function LocationPicker({
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'centerChanged') {
+        if (isProgrammaticPanningRef.current) {
+          isProgrammaticPanningRef.current = false;
+          return;
+        }
+
         const currentLat = selectedLocation?.latitude ?? DEFAULT_LAT;
         const currentLon = selectedLocation?.longitude ?? DEFAULT_LON;
 
