@@ -204,6 +204,19 @@ export default function RideSearchCard({
             </View>
           </View>
 
+          {/* Stopovers List */}
+          {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 12, paddingLeft: 18 }}>
+              <Ionicons name="location-outline" size={12} color="#D97706" />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#6B7280' }}>Via :</Text>
+              {ride.stopovers.map((stop: any, idx: number) => (
+                <View key={idx} style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A' }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>{stop.name}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Bannière d'arrêt intermédiaire */}
           {(isIntermediatePickup || isIntermediateDropoff) && (
             <View style={styles.intermediateBanner}>

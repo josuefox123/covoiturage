@@ -279,6 +279,7 @@ export default function RideManagementScreen() {
           <Text style={styles.sectionTitle}>Mon trajet</Text>
           
           <View style={styles.timeline}>
+            {/* Départ */}
             <View style={styles.timelineItem}>
               <View style={[styles.timelineDot, { borderColor: COLORS.primary }]} />
               <View style={styles.timelineLine} />
@@ -287,7 +288,25 @@ export default function RideManagementScreen() {
                 <Text style={styles.timeText}>{ride.departure_time?.substring(0, 5)}</Text>
               </View>
             </View>
+
+            {/* Villes et points d'arrêt (Stopovers) */}
+            {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 ? (
+              ride.stopovers.map((stop: any, idx: number) => {
+                const stopDuration = stop.stopDurationMin || stop.stop_duration_min || 15;
+                return (
+                  <View key={idx} style={styles.timelineItem}>
+                    <View style={[styles.timelineDot, { borderColor: '#F59E0B', backgroundColor: '#F59E0B' }]} />
+                    <View style={styles.timelineLine} />
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.locationText}>{stop.name}</Text>
+                      <Text style={styles.timeText}>Arrêt de {stopDuration} min</Text>
+                    </View>
+                  </View>
+                );
+              })
+            ) : null}
             
+            {/* Arrivée */}
             <View style={styles.timelineItem}>
               <View style={[styles.timelineDot, { borderColor: COLORS.success, backgroundColor: COLORS.success }]} />
               <View style={styles.timelineContent}>
