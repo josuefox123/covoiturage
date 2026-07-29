@@ -609,6 +609,7 @@ export default function RideDetailScreen() {
 
         {/* Timeline Route Card */}
         <View style={styles.card}>
+          {/* Départ */}
           <View style={styles.timelineItem}>
             <View style={styles.timelineDotStart} />
             <View style={styles.timelineContent}>
@@ -617,6 +618,28 @@ export default function RideDetailScreen() {
             </View>
           </View>
 
+          {/* Villes et points d'arrêt (Stopovers) */}
+          {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 ? (
+            ride.stopovers.map((stop: any, idx: number) => {
+              const stopDuration = stop.stopDurationMin || stop.stop_duration_min || 15;
+              return (
+                <React.Fragment key={idx}>
+                  <View style={styles.timelineLink}>
+                    <View style={styles.timelineLine} />
+                    <Text style={styles.distanceText}>Arrêt de {stopDuration} min</Text>
+                  </View>
+                  <View style={styles.timelineItem}>
+                    <View style={[styles.timelineDotStart, { backgroundColor: '#F59E0B' }]} />
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.locationText}>{stop.name}</Text>
+                    </View>
+                  </View>
+                </React.Fragment>
+              );
+            })
+          ) : null}
+
+          {/* Arrivée */}
           <View style={styles.timelineLink}>
             <View style={styles.timelineLine} />
             <Text style={styles.distanceText}>{ride.distance_km ? `${ride.distance_km} km` : 'Trajet direct'}</Text>
@@ -626,7 +649,6 @@ export default function RideDetailScreen() {
             <Ionicons name="location" size={20} color={COLORS.error} style={styles.timelineIconEnd} />
             <View style={styles.timelineContent}>
               <Text style={styles.locationText}>{ride.arrival_location}</Text>
-
             </View>
           </View>
         </View>

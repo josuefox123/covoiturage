@@ -42,4 +42,11 @@ export interface Ride {
   max_dimensions?: string;
   price_per_parcel?: number;
   allowed_parcel_types?: string[];
+  stopovers?: {
+    name: string;
+    stopDurationMin?: number;
+    stop_duration_min?: number;
+    latitude?: number | null;
+    longitude?: number | null;
+  }[];
 }

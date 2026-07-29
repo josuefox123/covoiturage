@@ -145,7 +145,7 @@ class RideViewSet(viewsets.ModelViewSet):
         if ride_type == 'parcel':
             queryset = queryset.filter(accepts_parcels=True)
 
-        # ── Smart Location & Compatibility Matching ──
+        # ── Smart Location & Compatibility Matching (including stopovers) ──
         if departure or destination:
             def extract_city(loc_str):
                 if not loc_str:
@@ -164,38 +164,61 @@ class RideViewSet(viewsets.ModelViewSet):
 
             from django.db.models import Q
             
-            query_cond = Q()
-
-            if dep_clean:
-                dep_words = [w for w in dep_clean.replace(',', ' ').split() if len(w) > 2]
-                dep_q = Q(departure_location__icontains=dep_clean) | Q(departure_location__icontains=dep_city)
-                for w in dep_words:
-                    dep_q |= Q(departure_location__icontains=w)
-                query_cond &= dep_q
-
-            if dest_clean:
-                dest_words = [w for w in dest_clean.replace(',', ' ').split() if len(w) > 2]
-                dest_q = Q(arrival_location__icontains=dest_clean) | Q(arrival_location__icontains=dest_city)
-                for w in dest_words:
-                    dest_q |= Q(arrival_location__icontains=w)
-                query_cond &= dest_q
-
-            matched_qs = queryset.filter(query_cond)
-
-            if matched_qs.exists():
-                queryset = matched_qs
-            else:
-                flexible_cond = Q()
-                if dep_city:
-                    flexible_cond &= (Q(departure_location__icontains=dep_city) | Q(arrival_location__icontains=dep_city))
-                if dest_city:
-                    flexible_cond &= (Q(departure_location__icontains=dest_city) | Q(arrival_location__icontains=dest_city))
+            # Initial DB filter to pre-select rides containing dep_city or dest_city to optimize queryset size
+            db_filter = Q()
+            if dep_city:
+                db_filter &= (
+                    Q(departure_location__icontains=dep_city) |
+                    Q(arrival_location__icontains=dep_city) |
+                    Q(stopovers__icontains=dep_city)
+                )
+            if dest_city:
+                db_filter &= (
+                    Q(departure_location__icontains=dest_city) |
+                    Q(arrival_location__icontains=dest_city) |
+                    Q(stopovers__icontains=dest_city)
+                )
                 
-                flex_qs = queryset.filter(flexible_cond)
-                if flex_qs.exists():
-                    queryset = flex_qs
+            candidate_qs = queryset.filter(db_filter)
+            
+            # Precise Python-level filtering to ensure chronological ordering
+            matching_ids = []
+            for ride in candidate_qs:
+                places = [ride.departure_location]
+                if ride.stopovers and isinstance(ride.stopovers, list):
+                    for s in ride.stopovers:
+                        if isinstance(s, dict) and s.get('name'):
+                            places.append(s['name'])
+                        elif isinstance(s, str):
+                            places.append(s)
+                places.append(ride.arrival_location)
+                
+                place_cities = [extract_city(p).lower() for p in places]
+                
+                dep_idx = -1
+                dest_idx = -1
+                
+                if dep_city:
+                    for idx, pc in enumerate(place_cities):
+                        if dep_city in pc:
+                            dep_idx = idx
+                            break
                 else:
-                    queryset = queryset.none()
+                    dep_idx = 0
+                    
+                if dep_idx != -1:
+                    if dest_city:
+                        for idx, pc in enumerate(place_cities):
+                            if dest_city in pc and idx > dep_idx:
+                                dest_idx = idx
+                                break
+                    else:
+                        dest_idx = len(place_cities) - 1
+                        
+                if (not dep_city or dep_idx != -1) and (not dest_city or dest_idx != -1):
+                    matching_ids.append(ride.id)
+                    
+            queryset = queryset.filter(id__in=matching_ids)
 
         # ── Date filtering (strict matching) ──
         if date_str:

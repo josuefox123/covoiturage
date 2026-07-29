@@ -11,12 +11,13 @@
  * Zemy
  * ==============================================================
  */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator,
   Modal, Image, Animated, Dimensions, Keyboard, Switch,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -70,6 +71,130 @@ export default function PublishScreen() {
   const [arrivalCords, setArrivalCords] = useState<{ lat: number; lon: number } | null>(null);
   const [estimation, setEstimation] = useState<{ distanceKm: number; durationMin: number } | null>(null);
   const [estimationLoading, setEstimationLoading] = useState(false);
+
+  const [googleRoutes, setGoogleRoutes] = useState<any[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState<number>(0);
+  const webviewRef = useRef<WebView>(null);
+
+  const BENIN_CITIES = [
+    'Allada', 'Bohicon', 'Abomey', 'Dassa-Zoumé', 'Dassa', 'Savè', 'Parakou', 
+    'Tchaourou', 'N\'Dali', 'Bembéréké', 'Kandi', 'Malanville', 'Djougou', 
+    'Natitingou', 'Tanguiéta', 'Ouidah', 'Grand-Popo', 'Lokosa', 'Comè', 
+    'Sèmè-Kpodji', 'Porto-Novo', 'Pobè', 'Kétou', 'Sakété', 'Zogbodomey'
+  ];
+
+  const googleMapHtml = useMemo(() => {
+    if (!departureCords || !arrivalCords) return '';
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <style>
+    body, html, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #f3f4f6; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map;
+    var directionsRenderer;
+    var directionsService;
+    var directionsResponse;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 12,
+        center: { lat: ${departureCords.lat}, lng: ${departureCords.lon} },
+        disableDefaultUI: true,
+        zoomControl: false,
+        styles: [
+          { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
+          { "featureType": "transit", "stylers": [{ "visibility": "off" }] },
+          { "featureType": "road", "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] }
+        ]
+      });
+
+      directionsService = new google.maps.DirectionsService();
+      
+      directionsRenderer = new google.maps.DirectionsRenderer({
+        map: map,
+        suppressMarkers: true,
+        polylineOptions: {
+          strokeColor: '#0066FF',
+          strokeOpacity: 0.9,
+          strokeWeight: 4
+        }
+      });
+
+      directionsService.route({
+        origin: { lat: ${departureCords.lat}, lng: ${departureCords.lon} },
+        destination: { lat: ${arrivalCords.lat}, lng: ${arrivalCords.lon} },
+        travelMode: google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: true
+      }, function(response, status) {
+        if (status === 'OK') {
+          directionsResponse = response;
+          window.renderRoute(0);
+        } else {
+          var flightPath = new google.maps.Polyline({
+            path: [
+              { lat: ${departureCords.lat}, lng: ${departureCords.lon} },
+              { lat: ${arrivalCords.lat}, lng: ${arrivalCords.lon} }
+            ],
+            strokeColor: '#0066FF',
+            strokeOpacity: 0.8,
+            strokeWeight: 3,
+            map: map
+          });
+          var bounds = new google.maps.LatLngBounds();
+          bounds.extend({ lat: ${departureCords.lat}, lng: ${departureCords.lon} });
+          bounds.extend({ lat: ${arrivalCords.lat}, lng: ${arrivalCords.lon} });
+          map.fitBounds(bounds);
+        }
+      });
+
+      new google.maps.Marker({
+        position: { lat: ${departureCords.lat}, lng: ${departureCords.lon} },
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: '#0066FF',
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 3
+        }
+      });
+
+      new google.maps.Marker({
+        position: { lat: ${arrivalCords.lat}, lng: ${arrivalCords.lon} },
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: '#EF4444',
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 3
+        }
+      });
+    }
+
+    window.renderRoute = function(index) {
+      if (!directionsResponse) return;
+      directionsRenderer.setRouteIndex(index);
+      directionsRenderer.setDirections(directionsResponse);
+    };
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc&callback=initMap">
+  </script>
+</body>
+</html>
+    `;
+  }, [departureCords, arrivalCords]);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDateObj, setSelectedDateObj] = useState(now);
@@ -273,11 +398,16 @@ export default function PublishScreen() {
     }
   };
 
-  // ─── Estimation via Valhalla (routes réelles, OpenStreetMap) ────────
+  // ─── Estimation via Google Directions (Alternative Routes and Stopovers) ───
+  // ─── Estimation via Google Directions (Alternative Routes and Stopovers) ───
   const computeEstimation = async (dep: { lat: number; lon: number }, arr: { lat: number; lon: number }) => {
     setEstimationLoading(true);
+    setGoogleRoutes([]);
+    setSelectedRouteIndex(0);
     setEstimation(null);
 
+    const GOOGLE_API_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
+    
     const haversineFallback = () => {
       const R = 6371;
       const dLat = ((arr.lat - dep.lat) * Math.PI) / 180;
@@ -288,29 +418,15 @@ export default function PublishScreen() {
       const durationMin = Math.round((distanceKm / 45) * 60);
       setEstimation({ distanceKm, durationMin });
       fetchPriceSuggestion(distanceKm);
-      setEstimationLoading(false);
     };
 
     try {
-      // Valhalla routing — OpenStreetMap Germany (gratuit, sans clé API)
-      const body = JSON.stringify({
-        locations: [
-          { lon: dep.lon, lat: dep.lat },
-          { lon: arr.lon, lat: arr.lat },
-        ],
-        costing: 'auto',
-        directions_options: { units: 'kilometers' },
-      });
-
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${dep.lat},${dep.lon}&destination=${arr.lat},${arr.lon}&alternatives=true&key=${GOOGLE_API_KEY}&language=fr`;
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const res = await fetch('https://valhalla1.openstreetmap.de/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        signal: controller.signal,
-      });
+      const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (!res.ok) {
@@ -320,20 +436,88 @@ export default function PublishScreen() {
 
       const json = await res.json();
 
-      if (json?.trip?.summary) {
-        const distanceKm = Math.round(json.trip.summary.length);  // déjà en km
-        const durationMin = Math.round(json.trip.summary.time / 60); // secondes → minutes
-        setEstimation({ distanceKm, durationMin });
-        fetchPriceSuggestion(distanceKm);
-        setEstimationLoading(false);
+      if (json.status === 'OK' && json.routes && json.routes.length > 0) {
+        const parsedRoutes = json.routes.map((r: any, idx: number) => ({
+          index: idx,
+          summary: r.summary,
+          distanceText: r.legs[0].distance.text,
+          distanceValue: r.legs[0].distance.value,
+          durationText: r.legs[0].duration.text,
+          durationValue: r.legs[0].duration.value,
+          steps: r.legs[0].steps.map((step: any) => ({
+            html_instructions: step.html_instructions,
+            end_location: {
+              lat: step.end_location.lat,
+              lng: step.end_location.lng
+            }
+          }))
+        }));
+
+        setGoogleRoutes(parsedRoutes);
+        
+        // Auto-select the first route
+        const firstRoute = parsedRoutes[0];
+        setEstimation({
+          distanceKm: Math.round(firstRoute.distanceValue / 1000),
+          durationMin: Math.round(firstRoute.durationValue / 60)
+        });
+        fetchPriceSuggestion(Math.round(firstRoute.distanceValue / 1000));
+        
+        // Suggest stopovers for the first route
+        suggestStopoversForRoute(firstRoute);
       } else {
         haversineFallback();
       }
-    } catch {
+    } catch (e) {
       haversineFallback();
     } finally {
       setEstimationLoading(false);
     }
+  };
+
+  const suggestStopoversForRoute = (route: any) => {
+    if (!route || !route.steps) return;
+    
+    const depCity = (departure || '').split(',')[0].trim().toLowerCase();
+    const arrCity = (arrival || '').split(',')[0].trim().toLowerCase();
+    
+    const suggestions: any[] = [];
+    route.steps.forEach((step: any) => {
+      const text = step.html_instructions || '';
+      const cleanText = text.replace(/<[^>]*>/g, '');
+      
+      BENIN_CITIES.forEach(city => {
+        const cityLower = city.toLowerCase();
+        if (
+          cleanText.toLowerCase().includes(cityLower) &&
+          cityLower !== depCity &&
+          cityLower !== arrCity &&
+          !suggestions.some(s => s.name.toLowerCase() === cityLower)
+        ) {
+          suggestions.push({
+            id: Math.random().toString(),
+            name: city,
+            coords: { lat: step.end_location.lat, lon: step.end_location.lng },
+            stopDurationMin: 15
+          });
+        }
+      });
+    });
+    
+    setStopovers(suggestions);
+  };
+
+  const handleSelectRoute = (idx: number) => {
+    setSelectedRouteIndex(idx);
+    const selectedRoute = googleRoutes[idx];
+    setEstimation({
+      distanceKm: Math.round(selectedRoute.distanceValue / 1000),
+      durationMin: Math.round(selectedRoute.durationValue / 60)
+    });
+    fetchPriceSuggestion(Math.round(selectedRoute.distanceValue / 1000));
+    suggestStopoversForRoute(selectedRoute);
+    
+    webviewRef.current?.injectJavaScript(`window.renderRoute && window.renderRoute(${idx}); true;`);
   };
 
 
@@ -481,6 +665,15 @@ export default function PublishScreen() {
       if (departureCords) { payload.departure_latitude = departureCords.lat; payload.departure_longitude = departureCords.lon; }
       if (arrivalCords) { payload.arrival_latitude = arrivalCords.lat; payload.arrival_longitude = arrivalCords.lon; }
 
+      if (stopovers && stopovers.length > 0) {
+        payload.stopovers = stopovers.map(s => ({
+          name: s.name,
+          stopDurationMin: s.stopDurationMin,
+          latitude: s.coords?.lat ?? null,
+          longitude: s.coords?.lon ?? null
+        }));
+      }
+
       if (isRecurrent) {
         payload.is_recurrent = true;
         payload.start_date = dateString;
@@ -503,6 +696,7 @@ export default function PublishScreen() {
 
       // Reset form
       setDeparture(''); setArrival(''); setDepartureCords(null); setArrivalCords(null);
+      setStopovers([]); setGoogleRoutes([]); setSelectedRouteIndex(0);
       setEstimation(null); setPrice(''); setSeats(3); setDescription('');
       setIsRecurrent(false); setSelectedDays([]);
       setPriceSuggestion(null);
@@ -740,6 +934,50 @@ export default function PublishScreen() {
                     <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
                   </TouchableOpacity>
                 </View>
+
+                {/* Map WebView and Route Selector */}
+                {departureCords && arrivalCords && (
+                  <View style={styles.mapContainer}>
+                    <WebView
+                      ref={webviewRef}
+                      originWhitelist={['*']}
+                      source={{ html: googleMapHtml }}
+                      style={styles.map}
+                      scrollEnabled={false}
+                      domStorageEnabled
+                      javaScriptEnabled
+                    />
+                  </View>
+                )}
+
+                {googleRoutes.length > 0 && (
+                  <View style={styles.routeSelectorCard}>
+                    <Text style={styles.routeSelectorTitle}>Quelle route prenez-vous ?</Text>
+                    {googleRoutes.map((r, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[
+                          styles.routeSelectorItem,
+                          selectedRouteIndex === idx && styles.routeSelectorItemActive
+                        ]}
+                        onPress={() => handleSelectRoute(idx)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.routeRadioCircle}>
+                          {selectedRouteIndex === idx && <View style={styles.routeRadioInner} />}
+                        </View>
+                        <View style={styles.routeSelectorContent}>
+                          <Text style={styles.routeTimeText}>
+                            {r.durationText.replace('hours', 'h').replace('hour', 'h').replace('mins', 'min').replace('min', 'min')}
+                          </Text>
+                          <Text style={styles.routeDistanceText}>
+                            {r.distanceText} - {r.summary || 'Itinéraire proposé'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
                 {/* ── Section Villes et points d'arrêt (Optionnel) ── */}
                 <View style={styles.stopoversHeaderRow}>
@@ -1769,6 +2007,76 @@ const styles = StyleSheet.create({
   locationLabel: { fontSize: 11, color: theme.colors.textLight, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
   locationValue: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
   locationPlaceholder: { color: '#C4C4C4', fontWeight: '400' },
+  mapContainer: {
+    height: 220,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  map: {
+    flex: 1,
+  },
+  routeSelectorCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  routeSelectorTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginBottom: 12,
+  },
+  routeSelectorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  routeSelectorItemActive: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+  },
+  routeRadioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  routeRadioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.primary,
+  },
+  routeSelectorContent: {
+    flex: 1,
+  },
+  routeTimeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  routeDistanceText: {
+    fontSize: 13,
+    color: theme.colors.textLight,
+    marginTop: 2,
+  },
 
   // Estimation card (step 1)
   estimationCard: {
