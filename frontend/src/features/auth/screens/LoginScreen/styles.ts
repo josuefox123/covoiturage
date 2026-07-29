@@ -15,7 +15,7 @@ export const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 40,
   },
 
   // ── En-tête ──────────────────────────────────────────────
@@ -337,7 +337,7 @@ export const styles = StyleSheet.create({
 
   // ── Spacer ────────────────────────────────────────────────
   bottomSpacer: {
-    height: Platform.OS === 'ios' ? 32 : 16,
+    height: Platform.OS === 'ios' ? 32 : 160,
   },
 
   // ── Modal Styles ──────────────────────────────────────────
@@ -503,4 +503,5 @@ export const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
+
 });

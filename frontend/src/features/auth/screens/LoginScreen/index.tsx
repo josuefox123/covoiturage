@@ -91,12 +91,12 @@ export default function LoginScreen() {
 
   const handleIdentifierFocus = useCallback(() => {
     form.setIdentifierFocused(true);
-    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 180, animated: true }), 150);
+    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 220, animated: true }), 200);
   }, [form]);
 
   const handlePasswordFocus = useCallback(() => {
     form.setPasswordFocused(true);
-    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 320, animated: true }), 150);
+    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 380, animated: true }), 200);
   }, [form]);
 
   const handlePressIn = useCallback(() => {
@@ -130,19 +130,21 @@ export default function LoginScreen() {
   });
 
   return (
-    <TouchableWithoutFeedback onPress={dismissKeyboard}>
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" translucent backgroundColor="transparent" />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}
+    >
+      <TouchableWithoutFeedback onPress={dismissKeyboard}>
+        <SafeAreaView style={styles.container}>
+          <StatusBar style="dark" translucent backgroundColor="transparent" />
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardView}
-        >
           <ScrollView
             ref={scrollViewRef}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            bounces={false}
           >
             {/* ═══════════════════════════════════════════════
                 EN-TÊTE PREMIUM
@@ -399,16 +401,16 @@ export default function LoginScreen() {
             {/* Espace clavier */}
             <View style={styles.bottomSpacer} />
           </ScrollView>
-        </KeyboardAvoidingView>
 
-        <CustomAlert
-          visible={form.alertConfig.visible}
-          title={form.alertConfig.title}
-          message={form.alertConfig.message}
-          type={form.alertConfig.type as any}
-          onClose={() => form.setAlertConfig({ ...form.alertConfig, visible: false })}
-        />
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+          <CustomAlert
+            visible={form.alertConfig.visible}
+            title={form.alertConfig.title}
+            message={form.alertConfig.message}
+            type={form.alertConfig.type as any}
+            onClose={() => form.setAlertConfig({ ...form.alertConfig, visible: false })}
+          />
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
