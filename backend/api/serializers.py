@@ -538,3 +538,5 @@ class DriverPayoutSerializer(serializers.ModelSerializer):
         if obj.ride:
             return f"{obj.ride.departure_location} → {obj.ride.arrival_location}"
         return ""
+
+# updated

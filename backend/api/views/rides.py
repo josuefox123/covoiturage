@@ -1027,6 +1027,8 @@ class PopularPlaceViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
+# updated
+
 
 
 
