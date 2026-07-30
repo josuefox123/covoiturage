@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import * as Location from 'expo-location';
 import { useAuth } from '../context/AuthContext';
@@ -131,6 +132,7 @@ const isItTimeForLiveRide = (dateStr: string, timeStr: string) => {
  */
 export default function LiveRideModal() {
   const { user, authFetch } = useAuth();
+  const insets = useSafeAreaInsets();
   const webviewRef = useRef<WebView>(null);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const isMountedRef = useRef(true);
@@ -1175,7 +1177,7 @@ export default function LiveRideModal() {
 
           {/* Speedometer widget */}
           {mapReady && (
-            <View style={styles.speedometerContainer}>
+            <View style={[styles.speedometerContainer, { bottom: Math.max(120, insets.bottom + 104) }]}>
               <Text style={styles.speedValue}>{currentSpeed}</Text>
               <Text style={styles.speedUnit}>km/h</Text>
             </View>
@@ -1183,7 +1185,7 @@ export default function LiveRideModal() {
 
           {/* Floating Ride Actions controls (FAB) */}
           {mapReady && (
-            <View style={styles.rideControlFabContainer}>
+            <View style={[styles.rideControlFabContainer, { bottom: Math.max(120, insets.bottom + 104) }]}>
               {activeRide.status === 'active' ? (
                 <TouchableOpacity style={styles.startFab} onPress={handleStartRide} activeOpacity={0.8}>
                   <Ionicons name="play" size={20} color={theme.colors.white} />
@@ -1204,7 +1206,7 @@ export default function LiveRideModal() {
 
           {/* Bottom Info Sheet (Google Maps Style) */}
           {mapReady && (
-            <View style={styles.bottomNavPanel}>
+            <View style={[styles.bottomNavPanel, { bottom: Math.max(24, insets.bottom + 12) }]}>
               {/* Close button */}
               <TouchableOpacity 
                 style={styles.bottomNavCloseBtn} 

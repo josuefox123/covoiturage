@@ -1211,7 +1211,7 @@ export default function RideDetailScreen() {
       </ScrollView>
 
       {/* Modern Footer Action Block */}
-      <View style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom + 12) }]}>
         <TouchableOpacity
           style={[styles.messageBtn, !canChat && styles.messageBtnDisabled]}
           onPress={() => {
