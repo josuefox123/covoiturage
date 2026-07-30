@@ -42,6 +42,13 @@ export default function HomeScreen() {
     passengers: 1,
   });
 
+  const [coords, setCoords] = useState<{
+    departure_lat?: number;
+    departure_lon?: number;
+    arrival_lat?: number;
+    arrival_lon?: number;
+  }>({});
+
   const updateSearch = (patch: Partial<SearchParams>) =>
     setSearchParams((p) => ({ ...p, ...patch }));
 
@@ -97,6 +104,10 @@ export default function HomeScreen() {
         date: searchParams.date.toISOString().split('T')[0], // YYYY-MM-DD
         tripType: searchParams.tripType,
         passengers: String(searchParams.passengers),
+        departure_latitude: coords.departure_lat ? String(coords.departure_lat) : '',
+        departure_longitude: coords.departure_lon ? String(coords.departure_lon) : '',
+        arrival_latitude: coords.arrival_lat ? String(coords.arrival_lat) : '',
+        arrival_longitude: coords.arrival_lon ? String(coords.arrival_lon) : '',
       },
     } as any);
   };
@@ -171,8 +182,13 @@ export default function HomeScreen() {
               : undefined
           }
           onLocationSelected={(loc) => {
-            if (pickingFor === 'departure') updateSearch({ departure: loc.name });
-            else updateSearch({ destination: loc.name });
+            if (pickingFor === 'departure') {
+              updateSearch({ departure: loc.name });
+              setCoords((c) => ({ ...c, departure_lat: loc.latitude, departure_lon: loc.longitude }));
+            } else {
+              updateSearch({ destination: loc.name });
+              setCoords((c) => ({ ...c, arrival_lat: loc.latitude, arrival_lon: loc.longitude }));
+            }
             setPickingFor(null);
           }}
           onCancel={() => setPickingFor(null)}

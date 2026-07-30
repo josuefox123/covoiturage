@@ -106,8 +106,94 @@ class RideViewSet(viewsets.ModelViewSet):
     serializer_class = RideSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+    def list(self, request, *args, **kwargs):
+        # Chercher s'il y a des coordonnées de recherche
+        dep_lat_str = request.query_params.get('departure_latitude')
+        dep_lon_str = request.query_params.get('departure_longitude')
+        arr_lat_str = request.query_params.get('arrival_latitude')
+        arr_lon_str = request.query_params.get('arrival_longitude')
+        date_str = request.query_params.get('date')
+        seats_str = request.query_params.get('seats', '1')
+
+        # Paramètres optionnels enrichis (Google Places & filtre horaire)
+        dep_place_id = request.query_params.get('departure_place_id')
+        arr_place_id = request.query_params.get('arrival_place_id')
+        time_filter = request.query_params.get('time')  # Ex: "08:30"
+
+        has_gps_search = (dep_lat_str and dep_lon_str) or (arr_lat_str and arr_lon_str)
+
+        if has_gps_search and date_str:
+            from datetime import datetime
+            try:
+                dep_lat = float(dep_lat_str) if (dep_lat_str and dep_lon_str) else None
+                dep_lon = float(dep_lon_str) if (dep_lat_str and dep_lon_str) else None
+                arr_lat = float(arr_lat_str) if (arr_lat_str and arr_lon_str) else None
+                arr_lon = float(arr_lon_str) if (arr_lat_str and arr_lon_str) else None
+                seats = int(seats_str)
+            except ValueError:
+                return Response({"error": "Paramètres géographiques ou nombre de places invalides."}, status=status.HTTP_400_BAD_REQUEST)
+
+            from ..services.search_service import SearchService
+            matches = SearchService.find_rides(
+                dep_lat, dep_lon, arr_lat, arr_lon, date_str, seats,
+                departure_place_id=dep_place_id,
+                arrival_place_id=arr_place_id,
+                time_filter=time_filter
+            )
+
+            # Sérialiser les résultats directs
+            serialized_directs = []
+            for item in matches['directs']:
+                ride_data = self.get_serializer(item['ride']).data
+                # Injecter les infos spécifiques au segment
+                ride_data['price_per_seat'] = item['price']
+                ride_data['departure_time'] = item['departure_time'].strftime('%H:%M:%S') if isinstance(item['departure_time'], datetime) else str(item['departure_time'])
+                ride_data['arrival_time'] = item['arrival_time'].strftime('%H:%M:%S') if isinstance(item['arrival_time'], datetime) else str(item['arrival_time'])
+                ride_data['seats_available'] = item['seats_available']
+                ride_data['walk_distance_origin_km'] = round(item['walk_distance_origin_km'], 2)
+                ride_data['walk_distance_dest_km'] = round(item['walk_distance_dest_km'], 2)
+                # Distance Matrix enrichments
+                ride_data['approach_duration_text'] = item.get('approach_duration_text')
+                ride_data['approach_duration_sec'] = item.get('approach_duration_sec')
+                ride_data['approach_distance_m'] = item.get('approach_distance_m')
+                serialized_directs.append(ride_data)
+
+            serialized_connections = []
+            for item in matches['connections']:
+                ride_1_data = self.get_serializer(item['ride_1']).data
+                ride_2_data = self.get_serializer(item['ride_2']).data
+
+                # Surcharger les prix et heures par segment pour l'affichage propre
+                ride_1_data['price_per_seat'] = item['arrival_leg_1'].price
+                ride_2_data['price_per_seat'] = item['arrival_leg_2'].price
+
+                serialized_connections.append({
+                    'type': 'connection',
+                    'ride_1': ride_1_data,
+                    'ride_2': ride_2_data,
+                    'connection_point_name': item['connection_point_name'],
+                    'price': item['price'],
+                    'departure_time_1': item['departure_time_1'].strftime('%H:%M:%S') if isinstance(item['departure_time_1'], datetime) else str(item['departure_time_1']),
+                    'arrival_time_1': item['arrival_time_1'].strftime('%H:%M:%S') if isinstance(item['arrival_time_1'], datetime) else str(item['arrival_time_1']),
+                    'departure_time_2': item['departure_time_2'].strftime('%H:%M:%S') if isinstance(item['departure_time_2'], datetime) else str(item['departure_time_2']),
+                    'arrival_time_2': item['arrival_time_2'].strftime('%H:%M:%S') if isinstance(item['arrival_time_2'], datetime) else str(item['arrival_time_2']),
+                    'waiting_time_min': item['waiting_time_min'],
+                    'seats_available': item['seats_available'],
+                    'walk_distance_origin_km': round(item['walk_distance_origin_km'], 2),
+                    'walk_distance_dest_km': round(item['walk_distance_dest_km'], 2),
+                    'approach_duration_text': item.get('approach_duration_text'),
+                    'approach_duration_sec': item.get('approach_duration_sec'),
+                })
+
+            return Response({
+                'directs': serialized_directs,
+                'connections': serialized_connections
+            }, status=status.HTTP_200_OK)
+
+        return super().list(request, *args, **kwargs)
+
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('driver', 'vehicle').prefetch_related('driver__vehicles', 'driver__rides_driven')
+        queryset = super().get_queryset().select_related('driver', 'vehicle')
         
         # Filtres de recherche/filtrage envoyés par le frontend
         departure = self.request.query_params.get('departure')
@@ -145,79 +231,79 @@ class RideViewSet(viewsets.ModelViewSet):
         if ride_type == 'parcel':
             queryset = queryset.filter(accepts_parcels=True)
 
-        # ── Smart Location & Compatibility Matching (including stopovers) ──
+        # ── Smart Location & Compatibility Matching (including stopovers & neighborhoods) ──
         if departure or destination:
-            def extract_city(loc_str):
-                if not loc_str:
-                    return ""
-                parts = [p.strip() for p in loc_str.replace('/', ',').split(',') if p.strip()]
-                if not parts:
-                    return loc_str.strip().lower()
-                ignore = {'bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france'}
-                clean_parts = [p for p in parts if p.lower() not in ignore]
-                return clean_parts[-1] if clean_parts else parts[0]
+            dep_clean = departure.strip().lower() if departure else ""
+            dest_clean = destination.strip().lower() if destination else ""
 
-            dep_clean = departure.strip() if departure else ""
-            dest_clean = destination.strip() if destination else ""
-            dep_city = extract_city(dep_clean).lower()
-            dest_city = extract_city(dest_clean).lower()
+            # Tokeniser pour des recherches par mots-clés plus souples (quartiers, villes, repères)
+            def get_keywords(text):
+                if not text:
+                    return []
+                ignore = {'bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france', 'rue', 'avenue', 'carrefour'}
+                words = []
+                for w in text.replace(',', ' ').replace('/', ' ').replace('-', ' ').split():
+                    w = w.strip()
+                    if len(w) >= 2 and w not in ignore:
+                        words.append(w)
+                return words
 
-            from django.db.models import Q
-            
-            # Initial DB filter to pre-select rides containing dep_city or dest_city to optimize queryset size
+            dep_kws = get_keywords(dep_clean)
+            dest_kws = get_keywords(dest_clean)
+
+            # Filtrage initial pour présélectionner les trajets (contenant au moins un mot-clé du départ ou de l'arrivée)
             db_filter = Q()
-            if dep_city:
-                db_filter &= (
-                    Q(departure_location__icontains=dep_city) |
-                    Q(arrival_location__icontains=dep_city) |
-                    Q(stopovers__icontains=dep_city)
-                )
-            if dest_city:
-                db_filter &= (
-                    Q(departure_location__icontains=dest_city) |
-                    Q(arrival_location__icontains=dest_city) |
-                    Q(stopovers__icontains=dest_city)
-                )
-                
+            if dep_kws:
+                dep_q = Q()
+                for kw in dep_kws:
+                    dep_q |= Q(departure_location__icontains=kw) | Q(arrival_location__icontains=kw) | Q(stopovers__icontains=kw)
+                db_filter &= dep_q
+            if dest_kws:
+                dest_q = Q()
+                for kw in dest_kws:
+                    dest_q |= Q(departure_location__icontains=kw) | Q(arrival_location__icontains=kw) | Q(stopovers__icontains=kw)
+                db_filter &= dest_q
+
             candidate_qs = queryset.filter(db_filter)
-            
-            # Precise Python-level filtering to ensure chronological ordering
             matching_ids = []
+
             for ride in candidate_qs:
-                places = [ride.departure_location]
+                # Construire la liste complète et ordonnée de tous les points de passage du trajet
+                places = [ride.departure_location.lower()]
                 if ride.stopovers and isinstance(ride.stopovers, list):
                     for s in ride.stopovers:
                         if isinstance(s, dict) and s.get('name'):
-                            places.append(s['name'])
+                            places.append(s['name'].lower())
                         elif isinstance(s, str):
-                            places.append(s)
-                places.append(ride.arrival_location)
-                
-                place_cities = [extract_city(p).lower() for p in places]
-                
+                            places.append(s.lower())
+                places.append(ride.arrival_location.lower())
+
                 dep_idx = -1
                 dest_idx = -1
-                
-                if dep_city:
-                    for idx, pc in enumerate(place_cities):
-                        if dep_city in pc:
+
+                # Trouver le premier point de passage qui correspond au départ recherché
+                if dep_kws:
+                    for idx, p in enumerate(places):
+                        if any(kw in p for kw in dep_kws):
                             dep_idx = idx
                             break
                 else:
                     dep_idx = 0
-                    
+
+                # Trouver le point de passage qui correspond à la destination recherchée (et qui est situé APRES le départ)
                 if dep_idx != -1:
-                    if dest_city:
-                        for idx, pc in enumerate(place_cities):
-                            if dest_city in pc and idx > dep_idx:
+                    if dest_kws:
+                        for idx, p in enumerate(places):
+                            if any(kw in p for kw in dest_kws) and idx > dep_idx:
                                 dest_idx = idx
                                 break
                     else:
-                        dest_idx = len(place_cities) - 1
-                        
-                if (not dep_city or dep_idx != -1) and (not dest_city or dest_idx != -1):
+                        dest_idx = len(places) - 1
+
+                # Si les deux points ont été trouvés dans le bon ordre chronologique, le trajet est valide
+                if (not dep_kws or dep_idx != -1) and (not dest_kws or dest_idx != -1):
                     matching_ids.append(ride.id)
-                    
+
             queryset = queryset.filter(id__in=matching_ids)
 
         # ── Date filtering (strict matching) ──
@@ -389,7 +475,7 @@ class RideViewSet(viewsets.ModelViewSet):
                             create_this_day = True
                     
                     if create_this_day:
-                        Ride.objects.create(
+                        ride_obj = Ride.objects.create(
                             series=series,
                             driver=request.user,
                             vehicle=vehicle_obj,
@@ -425,6 +511,11 @@ class RideViewSet(viewsets.ModelViewSet):
                             distance_km=float(distance_km_val) if distance_km_val else None,
                             duration_min=int(duration_min_val) if duration_min_val else None,
                         )
+                        from ..services.ride_service import RideService
+                        try:
+                            RideService.generate_legs(ride_obj)
+                        except Exception as e:
+                            logger.error(f"Error generating legs for recurring ride {ride_obj.id}: {e}")
                         created_count += 1
                         
                     current_date += timedelta(days=1)
@@ -455,12 +546,17 @@ class RideViewSet(viewsets.ModelViewSet):
         
         max_parcels = serializer.validated_data.get('max_parcels', 0)
         
-        serializer.save(
+        ride = serializer.save(
             driver=self.request.user,
             zemy_commission=zemy_commission,
             price_per_seat=price_per_seat,
             parcels_available=max_parcels
         )
+        from ..services.ride_service import RideService
+        try:
+            RideService.generate_legs(ride)
+        except Exception as e:
+            logger.error(f"Error generating legs for ride {ride.id}: {e}")
 
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel_ride(self, request, pk=None):
@@ -619,7 +715,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset().select_related('passenger', 'ride', 'ride__driver', 'ride__vehicle').prefetch_related('passenger__vehicles', 'ride__driver__vehicles', 'passenger__rides_driven', 'ride__driver__rides_driven')
+        queryset = super().get_queryset().select_related('passenger', 'ride', 'ride__driver', 'ride__vehicle')
         
         if not user.is_staff:
             from django.db.models import Q
@@ -650,11 +746,16 @@ class BookingViewSet(viewsets.ModelViewSet):
         ride_id = request.data.get('ride')
         seats_to_book = serializer.validated_data.get('seats_booked', 1)
         
+        departure_location = request.data.get('departure_location')
+        arrival_location = request.data.get('arrival_location')
+
         from ..bookings.services import BookingService
         booking, created = BookingService.create_booking(
             passenger=request.user,
             ride_id=ride_id,
-            seats_booked=seats_to_book
+            seats_booked=seats_to_book,
+            departure_location=departure_location,
+            arrival_location=arrival_location
         )
         
         if not created:
@@ -680,6 +781,14 @@ class BookingViewSet(viewsets.ModelViewSet):
         if existing_conv:
             response_data['conversation_id'] = str(existing_conv.id)
             
+        # Notification agressive au conducteur pour valider la demande
+        create_and_send_notification(
+            user=booking.ride.driver,
+            title="Nouvelle demande de réservation 🚗",
+            message=f"{booking.passenger.full_name or booking.passenger.phone} souhaite réserver {booking.seats_booked} place(s) sur votre trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+            data={'type': 'new_booking_request', 'booking_id': str(booking.id), 'screen': 'rides'}
+        )
+            
         return Response(response_data, status=status.HTTP_201_CREATED)
 
     def perform_update(self, serializer):
@@ -694,20 +803,19 @@ class BookingViewSet(viewsets.ModelViewSet):
             driver = ride.driver
             
             if new_status == 'cancelled' and old_status != 'cancelled':
-                # Restore seats securely
-                with transaction.atomic():
-                    locked_ride = Ride.objects.select_for_update().get(id=ride.id)
-                    locked_ride.seats_available += booking.seats_booked
-                    locked_ride.save()
-                
+                # Restore seats securely using BookingService
                 if old_status == 'confirmed':
+                    from ..bookings.services import BookingService
+                    BookingService.deallocate_seats(booking)
+                
+                if old_status in ['confirmed', 'pending_payment', 'pending']:
                     request_user = self.request.user
                     if request_user == driver:
-                        # Cancelled by driver
+                        # Cancelled/Refused by driver
                         create_and_send_notification(
                             user=passenger,
-                            title="Réservation annulée ❌",
-                            message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                            title="Demande de réservation refusée ❌",
+                            message=f"Le conducteur a décliné votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
                             data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
                     else:
@@ -719,22 +827,23 @@ class BookingViewSet(viewsets.ModelViewSet):
                             data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
             
-            elif new_status == 'confirmed':
-                # Conducteur: Réservation acceptée
-                create_and_send_notification(
-                    user=driver,
-                    title="Réservation acceptée ✅",
-                    message=f"Vous avez accepté la réservation du passager {passenger.full_name or passenger.phone} ({booking.seats_booked} place(s)) sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
-                    data={'type': 'booking_accepted_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
-                )
-                # Passager: Réservation acceptée
+            elif new_status == 'pending_payment' and old_status == 'pending':
+                # Chauffeur accepte la demande -> Notifier le passager pour procéder au paiement
                 create_and_send_notification(
                     user=passenger,
-                    title="Réservation acceptée ✅",
-                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {ride.departure_location} -> {ride.arrival_location} a été acceptée par le conducteur !",
+                    title="Demande acceptée par le conducteur 🚗",
+                    message=f"Votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location} a été acceptée par le conducteur ! Vous pouvez maintenant procéder au paiement.",
                     data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
-                # Passager: Paiement confirmé
+            
+            elif new_status == 'confirmed':
+                # Passager: Paiement confirmé & Réservation confirmée
+                create_and_send_notification(
+                    user=passenger,
+                    title="Réservation confirmée ✅",
+                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {ride.departure_location} -> {ride.arrival_location} est confirmée !",
+                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
                 create_and_send_notification(
                     user=passenger,
                     title="Paiement confirmé 💳",
@@ -815,6 +924,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.payment_status in ['escrow', 'paid']:
             return Response({"error": "Cette réservation est déjà payée."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Bloquer si le conducteur n'a pas encore validé
+        if booking.status != 'pending_payment':
+            return Response({"error": "Vous ne pouvez pas effectuer le paiement avant la validation du chauffeur."}, status=status.HTTP_400_BAD_REQUEST)
+
         # Bloquer si le trajet est terminé ou annulé
         if booking.ride and booking.ride.status in ['completed', 'cancelled']:
             return Response({"error": "Ce trajet est terminé. Le paiement n'est plus possible."}, status=status.HTTP_400_BAD_REQUEST)
@@ -847,6 +960,56 @@ class BookingViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='accept')
+    def accept_booking(self, request, pk=None):
+        """
+        Le conducteur accepte la demande de réservation du passager.
+        Passe le statut à 'pending_payment' (attente paiement).
+        """
+        booking = self.get_object()
+        if booking.ride.driver != request.user and not request.user.is_staff:
+            return Response({"error": "Seul le conducteur de ce trajet peut accepter cette réservation."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.status != 'pending':
+            return Response({"error": f"Impossible d'accepter une réservation au statut actuel: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        booking.status = 'pending_payment'
+        booking.save()
+        
+        # Notifier le passager
+        create_and_send_notification(
+            user=booking.passenger,
+            title="Demande acceptée par le conducteur 🚗",
+            message=f"Le conducteur a accepté votre réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}. Veuillez procéder au paiement pour la confirmer.",
+            data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+        )
+        return Response({"status": "Réservation acceptée. En attente de paiement."})
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_booking(self, request, pk=None):
+        """
+        Le conducteur refuse la demande de réservation du passager.
+        Passe le statut à 'cancelled' (annulée).
+        """
+        booking = self.get_object()
+        if booking.ride.driver != request.user and not request.user.is_staff:
+            return Response({"error": "Seul le conducteur de ce trajet peut refuser cette réservation."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.status not in ['pending', 'pending_payment']:
+            return Response({"error": f"Impossible de refuser une réservation déjà traitée (statut actuel: {booking.status})."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        booking.status = 'cancelled'
+        booking.save()
+        
+        # Notifier le passager
+        create_and_send_notification(
+            user=booking.passenger,
+            title="Demande de réservation déclinée ❌",
+            message=f"Le conducteur a refusé votre demande de réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+            data={'type': 'booking_rejected_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+        )
+        return Response({"status": "Réservation déclinée avec succès."})
 
 
 

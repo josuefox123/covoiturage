@@ -23,6 +23,18 @@ import * as Location from 'expo-location';
 import { useAuth } from '../context/AuthContext';
 import { Ride } from '../types';
 import { CustomAlert } from '../utils/CustomAlert';
+import * as Speech from 'expo-speech';
+
+const getDistanceInKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Radius of earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -138,9 +150,32 @@ export default function LiveRideModal() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [routes, setRoutes] = useState<RouteData[]>([]);
   const [activeRouteIndex, setActiveRouteIndex] = useState<number>(0);
+  const [isSoundMuted, setIsSoundMuted] = useState(false);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
+
+  const getEtaStr = (durationSeconds: number): string => {
+    const now = new Date();
+    const etaDate = new Date(now.getTime() + durationSeconds * 1000);
+    const hours = String(etaDate.getHours()).padStart(2, '0');
+    const minutes = String(etaDate.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
 
   const activeRideRef = useRef<Ride | null>(null);
   const isDriverRef = useRef<boolean>(false);
+
+  const hasSpokenStartRef = useRef(false);
+  const hasSpokenArrivalRef = useRef(false);
+  const hasSpokenDriverApproachingRef = useRef(false);
+
+  const speakText = (text: string) => {
+    if (isSoundMuted) return;
+    try {
+      Speech.speak(text, { language: 'fr', pitch: 1.0, rate: 0.95 });
+    } catch (e) {
+      console.log('Speech error:', e);
+    }
+  };
 
   useEffect(() => {
     activeRideRef.current = activeRide;
@@ -204,6 +239,14 @@ export default function LiveRideModal() {
           await geocodeRide(currentRide);
           if (currentRide.status === 'started') {
             await startTracking();
+            if (!hasSpokenStartRef.current) {
+              if (asDriver) {
+                speakText("Votre trajet a commencé. Zemy vous souhaite une excellente route. Restez attentif.");
+              } else {
+                speakText("Votre trajet vient de démarrer avec votre conducteur. Zemy vous souhaite un agréable voyage.");
+              }
+              hasSpokenStartRef.current = true;
+            }
           } else {
             stopTracking();
           }
@@ -291,12 +334,31 @@ export default function LiveRideModal() {
     }
 
     watchRef.current = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 10 },
+      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 2000, distanceInterval: 2 },
       (newLoc) => {
         if (!isMountedRef.current) return;
         const newPos = { lat: newLoc.coords.latitude, lon: newLoc.coords.longitude };
         setLocation(newPos);
-        sendToMap({ type: 'updateUserPosition', lat: newPos.lat, lon: newPos.lon });
+        
+        // Update current speed in km/h
+        const speedKmH = Math.round((newLoc.coords.speed || 0) * 3.6);
+        setCurrentSpeed(speedKmH >= 0 ? speedKmH : 0);
+
+        sendToMap({
+          type: 'updateUserPosition',
+          lat: newPos.lat,
+          lon: newPos.lon,
+          heading: newLoc.coords.heading || 0
+        });
+
+        // Check destination proximity
+        if (destCoords && !hasSpokenArrivalRef.current) {
+          const distToDest = getDistanceInKm(newPos.lat, newPos.lon, destCoords.lat, destCoords.lon);
+          if (distToDest <= 0.5) { // 500 meters
+            speakText("Vous approchez de votre destination. Préparez-vous à descendre.");
+            hasSpokenArrivalRef.current = true;
+          }
+        }
 
         const latestActiveRide = activeRideRef.current;
         const latestIsDriver = isDriverRef.current;
@@ -319,6 +381,9 @@ export default function LiveRideModal() {
       watchRef.current.remove();
       watchRef.current = null;
     }
+    hasSpokenStartRef.current = false;
+    hasSpokenArrivalRef.current = false;
+    hasSpokenDriverApproachingRef.current = false;
   };
 
   const sendToMap = (message: object) => {
@@ -329,20 +394,38 @@ export default function LiveRideModal() {
 
   useEffect(() => {
     if (!mapReady || !location) return;
-    sendToMap({ type: 'updateUserPosition', lat: location.lat, lon: location.lon });
+    sendToMap({ type: 'updateUserPosition', lat: location.lat, lon: location.lon, heading: 0 });
   }, [location, mapReady]);
+
+  useEffect(() => {
+    if (mapReady) {
+      sendToMap({ type: 'initRole', isDriver });
+    }
+  }, [mapReady, isDriver]);
 
   useEffect(() => {
     if (!mapReady || !activeRide || isDriver) return;
     if (activeRide.driver_latitude !== null && activeRide.driver_latitude !== undefined &&
         activeRide.driver_longitude !== null && activeRide.driver_longitude !== undefined) {
+      const drvLat = Number(activeRide.driver_latitude);
+      const drvLon = Number(activeRide.driver_longitude);
+
       sendToMap({
         type: 'updateDriverPosition',
-        lat: activeRide.driver_latitude,
-        lon: activeRide.driver_longitude
+        lat: drvLat,
+        lon: drvLon
       });
+
+      // Check driver proximity to passenger
+      if (location && !hasSpokenDriverApproachingRef.current && activeRide.status !== 'completed') {
+        const distToDriver = getDistanceInKm(location.lat, location.lon, drvLat, drvLon);
+        if (distToDriver <= 0.4) {
+          speakText("Votre conducteur est tout proche. Il sera là dans quelques instants.");
+          hasSpokenDriverApproachingRef.current = true;
+        }
+      }
     }
-  }, [activeRide, mapReady, isDriver]);
+  }, [activeRide, mapReady, isDriver, location]);
 
   useEffect(() => {
     if (!mapReady || !departCoords) return;
@@ -363,6 +446,21 @@ export default function LiveRideModal() {
     if (!mapReady || routes.length === 0) return;
     sendToMap({ type: 'drawRoutes', routes, activeIndex: activeRouteIndex });
   }, [routes, activeRouteIndex, mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !activeRide || !activeRide.stopovers) return;
+    try {
+      let stops = [];
+      if (typeof activeRide.stopovers === 'string') {
+        stops = JSON.parse(activeRide.stopovers);
+      } else if (Array.isArray(activeRide.stopovers)) {
+        stops = activeRide.stopovers;
+      }
+      sendToMap({ type: 'setStopovers', stopovers: stops });
+    } catch (err) {
+      console.log('Error parsing stopovers in LiveRideModal:', err);
+    }
+  }, [activeRide, mapReady]);
 
   const loadRoute = async (from: Coords, to: Coords) => {
     setRouteLoading(true);
@@ -463,6 +561,7 @@ export default function LiveRideModal() {
             if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
+            speakText("Le trajet est terminé. Merci d'avoir voyagé avec Zemy !");
             CustomAlert.alert('Trajet terminé', 'Merci pour ce trajet !');
           } catch (error: any) {
             CustomAlert.alert('Erreur', error.message || 'Impossible de terminer le trajet.');
@@ -485,6 +584,7 @@ export default function LiveRideModal() {
             if (!isMountedRef.current) return;
             setVisible(false);
             stopTracking();
+            speakText("Le trajet est terminé. Merci d'avoir voyagé avec Zemy !");
             CustomAlert.alert('Arrivé(e) !', 'Votre trajet est terminé. Merci d\'avoir voyagé avec nous !');
           } catch (error: any) {
             CustomAlert.alert('Erreur', error.message || 'Impossible de terminer la réservation.');
@@ -531,57 +631,92 @@ export default function LiveRideModal() {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html, #map { width: 100%; height: 100%; }
 
-    .pulse-user {
-      width: 18px; height: 18px;
-      background: #4285F4;
-      border-radius: 50%;
-      border: 3px solid white;
-      box-shadow: 0 2px 8px rgba(66,133,244,0.6);
-      position: relative;
-    }
-    .pulse-user::after {
-      content: '';
+    /* Advanced Google Maps Navigation marker styling */
+    .nav-marker-wrapper {
       position: absolute;
-      top: -9px; left: -9px;
-      width: 36px; height: 36px;
-      background: rgba(66,133,244,0.2);
-      border-radius: 50%;
-      animation: pulse 2s ease-out infinite;
+      width: 80px;
+      height: 80px;
+      margin-left: -40px;
+      margin-top: -40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
     }
-    .pulse-driver {
-      width: 18px; height: 18px;
-      background: #10B981;
-      border-radius: 50%;
-      border: 3px solid white;
-      box-shadow: 0 2px 8px rgba(16,185,129,0.6);
-      position: relative;
-    }
-    .pulse-driver::after {
-      content: '';
+
+    /* Directional cone of view */
+    .compass-beam {
       position: absolute;
-      top: -9px; left: -9px;
-      width: 36px; height: 36px;
-      background: rgba(16,185,129,0.2);
-      border-radius: 50%;
-      animation: pulse 2s ease-out infinite;
+      width: 80px;
+      height: 80px;
+      background: radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(66, 133, 244, 0) 70%);
+      clip-path: polygon(50% 50%, 25% 0%, 75% 0%); /* 60deg light cone */
+      transform-origin: 50% 50%;
+      pointer-events: none;
+      display: block;
+      transition: transform 0.2s ease-out;
     }
+
+    /* green compass beam for driver when viewed by passenger */
+    .compass-beam-driver {
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.4) 0%, rgba(16, 185, 129, 0) 70%);
+      clip-path: polygon(50% 50%, 25% 0%, 75% 0%);
+    }
+
+    .pulse-halo-nav {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(66, 133, 244, 0.25);
+      animation: pulseNav 2.5s infinite ease-out;
+      pointer-events: none;
+    }
+
+    .pulse-halo-nav-driver {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    @keyframes pulseNav {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    /* 3D chevron wrapper */
+    .chevron-svg-container {
+      position: absolute;
+      transform-origin: 50% 50%;
+      filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.4));
+      transition: transform 0.2s ease-out;
+    }
+
     .depart-pin {
-      width: 14px; height: 14px;
-      background: #22C55E;
+      width: 16px; height: 16px;
+      background: #10B981;
       border-radius: 50%;
       border: 3px solid white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
     .dest-pin {
-      width: 14px; height: 14px;
+      width: 16px; height: 16px;
       background: #EF4444;
       border-radius: 50%;
       border: 3px solid white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    @keyframes pulse {
-      0% { transform: scale(0.4); opacity: 1; }
-      100% { transform: scale(1.8); opacity: 0; }
+    .stopover-pin {
+      width: 24px;
+      height: 24px;
+      background: #4B5563;
+      color: white;
+      border: 2px solid white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
   </style>
 </head>
@@ -597,12 +732,71 @@ export default function LiveRideModal() {
     var directionsService = null;
     var departPos = null;
     var destPos = null;
+    var isDriverRole = false;
+    var autoCenter = true;
+    var lastUserPos = null;
+    var lastUserHeading = 0;
+    var lastDriverPos = null;
+    var lastDriverHeading = 0;
 
-    function makeDivMarker(htmlContent, anchorX, anchorY) {
-      return {
-        url: 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>'),
-        scaledSize: new google.maps.Size(1, 1)
+    function calculateHeading(prev, curr) {
+      if (!prev || !curr) return 0;
+      var dLon = (curr.lon - prev.lon) * Math.PI / 180;
+      var lat1 = prev.lat * Math.PI / 180;
+      var lat2 = curr.lat * Math.PI / 180;
+      var y = Math.sin(dLon) * Math.cos(lat2);
+      var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+      var brng = Math.atan2(y, x) * 180 / Math.PI;
+      return (brng + 360) % 360;
+    }
+
+    function createAdvancedNavMarker(position, type) {
+      var wrapper = document.createElement('div');
+      wrapper.className = 'nav-marker-wrapper';
+
+      var beam = document.createElement('div');
+      beam.className = type === 'driver' ? 'compass-beam compass-beam-driver' : 'compass-beam';
+      wrapper.appendChild(beam);
+
+      var halo = document.createElement('div');
+      halo.className = type === 'driver' ? 'pulse-halo-nav pulse-halo-nav-driver' : 'pulse-halo-nav';
+      wrapper.appendChild(halo);
+
+      var svgCont = document.createElement('div');
+      svgCont.className = 'chevron-svg-container';
+      
+      var fillColor = type === 'driver' ? '#10B981' : '#2563EB'; // Green vs Blue
+      svgCont.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" fill="' + fillColor + '" stroke="white" stroke-width="2" stroke-linejoin="round"/>' +
+        '</svg>';
+      
+      wrapper.appendChild(svgCont);
+
+      var overlay = new google.maps.OverlayView();
+      overlay.onAdd = function() {
+        this.getPanes().overlayMouseTarget.appendChild(wrapper);
       };
+      overlay.draw = function() {
+        var point = this.getProjection().fromLatLngToDivPixel(this.position);
+        if (point) {
+          wrapper.style.left = point.x + 'px';
+          wrapper.style.top = point.y + 'px';
+        }
+      };
+      overlay.onRemove = function() {
+        if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+      };
+      overlay.position = position;
+      overlay.setPosition = function(pos) {
+        this.position = pos;
+        this.draw();
+      };
+      overlay.setRotation = function(heading) {
+        svgCont.style.transform = 'rotate(' + heading + 'deg)';
+        beam.style.transform = 'rotate(' + heading + 'deg)';
+      };
+      overlay.setMap(map);
+      return overlay;
     }
 
     function createOverlayMarker(position, cls, title) {
@@ -636,11 +830,12 @@ export default function LiveRideModal() {
 
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
-        zoom: ${DEFAULT_ZOOM},
+        zoom: 17,
         center: { lat: ${DEFAULT_LAT}, lng: ${DEFAULT_LON} },
         disableDefaultUI: true,
-        zoomControl: true,
-        zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
+        tilt: 55,
+        heading: 0,
+        mapId: 'DEMO_MAP_ID',
         styles: [
           { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
           { "featureType": "transit", "stylers": [{ "visibility": "off" }] },
@@ -664,19 +859,41 @@ export default function LiveRideModal() {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
         }
       });
+
+      // Disable autoCenter if user manually drags/pans the map
+      map.addListener('dragstart', function() {
+        autoCenter = false;
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'autoCenterChanged', autoCenter: false }));
+        }
+      });
     }
 
     function drawRoute() {
       if (!departPos || !destPos || !directionsService) return;
+      
+      var waypoints = [];
+      if (window.stopoversList && window.stopoversList.length > 0) {
+        window.stopoversList.forEach(function(s) {
+          if (s.latitude && s.longitude) {
+            waypoints.push({
+              location: new google.maps.LatLng(Number(s.latitude), Number(s.longitude)),
+              stopover: true
+            });
+          }
+        });
+      }
+
       directionsService.route({
         origin: departPos,
         destination: destPos,
+        waypoints: waypoints,
+        optimizeWaypoints: false,
         travelMode: google.maps.TravelMode.DRIVING
       }, function(response, status) {
         if (status === 'OK') {
           directionsRenderer.setDirections(response);
         } else {
-          // Fallback straight line
           var line = new google.maps.Polyline({
             path: [departPos, destPos],
             strokeColor: '#3B82F6',
@@ -689,74 +906,99 @@ export default function LiveRideModal() {
     }
 
     window.handleMessage = function(msg) {
-      if (msg.type === 'setView') {
+      if (msg.type === 'initRole') {
+        isDriverRole = msg.isDriver;
+
+      } else if (msg.type === 'setView') {
         map.setCenter({ lat: msg.lat, lng: msg.lon });
         map.setZoom(msg.zoom || 14);
 
+      } else if (msg.type === 'recenter') {
+        autoCenter = true;
+        var targetPos = lastUserPos;
+        var targetHeading = lastUserHeading;
+        
+        if (!isDriverRole && lastDriverPos) {
+          targetPos = lastDriverPos;
+          targetHeading = lastDriverHeading;
+        }
+        
+        if (targetPos) {
+          map.panTo(targetPos);
+          map.setZoom(17);
+          map.setTilt(55);
+          if (targetHeading !== undefined && targetHeading !== null && targetHeading !== -1) {
+            map.setHeading(targetHeading);
+          }
+        }
+
       } else if (msg.type === 'updateUserPosition') {
         var pos = { lat: msg.lat, lng: msg.lon };
+        var heading = msg.heading || 0;
+        
+        lastUserPos = pos;
+        lastUserHeading = heading;
+
         if (!userMarker) {
-          var el = document.createElement('div');
-          el.className = 'pulse-user';
-          userMarker = new google.maps.marker.AdvancedMarkerElement
-            ? new google.maps.marker.AdvancedMarkerElement({ position: pos, map: map, content: el })
-            : new google.maps.Marker({
-                position: pos,
-                map: map,
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  scale: 8,
-                  fillColor: '#4285F4',
-                  fillOpacity: 1,
-                  strokeColor: 'white',
-                  strokeWeight: 3
-                },
-                title: 'Votre position',
-                zIndex: 1000
-              });
+          userMarker = createAdvancedNavMarker(pos, 'user');
         } else {
-          userMarker.setPosition ? userMarker.setPosition(pos) : (userMarker.position = pos);
+          userMarker.setPosition(pos);
+        }
+        userMarker.setRotation(heading);
+
+        // Follow user if autoCenter is active and they are the driver
+        if (autoCenter) {
+          var shouldFollow = false;
+          if (isDriverRole) {
+            shouldFollow = true;
+          } else if (!driverMarker) {
+            shouldFollow = true; // passenger follows themselves if driver hasn't sent GPS
+          }
+
+          if (shouldFollow) {
+            map.panTo(pos);
+            map.setZoom(17);
+            map.setTilt(55);
+            if (heading !== undefined && heading !== null && heading !== -1 && heading !== 0) {
+              map.setHeading(heading);
+            }
+          }
         }
 
       } else if (msg.type === 'updateDriverPosition') {
         var pos = { lat: msg.lat, lng: msg.lon };
+        var heading = 0;
+        if (lastDriverPos) {
+          heading = calculateHeading(lastDriverPos, pos);
+        }
+        
+        lastDriverPos = pos;
+        lastDriverHeading = heading;
+
         if (!driverMarker) {
-          driverMarker = new google.maps.Marker({
-            position: pos,
-            map: map,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 9,
-              fillColor: '#10B981',
-              fillOpacity: 1,
-              strokeColor: 'white',
-              strokeWeight: 3
-            },
-            title: 'Conducteur',
-            zIndex: 1100
-          });
+          driverMarker = createAdvancedNavMarker(pos, 'driver');
         } else {
           driverMarker.setPosition(pos);
+        }
+        driverMarker.setRotation(heading);
+
+        // Follow driver if autoCenter is active and passenger is watching
+        if (autoCenter && !isDriverRole) {
+          map.panTo(pos);
+          map.setZoom(17);
+          map.setTilt(55);
+          if (heading !== 0) {
+            map.setHeading(heading);
+          }
         }
 
       } else if (msg.type === 'setDepartMarker') {
         var pos = { lat: msg.lat, lng: msg.lon };
         departPos = pos;
         if (!departMarker) {
-          departMarker = new google.maps.Marker({
-            position: pos,
-            map: map,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 7,
-              fillColor: '#22C55E',
-              fillOpacity: 1,
-              strokeColor: 'white',
-              strokeWeight: 3
-            },
-            title: 'Départ',
-            zIndex: 500
-          });
+          departMarker = createOverlayMarker(pos, 'depart-pin', 'Départ');
+        } else {
+          departMarker.setPosition(pos);
         }
         drawRoute();
 
@@ -764,26 +1006,54 @@ export default function LiveRideModal() {
         var pos = { lat: msg.lat, lng: msg.lon };
         destPos = pos;
         if (!destMarker) {
-          destMarker = new google.maps.Marker({
-            position: pos,
-            map: map,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 7,
-              fillColor: '#EF4444',
-              fillOpacity: 1,
-              strokeColor: 'white',
-              strokeWeight: 3
-            },
-            title: 'Arrivée',
-            zIndex: 500
-          });
+          destMarker = createOverlayMarker(pos, 'dest-pin', 'Arrivée');
+        } else {
+          destMarker.setPosition(pos);
         }
         drawRoute();
 
       } else if (msg.type === 'drawRoutes') {
-        // With Google Maps DirectionsService we draw the main route only
-        // Route is already drawn when both markers are set
+        drawRoute();
+
+      } else if (msg.type === 'setStopovers') {
+        window.stopoversList = msg.stopovers || [];
+        
+        if (window.stopoverMarkers) {
+          window.stopoverMarkers.forEach(function(m) { m.setMap(null); });
+        }
+        window.stopoverMarkers = [];
+        
+        if (msg.stopovers && Array.isArray(msg.stopovers)) {
+          msg.stopovers.forEach(function(s, idx) {
+            if (s.latitude && s.longitude) {
+              var pos = { lat: Number(s.latitude), lng: Number(s.longitude) };
+              var div = document.createElement('div');
+              div.className = 'stopover-pin';
+              div.innerHTML = (idx + 1);
+              div.title = s.name;
+              
+              var overlay = new google.maps.OverlayView();
+              overlay.onAdd = function() {
+                this.getPanes().overlayMouseTarget.appendChild(div);
+              };
+              overlay.draw = function() {
+                var point = this.getProjection().fromLatLngToDivPixel(this.position);
+                if (point) {
+                  div.style.position = 'absolute';
+                  div.style.left = (point.x - 12) + 'px';
+                  div.style.top = (point.y - 12) + 'px';
+                }
+              };
+              overlay.onRemove = function() {
+                if (div.parentNode) div.parentNode.removeChild(div);
+              };
+              overlay.position = pos;
+              overlay.setMap(map);
+              
+              window.stopoverMarkers.push(overlay);
+            }
+          });
+        }
         drawRoute();
 
       } else if (msg.type === 'fitBounds') {
@@ -801,7 +1071,8 @@ export default function LiveRideModal() {
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc&callback=initMap">
   </script>
 </body>
-</html>`, []);
+</html>
+  `, []);
 
   if (!activeRide) return null;
 
@@ -828,180 +1099,158 @@ export default function LiveRideModal() {
   return (
     <>
       <Modal visible={visible} animationType="slide" transparent>
-        <View style={styles.overlay}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <View style={styles.liveIndicator}>
-                <View style={[
-                  styles.liveDot,
-                  { backgroundColor: activeRide.status === 'started' ? theme.colors.success : '#F59E0B' }
-                ]} />
-                <Text style={[
-                  styles.liveText,
-                  { color: activeRide.status === 'started' ? theme.colors.success : '#F59E0B' }
-                ]}>
-                  {activeRide.status === 'started' ? 'EN COURS' : 'PRÊT À DÉMARRER'}
-                </Text>
-                {routeLoading && <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginLeft: 8 }} />}
-              </View>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {activeRide.departure_location} → {activeRide.arrival_location}
-              </Text>
+        <View style={styles.overlayFull}>
+          {/* Full Screen Google Map */}
+          <WebView
+            ref={webviewRef}
+            originWhitelist={['*']}
+            source={{ html: googleMapHtml }}
+            onMessage={onMapMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            cacheEnabled={false}
+            androidLayerType="hardware"
+            style={styles.mapFull}
+            scrollEnabled={false}
+          />
+
+          {/* Loader */}
+          {!mapReady && (
+            <View style={styles.mapLoaderFull}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.mapLoaderText}>Lancement de la navigation...</Text>
             </View>
-            <TouchableOpacity onPress={() => { setVisible(false); setIsMinimized(true); }} style={styles.closeButton}>
-              <Ionicons name="remove-outline" size={26} color={theme.colors.text} />
-            </TouchableOpacity>
-          </View>
+          )}
 
-          {/* Main Content */}
-          <>
-            {/* Map */}
-              <View style={styles.mapContainer}>
-                <WebView
-                  ref={webviewRef}
-                  originWhitelist={['*']}
-                  source={{ html: googleMapHtml }}
-                  onMessage={onMapMessage}
-                  javaScriptEnabled
-                  domStorageEnabled
-                  cacheEnabled={false}
-                  androidLayerType="hardware"
-                  style={styles.map}
-                  scrollEnabled={false}
+          {/* Top Forest Green Guidance Card */}
+          {mapReady && (
+            <View style={styles.guidageContainer}>
+              <View style={styles.guidageMain}>
+                <View style={styles.guidageIconContainer}>
+                  <Ionicons name="arrow-up" size={32} color={theme.colors.white} />
+                </View>
+                <View style={styles.guidageTextContainer}>
+                  <Text style={styles.guidageInstruction} numberOfLines={2}>
+                    {activeRide.status === 'started' 
+                      ? `Continuer vers l'arrivée à ${activeRide.arrival_location}`
+                      : `Démarrer le trajet vers ${activeRide.arrival_location}`}
+                  </Text>
+                  <Text style={styles.guidageDistance}>Suivre le tracé bleu Zemy</Text>
+                </View>
+              </View>
+              <View style={styles.guidageSecondary}>
+                <Ionicons name="arrow-redo" size={16} color={theme.colors.white} />
+                <Text style={styles.guidageSecondaryText}>Puis fin de votre voyage</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Floating Right Navigation Controls */}
+          {mapReady && (
+            <View style={styles.rightControlsContainer}>
+              {/* Compass Heading Recenter */}
+              <TouchableOpacity style={styles.navRoundBtn} onPress={() => sendToMap({ type: 'recenter' })} activeOpacity={0.8}>
+                <Ionicons name="compass" size={24} color="#EF4444" />
+              </TouchableOpacity>
+
+              {/* Locate Recenter */}
+              <TouchableOpacity style={styles.navRoundBtn} onPress={() => sendToMap({ type: 'recenter' })} activeOpacity={0.8}>
+                <Ionicons name="locate" size={24} color={theme.colors.primary} />
+              </TouchableOpacity>
+
+              {/* Sound TTS Settings */}
+              <TouchableOpacity 
+                style={[styles.navRoundBtn, isSoundMuted && styles.navRoundBtnMuted]} 
+                onPress={() => setIsSoundMuted(!isSoundMuted)}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={isSoundMuted ? "volume-mute" : "volume-high"} 
+                  size={22} 
+                  color={isSoundMuted ? theme.colors.textLight : "#10B981"} 
                 />
-                {!mapReady && (
-                  <View style={styles.mapLoader}>
-                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text style={styles.mapLoaderText}>Chargement de la carte...</Text>
-                  </View>
-                )}
+              </TouchableOpacity>
+            </View>
+          )}
 
-                {mapReady && (
-                  <View style={styles.mapControls}>
-                    <TouchableOpacity
-                      style={styles.controlBtn}
-                      onPress={() => location && sendToMap({ type: 'setView', lat: location.lat, lon: location.lon, zoom: 15 })}
-                    >
-                      <Ionicons name="locate" size={20} color={theme.colors.primary} />
-                    </TouchableOpacity>
+          {/* Speedometer widget */}
+          {mapReady && (
+            <View style={styles.speedometerContainer}>
+              <Text style={styles.speedValue}>{currentSpeed}</Text>
+              <Text style={styles.speedUnit}>km/h</Text>
+            </View>
+          )}
 
-                    <TouchableOpacity style={styles.controlBtn} onPress={openGoogleMaps}>
-                      <Ionicons name="navigate" size={20} color="#4285F4" />
-                    </TouchableOpacity>
-                  </View>
-                )}
+          {/* Floating Ride Actions controls (FAB) */}
+          {mapReady && (
+            <View style={styles.rideControlFabContainer}>
+              {activeRide.status === 'active' ? (
+                <TouchableOpacity style={styles.startFab} onPress={handleStartRide} activeOpacity={0.8}>
+                  <Ionicons name="play" size={20} color={theme.colors.white} />
+                  <Text style={styles.rideControlFabText}>DÉMARRER</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.completeFab} 
+                  onPress={isDriver ? handleCompleteRide : handlePassengerComplete}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-sharp" size={20} color={theme.colors.white} />
+                  <Text style={styles.rideControlFabText}>TERMINER</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Bottom Info Sheet (Google Maps Style) */}
+          {mapReady && (
+            <View style={styles.bottomNavPanel}>
+              {/* Close button */}
+              <TouchableOpacity 
+                style={styles.bottomNavCloseBtn} 
+                onPress={() => { setVisible(false); setIsMinimized(true); }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+
+              {/* Center Navigation Stats */}
+              <View style={styles.bottomNavStats}>
+                <View style={styles.bottomNavTimeRow}>
+                  <Text style={styles.bottomNavTimeText}>
+                    {routes.length > 0 ? formatDuration(routes[activeRouteIndex].duration) : '---'}
+                  </Text>
+                  <Ionicons name="leaf" size={16} color="#10B981" style={{ marginLeft: 6 }} />
+                </View>
+                <Text style={styles.bottomNavDistanceEtaText}>
+                  {routes.length > 0 
+                    ? `${formatDistance(routes[activeRouteIndex].distance)} • ETA ${getEtaStr(routes[activeRouteIndex].duration)}`
+                    : 'Chargement des étapes...'}
+                </Text>
               </View>
 
-              {/* Légende de la route */}
-              {(departCoords || destCoords) && (
-                <View style={styles.legendRow}>
-                  {departCoords && (
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: theme.colors.success }]} />
-                      <Text style={styles.legendText} numberOfLines={1}>{activeRide.departure_location}</Text>
-                    </View>
-                  )}
-                  {destCoords && (
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: theme.colors.error }]} />
-                      <Text style={styles.legendText} numberOfLines={1}>{activeRide.arrival_location}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Détails de l'itinéraire sélectionné */}
-              {routes.length > 0 && (
-                <View style={styles.routeDetailsRow}>
-                  <View style={styles.routeHeader}>
-                    <Ionicons name="git-branch-outline" size={16} color={theme.colors.primary} />
-                    <Text style={styles.routeTitle}>
-                      Itinéraire ({activeRouteIndex + 1}/{routes.length})
-                    </Text>
-                  </View>
-                  <View style={styles.routeStats}>
-                    <View style={styles.routeStatItem}>
-                      <Ionicons name="time-outline" size={15} color={theme.colors.textLight} />
-                      <Text style={styles.routeStatLabel}>Durée :</Text>
-                      <Text style={styles.routeStatValue}>
-                        {formatDuration(routes[activeRouteIndex].duration)}
-                      </Text>
-                    </View>
-                    <View style={styles.routeStatItem}>
-                      <Ionicons name="swap-horizontal-outline" size={15} color={theme.colors.textLight} />
-                      <Text style={styles.routeStatLabel}>Distance :</Text>
-                      <Text style={styles.routeStatValue}>
-                        {formatDistance(routes[activeRouteIndex].distance)}
-                      </Text>
-                    </View>
-                  </View>
-                  {routes.length > 1 && (
-                    <View style={styles.routeSelector}>
-                      {routes.map((_, idx) => (
-                        <TouchableOpacity
-                          key={idx}
-                          style={[
-                            styles.routeSelectorBtn,
-                            activeRouteIndex === idx && styles.routeSelectorBtnActive
-                          ]}
-                          onPress={() => setActiveRouteIndex(idx)}
-                        >
-                          <Text style={[
-                            styles.routeSelectorBtnText,
-                            activeRouteIndex === idx && styles.routeSelectorBtnTextActive
-                          ]}>
-                            Chemin {idx + 1}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Footer */}
-              <View style={styles.footer}>
-                {activeRide.status === 'started' && (
-                  <TouchableOpacity style={styles.googleMapsBtn} onPress={openGoogleMaps}>
-                    <Ionicons name="map" size={18} color="#4285F4" />
-                    <Text style={styles.googleMapsBtnText}>Navigation GPS sur Google Maps</Text>
-                    <Ionicons name="open-outline" size={16} color="#4285F4" />
-                  </TouchableOpacity>
-                )}
-
-                <View style={styles.actionRow}>
-                  {activeRide.status === 'active' ? (
-                    <TouchableOpacity style={styles.startBtn} onPress={handleStartRide}>
-                      <Ionicons name="play-circle" size={20} color={theme.colors.white} />
-                      <Text style={styles.startBtnText}>Démarrer le trajet</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity style={styles.completeBtn} onPress={isDriver ? handleCompleteRide : handlePassengerComplete}>
-                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
-                      <Text style={styles.completeBtnText}>{isDriver ? 'Terminer le trajet' : 'Je suis arrivé(e)'}</Text>
-                    </TouchableOpacity>
-                  )}
-                  
-                  <TouchableOpacity style={styles.reportBtn} onPress={() => setShowReportModal(true)}>
-                    <Ionicons name="warning-outline" size={20} color={theme.colors.white} />
-                    <Text style={styles.reportBtnText}>Signaler</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </>
-          </View>
+              {/* Report Problem button */}
+              <TouchableOpacity 
+                style={styles.bottomNavReportBtn} 
+                onPress={() => setShowReportModal(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="warning-outline" size={22} color={theme.colors.error} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </Modal>
 
-      {/* Report Problem Modal */}
+      {/* Report Modal */}
       <Modal visible={showReportModal} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.reportOverlay}>
           <View style={styles.reportCard}>
             <Text style={styles.reportTitle}>Signaler un problème</Text>
-            <Text style={styles.reportSubtitle}>Décrivez le problème. Votre position GPS sera automatiquement envoyée à l'administration.</Text>
+            <Text style={styles.reportSubtitle}>Décrivez le problème rencontré sur ce trajet.</Text>
             <TextInput
               style={styles.reportInput}
-              placeholder="Ex: retard important, comportement dangereux..."
+              placeholder="Ex: retard important, panne de véhicule..."
               placeholderTextColor={theme.colors.textLight}
               value={problemText}
               onChangeText={setProblemText}
@@ -1145,5 +1394,230 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     fontSize: 15,
     fontWeight: 'bold',
+  },
+
+  // New Google Maps Overlay Styles
+  overlayFull: {
+    flex: 1,
+    backgroundColor: '#E5E7EB',
+    position: 'relative',
+  },
+  mapFull: {
+    flex: 1,
+  },
+  mapLoaderFull: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#FAFAFA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99,
+  },
+  guidageContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: '#0F5132',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  guidageMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  guidageIconContainer: {
+    marginRight: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guidageTextContainer: {
+    flex: 1,
+  },
+  guidageInstruction: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    lineHeight: 22,
+  },
+  guidageDistance: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  guidageSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0A3B24',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  guidageSecondaryText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  rightControlsContainer: {
+    position: 'absolute',
+    top: 200,
+    right: 12,
+    zIndex: 10,
+    gap: 12,
+  },
+  navRoundBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  navRoundBtnMuted: {
+    backgroundColor: '#F3F4F6',
+  },
+  speedometerContainer: {
+    position: 'absolute',
+    bottom: 120,
+    left: 16,
+    zIndex: 10,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  speedValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    lineHeight: 22,
+  },
+  speedUnit: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  bottomNavPanel: {
+    position: 'absolute',
+    bottom: 24,
+    left: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    height: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  bottomNavCloseBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  bottomNavStats: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomNavTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bottomNavTimeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#B45309',
+  },
+  bottomNavDistanceEtaText: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  bottomNavReportBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+  },
+  rideControlFabContainer: {
+    position: 'absolute',
+    bottom: 120,
+    right: 16,
+    zIndex: 10,
+  },
+  startFab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 28,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  completeFab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 28,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  rideControlFabText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 1.2,
   },
 });

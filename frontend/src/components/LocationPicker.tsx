@@ -28,6 +28,7 @@ import {
   TouchableWithoutFeedback,
   PanResponder,
   Animated,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -83,6 +84,7 @@ export default function LocationPicker({
   const insets = useSafeAreaInsets();
   const webviewRef = useRef<WebView>(null);
   const searchInputRef = useRef<TextInput>(null);
+  const placeCache = useRef<{ [placeId: string]: any }>({});
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -100,12 +102,93 @@ export default function LocationPicker({
   const [isDragging, setIsDragging] = useState(false);
   const [customLocationName, setCustomLocationName] = useState(initialLocation?.name || '');
 
+  const [isLoadingGPS, setIsLoadingGPS] = useState(false);
+  const [nearbySuggestions, setNearbySuggestions] = useState<any[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const gpsRotateAnim = useRef(new Animated.Value(0)).current;
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | 'cities' | 'establishments'>('all');
+  const [filterRadius, setFilterRadius] = useState<number>(50);
+
+  const gpsRotation = gpsRotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
   const lastReverseRef = useRef({ lat: 0, lon: 0 });
+
+  // Synchronise les suggestions proches et les points d'intérêt
+  useEffect(() => {
+    if (selectedLocation) {
+      const selectedLat = selectedLocation.latitude;
+      const selectedLon = selectedLocation.longitude;
+      
+      const sorted = [...DEFAULT_POPULAR_BENIN]
+        .map(p => {
+          const dLat = p.latitude - selectedLat;
+          const dLon = p.longitude - selectedLon;
+          const distKm = Math.sqrt(dLat*dLat + dLon*dLon) * 111; // Approx km
+          return { ...p, distKm };
+        })
+        .filter(p => p.name.toLowerCase() !== selectedLocation.name.toLowerCase())
+        .sort((a, b) => a.distKm - b.distKm);
+      
+      const suggested = sorted.slice(0, 3).map(p => {
+        let distanceText = '';
+        if (p.distKm < 1) {
+          distanceText = `${Math.round(p.distKm * 1000)} m`;
+        } else {
+          distanceText = `${p.distKm.toFixed(1)} km`;
+        }
+        return {
+          ...p,
+          distanceText
+        };
+      });
+      
+      while (suggested.length < 3) {
+        const dummyNames = ['Rue de l\'Église', 'Avenue de la Paix', 'Carrefour principal', 'Grand Marché'];
+        const name = dummyNames[suggested.length % dummyNames.length];
+        const distKm = 0.3 + (suggested.length * 0.4);
+        suggested.push({
+          name,
+          city: selectedLocation.city || 'Cotonou',
+          latitude: selectedLat + (Math.random() - 0.5) * 0.01,
+          longitude: selectedLon + (Math.random() - 0.5) * 0.01,
+          distKm,
+          distanceText: distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`
+        });
+      }
+      
+      setNearbySuggestions(suggested);
+    }
+  }, [selectedLocation]);
+
+  const selectShortcut = async (type: string) => {
+    const key = `@zemy_shortcut_${type.toLowerCase()}`;
+    try {
+      const saved = await AsyncStorage.getItem(key);
+      if (saved) {
+        const loc = JSON.parse(saved);
+        setSelectedLocation(loc);
+        setCustomLocationName(loc.name);
+        sendToMap({ type: 'setView', lat: loc.latitude, lon: loc.longitude, zoom: 16 });
+      } else {
+        if (selectedLocation) {
+          await AsyncStorage.setItem(key, JSON.stringify(selectedLocation));
+          Alert.alert('Raccourci enregistré', `Votre position actuelle a été enregistrée pour "${type}".`);
+        } else {
+          Alert.alert('Sélectionnez un lieu', 'Veuillez d\'abord cibler un lieu sur la carte pour l\'enregistrer.');
+        }
+      }
+    } catch(e) {}
+  };
 
   // ── GESTION PAN RESPONDER (GLISSEMENT POUR BAISSER / ÉLEVER / FERMER) ──
   const panY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -125,7 +208,7 @@ export default function LocationPicker({
     (target: 'expanded' | 'lowered' | 'closed') => {
       let toValue = 0;
       if (target === 'lowered') {
-        toValue = SCREEN_HEIGHT * 0.36;
+        toValue = SCREEN_HEIGHT * 0.22;
       } else if (target === 'closed') {
         toValue = SCREEN_HEIGHT;
       }
@@ -154,19 +237,21 @@ export default function LocationPicker({
         return Math.abs(gestureState.dy) > 5;
       },
       onPanResponderMove: (_, gestureState) => {
-        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.36 : 0;
+        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.22 : 0;
         const newY = baseOffset + gestureState.dy;
-        if (newY > -30) {
-          panY.setValue(newY);
-        }
+        // Clamp the Y coordinate between -30 (drag up compression) and SCREEN_HEIGHT * 0.22 (1/3 of app height lock)
+        const clampedY = Math.max(-30, Math.min(SCREEN_HEIGHT * 0.22, newY));
+        panY.setValue(clampedY);
       },
       onPanResponderRelease: (_, gestureState) => {
-        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.36 : 0;
+        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.22 : 0;
         const finalY = baseOffset + gestureState.dy;
 
-        if (gestureState.vy > 0.9 || finalY > SCREEN_HEIGHT * 0.55) {
-          snapTo('closed');
-        } else if (finalY > SCREEN_HEIGHT * 0.18) {
+        if (gestureState.vy > 0.4) {
+          snapTo('lowered');
+        } else if (gestureState.vy < -0.4) {
+          snapTo('expanded');
+        } else if (finalY > SCREEN_HEIGHT * 0.11) {
           snapTo('lowered');
         } else {
           snapTo('expanded');
@@ -443,12 +528,18 @@ export default function LocationPicker({
       } catch (err) {}
 
       // Google Places Autocomplete — fast, route-aware, precise
+      // Google Places Autocomplete — fast, route-aware, precise
+      const radiusMeters = filterRadius * 1000;
       const locationBias = userLocation
-        ? `&location=${userLocation.lat},${userLocation.lon}&radius=500000`
-        : '&location=6.3703,2.3912&radius=600000';
+        ? `&location=${userLocation.lat},${userLocation.lon}&radius=${radiusMeters}`
+        : `&location=6.3703,2.3912&radius=${radiusMeters}`;
+
+      let typesParam = 'geocode|establishment';
+      if (filterType === 'cities') typesParam = '(cities)';
+      else if (filterType === 'establishments') typesParam = 'establishment';
 
       const acResp = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_API_KEY}&language=fr&components=country:bj${locationBias}&types=geocode|establishment`,
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_API_KEY}&language=fr&components=country:bj${locationBias}&types=${typesParam}`,
         { signal: searchAbort.current.signal }
       );
 
@@ -506,7 +597,7 @@ export default function LocationPicker({
 
     searchTimeoutRef.current = setTimeout(() => {
       searchPlaces(text);
-    }, 300);
+    }, 750); // Debounce increased to 750ms for Google API cost savings
   }, [userLocation]);
 
   const handleSelectSuggestion = useCallback(
@@ -556,7 +647,13 @@ export default function LocationPicker({
         setIsLoadingAddress(true);
         setSearchQuery(item.name);
         try {
-          const details = await fetchPlaceDetails(item.place_id);
+          let details = placeCache.current[item.place_id];
+          if (!details) {
+            details = await fetchPlaceDetails(item.place_id);
+            if (details) {
+              placeCache.current[item.place_id] = details;
+            }
+          }
           if (details) {
             const loc: LocationData = {
               latitude: details.lat,
@@ -599,11 +696,22 @@ export default function LocationPicker({
 
   const goToMyLocation = useCallback(() => {
     if (userLocation) {
+      setIsLoadingGPS(true);
+      gpsRotateAnim.setValue(0);
+      Animated.timing(gpsRotateAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start(() => {
+        setIsLoadingGPS(false);
+        gpsRotateAnim.setValue(0);
+      });
+
       sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 15 });
       sendToMap({ type: 'setUserMarker', lat: userLocation.lat, lon: userLocation.lon });
       reverseGeocode(userLocation.lat, userLocation.lon);
     }
-  }, [userLocation, sendToMap]);
+  }, [userLocation, sendToMap, gpsRotateAnim]);
 
   const handleConfirmLocation = useCallback(() => {
     if (selectedLocation) {
@@ -686,16 +794,16 @@ export default function LocationPicker({
     .center-marker.dragging { transform: translate(-50%, -60%) scale(1.12); }
     .marker-pin {
       width: 36px; height: 36px; border-radius: 50% 50% 50% 0;
-      background: #0066FF; position: absolute; transform: rotate(-45deg);
+      background: #EA4335; position: absolute; transform: rotate(-45deg);
       left: 50%; top: 50%; margin: -18px 0 0 -18px;
-      box-shadow: 0 4px 14px rgba(0,102,255,0.45); border: 3px solid white;
+      box-shadow: 0 4px 14px rgba(234,67,53,0.45); border: 3px solid white;
     }
     .marker-pin::after {
       content: ''; width: 12px; height: 12px; margin: 9px 0 0 9px;
       background: white; position: absolute; border-radius: 50%;
     }
     .pulse {
-      width: 64px; height: 64px; background: rgba(0,102,255,0.2);
+      width: 64px; height: 64px; background: rgba(234,67,53,0.2);
       border-radius: 50%; position: absolute; left: 50%; top: 50%;
       margin: -32px 0 0 -32px; animation: pulse 1.6s infinite;
     }
@@ -779,8 +887,8 @@ export default function LocationPicker({
             position: uPos, map: map,
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
-              scale: 8, fillColor: '#10B981', fillOpacity: 1,
-              strokeColor: 'white', strokeWeight: 3
+              scale: 9, fillColor: '#1A73E8', fillOpacity: 1,
+              strokeColor: '#FFFFFF', strokeWeight: 2.5
             },
             zIndex: 200
           });
@@ -820,308 +928,427 @@ export default function LocationPicker({
 
   return (
     <View style={styles.overlayContainer}>
-      <TouchableWithoutFeedback onPress={() => snapTo('closed')}>
-        <View style={styles.backdropTouch} />
-      </TouchableWithoutFeedback>
+      {/* ── Map WebView taking absolute full screen ── */}
+      <View style={styles.mapFullContainer}>
+        <WebView
+          ref={webviewRef}
+          originWhitelist={['*']}
+          source={{ html: googleMapsHtml }}
+          onMessage={onMapMessage}
+          javaScriptEnabled
+          domStorageEnabled
+          cacheEnabled
+          style={styles.mapWebView}
+          scrollEnabled={true}
+          androidLayerType="hardware"
+          mixedContentMode="compatibility"
+          allowsInlineMediaPlayback
+        />
 
-      {/* ── FENÊTRE MODALE ANCRÉE SOUS LA BARRE DE STATUT (IMMOBILE) ── */}
-      <Animated.View
+        {!mapReady && (
+          <View style={styles.mapLoadingOverlay}>
+            <ActivityIndicator size="large" color="#0066FF" />
+            <Text style={styles.mapLoadingText}>Chargement de la carte...</Text>
+          </View>
+        )}
+      </View>
+
+      {/* ── Floating Location Button (floats above footer card) ── */}
+      {!isSearchFocused && (
+        <TouchableOpacity
+          style={[
+            styles.myLocationFloatingBtn,
+            { bottom: snapState === 'lowered' ? insets.bottom + 280 : insets.bottom + 380 }
+          ]}
+          onPress={goToMyLocation}
+          activeOpacity={0.8}
+        >
+          <Animated.View style={isLoadingGPS ? { transform: [{ rotate: gpsRotation }] } : null}>
+            <Ionicons name="navigate" size={22} color="#0066FF" />
+          </Animated.View>
+        </TouchableOpacity>
+      )}
+
+      {/* ── Floating Confirmation Card at the bottom (Draggable/Movable) ── */}
+      {!isSearchFocused && (
+        <Animated.View
+          style={[
+            styles.floatingFooterCard,
+            {
+              bottom: 0,
+              transform: [
+                {
+                  translateY: panY.interpolate({
+                    inputRange: [-100, 0, SCREEN_HEIGHT],
+                    outputRange: [0, 0, SCREEN_HEIGHT],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          {/* Header area acts as the PanResponder drag zone */}
+          <View {...panResponder.panHandlers} style={styles.dragZone}>
+            {/* Top Grab Handle */}
+            <View style={styles.sheetHandle} />
+
+            {/* Location Title Header with Favorite Star */}
+            <View style={styles.bottomSheetHeader}>
+              <View style={styles.locationIconCircle}>
+                <Ionicons name="location" size={20} color="#0066FF" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                {isLoadingAddress ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color="#0066FF" style={{ marginRight: 6 }} />
+                    <Text style={styles.loadingAddrText}>Recherche du lieu...</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.sheetLocationTitle} numberOfLines={1}>
+                      {selectedLocation?.name || 'Déplacez la carte pour choisir'}
+                    </Text>
+                    {selectedLocation?.address ? (
+                      <Text style={styles.sheetLocationSubtitle} numberOfLines={1}>
+                        {selectedLocation.address}
+                      </Text>
+                    ) : null}
+                  </>
+                )}
+              </View>
+              <TouchableOpacity style={styles.starBtn} onPress={() => setIsFavorite(!isFavorite)} activeOpacity={0.7}>
+                <Ionicons name={isFavorite ? "star" : "star-outline"} size={22} color={isFavorite ? "#F59E0B" : "#9CA3AF"} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Scrollable sheet body content */}
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+            {/* Saisie précision optionnelle */}
+            <View style={styles.customNoteInputRow}>
+              <Ionicons name="pencil" size={16} color="#6B7280" />
+              <TextInput
+                style={styles.customNoteInput}
+                placeholder="Ajouter un détail (bâtiment, référence...)"
+                placeholderTextColor="#9CA3AF"
+                value={customLocationName}
+                onChangeText={setCustomLocationName}
+              />
+            </View>
+
+            {/* Bouton de confirmation principal */}
+            <TouchableOpacity
+              style={[styles.confirmLocationBtn, isLoadingAddress && styles.confirmBtnDisabled]}
+              onPress={handleConfirmLocation}
+              disabled={isLoadingAddress}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.confirmBtnText}>Confirmer cet emplacement</Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+
+            {/* Suggestions proches */}
+            {nearbySuggestions.length > 0 && (
+              <>
+                <Text style={styles.suggestionsSectionTitle}>Suggestions proches</Text>
+                <View style={styles.nearbyList}>
+                  {nearbySuggestions.map((item, idx) => (
+                    <TouchableOpacity
+                      key={`nearby-${idx}`}
+                      style={styles.nearbyItem}
+                      onPress={() => {
+                        setSelectedLocation(item);
+                        setCustomLocationName(item.name);
+                        sendToMap({ type: 'setView', lat: item.latitude, lon: item.longitude, zoom: 16 });
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="location-outline" size={16} color="#9CA3AF" style={{ marginRight: 10 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.nearbyName}>{item.name}</Text>
+                        <Text style={styles.nearbySub}>{item.city ? `${item.city}, Bénin` : 'Bénin'}</Text>
+                      </View>
+                      <Text style={styles.nearbyDistance}>{item.distanceText}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {/* ── Separate Circular Back Button (floats absolute on top of overlayContainer) ── */}
+      {!isSearchFocused && (
+        <View
+          style={[
+            styles.modernBackBtnContainer,
+            {
+              top: cardTopMargin,
+            },
+          ]}
+        >
+          <TouchableOpacity style={styles.modernBackBtn} onPress={() => snapTo('closed')} activeOpacity={0.8}>
+            <Ionicons name="arrow-back" size={22} color="#1F2937" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ── Floating Search Card at the top (floats absolute on top of overlayContainer) ── */}
+      <View
         style={[
-          styles.modalContentCard,
+          isSearchFocused ? styles.floatingSearchCardFocused : styles.floatingSearchCard,
           {
             top: cardTopMargin,
-            transform: [
-              {
-                translateY: panY.interpolate({
-                  inputRange: [-100, 0, SCREEN_HEIGHT],
-                  outputRange: [-25, 0, SCREEN_HEIGHT],
-                  extrapolate: 'clamp',
-                }),
-              },
-            ],
+            left: isSearchFocused ? 16 : 72,
           },
         ]}
       >
-        {/* 1. EN-TÊTE FIXE IMMOBILE (Poignée + Titre + Fermer) */}
-        <View {...panResponder.panHandlers} style={styles.fixedHeaderArea}>
-          <TouchableOpacity
-            style={styles.modalHandleTouchContainer}
-            onPress={() => snapTo(snapState === 'expanded' ? 'lowered' : 'expanded')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.modalHandleBar} />
-            <Text style={styles.dragHintText}>
-              {snapState === 'expanded' ? 'Glissez vers le bas pour baisser' : 'Glissez vers le haut pour agrandir'}
-            </Text>
+        {isSearchFocused ? (
+          <TouchableOpacity style={styles.floatingBackBtn} onPress={() => { Keyboard.dismiss(); setIsSearchFocused(false); }}>
+            <Ionicons name="arrow-back" size={22} color="#1F2937" />
           </TouchableOpacity>
+        ) : (
+          <Ionicons name="location" size={20} color="#0066FF" style={{ marginRight: 8 }} />
+        )}
+        <TextInput
+          ref={searchInputRef}
+          style={styles.floatingSearchInput}
+          placeholder="Rechercher une ville, quartier..."
+          placeholderTextColor="#9CA3AF"
+          value={searchQuery}
+          onChangeText={handleSearchChange}
+          onFocus={handleFocusSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {isSearching ? (
+          <ActivityIndicator size="small" color="#0066FF" style={{ marginRight: 4 }} />
+        ) : searchQuery.length > 0 ? (
+          <TouchableOpacity onPress={() => handleSearchChange('')}>
+            <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
+        ) : !isSearchFocused ? (
+          <TouchableOpacity style={{ padding: 4 }} onPress={() => setShowFilters(true)}>
+            <Ionicons name="options-outline" size={20} color="#6B7280" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => { Keyboard.dismiss(); setIsSearchFocused(false); }}>
+            <Ionicons name="chevron-up" size={18} color="#0066FF" />
+          </TouchableOpacity>
+        )}
+      </View>
 
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderTitleRow}>
-              <Ionicons name="map" size={22} color="#0066FF" />
-              <Text style={styles.modalHeaderTitle}>{title}</Text>
+      {/* ── Floating Suggestions Panel right below search input ── */}
+      {showSuggestions && (
+        <Animated.View
+          style={[
+            styles.floatingSuggestionsPanel,
+            {
+              top: cardTopMargin + 60,
+              transform: [
+                {
+                  translateY: panY.interpolate({
+                    inputRange: [-100, 0, SCREEN_HEIGHT],
+                    outputRange: [-10, 0, SCREEN_HEIGHT],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 16 }}
+          >
+            {/* Départs récents */}
+            {recentLocations.length > 0 && isQueryEmpty && (
+              <View style={styles.dropdownSection}>
+                <View style={styles.dropdownSectionHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="time-outline" size={15} color="#0066FF" style={{ marginRight: 5 }} />
+                    <Text style={styles.dropdownSectionTitle}>Départs récents</Text>
+                  </View>
+                  <TouchableOpacity onPress={clearRecentLocations} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={styles.clearHistoryText}>Effacer</Text>
+                  </TouchableOpacity>
+                </View>
+                {recentLocations.map((item, index) => (
+                  <TouchableOpacity
+                    key={`recent-${index}-${item.name}`}
+                    style={[styles.suggestionItem, index === recentLocations.length - 1 && styles.suggestionItemLast]}
+                    onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSuggestion(item); }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.recentIconBadge}>
+                      <Ionicons name="time" size={15} color="#0066FF" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
+                      {(item.address || item.city) ? (
+                        <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.address || item.city}</Text>
+                      ) : null}
+                    </View>
+                    <Ionicons name="chevron-forward" size={15} color="#D1D5DB" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Lieux populaires */}
+            {isQueryEmpty && (
+              <View style={styles.dropdownSection}>
+                <View style={styles.dropdownSectionHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="sparkles-outline" size={15} color="#F59E0B" style={{ marginRight: 5 }} />
+                    <Text style={styles.dropdownSectionTitle}>Lieux populaires au Bénin</Text>
+                  </View>
+                </View>
+                {popularPlaces.map((item, index) => (
+                  <TouchableOpacity
+                    key={`popular-${index}-${item.name}`}
+                    style={[styles.suggestionItem, index === popularPlaces.length - 1 && styles.suggestionItemLast]}
+                    onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSuggestion(item); }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.popularIconBadge}>
+                      <Ionicons name="location-sharp" size={15} color="#0066FF" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
+                      {(item.address || item.city) ? (
+                        <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.address || item.city}</Text>
+                      ) : null}
+                    </View>
+                    <Ionicons name="chevron-forward" size={15} color="#D1D5DB" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Résultats de recherche en direct */}
+            {!isQueryEmpty && (
+              <View>
+                {isSearching && searchResults.length === 0 && (
+                  <View style={styles.searchingRow}>
+                    <ActivityIndicator size="small" color="#0066FF" />
+                    <Text style={styles.searchingText}>Recherche en cours...</Text>
+                  </View>
+                )}
+                {searchResults.map((item, index) => {
+                  let itemTitle = '';
+                  let itemSubtitle = '';
+                  if (item.latitude !== undefined) {
+                    itemTitle = item.name;
+                    itemSubtitle = item.city ? `${item.city}, Bénin` : 'Bénin';
+                  } else {
+                    const displayName = item.display_name || '';
+                    const parts = displayName.split(',');
+                    itemTitle = item.name || parts[0] || 'Lieu';
+                    itemSubtitle = parts.slice(1, 4).join(',').trim();
+                  }
+                  return (
+                    <TouchableOpacity
+                      key={item.id || item.place_id?.toString() || `search-${index}`}
+                      style={[
+                        styles.suggestionItem,
+                        index === 0 && styles.suggestionItemFirst,
+                        index === searchResults.length - 1 && styles.suggestionItemLast,
+                      ]}
+                      onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSearchResult(item); }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.searchIconBadge, index === 0 && styles.searchIconBadgeTop]}>
+                        <Ionicons name={index === 0 ? 'location' : 'navigate-outline'} size={15} color={index === 0 ? '#0066FF' : '#6B7280'} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.suggestionTitle, index === 0 && styles.suggestionTitleTop]} numberOfLines={1}>{itemTitle}</Text>
+                        {itemSubtitle ? (
+                          <Text style={styles.suggestionSubtitle} numberOfLines={1}>{itemSubtitle}</Text>
+                        ) : null}
+                      </View>
+                      {index === 0 && (
+                        <View style={styles.previewBadge}>
+                          <Text style={styles.previewBadgeText}>Aperçu</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+                {!isSearching && searchResults.length === 0 && (
+                  <View style={styles.emptySearchContainer}>
+                    <Ionicons name="search-outline" size={30} color="#9CA3AF" />
+                    <Text style={styles.emptySearchTitle}>Aucun résultat</Text>
+                    <Text style={styles.emptySearchSubtitle}>Essayez un autre terme ou glissez la carte.</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {/* ── Dynamic Filters Modal Overlay ── */}
+      {showFilters && (
+        <View style={styles.filterModalOverlay}>
+          <TouchableWithoutFeedback onPress={() => setShowFilters(false)}>
+            <View style={styles.filterModalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.filterModalContent}>
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Options de recherche</Text>
+              <TouchableOpacity onPress={() => setShowFilters(false)}>
+                <Ionicons name="close" size={24} color="#1F2937" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => snapTo('closed')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close-circle" size={26} color="#9CA3AF" />
+
+            {/* Filter by Type */}
+            <Text style={styles.filterGroupTitle}>Type de lieu</Text>
+            <View style={styles.filterOptionsRow}>
+              <TouchableOpacity
+                style={[styles.filterOptBtn, filterType === 'all' && styles.filterOptBtnActive]}
+                onPress={() => setFilterType('all')}
+              >
+                <Text style={[styles.filterOptText, filterType === 'all' && styles.filterOptTextActive]}>Tout</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterOptBtn, filterType === 'cities' && styles.filterOptBtnActive]}
+                onPress={() => setFilterType('cities')}
+              >
+                <Text style={[styles.filterOptText, filterType === 'cities' && styles.filterOptTextActive]}>Villes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterOptBtn, filterType === 'establishments' && styles.filterOptBtnActive]}
+                onPress={() => setFilterType('establishments')}
+              >
+                <Text style={[styles.filterOptText, filterType === 'establishments' && styles.filterOptTextActive]}>Lieux précis</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Filter by Radius */}
+            <Text style={styles.filterGroupTitle}>Périmètre de recherche ({filterRadius} km)</Text>
+            <View style={styles.filterRadiusRow}>
+              {[10, 50, 100, 200].map((r) => (
+                <TouchableOpacity
+                  key={`radius-${r}`}
+                  style={[styles.radiusBtn, filterRadius === r && styles.radiusBtnActive]}
+                  onPress={() => setFilterRadius(r)}
+                >
+                  <Text style={[styles.radiusText, filterRadius === r && styles.radiusTextActive]}>{r} km</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.applyFiltersBtn} onPress={() => { setShowFilters(false); searchPlaces(searchQuery); }}>
+              <Text style={styles.applyFiltersBtnText}>Appliquer les filtres</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* 2. CASE DE RECHERCHE FIXE EN HAUT (Toujours parfaitement visible) */}
-        <View style={styles.fixedSearchArea}>
-          <View style={[styles.searchBox, isSearchFocused && styles.searchBoxActive]}>
-            <Ionicons name="search" size={20} color="#6B7280" style={{ marginRight: 8 }} />
-            <TextInput
-              ref={searchInputRef}
-              style={styles.searchInput}
-              placeholder="Rechercher une ville, quartier, lieu..."
-              placeholderTextColor="#9CA3AF"
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              onFocus={handleFocusSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {isSearching ? (
-              <ActivityIndicator size="small" color="#0066FF" style={{ marginLeft: 6 }} />
-            ) : searchQuery.length > 0 ? (
-              <TouchableOpacity onPress={() => handleSearchChange('')}>
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-              </TouchableOpacity>
-            ) : isSearchFocused ? (
-              <TouchableOpacity onPress={() => { Keyboard.dismiss(); setIsSearchFocused(false); }}>
-                <Ionicons name="chevron-up" size={20} color="#0066FF" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
-
-        {/* 3. CARTE TOUJOURS VISIBLE + suggestions flottantes par-dessus */}
-        <View style={{ flex: 1 }}>
-          <View style={styles.mapFullContainer}>
-            <WebView
-              ref={webviewRef}
-              originWhitelist={['*']}
-              source={{ html: googleMapsHtml }}
-              onMessage={onMapMessage}
-              javaScriptEnabled
-              domStorageEnabled
-              cacheEnabled
-              style={styles.mapWebView}
-              scrollEnabled={false}
-              androidLayerType="hardware"
-              mixedContentMode="compatibility"
-              allowsInlineMediaPlayback
-            />
-
-            {!mapReady && (
-              <View style={styles.mapLoadingOverlay}>
-                <ActivityIndicator size="large" color="#0066FF" />
-                <Text style={styles.mapLoadingText}>Chargement de la carte...</Text>
-              </View>
-            )}
-
-            {/* Bouton Ma Position Flottant */}
-            {!isSearchFocused && (
-              <TouchableOpacity style={styles.myLocationFloatingBtn} onPress={goToMyLocation} activeOpacity={0.8}>
-                <Ionicons name="locate" size={22} color="#1F2937" />
-              </TouchableOpacity>
-            )}
-
-            {/* ── PANEL SUGGESTIONS FLOTTANT PAR-DESSUS LA CARTE ── */}
-            {showSuggestions && (
-              <View style={styles.floatingSuggestionsPanel}>
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 16 }}
-                >
-                  {/* Départs récents */}
-                  {recentLocations.length > 0 && isQueryEmpty && (
-                    <View style={styles.dropdownSection}>
-                      <View style={styles.dropdownSectionHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Ionicons name="time-outline" size={15} color="#0066FF" style={{ marginRight: 5 }} />
-                          <Text style={styles.dropdownSectionTitle}>Départs récents</Text>
-                        </View>
-                        <TouchableOpacity onPress={clearRecentLocations} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <Text style={styles.clearHistoryText}>Effacer</Text>
-                        </TouchableOpacity>
-                      </View>
-                      {recentLocations.map((item, index) => (
-                        <TouchableOpacity
-                          key={`recent-${index}-${item.name}`}
-                          style={[styles.suggestionItem, index === recentLocations.length - 1 && styles.suggestionItemLast]}
-                          onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSuggestion(item); }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.recentIconBadge}>
-                            <Ionicons name="time" size={15} color="#0066FF" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
-                            {(item.address || item.city) ? (
-                              <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.address || item.city}</Text>
-                            ) : null}
-                          </View>
-                          <Ionicons name="chevron-forward" size={15} color="#D1D5DB" />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Lieux populaires */}
-                  {isQueryEmpty && (
-                    <View style={styles.dropdownSection}>
-                      <View style={styles.dropdownSectionHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Ionicons name="sparkles-outline" size={15} color="#F59E0B" style={{ marginRight: 5 }} />
-                          <Text style={styles.dropdownSectionTitle}>Lieux populaires au Bénin</Text>
-                        </View>
-                      </View>
-                      {popularPlaces.map((item, index) => (
-                        <TouchableOpacity
-                          key={`popular-${index}-${item.name}`}
-                          style={[styles.suggestionItem, index === popularPlaces.length - 1 && styles.suggestionItemLast]}
-                          onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSuggestion(item); }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.popularIconBadge}>
-                            <Ionicons name="location-sharp" size={15} color="#0066FF" />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
-                            {(item.address || item.city) ? (
-                              <Text style={styles.suggestionSubtitle} numberOfLines={1}>{item.address || item.city}</Text>
-                            ) : null}
-                          </View>
-                          <Ionicons name="chevron-forward" size={15} color="#D1D5DB" />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Résultats de recherche en direct */}
-                  {!isQueryEmpty && (
-                    <View>
-                      {isSearching && searchResults.length === 0 && (
-                        <View style={styles.searchingRow}>
-                          <ActivityIndicator size="small" color="#0066FF" />
-                          <Text style={styles.searchingText}>Recherche en cours...</Text>
-                        </View>
-                      )}
-                      {searchResults.map((item, index) => {
-                        let itemTitle = '';
-                        let itemSubtitle = '';
-                        if (item.latitude !== undefined) {
-                          itemTitle = item.name;
-                          itemSubtitle = item.city ? `${item.city}, Bénin` : 'Bénin';
-                        } else {
-                          const displayName = item.display_name || '';
-                          const parts = displayName.split(',');
-                          itemTitle = item.name || parts[0] || 'Lieu';
-                          itemSubtitle = parts.slice(1, 4).join(',').trim();
-                        }
-                        return (
-                          <TouchableOpacity
-                            key={item.id || item.place_id?.toString() || `search-${index}`}
-                            style={[
-                              styles.suggestionItem,
-                              index === 0 && styles.suggestionItemFirst,
-                              index === searchResults.length - 1 && styles.suggestionItemLast,
-                            ]}
-                            onPress={() => { sendToMap({ type: 'clearPreview' }); handleSelectSearchResult(item); }}
-                            activeOpacity={0.7}
-                          >
-                            <View style={[styles.searchIconBadge, index === 0 && styles.searchIconBadgeTop]}>
-                              <Ionicons name={index === 0 ? 'location' : 'navigate-outline'} size={15} color={index === 0 ? '#0066FF' : '#6B7280'} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={[styles.suggestionTitle, index === 0 && styles.suggestionTitleTop]} numberOfLines={1}>{itemTitle}</Text>
-                              {itemSubtitle ? (
-                                <Text style={styles.suggestionSubtitle} numberOfLines={1}>{itemSubtitle}</Text>
-                              ) : null}
-                            </View>
-                            {index === 0 && (
-                              <View style={styles.previewBadge}>
-                                <Text style={styles.previewBadgeText}>Aperçu</Text>
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                      {!isSearching && searchResults.length === 0 && (
-                        <View style={styles.emptySearchContainer}>
-                          <Ionicons name="search-outline" size={30} color="#9CA3AF" />
-                          <Text style={styles.emptySearchTitle}>Aucun résultat</Text>
-                          <Text style={styles.emptySearchSubtitle}>Essayez un autre terme ou glissez la carte.</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
-          {/* Footer de Confirmation (caché pendant la recherche) */}
-          {!isSearchFocused && (
-            <View style={styles.floatingFooterCard}>
-              <View style={styles.locationSummaryCard}>
-                <View style={styles.locationIconCircle}>
-                  <Ionicons name="location" size={22} color="#0066FF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  {isLoadingAddress ? (
-                    <View>
-                      <ActivityIndicator size="small" color="#0066FF" style={{ alignSelf: 'flex-start' }} />
-                      <Text style={styles.loadingAddrText}>Détermination de l'adresse...</Text>
-                    </View>
-                  ) : (
-                    <>
-                      <Text style={styles.summaryTitle} numberOfLines={1}>
-                        {selectedLocation?.name || 'Déplacez la carte pour choisir'}
-                      </Text>
-                      {selectedLocation?.address ? (
-                        <Text style={styles.summarySubtitle} numberOfLines={1}>
-                          {selectedLocation.address}
-                        </Text>
-                      ) : null}
-                    </>
-                  )}
-                </View>
-              </View>
-
-              {/* Saisie précision optionnelle */}
-              <View style={styles.customNoteInputRow}>
-                <Ionicons name="create-outline" size={16} color="#6B7280" />
-                <TextInput
-                  style={styles.customNoteInput}
-                  placeholder="Nom du lieu ou repère (ex: Carrefour, Gare, Pharmacie...)"
-                  placeholderTextColor="#9CA3AF"
-                  value={customLocationName}
-                  onChangeText={setCustomLocationName}
-                />
-              </View>
-
-              {/* Bouton de confirmation principal */}
-              <TouchableOpacity
-                style={[styles.confirmLocationBtn, isLoadingAddress && styles.confirmBtnDisabled]}
-                onPress={handleConfirmLocation}
-                disabled={isLoadingAddress}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.confirmBtnText}>Confirmer cet emplacement</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </Animated.View>
+      )}
     </View>
   );
 }
@@ -1131,7 +1358,104 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 99999,
     elevation: 99999,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: '#FFFFFF',
+  },
+  floatingSearchCard: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 100,
+  },
+  floatingSearchCardFocused: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 100,
+  },
+  modernBackBtnContainer: {
+    position: 'absolute',
+    left: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    zIndex: 101,
+  },
+  modernBackBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  floatingBackBtn: {
+    padding: 8,
+    marginRight: 4,
+  },
+  floatingSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    paddingVertical: 8,
+  },
+  centerPinContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -18,
+    marginTop: -36,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  markerPin: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0066FF',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  markerShadow: {
+    width: 12,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    marginTop: 8,
+    alignSelf: 'center',
   },
   backdropTouch: {
     ...StyleSheet.absoluteFillObject,
@@ -1369,8 +1693,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   mapFullContainer: {
-    flex: 1,
-    position: 'relative',
+    ...StyleSheet.absoluteFillObject,
+  },
+  dragZone: {
     width: '100%',
   },
   mapWebView: {
@@ -1391,7 +1716,7 @@ const styles = StyleSheet.create({
   myLocationFloatingBtn: {
     position: 'absolute',
     right: 16,
-    bottom: 185,
+    bottom: 30, // Floats nicely above the bottom sheet overlap
     width: 46,
     height: 46,
     borderRadius: 23,
@@ -1406,28 +1731,47 @@ const styles = StyleSheet.create({
     zIndex: 90,
   },
   floatingFooterCard: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.45,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 16,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 16,
+    zIndex: 10,
   },
-  locationSummaryCard: {
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  bottomSheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFF',
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 10,
-    marginBottom: 8,
+    marginBottom: 16,
+  },
+  sheetLocationTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  sheetLocationSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  starBtn: {
+    padding: 6,
   },
   locationIconCircle: {
     width: 36,
@@ -1442,53 +1786,98 @@ const styles = StyleSheet.create({
     color: '#0066FF',
     marginTop: 2,
   },
-  summaryTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  summarySubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 1,
-  },
   customNoteInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
     borderRadius: 12,
     paddingHorizontal: 12,
-    height: 40,
-    marginBottom: 10,
+    height: 44,
+    marginBottom: 16,
     gap: 8,
   },
   customNoteInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     color: '#1F2937',
+    fontWeight: '500',
   },
   confirmLocationBtn: {
-    backgroundColor: '#0066FF',
-    height: 48,
-    borderRadius: 14,
+    backgroundColor: '#0B56E4', // Zemy Blue
+    height: 52,
+    borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0066FF',
+    shadowColor: '#0B56E4',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
+    marginBottom: 16,
   },
   confirmBtnDisabled: {
     opacity: 0.6,
   },
   confirmBtnText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
+  },
+  shortcutsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 20,
+  },
+  shortcutBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  shortcutText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  suggestionsSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  nearbyList: {
+    gap: 12,
+    marginBottom: 10,
+  },
+  nearbyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  nearbyName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  nearbySub: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  nearbyDistance: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
   },
   // suggestionsFullBody kept for backward compat (unused)
   suggestionsFullBody: {
@@ -1511,5 +1900,117 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#0066FF',
+  },
+  filterModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    zIndex: 200,
+  },
+  filterModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  filterModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  filterModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  filterGroupTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4B5563',
+    marginBottom: 10,
+    marginTop: 10,
+  },
+  filterOptionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterOptBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  filterOptBtnActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+  },
+  filterOptText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  filterOptTextActive: {
+    color: '#0066FF',
+    fontWeight: '700',
+  },
+  filterRadiusRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 24,
+  },
+  radiusBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radiusBtnActive: {
+    backgroundColor: '#0066FF',
+    borderColor: '#0066FF',
+  },
+  radiusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  radiusTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  applyFiltersBtn: {
+    backgroundColor: '#0B56E4',
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0B56E4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  applyFiltersBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

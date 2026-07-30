@@ -15,7 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl, Linking, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import * as ExpoLinking from 'expo-linking';
 import { useAuth } from '../../src/context/AuthContext';
@@ -47,8 +47,9 @@ const COLORS = {
  * - Affichage et gestion de l'état lié à RideDetailScreen.
  */
 export default function RideDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, departure, destination } = useLocalSearchParams<{ id: string; departure?: string; destination?: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { authFetch, user } = useAuth();
   const { createBooking } = useBooking();
 
@@ -67,8 +68,9 @@ export default function RideDetailScreen() {
   const fetchRide = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
+      const queryParams = departure && destination ? `?departure=${encodeURIComponent(departure)}&destination=${encodeURIComponent(destination)}` : '';
       const [data, settingsData] = await Promise.all([
-        authFetch(`/rides/${id}/`),
+        authFetch(`/rides/${id}/${queryParams}`),
         authFetch('/financial-settings/')
       ]);
       setRide(data);
@@ -81,7 +83,7 @@ export default function RideDetailScreen() {
           const allBookings: Booking[] = await authFetch(`/bookings/?ride=${id}`);
           setBookings(Array.isArray(allBookings) ? allBookings : (allBookings as any)?.results || []);
         } else {
-          const passengerBookings: Booking[] = await authFetch(`/bookings/?passenger=${user.id}`);
+          const passengerBookings: Booking[] = await authFetch(`/bookings/?passenger=${user.id}&ride=${id}`);
           const myBooking = passengerBookings.find((b) =>
             b.status !== 'cancelled' && (typeof b.ride === 'object' && b.ride !== null
               ? String(b.ride.id) === String(id)
@@ -201,7 +203,7 @@ export default function RideDetailScreen() {
     if (bookingLoading || hasBooked) return;
     try {
       setBookingLoading(true);
-      const res = await createBooking(id as string, 1);
+      const res = await createBooking(id as string, 1, departure, destination);
       if (res && res.id) {
         setBookingId(res.id);
         setHasBooked(true);
@@ -320,6 +322,7 @@ export default function RideDetailScreen() {
   const isCompleted = ride.status === 'completed';
   const isStarted = ride.status === 'started';
 
+  const stopoversJson = JSON.stringify(ride.stopovers || []);
   const mapHtml = (ride.departure_latitude && ride.departure_longitude && ride.arrival_latitude && ride.arrival_longitude) ? `
 <!DOCTYPE html>
 <html>
@@ -355,6 +358,7 @@ export default function RideDetailScreen() {
     const depLon = ${ride.departure_longitude};
     const arrLat = ${ride.arrival_latitude};
     const arrLon = ${ride.arrival_longitude};
+    const stopovers = ${stopoversJson};
 
     var map;
 
@@ -362,14 +366,8 @@ export default function RideDetailScreen() {
       var mapOptions = {
         zoom: 12,
         center: { lat: depLat, lng: depLon },
-        disableDefaultUI: true,
-        zoomControl: false,
-        styles: [
-          { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "visibility": "off" }] },
-          { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
-          { "featureType": "road", "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-          { "featureType": "transit", "stylers": [{ "visibility": "off" }] }
-        ]
+        disableDefaultUI: false,
+        zoomControl: true
       };
 
       map = new google.maps.Map(document.getElementById('map'), mapOptions);
@@ -401,6 +399,35 @@ export default function RideDetailScreen() {
         }
       });
 
+      // Custom markers for stopovers
+      for (var i = 0; i < stopovers.length; i++) {
+        var stop = stopovers[i];
+        var stopLat = stop.latitude || stop.lat;
+        var stopLon = stop.longitude || stop.lon;
+        if (stopLat && stopLon) {
+          var stopMarker = new google.maps.Marker({
+            position: { lat: parseFloat(stopLat), lng: parseFloat(stopLon) },
+            map: map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 6,
+              fillColor: '#F59E0B',
+              fillOpacity: 1,
+              strokeColor: 'white',
+              strokeWeight: 2
+            }
+          });
+
+          // Add pre-opened InfoWindow showing stopover city name
+          var cityName = stop.name.split(',')[0].trim();
+          var infow = new google.maps.InfoWindow({
+            content: '<div style="font-family: system-ui, -apple-system, sans-serif; font-size: 11px; font-weight: 700; color: #1F2937; padding: 2px;">' + cityName + '</div>',
+            disableAutoPan: true
+          });
+          infow.open(map, stopMarker);
+        }
+      }
+
       // Directions Service
       var directionsService = new google.maps.DirectionsService();
       var directionsRenderer = new google.maps.DirectionsRenderer({
@@ -413,9 +440,24 @@ export default function RideDetailScreen() {
         }
       });
 
+      var waypoints = [];
+      for (var i = 0; i < stopovers.length; i++) {
+        var stop = stopovers[i];
+        var stopLat = stop.latitude || stop.lat;
+        var stopLon = stop.longitude || stop.lon;
+        if (stopLat && stopLon) {
+          waypoints.push({
+            location: { lat: parseFloat(stopLat), lng: parseFloat(stopLon) },
+            stopover: true
+          });
+        }
+      }
+
       directionsService.route({
         origin: { lat: depLat, lng: depLon },
         destination: { lat: arrLat, lng: arrLon },
+        waypoints: waypoints,
+        optimizeWaypoints: false,
         travelMode: google.maps.TravelMode.DRIVING
       }, function(response, status) {
         if (status === 'OK') {
@@ -428,11 +470,19 @@ export default function RideDetailScreen() {
     }
 
     function drawFallback() {
+      var points = [{ lat: depLat, lng: depLon }];
+      for (var i = 0; i < stopovers.length; i++) {
+        var stop = stopovers[i];
+        var stopLat = stop.latitude || stop.lat;
+        var stopLon = stop.longitude || stop.lon;
+        if (stopLat && stopLon) {
+          points.push({ lat: parseFloat(stopLat), lng: parseFloat(stopLon) });
+        }
+      }
+      points.push({ lat: arrLat, lng: arrLon });
+
       var flightPath = new google.maps.Polyline({
-        path: [
-          { lat: depLat, lng: depLon },
-          { lat: arrLat, lng: arrLon }
-        ],
+        path: points,
         strokeColor: '#0066FF',
         strokeOpacity: 0.8,
         strokeWeight: 3
@@ -440,8 +490,9 @@ export default function RideDetailScreen() {
       flightPath.setMap(map);
 
       var bounds = new google.maps.LatLngBounds();
-      bounds.extend({ lat: depLat, lng: depLon });
-      bounds.extend({ lat: arrLat, lng: arrLon });
+      for (var i = 0; i < points.length; i++) {
+        bounds.extend(points[i]);
+      }
       map.fitBounds(bounds);
 
       document.getElementById('loader').style.display = 'none';
@@ -481,7 +532,7 @@ export default function RideDetailScreen() {
           <View style={{ marginBottom: 0 }}>
             {/* Full-width map container – edge to edge like BlaBlaCar */}
             <View style={{
-              height: 300,
+              height: 480,
               width: '100%',
               overflow: 'hidden',
               backgroundColor: '#e8eaed',
@@ -490,7 +541,7 @@ export default function RideDetailScreen() {
               <WebView
                 originWhitelist={['*']}
                 source={{ html: mapHtml }}
-                scrollEnabled={false}
+                scrollEnabled={true}
                 showsVerticalScrollIndicator={false}
                 showsHorizontalScrollIndicator={false}
                 style={{ flex: 1 }}
@@ -498,61 +549,6 @@ export default function RideDetailScreen() {
                 domStorageEnabled={true}
                 mixedContentMode="always"
               />
-
-              {/* Top-left label pill */}
-              <View style={{
-                position: 'absolute',
-                top: 12,
-                left: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: 'rgba(255,255,255,0.95)',
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-                borderRadius: 20,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.12,
-                shadowRadius: 4,
-                elevation: 3,
-                gap: 5
-              }}>
-                <Ionicons name="navigate" size={13} color={COLORS.primary} />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.text }}>
-                  Itinéraire
-                </Text>
-              </View>
-
-              {/* Bottom-right: Open in Google Maps floating button */}
-              <TouchableOpacity
-                style={{
-                  position: 'absolute',
-                  bottom: 12,
-                  right: 12,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: '#FFFFFF',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 6,
-                  elevation: 5,
-                  gap: 6
-                }}
-                onPress={() => {
-                  const url = `https://www.google.com/maps/dir/?api=1&origin=${ride.departure_latitude},${ride.departure_longitude}&destination=${ride.arrival_latitude},${ride.arrival_longitude}&travelmode=driving`;
-                  Linking.openURL(url).catch(() => {
-                    CustomAlert.alert("Erreur", "Impossible d'ouvrir Google Maps.");
-                  });
-                }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="logo-google" size={14} color="#4285F4" />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.text }}>Google Maps</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Route strip bar below map */}
@@ -622,11 +618,20 @@ export default function RideDetailScreen() {
           {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 ? (
             ride.stopovers.map((stop: any, idx: number) => {
               const stopDuration = stop.stopDurationMin || stop.stop_duration_min || 15;
+              const legPrice = stop.price || 0;
               return (
                 <React.Fragment key={idx}>
                   <View style={styles.timelineLink}>
                     <View style={styles.timelineLine} />
-                    <Text style={styles.distanceText}>Arrêt de {stopDuration} min</Text>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <View style={styles.legPriceBadge}>
+                        <Ionicons name="card-outline" size={12} color="#0284C7" />
+                        <Text style={styles.legPriceBadgeText}>
+                          {legPrice > 0 ? `${legPrice.toLocaleString()} FCFA` : 'Prix libre'}
+                        </Text>
+                      </View>
+                      <Text style={styles.distanceText}>Arrêt de {stopDuration} min</Text>
+                    </View>
                   </View>
                   <View style={styles.timelineItem}>
                     <View style={[styles.timelineDotStart, { backgroundColor: '#F59E0B' }]} />
@@ -642,7 +647,22 @@ export default function RideDetailScreen() {
           {/* Arrivée */}
           <View style={styles.timelineLink}>
             <View style={styles.timelineLine} />
-            <Text style={styles.distanceText}>{ride.distance_km ? `${ride.distance_km} km` : 'Trajet direct'}</Text>
+            {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 ? (
+              (() => {
+                const lastStop = ride.stopovers[ride.stopovers.length - 1];
+                const lastLegPrice = lastStop?.arrival_price || lastStop?.price || 0;
+                return (
+                  <View style={styles.legPriceBadge}>
+                    <Ionicons name="card-outline" size={12} color="#0284C7" />
+                    <Text style={styles.legPriceBadgeText}>
+                      {lastLegPrice > 0 ? `${lastLegPrice.toLocaleString()} FCFA` : 'Prix libre'}
+                    </Text>
+                  </View>
+                );
+              })()
+            ) : (
+              <Text style={styles.distanceText}>{ride.distance_km ? `${ride.distance_km} km` : 'Trajet direct'}</Text>
+            )}
           </View>
 
           <View style={styles.timelineItem}>
@@ -657,7 +677,9 @@ export default function RideDetailScreen() {
         <View style={styles.card}>
           <View style={styles.priceRow}>
             <View>
-              <Text style={styles.priceLabel}>Prix total</Text>
+              <Text style={styles.priceLabel}>
+                {departure && destination ? "Prix du tronçon" : "Prix total"}
+              </Text>
               <View style={styles.seatsBadge}>
                 <Ionicons name="people" size={16} color={COLORS.textLight} />
                 <Text style={styles.seatsValue}>{ride.seats_available} places restantes</Text>
@@ -669,6 +691,23 @@ export default function RideDetailScreen() {
               <Text style={styles.priceUnit}>par place</Text>
             </View>
           </View>
+
+          {/* Explanation banner for segment pricing */}
+          {departure && destination && (
+            <View style={styles.segmentExplanationBanner}>
+              <Ionicons name="information-circle" size={18} color="#0284C7" style={{ marginRight: 8, marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.segmentExplanationText}>
+                  Ce tarif correspond uniquement à votre portion de voyage recherchée : <Text style={{ fontWeight: '800' }}>{departure.split(',')[0]} ➔ {destination.split(',')[0]}</Text>.
+                </Text>
+                {ride.original_price_per_seat && (
+                  <Text style={styles.segmentExplanationSubText}>
+                    (Le tarif complet de bout en bout du conducteur est de {ride.original_price_per_seat.toLocaleString()} FCFA).
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
         </View>
 
 
@@ -948,7 +987,7 @@ export default function RideDetailScreen() {
       </ScrollView>
 
       {/* Modern Footer Action Block */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}>
         <TouchableOpacity
           style={[styles.messageBtn, !canChat && styles.messageBtnDisabled]}
           onPress={() => {
@@ -1081,6 +1120,28 @@ const styles = StyleSheet.create({
   priceCurrency: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginTop: -4 },
   priceUnit: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },
 
+  segmentExplanationBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+  },
+  segmentExplanationText: {
+    fontSize: 12,
+    color: '#0369A1',
+    lineHeight: 16,
+  },
+  segmentExplanationSubText: {
+    fontSize: 11,
+    color: '#0284C7',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 16 },
 
   sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 12, marginLeft: 4 },
@@ -1171,5 +1232,22 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     lineHeight: 20,
     fontStyle: 'italic',
+  },
+  legPriceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginVertical: 2,
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginLeft: 16,
+  },
+  legPriceBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0369A1',
   },
 });

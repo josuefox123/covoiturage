@@ -107,11 +107,12 @@ class PaymentService:
         if tx_status in ['SUCCESSFUL', 'SUCCESS', 'APPROVED']:
             with transaction.atomic():
                 # Re-verrouiller le trajet pour éviter le surbooking lors de la validation concurrente
-                ride = Ride.objects.select_for_update().get(id=booking.ride_id)
-                
-                # Vérifier à nouveau les places (sécurité)
-                if ride.seats_available < booking.seats_booked and booking.status != 'confirmed':
-                    raise ValidationError({"error": "Le trajet est complet entre-temps. Paiement annulé."})
+                from api.bookings.services import BookingService
+                # Vérifier et décrémenter les places sur les segments concernés (sécurité)
+                if booking.status != 'confirmed':
+                    allocated = BookingService.allocate_seats(booking)
+                    if not allocated:
+                        raise ValidationError({"error": "Le trajet est complet entre-temps. Paiement annulé."})
 
                 # Mettre à jour le paiement
                 payment.status = 'SUCCESS'
@@ -123,10 +124,6 @@ class PaymentService:
                 booking.payment_status = 'escrow' # Zemy retient les fonds
                 booking.transaction_id = transaction_reference
                 booking.save()
-
-                # Décrémenter les places restantes
-                ride.seats_available -= booking.seats_booked
-                ride.save()
 
                 # Créer le ticket
                 ticket_number = f"T-{booking.id.hex[:8].upper()}"

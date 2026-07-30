@@ -10,13 +10,21 @@ export interface BookingResponse {
 }
 
 export const BookingService = {
-    createBooking: async (authFetch: any, rideId: string, seatsBooked: number): Promise<BookingResponse> => {
+    createBooking: async (
+        authFetch: any,
+        rideId: string,
+        seatsBooked: number,
+        departureLocation?: string,
+        arrivalLocation?: string
+    ): Promise<BookingResponse> => {
         try {
             const response = await authFetch('/bookings/', {
                 method: 'POST',
                 body: JSON.stringify({
                     ride: rideId,
-                    seats_booked: seatsBooked
+                    seats_booked: seatsBooked,
+                    departure_location: departureLocation,
+                    arrival_location: arrivalLocation
                 })
             });
             return response;

@@ -92,7 +92,7 @@ export default function RideSearchCard({
 
   const driverName = ride.driver_details?.full_name || 'Conducteur';
   
-  const price = ride.price_per_seat?.toLocaleString() || '0';
+  const price = (ride.original_price_per_seat ?? ride.price_per_seat)?.toLocaleString() || '0';
   const priceUnit = 'par place';
   const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
   const seatsLeft = ride.seats_available || 0;

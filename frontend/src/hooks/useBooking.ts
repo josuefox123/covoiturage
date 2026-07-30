@@ -7,11 +7,16 @@ export const useBooking = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const createBooking = useCallback(async (rideId: string, seatsBooked: number): Promise<BookingResponse | null> => {
+    const createBooking = useCallback(async (
+        rideId: string,
+        seatsBooked: number,
+        departureLocation?: string,
+        arrivalLocation?: string
+    ): Promise<BookingResponse | null> => {
         setLoading(true);
         setError(null);
         try {
-            const booking = await BookingService.createBooking(authFetch, rideId, seatsBooked);
+            const booking = await BookingService.createBooking(authFetch, rideId, seatsBooked, departureLocation, arrivalLocation);
             return booking;
         } catch (err: any) {
             const errMsg = err.error || err.message || "Erreur lors de la création de la réservation.";

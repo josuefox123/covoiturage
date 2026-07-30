@@ -21,6 +21,7 @@ export interface Ride {
   departure_time: string;
   departure_date: string;
   price_per_seat: number;
+  original_price_per_seat?: number;
   seats_available: number;
   total_seats: number;
   status: string;
@@ -48,5 +49,7 @@ export interface Ride {
     stop_duration_min?: number;
     latitude?: number | null;
     longitude?: number | null;
+    price?: number;
+    arrival_price?: number;
   }[];
 }

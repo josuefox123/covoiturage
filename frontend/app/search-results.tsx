@@ -279,6 +279,63 @@ function FilterModal({ visible, filters, rides, onClose, onApply }: FilterModalP
   );
 }
 
+interface ConnectionRideCardProps {
+  item: any;
+  onPress: () => void;
+}
+
+function ConnectionRideCard({ item, onPress }: ConnectionRideCardProps) {
+  const driver1 = item.ride_1.driver_details?.full_name || 'Conducteur 1';
+  const driver2 = item.ride_2.driver_details?.full_name || 'Conducteur 2';
+  
+  const depTime1 = item.departure_time_1?.substring(0, 5) || '--:--';
+  const arrTime1 = item.arrival_time_1?.substring(0, 5) || '--:--';
+  const depTime2 = item.departure_time_2?.substring(0, 5) || '--:--';
+  const arrTime2 = item.arrival_time_2?.substring(0, 5) || '--:--';
+
+  return (
+    <TouchableOpacity style={styles.connCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.connHeader}>
+        <View style={styles.connBadge}>
+          <Ionicons name="git-branch" size={14} color="#0284C7" />
+          <Text style={styles.connBadgeTxt}>1 CORRESPONDANCE</Text>
+        </View>
+        <Text style={styles.connPrice}>{item.price?.toLocaleString()} FCFA</Text>
+      </View>
+
+      <Text style={styles.connEscale}>
+        Escale à <Text style={{ fontWeight: '700' }}>{item.connection_point_name}</Text> ({item.waiting_time_min} min d'attente)
+      </Text>
+
+      <View style={styles.connTimeline}>
+        {/* Tronçon 1 */}
+        <View style={styles.connStep}>
+          <Ionicons name="time-outline" size={16} color="#6B7280" />
+          <Text style={styles.connStepTime}>{depTime1} ➔ {arrTime1}</Text>
+          <Text style={styles.connStepDriver} numberOfLines={1}>Conducteur : {driver1}</Text>
+        </View>
+
+        {/* Connecteur pointillé */}
+        <View style={styles.connDivider}>
+          <View style={styles.connDotLine} />
+        </View>
+
+        {/* Tronçon 2 */}
+        <View style={styles.connStep}>
+          <Ionicons name="time-outline" size={16} color="#6B7280" />
+          <Text style={styles.connStepTime}>{depTime2} ➔ {arrTime2}</Text>
+          <Text style={styles.connStepDriver} numberOfLines={1}>Conducteur : {driver2}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.connFooter}>
+        <Text style={styles.connMoreTxt}>Voir les détails de la correspondance</Text>
+        <Ionicons name="chevron-forward" size={16} color="#0284C7" />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function SearchResultsScreen() {
@@ -291,6 +348,10 @@ export default function SearchResultsScreen() {
     date: string;
     tripType: string;
     passengers: string;
+    departure_latitude?: string;
+    departure_longitude?: string;
+    arrival_latitude?: string;
+    arrival_longitude?: string;
   }>();
 
   const departure   = raw.departure   || '';
@@ -298,8 +359,13 @@ export default function SearchResultsScreen() {
   const vehicleType = raw.vehicleType || '';
   const date        = raw.date        || '';
   const passengers  = parseInt(raw.passengers || '1', 10);
+  const departure_latitude  = raw.departure_latitude  || '';
+  const departure_longitude = raw.departure_longitude || '';
+  const arrival_latitude    = raw.arrival_latitude    || '';
+  const arrival_longitude   = raw.arrival_longitude   || '';
 
   const [rides,      setRides]      = useState<Ride[]>([]);
+  const [connections, setConnections] = useState<any[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
@@ -321,10 +387,27 @@ export default function SearchResultsScreen() {
       if (vehicleType && vehicleType !== 'covoiturage') qp.push(`vehicle_type=${encodeURIComponent(vehicleType)}`);
       if (date)        qp.push(`date=${date}`);
       if (passengers > 1) qp.push(`seats=${passengers}`);
+      
+      if (departure_latitude)  qp.push(`departure_latitude=${departure_latitude}`);
+      if (departure_longitude) qp.push(`departure_longitude=${departure_longitude}`);
+      if (arrival_latitude)    qp.push(`arrival_latitude=${arrival_latitude}`);
+      if (arrival_longitude)   qp.push(`arrival_longitude=${arrival_longitude}`);
 
       const qs   = qp.length ? `?${qp.join('&')}` : '';
       const data = await authFetch(`/rides/${qs}`);
-      const list: Ride[] = Array.isArray(data) ? data : data?.results ?? [];
+      
+      let list: Ride[] = [];
+      let connList: any[] = [];
+      
+      if (data && typeof data === 'object' && ('directs' in data || 'connections' in data)) {
+        list = data.directs || [];
+        connList = data.connections || [];
+      } else {
+        list = Array.isArray(data) ? data : data?.results ?? [];
+      }
+      
+      setConnections(connList);
+      
       const now = new Date();
       const valid = list.filter((r) => {
         if ((r.seats_available ?? 0) <= 0) return false;
@@ -353,7 +436,10 @@ export default function SearchResultsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [departure, destination, vehicleType, date, passengers, authFetch]);
+  }, [
+    departure, destination, vehicleType, date, passengers, authFetch,
+    departure_latitude, departure_longitude, arrival_latitude, arrival_longitude
+  ]);
 
   useEffect(() => { fetchRides(); }, [fetchRides]);
 
@@ -381,6 +467,21 @@ export default function SearchResultsScreen() {
     }
     return list;
   }, [rides, selectedVehicle, filters]);
+
+  const [selectedConnection, setSelectedConnection] = useState<any | null>(null);
+
+  // Combinaison des résultats directs et correspondances
+  const combinedData = useMemo(() => {
+    const list: any[] = displayed.map(d => ({ ...d, cardType: 'direct' }));
+    connections.forEach((c, idx) => {
+      list.push({
+        ...c,
+        id: `conn-${idx}`,
+        cardType: 'connection'
+      });
+    });
+    return list;
+  }, [displayed, connections]);
 
   const activeCount = useMemo(() => {
     let c = 0;
@@ -496,12 +597,12 @@ export default function SearchResultsScreen() {
         </View>
       ) : (
         <FlatList
-          data={displayed}
+          data={combinedData}
           keyExtractor={(item) => String(item.id)}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.listContent,
-            displayed.length === 0 && styles.listEmpty,
+            combinedData.length === 0 && styles.listEmpty,
           ]}
           refreshControl={
             <RefreshControl
@@ -514,7 +615,8 @@ export default function SearchResultsScreen() {
           ListHeaderComponent={
             <View style={styles.listHeader}>
               <Text style={styles.countTxt}>
-                {displayed.length} trajet{displayed.length !== 1 ? 's' : ''}
+                {displayed.length} trajet{displayed.length !== 1 ? 's' : ''} direct{displayed.length !== 1 ? 's' : ''}
+                {connections.length > 0 ? ` · ${connections.length} correspondance${connections.length !== 1 ? 's' : ''}` : ''}
               </Text>
               {activeCount > 0 && (
                 <TouchableOpacity onPress={() => { setFilters(DEFAULT_FILTERS); setSelectedVehicle('all'); }}>
@@ -523,16 +625,29 @@ export default function SearchResultsScreen() {
               )}
             </View>
           }
-          renderItem={({ item, index }) => (
-            <RideSearchCard
-              ride={item}
-              onPress={() => router.push(`/ride/${item.id}` as any)}
-              index={index}
-              searchedDeparture={departure}
-              searchedDestination={destination}
-              searchedSeats={passengers}
-            />
-          )}
+          renderItem={({ item, index }) => {
+            if (item.cardType === 'connection') {
+              return (
+                <ConnectionRideCard
+                  item={item}
+                  onPress={() => setSelectedConnection(item)}
+                />
+              );
+            }
+            return (
+              <RideSearchCard
+                ride={item}
+                onPress={() => router.push({
+                  pathname: `/ride/${item.id}`,
+                  params: { departure, destination }
+                } as any)}
+                index={index}
+                searchedDeparture={departure}
+                searchedDestination={destination}
+                searchedSeats={passengers}
+              />
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.center}>
               <Ionicons name="car-outline" size={64} color="#D1D5DB" />
@@ -560,6 +675,91 @@ export default function SearchResultsScreen() {
         onClose={() => setShowFilter(false)}
         onApply={(f) => { setFilters(f); setShowFilter(false); }}
       />
+
+      {/* ── Connection Details Modal ── */}
+      <Modal
+        visible={selectedConnection !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSelectedConnection(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Détails de la correspondance</Text>
+              <TouchableOpacity style={styles.modalClose} onPress={() => setSelectedConnection(null)}>
+                <Ionicons name="close" size={24} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScroll}>
+              <Text style={styles.modalSubtitle}>
+                Votre trajet comporte 2 étapes de covoiturage pour relier votre destination.
+              </Text>
+
+              {/* Trajet 1 */}
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <View style={styles.stepIndicator}><Text style={styles.stepIndicatorTxt}>1</Text></View>
+                  <Text style={styles.modalSectionTitle}>Premier Trajet</Text>
+                </View>
+                <Text style={styles.modalLocation}>{selectedConnection?.ride_1.departure_location.split(',')[0]} ➔ {selectedConnection?.connection_point_name}</Text>
+                <Text style={styles.modalTime}>Départ : {selectedConnection?.departure_time_1.substring(0, 5)} | Arrivée : {selectedConnection?.arrival_time_1.substring(0, 5)}</Text>
+                <Text style={styles.modalDriver}>Conducteur : {selectedConnection?.ride_1.driver_details?.full_name} ({selectedConnection?.ride_1.vehicle_details?.brand || 'Véhicule'} {selectedConnection?.ride_1.vehicle_details?.model || ''})</Text>
+                <TouchableOpacity 
+                  style={styles.modalBookBtn}
+                  onPress={() => {
+                    setSelectedConnection(null);
+                    router.push({
+                      pathname: `/ride/${selectedConnection?.ride_1.id}`,
+                      params: { 
+                        departure: departure, 
+                        destination: selectedConnection?.connection_point_name 
+                      }
+                    } as any);
+                  }}
+                >
+                  <Text style={styles.modalBookBtnTxt}>Réserver le Trajet 1 ({selectedConnection?.arrival_leg_1.price.toLocaleString()} FCFA)</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Escale Pivot info */}
+              <View style={styles.modalEscaleInfo}>
+                <Ionicons name="walk" size={20} color="#0284C7" />
+                <Text style={styles.modalEscaleText}>
+                  Escale de <Text style={{fontWeight: '700'}}>{selectedConnection?.waiting_time_min} minutes</Text> à {selectedConnection?.connection_point_name}.
+                </Text>
+              </View>
+
+              {/* Trajet 2 */}
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <View style={styles.stepIndicator}><Text style={styles.stepIndicatorTxt}>2</Text></View>
+                  <Text style={styles.modalSectionTitle}>Second Trajet</Text>
+                </View>
+                <Text style={styles.modalLocation}>{selectedConnection?.connection_point_name} ➔ {selectedConnection?.ride_2.arrival_location.split(',')[0]}</Text>
+                <Text style={styles.modalTime}>Départ : {selectedConnection?.departure_time_2.substring(0, 5)} | Arrivée : {selectedConnection?.arrival_time_2.substring(0, 5)}</Text>
+                <Text style={styles.modalDriver}>Conducteur : {selectedConnection?.ride_2.driver_details?.full_name} ({selectedConnection?.ride_2.vehicle_details?.brand || 'Véhicule'} {selectedConnection?.ride_2.vehicle_details?.model || ''})</Text>
+                <TouchableOpacity 
+                  style={styles.modalBookBtn}
+                  onPress={() => {
+                    setSelectedConnection(null);
+                    router.push({
+                      pathname: `/ride/${selectedConnection?.ride_2.id}`,
+                      params: { 
+                        departure: selectedConnection?.connection_point_name, 
+                        destination: destination 
+                      }
+                    } as any);
+                  }}
+                >
+                  <Text style={styles.modalBookBtnTxt}>Réserver le Trajet 2 ({selectedConnection?.arrival_leg_2.price.toLocaleString()} FCFA)</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -674,6 +874,210 @@ const styles = StyleSheet.create({
   emptyP:   { fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 19 },
   retryBtn: { marginTop: 18, backgroundColor: PRIMARY, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14 },
   retryTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  /* connection card */
+  connCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#BAE6FD',
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  connHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  connBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  connBadgeTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0369A1',
+  },
+  connPrice: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  connEscale: {
+    fontSize: 13,
+    color: '#374151',
+    marginBottom: 12,
+  },
+  connTimeline: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  connStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  connStepTime: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  connStepDriver: {
+    fontSize: 12,
+    color: '#6B7280',
+    flex: 1,
+  },
+  connDivider: {
+    marginLeft: 7,
+    height: 10,
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#D1D5DB',
+    borderStyle: 'dashed',
+  },
+  connDotLine: {
+    height: '100%',
+  },
+  connFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  connMoreTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+
+  /* modal styles */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '90%',
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalScroll: {
+    padding: 20,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalSection: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  stepIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepIndicatorTxt: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modalSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  modalLocation: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  modalTime: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+    marginBottom: 4,
+  },
+  modalDriver: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  modalBookBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  modalBookBtnTxt: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalEscaleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 14,
+    paddingHorizontal: 16,
+  },
+  modalEscaleText: {
+    fontSize: 13,
+    color: '#0284C7',
+  },
 });
 
 // ─── Styles: filter modal ─────────────────────────────────────────────────────

@@ -248,6 +248,10 @@ class Ride(models.Model):
     duration_min = models.IntegerField(blank=True, null=True)
     stopovers = models.JSONField(blank=True, null=True)
 
+    # Identifiants Google Places (place_id) pour l'indexation précise et le cache des itinéraires
+    departure_place_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="Place ID Google du départ")
+    arrival_place_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="Place ID Google de l'arrivée")
+
     # Préférences du conducteur pour ce trajet
     music = models.BooleanField(default=True)
     smoking = models.BooleanField(default=False)
@@ -275,6 +279,71 @@ class Ride(models.Model):
 
     def __str__(self):
         return f"Trajet {self.departure_location} -> {self.arrival_location}"
+
+    def get_segment_price(self, departure, destination):
+        """
+        Calcule le prix d'un tronçon intermédiaire de ce trajet.
+        """
+        def extract_city(loc_str):
+            if not loc_str:
+                return ""
+            parts = [p.strip() for p in loc_str.replace('/', ',').split(',') if p.strip()]
+            if not parts:
+                return loc_str.strip().lower()
+            ignore = {'bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france'}
+            clean_parts = [p for p in parts if p.lower() not in ignore]
+            return clean_parts[-1] if clean_parts else parts[0]
+
+        dep_city = extract_city(departure).lower()
+        arr_city = extract_city(destination).lower()
+
+        # Liste des points de passage et tarifs
+        places = [self.departure_location]
+        leg_prices = []
+
+        if self.stopovers and isinstance(self.stopovers, list):
+            for s in self.stopovers:
+                if isinstance(s, dict):
+                    places.append(s.get('name', ''))
+                    leg_prices.append(int(s.get('price', 0)))
+                elif isinstance(s, str):
+                    places.append(s)
+                    leg_prices.append(0)
+            
+            last_s = self.stopovers[-1]
+            if isinstance(last_s, dict):
+                leg_prices.append(int(last_s.get('arrival_price', 0)))
+            else:
+                leg_prices.append(0)
+        else:
+            leg_prices.append(self.price_per_seat)
+        
+        places.append(self.arrival_location)
+        place_cities = [extract_city(p).lower() for p in places]
+
+        dep_idx = -1
+        dest_idx = -1
+
+        for idx, pc in enumerate(place_cities):
+            if dep_city in pc:
+                dep_idx = idx
+                break
+        
+        if dep_idx != -1:
+            for idx, pc in enumerate(place_cities):
+                if arr_city in pc and idx > dep_idx:
+                    dest_idx = idx
+                    break
+
+        if dep_idx != -1 and dest_idx != -1:
+            total = 0
+            for i in range(dep_idx, dest_idx):
+                if i < len(leg_prices):
+                    total += leg_prices[i]
+            if total > 0:
+                return total
+
+        return self.price_per_seat
 
 class Booking(models.Model):
     """
@@ -311,6 +380,8 @@ class Booking(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     transaction_id = models.CharField(max_length=255, blank=True, null=True)
+    departure_location = models.CharField(max_length=255, blank=True, null=True)
+    arrival_location = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -322,14 +393,22 @@ class Booking(models.Model):
 
     def delete(self, using=None, keep_parents=False):  # type: ignore[override]
         if self.status == 'confirmed' and self.ride:
-            from django.db.models import F
-            Ride.objects.filter(id=self.ride_id).update(
-                seats_available=F('seats_available') + self.seats_booked
-            )
+            try:
+                from api.bookings.services import BookingService
+                BookingService.deallocate_seats(self)
+            except Exception:
+                from django.db.models import F
+                Ride.objects.filter(id=self.ride_id).update(
+                    seats_available=F('seats_available') + self.seats_booked
+                )
         return super().delete(using=using, keep_parents=keep_parents)
         
     @property
     def total_amount(self):
+        if self.departure_location and self.arrival_location:
+            segment_price = self.ride.get_segment_price(self.departure_location, self.arrival_location)
+            if segment_price:
+                return self.seats_booked * segment_price
         return self.seats_booked * self.ride.price_per_seat
 
     @property
@@ -960,3 +1039,48 @@ class DriverPayout(models.Model):
 
     def __str__(self):
         return f"Payout {self.driver} - Trajet {self.ride_id} - {self.amount} XOF ({self.status})"
+
+
+class RideLeg(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='legs')
+    start_location = models.CharField(max_length=255)
+    end_location = models.CharField(max_length=255)
+    start_latitude = models.FloatField()
+    start_longitude = models.FloatField()
+    end_latitude = models.FloatField()
+    end_longitude = models.FloatField()
+    start_place_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="Place ID Google du départ du tronçon")
+    end_place_id = models.CharField(max_length=255, blank=True, null=True, verbose_name="Place ID Google de l'arrivée du tronçon")
+    departure_time = models.DateTimeField()
+    arrival_time = models.DateTimeField()
+    seats_available = models.IntegerField()
+    price = models.IntegerField()
+    order = models.IntegerField(help_text="Index chronologique du tronçon dans le trajet")
+
+    class Meta:
+        verbose_name = "Tronçon de trajet"
+        verbose_name_plural = "Tronçons de trajets"
+        ordering = ['ride', 'order']
+
+    def __str__(self):
+        return f"{self.ride.id} - Tronçon {self.order}: {self.start_location} -> {self.end_location} ({self.price} XOF)"
+
+
+class DirectionsCache(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    origin_place_id = models.CharField(max_length=150, blank=True, null=True)
+    destination_place_id = models.CharField(max_length=150, blank=True, null=True)
+    waypoints_hash = models.CharField(max_length=64, help_text="Hash SHA256 des points d'arrêt intermédiaires ordonnés")
+    route_data = models.JSONField(help_text="Données complètes de l'itinéraire retournées par l'API")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Cache d'itinéraire Google"
+        verbose_name_plural = "Cache d'itinéraires Google"
+        indexes = [
+            models.Index(fields=['origin_place_id', 'destination_place_id', 'waypoints_hash']),
+        ]
+
+    def __str__(self):
+        return f"Cache {self.origin_place_id} -> {self.destination_place_id}"

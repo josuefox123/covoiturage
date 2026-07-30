@@ -15,7 +15,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator,
-  Modal, Image, Animated, Dimensions, Keyboard, Switch,
+  Modal, Image, Animated, Dimensions, Keyboard, Switch, DeviceEventEmitter,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -39,7 +39,7 @@ const PROFILE_STEPS = ['personal', 'vehicle', 'preferences'] as const;
 type ProfileStep = typeof PROFILE_STEPS[number];
 const DAYS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const DAYS_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-const STEP_LABELS = ['Itinéraire', 'Date', 'Prix', 'Options'];
+const STEP_LABELS = ['Itinéraire', 'Étapes', 'Date', 'Prix', 'Options'];
 
 export default function PublishScreen() {
   const router = useRouter();
@@ -52,6 +52,7 @@ export default function PublishScreen() {
 
   // ─── Multi-step state ────────────────────────────────────────────
   const [formStep, setFormStep] = useState(1); // 1,2,3,4
+  const [stopoverSubStep, setStopoverSubStep] = useState<1 | 2>(1);
   const stepAnim = useRef(new Animated.Value(0)).current;
 
   const animateStep = () => {
@@ -76,11 +77,34 @@ export default function PublishScreen() {
   const [selectedRouteIndex, setSelectedRouteIndex] = useState<number>(0);
   const webviewRef = useRef<WebView>(null);
 
-  const BENIN_CITIES = [
-    'Allada', 'Bohicon', 'Abomey', 'Dassa-Zoumé', 'Dassa', 'Savè', 'Parakou', 
-    'Tchaourou', 'N\'Dali', 'Bembéréké', 'Kandi', 'Malanville', 'Djougou', 
-    'Natitingou', 'Tanguiéta', 'Ouidah', 'Grand-Popo', 'Lokosa', 'Comè', 
-    'Sèmè-Kpodji', 'Porto-Novo', 'Pobè', 'Kétou', 'Sakété', 'Zogbodomey'
+  const BENIN_CITIES_COORDS = [
+    { name: 'Allada', lat: 6.6655, lon: 2.1514 },
+    { name: 'Bohicon', lat: 7.1782, lon: 2.0667 },
+    { name: 'Abomey', lat: 7.1808, lon: 1.9978 },
+    { name: 'Dassa-Zoumé', lat: 7.7472, lon: 2.1839 },
+    { name: 'Dassa', lat: 7.7472, lon: 2.1839 },
+    { name: 'Savè', lat: 8.0333, lon: 2.4833 },
+    { name: 'Parakou', lat: 9.3372, lon: 2.6294 },
+    { name: 'Tchaourou', lat: 8.8864, lon: 2.5975 },
+    { name: 'N\'Dali', lat: 9.8617, lon: 2.6783 },
+    { name: 'Bembéréké', lat: 10.2283, lon: 2.6636 },
+    { name: 'Kandi', lat: 11.1342, lon: 2.9386 },
+    { name: 'Malanville', lat: 11.8667, lon: 3.3833 },
+    { name: 'Djougou', lat: 9.7085, lon: 1.6659 },
+    { name: 'Natitingou', lat: 10.3042, lon: 1.3794 },
+    { name: 'Tanguiéta', lat: 10.6214, lon: 1.2675 },
+    { name: 'Ouidah', lat: 6.3667, lon: 2.0833 },
+    { name: 'Grand-Popo', lat: 6.2803, lon: 1.8286 },
+    { name: 'Lokosa', lat: 6.6384, lon: 1.7167 },
+    { name: 'Comè', lat: 6.4083, lon: 1.8817 },
+    { name: 'Sèmè-Kpodji', lat: 6.3764, lon: 2.5833 },
+    { name: 'Porto-Novo', lat: 6.4969, lon: 2.6289 },
+    { name: 'Pobè', lat: 6.9800, lon: 2.6789 },
+    { name: 'Kétou', lat: 7.3633, lon: 2.7183 },
+    { name: 'Sakété', lat: 6.7361, lon: 2.6586 },
+    { name: 'Zogbodomey', lat: 6.9481, lon: 2.0994 },
+    { name: 'Abomey-Calavi', lat: 6.4497, lon: 2.3486 },
+    { name: 'Cotonou', lat: 6.3654, lon: 2.4183 }
   ];
 
   const googleMapHtml = useMemo(() => {
@@ -102,6 +126,35 @@ export default function PublishScreen() {
     var directionsRenderer;
     var directionsService;
     var directionsResponse;
+
+    function getRouteSteps(r) {
+      var steps = [];
+      r.legs.forEach(function(l) {
+        if (l.steps) {
+          l.steps.forEach(function(s) {
+            steps.push({
+              end_location: {
+                lat: typeof s.end_location.lat === 'function' ? s.end_location.lat() : s.end_location.lat,
+                lng: typeof s.end_location.lng === 'function' ? s.end_location.lng() : s.end_location.lng
+              },
+              html_instructions: s.instructions || s.html_instructions || ''
+            });
+          });
+        }
+      });
+      return steps;
+    }
+
+    function getRouteLegs(r) {
+      return r.legs.map(function(l) {
+        return {
+          start_address: l.start_address,
+          end_address: l.end_address,
+          distanceKm: Math.round(l.distance.value / 1000),
+          durationMin: Math.round(l.duration.value / 60)
+        };
+      });
+    }
 
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
@@ -136,8 +189,29 @@ export default function PublishScreen() {
       }, function(response, status) {
         if (status === 'OK') {
           directionsResponse = response;
-          window.renderRoute(0);
+          directionsRenderer.setDirections(response);
+          directionsRenderer.setRouteIndex(0);
+          
+          var routes = response.routes.map(function(r, idx) {
+            return {
+              index: idx,
+              summary: r.summary || 'Itinéraire proposé',
+              distanceText: r.legs[0].distance.text,
+              distanceValue: r.legs[0].distance.value,
+              durationText: r.legs[0].duration.text,
+              durationValue: r.legs[0].duration.value,
+              steps: getRouteSteps(r),
+              legs: getRouteLegs(r)
+            };
+          });
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'routesCalculated',
+            routes: routes
+          }));
         } else {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'routesFailed'
+          }));
           var flightPath = new google.maps.Polyline({
             path: [
               { lat: ${departureCords.lat}, lng: ${departureCords.lon} },
@@ -180,12 +254,85 @@ export default function PublishScreen() {
           strokeWeight: 3
         }
       });
+
+      // Post ready message
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
     }
 
     window.renderRoute = function(index) {
-      if (!directionsResponse) return;
-      directionsRenderer.setRouteIndex(index);
-      directionsRenderer.setDirections(directionsResponse);
+      if (directionsRenderer) {
+        directionsRenderer.setRouteIndex(index);
+      }
+    };
+
+    window.updateWaypoints = function(stopoversJson) {
+      var stops = [];
+      try {
+        stops = JSON.parse(stopoversJson) || [];
+      } catch (e) {
+        console.error("Error parsing stops", e);
+      }
+
+      var waypoints = [];
+      stops.forEach(function(s) {
+        if (s.coords && s.coords.lat && s.coords.lon) {
+          waypoints.push({
+            location: new google.maps.LatLng(s.coords.lat, s.coords.lon),
+            stopover: true
+          });
+        }
+      });
+
+      directionsService.route({
+        origin: { lat: ${departureCords.lat}, lng: ${departureCords.lon} },
+        destination: { lat: ${arrivalCords.lat}, lng: ${arrivalCords.lon} },
+        waypoints: waypoints,
+        optimizeWaypoints: false,
+        travelMode: google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: waypoints.length === 0
+      }, function(response, status) {
+        if (status === 'OK') {
+          directionsResponse = response;
+          directionsRenderer.setDirections(response);
+          directionsRenderer.setRouteIndex(0);
+
+          var routes = response.routes.map(function(r, idx) {
+            var distVal = 0;
+            var durVal = 0;
+            r.legs.forEach(function(l) {
+              distVal += l.distance.value;
+              durVal += l.duration.value;
+            });
+
+            // Format distance and duration to human-friendly text
+            var distText = (distVal / 1000).toFixed(1) + ' km';
+            var totalMin = Math.round(durVal / 60);
+            var hrs = Math.floor(totalMin / 60);
+            var mins = totalMin % 60;
+            var durText = hrs > 0 ? hrs + ' h ' + mins + ' min' : mins + ' min';
+
+            return {
+              index: idx,
+              summary: r.summary || 'Itinéraire proposé',
+              distanceText: distText,
+              distanceValue: distVal,
+              durationText: durText,
+              durationValue: durVal,
+              steps: getRouteSteps(r),
+              legs: getRouteLegs(r)
+            };
+          });
+
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'routesCalculated',
+            routes: routes
+          }));
+        } else {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'routesFailed'
+          }));
+        }
+      });
     };
   </script>
   <script async defer
@@ -196,6 +343,11 @@ export default function PublishScreen() {
     `;
   }, [departureCords, arrivalCords]);
 
+  const mapSource = useMemo(() => {
+    if (!departureCords || !arrivalCords) return null;
+    return { html: googleMapHtml };
+  }, [googleMapHtml]);
+
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDateObj, setSelectedDateObj] = useState(now);
   const [timeDate, setTimeDate] = useState(now);
@@ -205,20 +357,87 @@ export default function PublishScreen() {
   const [seats, setSeats] = useState(3);
   const [pickingLocationFor, setPickingLocationFor] = useState<string | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+
+  useEffect(() => {
+    if (pickingLocationFor !== null) {
+      DeviceEventEmitter.emit('toggleSupportBubble', false);
+    } else {
+      DeviceEventEmitter.emit('toggleSupportBubble', true);
+    }
+    return () => {
+      DeviceEventEmitter.emit('toggleSupportBubble', true);
+    };
+  }, [pickingLocationFor]);
 
   // Villes et points d'arrêt (Stopovers)
   const [stopovers, setStopovers] = useState<{ id: string; name: string; coords?: { lat: number; lon: number }; stopDurationMin: number }[]>([]);
+  const [detectedStopovers, setDetectedStopovers] = useState<{
+    id: string;
+    name: string;
+    coords: { lat: number; lon: number };
+    checked: boolean;
+    stopDurationMin: number;
+  }[]>([]);
 
-  const addStopover = (city = '', coords = undefined, duration = 15) => {
+  const toggleStopoverCheck = (id: string) => {
+    setDetectedStopovers((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const newChecked = !item.checked;
+          if (newChecked) {
+            setStopovers((prevStops) => {
+              if (!prevStops.some((s) => s.name.toLowerCase() === item.name.toLowerCase())) {
+                return [
+                  ...prevStops,
+                  {
+                    id: item.id,
+                    name: item.name,
+                    coords: item.coords,
+                    stopDurationMin: item.stopDurationMin,
+                  },
+                ];
+              }
+              return prevStops;
+            });
+          } else {
+            setStopovers((prevStops) => prevStops.filter((s) => s.name.toLowerCase() !== item.name.toLowerCase()));
+          }
+          return { ...item, checked: newChecked };
+        }
+        return item;
+      })
+    );
+  };
+
+  const addStopover = (city = '', coords?: { lat: number; lon: number }, duration = 15) => {
+    const newId = Math.random().toString();
     setStopovers((prev) => [
       ...prev,
       {
-        id: Math.random().toString(),
+        id: newId,
         name: city,
         coords: coords,
         stopDurationMin: duration,
       },
     ]);
+    if (coords) {
+      setDetectedStopovers((prev) => {
+        if (prev.some((s) => s.name.toLowerCase() === city.toLowerCase())) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: newId,
+            name: city,
+            coords: coords,
+            checked: true,
+            stopDurationMin: duration,
+          },
+        ];
+      });
+    }
   };
 
   const updateStopover = (id: string, updates: Partial<{ name: string; coords?: { lat: number; lon: number }; stopDurationMin: number }>) => {
@@ -292,6 +511,70 @@ export default function PublishScreen() {
   } | null>(null);
   const [price, setPrice] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
+  const [legs, setLegs] = useState<any[]>([]);
+  const [legPrices, setLegPrices] = useState<number[]>([]);
+
+  // Synchronize legs (segments) with the selected stopovers
+  useEffect(() => {
+    if (!departure || !arrival) return;
+
+    const totalDist = estimation?.distanceKm || 100;
+    const totalDur = estimation?.durationMin || 120;
+
+    // If no stopovers, we have 1 leg (the overall ride)
+    if (stopovers.length === 0) {
+      setLegs([
+        {
+          start_location: departure,
+          end_location: arrival,
+          distanceKm: totalDist,
+          durationMin: totalDur,
+        }
+      ]);
+      return;
+    }
+
+    // If we have stopovers, divide the total distance and duration equally
+    // among the (stopovers.length + 1) legs.
+    const numLegs = stopovers.length + 1;
+    const legDist = Math.round(totalDist / numLegs);
+    const legDur = Math.round(totalDur / numLegs);
+
+    const newLegs = [];
+    for (let i = 0; i < numLegs; i++) {
+      const startLoc = i === 0 ? departure : stopovers[i - 1].name;
+      const endLoc = i === numLegs - 1 ? arrival : stopovers[i].name;
+
+      newLegs.push({
+        start_location: startLoc,
+        end_location: endLoc,
+        distanceKm: legDist,
+        durationMin: legDur,
+      });
+    }
+    setLegs(newLegs);
+  }, [stopovers, departure, arrival, estimation]);
+
+  // Synchronize leg prices when legs changes
+  useEffect(() => {
+    if (legs && legs.length > 0) {
+      const prices = legs.map((leg) => {
+        const dist = leg.distanceKm || 10;
+        return Math.max(500, Math.round((dist * 30) / 100) * 100);
+      });
+      setLegPrices(prices);
+    } else {
+      setLegPrices([]);
+    }
+  }, [legs]);
+
+  // Synchronize overall price with the sum of leg prices
+  useEffect(() => {
+    if (legPrices.length > 1) {
+      const total = legPrices.reduce((sum, p) => sum + p, 0);
+      setPrice(String(total));
+    }
+  }, [legPrices]);
 
   // Preferences step
   const [music, setMusic] = useState(true);
@@ -399,81 +682,64 @@ export default function PublishScreen() {
   };
 
   // ─── Estimation via Google Directions (Alternative Routes and Stopovers) ───
-  // ─── Estimation via Google Directions (Alternative Routes and Stopovers) ───
   const computeEstimation = async (dep: { lat: number; lon: number }, arr: { lat: number; lon: number }) => {
     setEstimationLoading(true);
     setGoogleRoutes([]);
     setSelectedRouteIndex(0);
     setEstimation(null);
+    setMapReady(false);
+  };
 
-    const GOOGLE_API_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
-    
-    const haversineFallback = () => {
-      const R = 6371;
-      const dLat = ((arr.lat - dep.lat) * Math.PI) / 180;
-      const dLon = ((arr.lon - dep.lon) * Math.PI) / 180;
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos((dep.lat * Math.PI) / 180) * Math.cos((arr.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-      const straightKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distanceKm = Math.round(straightKm * 1.35);
-      const durationMin = Math.round((distanceKm / 45) * 60);
-      setEstimation({ distanceKm, durationMin });
-      fetchPriceSuggestion(distanceKm);
-    };
-
+  const onMapMessage = useCallback((event: any) => {
     try {
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${dep.lat},${dep.lon}&destination=${arr.lat},${arr.lon}&alternatives=true&key=${GOOGLE_API_KEY}&language=fr`;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        haversineFallback();
-        return;
-      }
-
-      const json = await res.json();
-
-      if (json.status === 'OK' && json.routes && json.routes.length > 0) {
-        const parsedRoutes = json.routes.map((r: any, idx: number) => ({
-          index: idx,
-          summary: r.summary,
-          distanceText: r.legs[0].distance.text,
-          distanceValue: r.legs[0].distance.value,
-          durationText: r.legs[0].duration.text,
-          durationValue: r.legs[0].duration.value,
-          steps: r.legs[0].steps.map((step: any) => ({
-            html_instructions: step.html_instructions,
-            end_location: {
-              lat: step.end_location.lat,
-              lng: step.end_location.lng
-            }
-          }))
-        }));
-
-        setGoogleRoutes(parsedRoutes);
-        
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'ready') {
+        setMapReady(true);
+      } else if (data.type === 'routesCalculated') {
+        setGoogleRoutes(data.routes);
         // Auto-select the first route
-        const firstRoute = parsedRoutes[0];
-        setEstimation({
-          distanceKm: Math.round(firstRoute.distanceValue / 1000),
-          durationMin: Math.round(firstRoute.durationValue / 60)
-        });
-        fetchPriceSuggestion(Math.round(firstRoute.distanceValue / 1000));
-        
-        // Suggest stopovers for the first route
-        suggestStopoversForRoute(firstRoute);
-      } else {
-        haversineFallback();
+        const firstRoute = data.routes[0];
+        if (firstRoute) {
+          setEstimation({
+            distanceKm: Math.round(firstRoute.distanceValue / 1000),
+            durationMin: Math.round(firstRoute.durationValue / 60)
+          });
+          fetchPriceSuggestion(Math.round(firstRoute.distanceValue / 1000));
+          // Suggest stopovers for the first route
+          suggestStopoversForRoute(firstRoute);
+          setLegs(firstRoute.legs || []);
+        }
+        setEstimationLoading(false);
+      } else if (data.type === 'routesFailed') {
+        // Haversine fallback
+        const R = 6371;
+        if (departureCords && arrivalCords) {
+          const dLat = ((arrivalCords.lat - departureCords.lat) * Math.PI) / 180;
+          const dLon = ((arrivalCords.lon - departureCords.lon) * Math.PI) / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos((departureCords.lat * Math.PI) / 180) * Math.cos((arrivalCords.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+          const straightKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distanceKm = Math.round(straightKm * 1.35);
+          const durationMin = Math.round((distanceKm / 45) * 60);
+          setEstimation({ distanceKm, durationMin });
+          fetchPriceSuggestion(distanceKm);
+        }
+        setEstimationLoading(false);
       }
     } catch (e) {
-      haversineFallback();
-    } finally {
+      console.error('Error parsing WebView message:', e);
       setEstimationLoading(false);
     }
-  };
+  }, [departureCords, arrivalCords]);
+
+  // Synchronise les points d'arrêt (stopovers) avec le tracé de la WebView carte
+  useEffect(() => {
+    if (mapReady && departureCords && arrivalCords && webviewRef.current) {
+      const stopoversJson = JSON.stringify(stopovers);
+      webviewRef.current.injectJavaScript(
+        `window.updateWaypoints && window.updateWaypoints(${JSON.stringify(stopoversJson)}); true;`
+      );
+    }
+  }, [stopovers, mapReady, departureCords, arrivalCords]);
 
   const suggestStopoversForRoute = (route: any) => {
     if (!route || !route.steps) return;
@@ -481,30 +747,85 @@ export default function PublishScreen() {
     const depCity = (departure || '').split(',')[0].trim().toLowerCase();
     const arrCity = (arrival || '').split(',')[0].trim().toLowerCase();
     
+    const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371; // km
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
     const suggestions: any[] = [];
+    
+    // Fallback detection by matching text in HTML instructions
+    const matchedCitiesByText = new Set<string>();
     route.steps.forEach((step: any) => {
       const text = step.html_instructions || '';
-      const cleanText = text.replace(/<[^>]*>/g, '');
-      
-      BENIN_CITIES.forEach(city => {
-        const cityLower = city.toLowerCase();
-        if (
-          cleanText.toLowerCase().includes(cityLower) &&
-          cityLower !== depCity &&
-          cityLower !== arrCity &&
-          !suggestions.some(s => s.name.toLowerCase() === cityLower)
-        ) {
-          suggestions.push({
-            id: Math.random().toString(),
-            name: city,
-            coords: { lat: step.end_location.lat, lon: step.end_location.lng },
-            stopDurationMin: 15
-          });
+      const cleanText = text.replace(/<[^>]*>/g, '').toLowerCase();
+      BENIN_CITIES_COORDS.forEach(cityObj => {
+        const cityLower = cityObj.name.toLowerCase();
+        if (cleanText.includes(cityLower)) {
+          matchedCitiesByText.add(cityLower);
         }
       });
     });
+
+    // Spatial check for route proximity
+    BENIN_CITIES_COORDS.forEach(cityObj => {
+      const cityLower = cityObj.name.toLowerCase();
+      
+      // Exclude departure/arrival cities by name
+      if (cityLower === depCity || cityLower === arrCity) return;
+      
+      // Exclude if too close to departure or arrival coordinates (within 10km)
+      if (departureCords) {
+        const distToDep = getDistanceKm(cityObj.lat, cityObj.lon, departureCords.lat, departureCords.lon);
+        if (distToDep < 10) return;
+      }
+      if (arrivalCords) {
+        const distToArr = getDistanceKm(cityObj.lat, cityObj.lon, arrivalCords.lat, arrivalCords.lon);
+        if (distToArr < 10) return;
+      }
+
+      let isNearRoute = false;
+
+      if (matchedCitiesByText.has(cityLower)) {
+        isNearRoute = true;
+      } else {
+        // Find if any step on the route is within 12km of the city
+        for (const step of route.steps) {
+          if (step.end_location && typeof step.end_location.lat === 'number' && typeof step.end_location.lng === 'number') {
+            const dist = getDistanceKm(cityObj.lat, cityObj.lon, step.end_location.lat, step.end_location.lng);
+            if (dist <= 12) {
+              isNearRoute = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (isNearRoute) {
+        suggestions.push({
+          id: Math.random().toString(),
+          name: cityObj.name,
+          coords: { lat: cityObj.lat, lon: cityObj.lon },
+          stopDurationMin: 15
+        });
+      }
+    });
     
-    setStopovers(suggestions);
+    const withCheckStatus = suggestions.map(s => ({ ...s, checked: true }));
+    setDetectedStopovers(withCheckStatus);
+    setStopovers(withCheckStatus.map(s => ({
+      id: s.id,
+      name: s.name,
+      coords: s.coords,
+      stopDurationMin: s.stopDurationMin
+    })));
   };
 
   const handleSelectRoute = (idx: number) => {
@@ -516,6 +837,7 @@ export default function PublishScreen() {
     });
     fetchPriceSuggestion(Math.round(selectedRoute.distanceValue / 1000));
     suggestStopoversForRoute(selectedRoute);
+    setLegs(selectedRoute.legs || []);
     
     webviewRef.current?.injectJavaScript(`window.renderRoute && window.renderRoute(${idx}); true;`);
   };
@@ -610,16 +932,44 @@ export default function PublishScreen() {
 
   const handleNext = () => {
     Keyboard.dismiss();
-    if (formStep === 1 && !validateStep1()) return;
-    if (formStep === 2 && !validateStep2()) return;
-    if (formStep === 3 && !validateStep3()) return;
-    if (formStep < 4) {
-      if (formStep === 2 && estimation) fetchPriceSuggestion(estimation.distanceKm);
-      goToStep(formStep + 1);
+    if (formStep === 1) {
+      if (!validateStep1()) return;
+      if (googleRoutes.length === 0) {
+        CustomAlert.alert('Itinéraire manquant', 'Veuillez patienter pendant le calcul de l\'itinéraire.');
+        return;
+      }
+      setStopoverSubStep(1);
+      goToStep(2);
+    } else if (formStep === 2) {
+      if (stopoverSubStep === 1) {
+        setStopoverSubStep(2);
+      } else {
+        goToStep(3);
+      }
+    } else if (formStep === 3) {
+      if (!validateStep2()) return;
+      goToStep(4);
+    } else if (formStep === 4) {
+      if (!validateStep3()) return;
+      if (estimation) fetchPriceSuggestion(estimation.distanceKm);
+      goToStep(5);
     }
   };
 
-  const handleBack = () => { if (formStep > 1) goToStep(formStep - 1); };
+  const handleBack = () => {
+    Keyboard.dismiss();
+    if (formStep === 2) {
+      if (stopoverSubStep === 2) {
+        setStopoverSubStep(1);
+      } else {
+        goToStep(1);
+      }
+    } else if (formStep > 1) {
+      goToStep(formStep - 1);
+    } else {
+      router.push('/(tabs)/home');
+    }
+  };
 
   // ─── Publish ─────────────────────────────────────────────────────
   const handlePublishPress = () => {
@@ -666,12 +1016,18 @@ export default function PublishScreen() {
       if (arrivalCords) { payload.arrival_latitude = arrivalCords.lat; payload.arrival_longitude = arrivalCords.lon; }
 
       if (stopovers && stopovers.length > 0) {
-        payload.stopovers = stopovers.map(s => ({
-          name: s.name,
-          stopDurationMin: s.stopDurationMin,
-          latitude: s.coords?.lat ?? null,
-          longitude: s.coords?.lon ?? null
-        }));
+        payload.stopovers = stopovers.map((s, idx) => {
+          const stopoverPrice = legPrices && legPrices.length > idx ? legPrices[idx] : 0;
+          const arrivalPrice = legPrices && legPrices.length > idx + 1 ? legPrices[idx + 1] : 0;
+          return {
+            name: s.name,
+            stopDurationMin: s.stopDurationMin,
+            latitude: s.coords?.lat ?? null,
+            longitude: s.coords?.lon ?? null,
+            price: stopoverPrice,
+            ...(idx === stopovers.length - 1 ? { arrival_price: arrivalPrice } : {})
+          };
+        });
       }
 
       if (isRecurrent) {
@@ -696,7 +1052,7 @@ export default function PublishScreen() {
 
       // Reset form
       setDeparture(''); setArrival(''); setDepartureCords(null); setArrivalCords(null);
-      setStopovers([]); setGoogleRoutes([]); setSelectedRouteIndex(0);
+      setStopovers([]); setDetectedStopovers([]); setGoogleRoutes([]); setSelectedRouteIndex(0);
       setEstimation(null); setPrice(''); setSeats(3); setDescription('');
       setIsRecurrent(false); setSelectedDays([]);
       setPriceSuggestion(null);
@@ -877,7 +1233,7 @@ export default function PublishScreen() {
             <Text style={styles.headerTitle}>Publier un trajet</Text>
             <View style={{ width: 40 }} />
           </View>
-          <StepIndicator currentStep={formStep} totalSteps={4} labels={STEP_LABELS} />
+          <StepIndicator currentStep={formStep} totalSteps={5} labels={STEP_LABELS} />
         </View>
 
         <ScrollView
@@ -893,7 +1249,7 @@ export default function PublishScreen() {
             {formStep === 1 && (
               <>
                 <Text style={styles.stepTitle}>Où allez-vous ?</Text>
-                <Text style={styles.stepSubtitle}>Choisissez votre point de départ et votre destination</Text>
+                <Text style={styles.stepSubtitle}>Choisissez votre point de départ, votre destination et l'itinéraire</Text>
 
                 {/* Route card */}
                 <View style={styles.routeCard}>
@@ -936,16 +1292,17 @@ export default function PublishScreen() {
                 </View>
 
                 {/* Map WebView and Route Selector */}
-                {departureCords && arrivalCords && (
+                {departureCords && arrivalCords && mapSource && (
                   <View style={styles.mapContainer}>
                     <WebView
                       ref={webviewRef}
                       originWhitelist={['*']}
-                      source={{ html: googleMapHtml }}
+                      source={mapSource}
                       style={styles.map}
                       scrollEnabled={false}
                       domStorageEnabled
                       javaScriptEnabled
+                      onMessage={onMapMessage}
                     />
                   </View>
                 )}
@@ -978,73 +1335,169 @@ export default function PublishScreen() {
                     ))}
                   </View>
                 )}
+              </>
+            )}
 
-                {/* ── Section Villes et points d'arrêt (Optionnel) ── */}
-                <View style={styles.stopoversHeaderRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="location-outline" size={18} color={theme.colors.primary} />
-                    <Text style={styles.stopoversTitle}>Villes et points d'arrêt (Optionnel)</Text>
+            {/* ══════════════════════════════════════════════════════
+                ÉTAPE 2 — POINTS D'ARRÊT & ÉTAPES
+            ══════════════════════════════════════════════════════ */}
+            {/* ══════════════════════════════════════════════════════
+                ÉTAPE 2 — POINTS D'ARRÊT & ÉTAPES (BLABLACAR STYLE)
+            ══════════════════════════════════════════════════════ */}
+            {formStep === 2 && stopoverSubStep === 1 && (
+              <>
+                <Text style={styles.stepTitle}>Ajoutez des étapes pour trouver plus de passagers</Text>
+                <Text style={styles.stepSubtitle}>
+                  Zemy détecte automatiquement les meilleures villes sur votre itinéraire pour maximiser vos chances de remplissage.
+                </Text>
+
+                {/* Recap of previous choices */}
+                <View style={styles.recapContainer}>
+                  <View style={styles.recapRow}>
+                    <Ionicons name="map-outline" size={16} color={theme.colors.primary} />
+                    <Text style={styles.recapText} numberOfLines={1}>
+                      {departure} vers {arrival}
+                    </Text>
                   </View>
+                  {googleRoutes[selectedRouteIndex] && (
+                    <View style={styles.recapRow}>
+                      <Ionicons name="compass-outline" size={16} color={theme.colors.primary} />
+                      <Text style={styles.recapTextSub} numberOfLines={1}>
+                        Route : {googleRoutes[selectedRouteIndex].summary || 'Itinéraire sélectionné'}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
-                {stopovers.length > 0 && (
-                  <View style={styles.stopoversCard}>
-                    {stopovers.map((s, idx) => (
-                      <View key={s.id} style={styles.stopoverItemRow}>
-                        <View style={styles.stopoverIndexBadge}>
-                          <Text style={styles.stopoverIndexText}>{idx + 1}</Text>
+                {/* Checklist Section for detected cities */}
+                {detectedStopovers.length > 0 ? (
+                  <View style={styles.checklistCard}>
+                    {detectedStopovers.map((s) => (
+                      <TouchableOpacity
+                        key={s.id}
+                        style={styles.checklistItem}
+                        onPress={() => toggleStopoverCheck(s.id)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.checklistText}>{s.name}</Text>
+                        <View style={[styles.checkboxSquare, s.checked && styles.checkboxSquareActive]}>
+                          {s.checked && <Ionicons name="checkmark" size={14} color="#FFF" />}
                         </View>
-
-                        <TouchableOpacity
-                          style={styles.stopoverNameBox}
-                          onPress={() => setPickingLocationFor(s.id)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.stopoverNameLabel}>Ville / Point d'arrêt</Text>
-                          <Text style={[styles.stopoverNameValue, !s.name && { color: theme.colors.textMuted }]} numberOfLines={1}>
-                            {s.name || "Choisir sur la carte / rechercher"}
-                          </Text>
-                        </TouchableOpacity>
-
-                        <View style={styles.stopoverDurationBox}>
-                          <Text style={styles.stopoverDurationLabel}>Arrêt</Text>
-                          <View style={styles.stopoverDurationPicker}>
-                            <TouchableOpacity
-                              onPress={() => updateStopover(s.id, { stopDurationMin: Math.max(5, (s.stopDurationMin || 15) - 5) })}
-                              style={styles.stopoverBtnStep}
-                            >
-                              <Text style={styles.stopoverBtnStepText}>-</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.stopoverDurationText}>{s.stopDurationMin} m</Text>
-                            <TouchableOpacity
-                              onPress={() => updateStopover(s.id, { stopDurationMin: (s.stopDurationMin || 15) + 5 })}
-                              style={styles.stopoverBtnStep}
-                            >
-                              <Text style={styles.stopoverBtnStepText}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        <TouchableOpacity
-                          onPress={() => removeStopover(s.id)}
-                          style={styles.stopoverDeleteBtn}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
+                      </TouchableOpacity>
                     ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyStopoversCard}>
+                    <Ionicons name="location-outline" size={32} color={theme.colors.textMuted} style={{ marginBottom: 8 }} />
+                    <Text style={styles.emptyStopoversText}>
+                      Aucune ville intermédiaire détectée sur l'itinéraire choisi.
+                    </Text>
                   </View>
                 )}
 
+                {/* Ajouter une étape link */}
                 <TouchableOpacity
-                  style={styles.addStopoverBtn}
-                  onPress={() => addStopover()}
-                  activeOpacity={0.8}
+                  style={styles.addStopoverLink}
+                  onPress={() => setPickingLocationFor('new_custom')}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="add-circle" size={18} color={theme.colors.primary} />
-                  <Text style={styles.addStopoverBtnText}>+ Ajouter une ville d'arrêt sur le trajet</Text>
+                  <Ionicons name="add" size={20} color={theme.colors.primary} />
+                  <Text style={styles.addStopoverLinkText}>Ajouter une étape</Text>
                 </TouchableOpacity>
+
+
+              </>
+            )}
+
+            {formStep === 2 && stopoverSubStep === 2 && (
+              <>
+                <Text style={styles.stepTitle}>Voici les meilleurs endroits pour s'arrêter. OK pour vous ?</Text>
+                <Text style={styles.stepSubtitle}>
+                  Zemy a sélectionné des points d'arrêt stratégiques. Cliquez sur un arrêt pour le modifier ou l'ajuster.
+                </Text>
+
+                {/* Vertical Timeline container */}
+                <View style={styles.timelineContainer}>
+                  {/* Vertical left line connector */}
+                  <View style={styles.timelineTrack} />
+
+                  {/* Node 1: Departure (Greyed out) */}
+                  <View style={styles.timelineNodeRow}>
+                    <View style={styles.timelineCircleGrey}>
+                      <View style={styles.timelineCircleInnerGrey} />
+                    </View>
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.timelineNodeCityText} numberOfLines={1}>{departure.split(',')[0]}</Text>
+                      <Text style={styles.timelineNodeAddressText} numberOfLines={1}>{departure}</Text>
+                    </View>
+                  </View>
+
+                  {/* Nodes: Stopovers (Active) */}
+                  {stopovers.length > 0 ? (
+                    stopovers.map((s, idx) => (
+                      <View key={s.id} style={styles.timelineNodeRow}>
+                        <View style={styles.timelineCircleBlue}>
+                          <View style={styles.timelineCircleInnerBlue} />
+                        </View>
+                        
+                        <View style={styles.timelineContent}>
+                          <View style={styles.timelineHeaderRow}>
+                            <Text style={styles.timelineNodeCityText} numberOfLines={1}>
+                              {s.name ? s.name.split(',')[0] : `Étape ${idx + 1}`}
+                            </Text>
+                            
+                            {/* Duration adjustments */}
+                            <View style={styles.timelineDurationContainer}>
+                              <TouchableOpacity
+                                onPress={() => updateStopover(s.id, { stopDurationMin: Math.max(5, (s.stopDurationMin || 15) - 5) })}
+                                style={styles.timelineDurationBtn}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Text style={styles.timelineDurationBtnText}>-</Text>
+                              </TouchableOpacity>
+                              <Text style={styles.timelineDurationText}>{s.stopDurationMin}m</Text>
+                              <TouchableOpacity
+                                onPress={() => updateStopover(s.id, { stopDurationMin: (s.stopDurationMin || 15) + 5 })}
+                                style={styles.timelineDurationBtn}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Text style={styles.timelineDurationBtnText}>+</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+
+                          <Text style={styles.timelineNodeAddressText} numberOfLines={1}>
+                            {s.name || "Rechercher un point d'arrêt précis"}
+                          </Text>
+                        </View>
+
+                        {/* Chevron/Edit map button on the right */}
+                        <TouchableOpacity
+                          onPress={() => setPickingLocationFor(s.id)}
+                          activeOpacity={0.7}
+                          style={styles.timelineChevron}
+                        >
+                          <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.timelineEmptyRow}>
+                      <Text style={styles.timelineEmptyText}>Aucune étape sélectionnée</Text>
+                    </View>
+                  )}
+
+                  {/* Node Last: Arrival (Greyed out) */}
+                  <View style={styles.timelineNodeRow}>
+                    <View style={styles.timelineCircleGrey}>
+                      <View style={styles.timelineCircleInnerGrey} />
+                    </View>
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.timelineNodeCityText} numberOfLines={1}>{arrival.split(',')[0]}</Text>
+                      <Text style={styles.timelineNodeAddressText} numberOfLines={1}>{arrival}</Text>
+                    </View>
+                  </View>
+                </View>
 
                 {/* Distance / Duration info */}
                 {departure && arrival && (
@@ -1092,13 +1545,25 @@ export default function PublishScreen() {
                     ) : null}
                   </View>
                 )}
+
+                {/* Ajouter un arrêt personnalisé button */}
+                <TouchableOpacity
+                  style={styles.addStopoverLink}
+                  onPress={() => setPickingLocationFor('new_custom')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={20} color={theme.colors.primary} />
+                  <Text style={styles.addStopoverLinkText}>Ajouter un arrêt personnalisé</Text>
+                </TouchableOpacity>
+
+
               </>
             )}
 
             {/* ══════════════════════════════════════════════════════
                 ÉTAPE 2 — DATE & PLACES
             ══════════════════════════════════════════════════════ */}
-            {formStep === 2 && (
+            {formStep === 3 && (
               <>
                 <Text style={styles.stepTitle}>Quand partez-vous ?</Text>
                 <Text style={styles.stepSubtitle}>Définissez la date, l'heure et le nombre de places</Text>
@@ -1264,162 +1729,257 @@ export default function PublishScreen() {
             {/* ══════════════════════════════════════════════════════
                 ÉTAPE 3 — PRIX
             ══════════════════════════════════════════════════════ */}
-            {formStep === 3 && (
+            {formStep === 4 && (
               <>
-                <Text style={styles.stepTitle}>Combien souhaitez-vous gagner ?</Text>
-                <Text style={styles.stepSubtitle}>Fixez le montant que vous souhaitez recevoir par place</Text>
-
-                {/* Price suggestion banner */}
-                {priceLoading ? (
-                  <View style={[styles.suggestCard, { justifyContent: 'center', alignItems: 'center', paddingVertical: 24 }]}>
-                    <ActivityIndicator color={theme.colors.primary} />
-                    <Text style={{ color: theme.colors.textLight, marginTop: 8 }}>Calcul du prix conseillé...</Text>
-                  </View>
-                ) : priceSuggestion && (
-                  <View style={styles.suggestCard}>
-                    <View style={styles.suggestHeader}>
-                      <Ionicons name="bulb-outline" size={18} color={theme.colors.primary} />
-                      <Text style={styles.suggestHeaderText}>Prix conseillé</Text>
-                    </View>
-                    <Text style={styles.suggestPrice}>{priceSuggestion.suggested_price.toLocaleString()} FCFA</Text>
-                    <Text style={styles.suggestSub}>
-                      Basé sur {estimation?.distanceKm} km ({priceSuggestion.price_per_km} FCFA/km)
+                {legs.length > 1 ? (
+                  <>
+                    <Text style={styles.stepTitle}>Modifier notre prix recommandé par siège</Text>
+                    <Text style={styles.stepSubtitle}>
+                      Ajustez le prix demandé aux passagers pour chaque tronçon de votre trajet.
                     </Text>
-                    <View style={styles.suggestRange}>
-                      <View style={styles.suggestRangeItem}>
-                        <Text style={styles.suggestRangeLabel}>Min</Text>
-                        <Text style={styles.suggestRangeValue}>{priceSuggestion.min_price.toLocaleString()}</Text>
-                      </View>
-                      <View style={styles.suggestRangeBar}>
-                        <View style={styles.suggestRangeBarFill} />
-                      </View>
-                      <View style={styles.suggestRangeItem}>
-                        <Text style={styles.suggestRangeLabel}>Max</Text>
-                        <Text style={styles.suggestRangeValue}>{priceSuggestion.max_price.toLocaleString()}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.suggestBtnRow}>
-                      {[
-                        { label: 'Min', val: priceSuggestion.min_price },
-                        { label: 'Conseillé', val: priceSuggestion.suggested_price },
-                        { label: 'Max', val: priceSuggestion.max_price },
-                      ].map((item, i) => (
-                        <TouchableOpacity
-                          key={i}
-                          style={[styles.suggestPresetBtn, price === String(item.val) && styles.suggestPresetBtnActive]}
-                          onPress={() => setPrice(String(item.val))}
-                        >
-                          <Text style={[styles.suggestPresetLabel, price === String(item.val) && styles.suggestPresetLabelActive]}>
-                            {item.label}
-                          </Text>
-                          <Text style={[styles.suggestPresetText, price === String(item.val) && styles.suggestPresetTextActive]}>
-                            {item.val.toLocaleString()} F
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
 
-                {/* Saisie directe du Prix (Saisie libre + Steppers -/+ 500) */}
-                <View style={styles.priceInputCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={styles.priceInputLabel}>MON PRIX PAR PLACE (FCFA)</Text>
-                    <TouchableOpacity onPress={() => setPrice('0')}>
-                      <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '700' }}>Effacer / Mettre à 0</Text>
-                    </TouchableOpacity>
-                  </View>
+                    <View style={styles.segmentPricesList}>
+                      {legs.map((leg, idx) => {
+                        const startCity = idx === 0 ? departure.split(',')[0].trim() : stopovers[idx - 1]?.name.split(',')[0].trim();
+                        const endCity = idx === legs.length - 1 ? arrival.split(',')[0].trim() : stopovers[idx]?.name.split(',')[0].trim();
+                        const legPrice = legPrices[idx] || 500;
 
-                  <View style={styles.priceStepperRow}>
-                    {/* Bouton Moins (-) */}
-                    <TouchableOpacity
-                      style={styles.priceStepBtn}
-                      onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 500)))}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="remove" size={24} color={theme.colors.primary} />
-                    </TouchableOpacity>
+                        return (
+                          <View key={idx} style={styles.segmentRow}>
+                            {/* Vertical path preview */}
+                            <View style={styles.segmentLeft}>
+                              <View style={styles.segmentTimeline}>
+                                <View style={styles.segmentDotBlue} />
+                                <View style={styles.segmentLine} />
+                                <View style={styles.segmentDotGreen} />
+                              </View>
+                              <View style={styles.segmentAddresses}>
+                                <Text style={styles.segmentCityText} numberOfLines={1}>{startCity}</Text>
+                                <Text style={styles.segmentCityText} numberOfLines={1}>{endCity}</Text>
+                              </View>
+                            </View>
 
-                    {/* Zone d'écriture directe avec curseur clignotant */}
-                    <View style={styles.priceInputWrapper}>
-                      <TextInput
-                        style={styles.priceInputField}
-                        value={price}
-                        onChangeText={(txt) => {
-                          const cleaned = txt.replace(/[^0-9]/g, '');
-                          setPrice(cleaned);
-                        }}
-                        keyboardType="numeric"
-                        placeholder="0"
-                        placeholderTextColor="#9CA3AF"
-                        selectTextOnFocus
-                        maxLength={7}
-                      />
-                      <Text style={styles.priceInputCurrency}>FCFA</Text>
+                            {/* Price adjusters */}
+                            <View style={styles.segmentRight}>
+                              <TouchableOpacity
+                                style={styles.legPriceAdjustBtn}
+                                onPress={() => {
+                                  const nextPrices = [...legPrices];
+                                  nextPrices[idx] = Math.max(500, legPrice - 500);
+                                  setLegPrices(nextPrices);
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons name="remove" size={16} color={theme.colors.primary} />
+                              </TouchableOpacity>
+                              <Text style={styles.legPriceValueText}>{legPrice.toLocaleString()} F</Text>
+                              <TouchableOpacity
+                                style={styles.legPriceAdjustBtn}
+                                onPress={() => {
+                                  const nextPrices = [...legPrices];
+                                  nextPrices[idx] = legPrice + 500;
+                                  setLegPrices(nextPrices);
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <Ionicons name="add" size={16} color={theme.colors.primary} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
 
-                    {/* Bouton Plus (+) */}
-                    <TouchableOpacity
-                      style={styles.priceStepBtn}
-                      onPress={() => setPrice(String((parseInt(price, 10) || 0) + 500))}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="add" size={24} color={theme.colors.primary} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Boutons d'ajustement rapide (+500 / +1000 / -500 / -1000) */}
-                  <View style={styles.quickAdjustRow}>
-                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 1000)))}>
-                      <Text style={styles.quickAdjustText}>-1000</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 500)))}>
-                      <Text style={styles.quickAdjustText}>-500</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String((parseInt(price, 10) || 0) + 500))}>
-                      <Text style={styles.quickAdjustText}>+500</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String((parseInt(price, 10) || 0) + 1000))}>
-                      <Text style={styles.quickAdjustText}>+1000</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Total estimé pour TOUTES les places */}
-                {priceNum > 0 && (
-                  <View style={styles.totalEarningsCard}>
-                    <View style={styles.totalEarningsHeader}>
+                    {/* Total sum summary */}
+                    <View style={styles.totalSegmentSummaryCard}>
                       <Ionicons name="wallet" size={24} color="#059669" />
-                      <View style={{ flex: 1, marginLeft: 10 }}>
-                        <Text style={styles.totalEarningsTitle}>VOTRE GAIN TOTAL ESTIMÉ</Text>
-                        <Text style={styles.totalEarningsSub}>
-                          Si les <Text style={{ fontWeight: '800' }}>{seats} places</Text> sont réservées ({priceNum.toLocaleString()} F × {seats})
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.totalSegmentSummaryText}>
+                          Total estimé pour un passager faisant tout le trajet :
+                        </Text>
+                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#059669', marginTop: 2 }}>
+                          {parseInt(price, 10).toLocaleString()} FCFA
                         </Text>
                       </View>
-                      <Text style={styles.totalEarningsAmount}>
-                        {(priceNum * seats).toLocaleString()} FCFA
-                      </Text>
                     </View>
-                  </View>
-                )}
 
-                {/* Commission & prix passager */}
-                {priceNum > 0 && (
-                  <View style={styles.commissionCard}>
-                    <View style={styles.commissionRow}>
-                      <Text style={styles.commissionLabel}>Vous recevrez par place</Text>
-                      <Text style={styles.commissionValue}>{priceNum.toLocaleString()} FCFA</Text>
+                    {/* Commission & prix passager for complete ride */}
+                    {priceNum > 0 && (
+                      <View style={[styles.commissionCard, { marginTop: 16 }]}>
+                        <View style={styles.commissionRow}>
+                          <Text style={styles.commissionLabel}>Vous recevrez (trajet complet)</Text>
+                          <Text style={styles.commissionValue}>{priceNum.toLocaleString()} FCFA</Text>
+                        </View>
+                        <View style={styles.commissionRow}>
+                          <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage || 10}%)</Text>
+                          <Text style={styles.commissionValueSub}>+{commission.toLocaleString()} FCFA</Text>
+                        </View>
+                        <View style={styles.commissionDivider} />
+                        <View style={styles.commissionRow}>
+                          <Text style={styles.commissionLabelTotal}>Le passager paiera (trajet complet)</Text>
+                          <Text style={styles.commissionValueTotal}>{totalPassenger.toLocaleString()} FCFA</Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.stepTitle}>Combien souhaitez-vous gagner ?</Text>
+                    <Text style={styles.stepSubtitle}>Fixez le montant que vous souhaitez recevoir par place</Text>
+
+                    {/* Price suggestion banner */}
+                    {priceLoading ? (
+                      <View style={[styles.suggestCard, { justifyContent: 'center', alignItems: 'center', paddingVertical: 24 }]}>
+                        <ActivityIndicator color={theme.colors.primary} />
+                        <Text style={{ color: theme.colors.textLight, marginTop: 8 }}>Calcul du prix conseillé...</Text>
+                      </View>
+                    ) : priceSuggestion && (
+                      <View style={styles.suggestCard}>
+                        <View style={styles.suggestHeader}>
+                          <Ionicons name="bulb-outline" size={18} color={theme.colors.primary} />
+                          <Text style={styles.suggestHeaderText}>Prix conseillé</Text>
+                        </View>
+                        <Text style={styles.suggestPrice}>{priceSuggestion.suggested_price.toLocaleString()} FCFA</Text>
+                        <Text style={styles.suggestSub}>
+                          Basé sur {estimation?.distanceKm} km ({priceSuggestion.price_per_km} FCFA/km)
+                        </Text>
+                        <View style={styles.suggestRange}>
+                          <View style={styles.suggestRangeItem}>
+                            <Text style={styles.suggestRangeLabel}>Min</Text>
+                            <Text style={styles.suggestRangeValue}>{priceSuggestion.min_price.toLocaleString()}</Text>
+                          </View>
+                          <View style={styles.suggestRangeBar}>
+                            <View style={styles.suggestRangeBarFill} />
+                          </View>
+                          <View style={styles.suggestRangeItem}>
+                            <Text style={styles.suggestRangeLabel}>Max</Text>
+                            <Text style={styles.suggestRangeValue}>{priceSuggestion.max_price.toLocaleString()}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.suggestBtnRow}>
+                          {[
+                            { label: 'Min', val: priceSuggestion.min_price },
+                            { label: 'Conseillé', val: priceSuggestion.suggested_price },
+                            { label: 'Max', val: priceSuggestion.max_price },
+                          ].map((item, i) => (
+                            <TouchableOpacity
+                              key={i}
+                              style={[styles.suggestPresetBtn, price === String(item.val) && styles.suggestPresetBtnActive]}
+                              onPress={() => setPrice(String(item.val))}
+                            >
+                              <Text style={[styles.suggestPresetLabel, price === String(item.val) && styles.suggestPresetLabelActive]}>
+                                {item.label}
+                              </Text>
+                              <Text style={[styles.suggestPresetText, price === String(item.val) && styles.suggestPresetTextActive]}>
+                                {item.val.toLocaleString()} F
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Saisie directe du Prix (Saisie libre + Steppers -/+ 500) */}
+                    <View style={styles.priceInputCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={styles.priceInputLabel}>MON PRIX PAR PLACE (FCFA)</Text>
+                        <TouchableOpacity onPress={() => setPrice('0')}>
+                          <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '700' }}>Effacer / Mettre à 0</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.priceStepperRow}>
+                        {/* Bouton Moins (-) */}
+                        <TouchableOpacity
+                          style={styles.priceStepBtn}
+                          onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 500)))}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="remove" size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
+
+                        {/* Zone d'écriture directe avec curseur clignotant */}
+                        <View style={styles.priceInputWrapper}>
+                          <TextInput
+                            style={styles.priceInputField}
+                            value={price}
+                            onChangeText={(txt) => {
+                              const cleaned = txt.replace(/[^0-9]/g, '');
+                              setPrice(cleaned);
+                            }}
+                            keyboardType="numeric"
+                            placeholder="0"
+                            placeholderTextColor="#9CA3AF"
+                            selectTextOnFocus
+                            maxLength={7}
+                          />
+                          <Text style={styles.priceInputCurrency}>FCFA</Text>
+                        </View>
+
+                        {/* Bouton Plus (+) */}
+                        <TouchableOpacity
+                          style={styles.priceStepBtn}
+                          onPress={() => setPrice(String((parseInt(price, 10) || 0) + 500))}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="add" size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Boutons d'ajustement rapide (+500 / +1000 / -500 / -1000) */}
+                      <View style={styles.quickAdjustRow}>
+                        <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 1000)))}>
+                          <Text style={styles.quickAdjustText}>-1000</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String(Math.max(0, (parseInt(price, 10) || 0) - 500)))}>
+                          <Text style={styles.quickAdjustText}>-500</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String((parseInt(price, 10) || 0) + 500))}>
+                          <Text style={styles.quickAdjustText}>+500</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.quickAdjustBtn} onPress={() => setPrice(String((parseInt(price, 10) || 0) + 1000))}>
+                          <Text style={styles.quickAdjustText}>+1000</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={styles.commissionRow}>
-                      <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage || 10}%)</Text>
-                      <Text style={styles.commissionValueSub}>+{commission.toLocaleString()} FCFA</Text>
-                    </View>
-                    <View style={styles.commissionDivider} />
-                    <View style={styles.commissionRow}>
-                      <Text style={styles.commissionLabelTotal}>Le passager paiera par place</Text>
-                      <Text style={styles.commissionValueTotal}>{totalPassenger.toLocaleString()} FCFA</Text>
-                    </View>
-                  </View>
+
+                    {/* Total estimé pour TOUTES les places */}
+                    {priceNum > 0 && (
+                      <View style={styles.totalEarningsCard}>
+                        <View style={styles.totalEarningsHeader}>
+                          <Ionicons name="wallet" size={24} color="#059669" />
+                          <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={styles.totalEarningsTitle}>VOTRE GAIN TOTAL ESTIMÉ</Text>
+                            <Text style={styles.totalEarningsSub}>
+                              Si les <Text style={{ fontWeight: '800' }}>{seats} places</Text> sont réservées ({priceNum.toLocaleString()} F × {seats})
+                            </Text>
+                          </View>
+                          <Text style={styles.totalEarningsAmount}>
+                            {(priceNum * seats).toLocaleString()} FCFA
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Commission & prix passager */}
+                    {priceNum > 0 && (
+                      <View style={styles.commissionCard}>
+                        <View style={styles.commissionRow}>
+                          <Text style={styles.commissionLabel}>Vous recevrez par place</Text>
+                          <Text style={styles.commissionValue}>{priceNum.toLocaleString()} FCFA</Text>
+                        </View>
+                        <View style={styles.commissionRow}>
+                          <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage || 10}%)</Text>
+                          <Text style={styles.commissionValueSub}>+{commission.toLocaleString()} FCFA</Text>
+                        </View>
+                        <View style={styles.commissionDivider} />
+                        <View style={styles.commissionRow}>
+                          <Text style={styles.commissionLabelTotal}>Le passager paiera par place</Text>
+                          <Text style={styles.commissionValueTotal}>{totalPassenger.toLocaleString()} FCFA</Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -1427,7 +1987,7 @@ export default function PublishScreen() {
             {/* ══════════════════════════════════════════════════════
                 ÉTAPE 4 — PRÉFÉRENCES & DESCRIPTION
             ══════════════════════════════════════════════════════ */}
-            {formStep === 4 && (
+            {formStep === 5 && (
               <>
                 <Text style={styles.stepTitle}>Vos préférences</Text>
                 <Text style={styles.stepSubtitle}>Partagez vos habitudes pour attirer les bons passagers</Text>
@@ -1558,8 +2118,8 @@ export default function PublishScreen() {
               </>
             )}
 
-            {/* ── Next button (steps 1-3) ── */}
-            {formStep < 4 && (
+            {/* ── Next button (steps 1-4) ── */}
+            {formStep < 5 && (
               <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
                 <LinearGradient
                   colors={[theme.colors.primary, theme.colors.primaryDark]}
@@ -1567,7 +2127,7 @@ export default function PublishScreen() {
                   style={styles.nextBtnGradient}
                 >
                   <Text style={styles.nextBtnText}>
-                    {formStep === 3 ? 'Continuer vers les options' : 'Continuer'}
+                    {formStep === 4 ? 'Continuer vers les options' : 'Continuer'}
                   </Text>
                   <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
                 </LinearGradient>
@@ -1608,6 +2168,8 @@ export default function PublishScreen() {
               setArrival(loc.name); setArrivalCords(cords);
               newArr = loc.name;
               if (departureCords) computeEstimation(departureCords, cords);
+            } else if (pickingLocationFor === 'new_custom') {
+              addStopover(loc.name, cords, 15);
             } else {
               // Location selection for stopover item
               updateStopover(pickingLocationFor, {
@@ -2308,12 +2870,12 @@ const styles = StyleSheet.create({
   totalEarningsAmount: { fontSize: 20, fontWeight: '900', color: '#047857' },
   commissionCard: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
   commissionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  commissionLabel: { fontSize: 14, fontWeight: '600', color: theme.colors.text },
+  commissionLabel: { flex: 1, marginRight: 8, fontSize: 14, fontWeight: '600', color: theme.colors.text },
   commissionValue: { fontSize: 15, fontWeight: '800', color: theme.colors.text },
-  commissionLabelSub: { fontSize: 12, color: theme.colors.textLight },
+  commissionLabelSub: { flex: 1, marginRight: 8, fontSize: 12, color: theme.colors.textLight },
   commissionValueSub: { fontSize: 13, color: theme.colors.textLight, fontWeight: '600' },
   commissionDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 8 },
-  commissionLabelTotal: { fontSize: 15, fontWeight: '800', color: theme.colors.primary },
+  commissionLabelTotal: { flex: 1, marginRight: 8, fontSize: 15, fontWeight: '800', color: theme.colors.primary },
   commissionValueTotal: { fontSize: 18, fontWeight: '900', color: theme.colors.primary },
 
   // Step 4 — Preferences
@@ -2651,5 +3213,352 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  recapContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    gap: 8,
+  },
+  recapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recapText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  recapTextSub: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  checklistCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  checklistText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  checkboxSquare: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxSquareActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary,
+  },
+  emptyStopoversCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    marginBottom: 20,
+    backgroundColor: '#F8FAFC',
+  },
+  emptyStopoversText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  addStopoverLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginVertical: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addStopoverLinkText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  nextFloatingBtnContainer: {
+    marginTop: 20,
+    alignItems: 'flex-end',
+    paddingRight: 6,
+    marginBottom: 24,
+  },
+  nextCircularBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  timelineContainer: {
+    position: 'relative',
+    marginVertical: 16,
+    paddingLeft: 4,
+  },
+  timelineTrack: {
+    position: 'absolute',
+    left: 12,
+    top: 18,
+    bottom: 18,
+    width: 2.5,
+    backgroundColor: '#E2E8F0',
+    zIndex: 1,
+  },
+  timelineNodeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 10,
+    zIndex: 2,
+  },
+  timelineCircleGrey: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#9CA3AF',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  timelineCircleInnerGrey: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#9CA3AF',
+  },
+  timelineCircleBlue: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  timelineCircleInnerBlue: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.primary,
+  },
+  timelineContent: {
+    flex: 1,
+    marginLeft: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  timelineHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  timelineNodeCityText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1F2937',
+    flex: 1,
+  },
+  timelineNodeAddressText: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  timelineDurationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+  },
+  timelineDurationBtn: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timelineDurationBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  timelineDurationText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginHorizontal: 4,
+  },
+  timelineChevron: {
+    paddingHorizontal: 8,
+    alignSelf: 'center',
+  },
+  timelineEmptyRow: {
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  timelineEmptyText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+  },
+  segmentPricesList: {
+    marginTop: 16,
+    gap: 12,
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  segmentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 16,
+  },
+  segmentTimeline: {
+    alignItems: 'center',
+    width: 16,
+    marginRight: 12,
+  },
+  segmentDotBlue: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0066FF',
+  },
+  segmentDotGreen: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  segmentLine: {
+    width: 2,
+    height: 16,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 2,
+  },
+  segmentAddresses: {
+    flex: 1,
+    gap: 4,
+  },
+  segmentCityText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  segmentRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 4,
+  },
+  legPriceAdjustBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legPriceValueText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginHorizontal: 12,
+    minWidth: 60,
+    textAlign: 'center',
+  },
+  totalSegmentSummaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    gap: 10,
+  },
+  totalSegmentSummaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#065F46',
   },
 });

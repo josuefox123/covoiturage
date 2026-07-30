@@ -101,6 +101,22 @@ class UserSerializer(serializers.ModelSerializer):
                 return 'pending'
         return 'not_verified'
 
+class CompactUserSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur léger pour le modèle User utilisé comme relation imbriquée (N+1 queries optimization).
+    """
+    rides_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'full_name', 'phone', 'avatar', 'rating', 'is_verified', 'rides_count'
+        ]
+
+    @extend_schema_field(int)
+    def get_rides_count(self, obj):
+        return obj.rides_driven.filter(status='completed').count()
+
 class AdminUserSerializer(serializers.ModelSerializer):
     """
     Sérialiseur complet du modèle User pour le tableau de bord administrateur.
@@ -159,7 +175,7 @@ class RideSerializer(serializers.ModelSerializer):
     Valide les lieux de départ/arrivée, les prix et les options de colis.
     Inclus les relations imbriquées (conducteur, véhicule) en lecture.
     """
-    driver_details = UserSerializer(source='driver', read_only=True)
+    driver_details = CompactUserSerializer(source='driver', read_only=True)
     vehicle_details = VehicleSerializer(source='vehicle', read_only=True)
 
     class Meta:
@@ -167,12 +183,26 @@ class RideSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['driver', 'price_per_seat', 'zemy_commission']
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['original_price_per_seat'] = instance.price_per_seat
+        request = self.context.get('request')
+        if request:
+            query_params = request.query_params if hasattr(request, 'query_params') else getattr(request, 'GET', {})
+            departure = query_params.get('departure')
+            destination = query_params.get('destination')
+            if departure and destination:
+                segment_price = instance.get_segment_price(departure, destination)
+                if segment_price:
+                    ret['price_per_seat'] = segment_price
+        return ret
+
 class BookingSerializer(serializers.ModelSerializer):
     """
     Sérialiseur pour le modèle Booking (Réservation).
     Valide le nombre de places et expose les informations du passager.
     """
-    passenger_details = UserSerializer(source='passenger', read_only=True)
+    passenger_details = CompactUserSerializer(source='passenger', read_only=True)
     ride_details = RideSerializer(source='ride', read_only=True)
 
     class Meta:

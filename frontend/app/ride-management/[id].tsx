@@ -12,7 +12,7 @@
  */
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Animated, Image, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
@@ -42,6 +42,7 @@ const COLORS = {
 export default function RideManagementScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, authFetch } = useAuth();
   
   const [ride, setRide] = useState<Ride | null>(null);
@@ -546,12 +547,12 @@ export default function RideManagementScreen() {
         )}
         
         {/* Spacer for FAB */}
-        <View style={{ height: 80 }} />
+        <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
       {/* Floating Action Button */}
       {activeBookings.length > 0 && ride.status === 'active' && (
-        <View style={styles.fabContainer}>
+        <View style={[styles.fabContainer, { bottom: Math.max(24, insets.bottom + 8) }]}>
           <TouchableOpacity style={styles.fab} onPress={handleContactPassengers} activeOpacity={0.9}>
             <Ionicons name="chatbubbles" size={20} color={COLORS.white} />
             <Text style={styles.fabText}>Contacter les passagers</Text>

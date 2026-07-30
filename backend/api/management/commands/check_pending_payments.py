@@ -53,11 +53,9 @@ class Command(BaseCommand):
                         if payment_locked.booking:
                             booking = payment_locked.booking
                             if booking.payment_status != 'escrow':
-                                from api.models import Ride
-                                # Décrémenter les places sur le trajet
-                                ride = Ride.objects.select_for_update().get(id=booking.ride.id)
-                                ride.seats_available -= booking.seats_booked
-                                ride.save()
+                                from api.bookings.services import BookingService
+                                # Décrémenter les places sur le trajet de façon segmentée
+                                BookingService.allocate_seats(booking)
 
                                 booking.payment_status = 'escrow'
                                 booking.status = 'confirmed'

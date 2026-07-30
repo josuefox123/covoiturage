@@ -9,7 +9,7 @@ from .feexpay_service import FeexPayService
 
 class BookingService:
     @staticmethod
-    def create_booking(passenger, ride_id, seats_booked, payment_status='pending'):
+    def create_booking(passenger, ride_id, seats_booked, payment_status='pending', departure_location=None, arrival_location=None):
         """
         Gère la création sécurisée d'une réservation avec gestion des race conditions,
         de la disponibilité des sièges et de la validation FeexPay.
@@ -86,7 +86,9 @@ class BookingService:
                 passenger=passenger,
                 seats_booked=seats_booked,
                 payment_status=payment_status,
-                status='pending'
+                status='pending',
+                departure_location=departure_location,
+                arrival_location=arrival_location
             )
             
             return booking, True
@@ -106,10 +108,7 @@ class BookingService:
         
         # Restituer les places si la réservation était confirmée et qu'on l'annule
         if old_status == 'confirmed':
-            with transaction.atomic():
-                locked_ride = Ride.objects.select_for_update().get(id=booking.ride.id)
-                locked_ride.seats_available += booking.seats_booked
-                locked_ride.save()
+            BookingService.deallocate_seats(booking)
                 
             ride = booking.ride
             passenger = booking.passenger

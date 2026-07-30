@@ -106,7 +106,7 @@ export default function TabsLayout() {
                     elevation: 5,
                   }}
                 >
-                  <Ionicons name="cash" size={25} color="white" />
+                  <Ionicons name="wallet" size={25} color="white" />
                 </View>
               </TouchableOpacity>
             ),

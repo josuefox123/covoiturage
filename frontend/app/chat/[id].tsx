@@ -18,7 +18,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { WebSocketService, buildWsUrl, WSMessage } from '../../src/services/websocketService';
 import { API_URL } from '../../src/services/api';
@@ -32,6 +32,7 @@ import { API_URL } from '../../src/services/api';
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, token, authFetch } = useAuth();
 
   const flatListRef = useRef<FlatList>(null);
@@ -327,7 +328,7 @@ export default function ChatScreen() {
         />
 
         {/* Input Bar */}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(theme.spacing.md, insets.bottom) }]}>
           <TextInput
             style={styles.textInput}
             placeholder="Écrivez votre message..."

@@ -10,12 +10,13 @@
  * Zemy
  * ==============================================================
  */
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   TouchableOpacity,
   StyleSheet,
   Animated,
   View,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +32,16 @@ export default function SupportBubble() {
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('toggleSupportBubble', (show: boolean) => {
+      setVisible(show);
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
 
   // Subtle pulse animation
   useEffect(() => {
@@ -69,6 +80,8 @@ export default function SupportBubble() {
   const handlePress = () => {
     router.push('/support_chat');
   };
+
+  if (!visible) return null;
 
   return (
     <View style={styles.container} pointerEvents="box-none">

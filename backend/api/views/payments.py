@@ -151,17 +151,14 @@ def confirm_payment(request):
                 payment.save()
                 
                 if booking.payment_status != 'escrow':
-                    # Vérifier s'il y a assez de places disponibles
-                    ride = Ride.objects.select_for_update().get(id=booking.ride.id)
-                    if ride.seats_available < booking.seats_booked:
+                    from ..bookings.services import BookingService
+                    # Décrémenter les places sur les segments concernés
+                    allocated = BookingService.allocate_seats(booking)
+                    if not allocated:
                         booking.status = 'cancelled'
                         booking.payment_status = 'pending'
                         booking.save()
                         return Response({"error": "Désolé, les places ne sont plus disponibles. Contactez le support pour remboursement."}, status=status.HTTP_400_BAD_REQUEST)
-                    
-                    # Décrémenter définitivement les places
-                    ride.seats_available -= booking.seats_booked
-                    ride.save()
                     
                     booking.payment_status = 'escrow'
                     booking.status = 'confirmed'
