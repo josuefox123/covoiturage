@@ -108,13 +108,28 @@ export default function RideDetailScreen() {
     try {
       if (showLoading) setLoading(true);
       const queryParams = departure && destination ? `?departure=${encodeURIComponent(departure)}&destination=${encodeURIComponent(destination)}` : '';
-      const [data, settingsData] = await Promise.all([
-        authFetch(`/rides/${id}/${queryParams}`),
-        authFetch('/financial-settings/')
-      ]);
+      
+      let data = null;
+      try {
+        data = await authFetch(`/rides/${id}/${queryParams}`);
+      } catch (err) {
+        console.error("Error fetching ride details:", err);
+      }
+
+      if (!data) {
+        setLoading(false);
+        return;
+      }
+
       setRide(data);
-      if (settingsData && settingsData.length > 0) {
-        setFinancialSettings(settingsData[0]);
+
+      try {
+        const settingsData = await authFetch('/financial-settings/');
+        if (settingsData && settingsData.length > 0) {
+          setFinancialSettings(settingsData[0]);
+        }
+      } catch (err) {
+        console.warn("Could not fetch financial settings:", err);
       }
 
       if (user) {
