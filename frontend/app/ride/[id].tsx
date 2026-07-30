@@ -71,6 +71,9 @@ export default function RideDetailScreen() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
 
+  const [showBookingConfirmModal, setShowBookingConfirmModal] = useState(false);
+  const [showBookingSuccessModal, setShowBookingSuccessModal] = useState(false);
+
   const [financialSettings, setFinancialSettings] = useState<any>(null);
 
   const fetchRide = async (showLoading = true) => {
@@ -211,28 +214,30 @@ export default function RideDetailScreen() {
     if (bookingLoading || hasBooked) return;
     try {
       setBookingLoading(true);
+      setShowBookingConfirmModal(false);
       const res = await createBooking(id as string, 1, departure, destination);
       if (res && res.id) {
         setBookingId(res.id);
         setHasBooked(true);
-        
-        // Estimer le montant (prix total du trajet en ligne)
-        const totalSeatPrice = ride ? (ride.price_per_seat || 0) : 0;
-        
-        // Rediriger vers l'écran de paiement
-        router.push({
-          pathname: '/payment',
-          params: {
-            booking_id: String(res.id),
-            amount: String(res.amount_paid_online || totalSeatPrice)
-          }
-        });
+        setShowBookingSuccessModal(true);
+        await fetchRide(false);
       }
     } catch (error: any) {
       CustomAlert.alert('Erreur', error.message || "Impossible de créer la réservation. Veuillez réessayer.");
     } finally {
       setBookingLoading(false);
     }
+  };
+
+  const handleBooking = async () => {
+    if (bookingLoading || hasBooked) return;
+    
+    if (!user?.is_verified) {
+      CustomAlert.alert('Compte non vérifié', 'Votre compte doit être vérifié pour effectuer une réservation.');
+      return;
+    }
+
+    setShowBookingConfirmModal(true);
   };
 
   /**
@@ -248,24 +253,6 @@ export default function RideDetailScreen() {
         amount: String(myBooking?.amount_paid_online || totalSeatPrice)
       }
     });
-  };
-
-  const handleBooking = async () => {
-    if (bookingLoading || hasBooked) return;
-    
-    if (!user?.is_verified) {
-      CustomAlert.alert('Compte non vérifié', 'Votre compte doit être vérifié pour effectuer une réservation.');
-      return;
-    }
-
-    CustomAlert.alert(
-      'Conditions et règles de remboursement',
-      'Pour valider votre place, vous allez régler les frais de réservation en ligne. Le reste du montant sera à régler directement au conducteur lors du trajet.\n\nRègles de remboursement :\n• Annulation par le conducteur : Remboursement intégral (100%).\n• Annulation par vous à plus de 5h du départ (si montant ≥ 1 000 FCFA) : Éligible à un remboursement (soumis à validation).\n• Annulation par vous à moins de 5h du départ ou montant < 1 000 FCFA : Aucun remboursement possible.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'J\'accepte et je réserve', onPress: performBooking }
-      ]
-    );
   };
 
   const handleCancelBooking = () => {
@@ -1109,10 +1096,22 @@ export default function RideDetailScreen() {
 
         {!isOwnRide ? (
           hasBooked ? (
-            myBooking?.payment_status === 'pending' ? (
-              // Réservation créée mais paiement pas encore validé — relancer le checkout FeexPay
+            myBooking?.status === 'pending' ? (
+              // En attente de validation du chauffeur
               <TouchableOpacity
-                style={[styles.bookBtn, { backgroundColor: '#D97706' }, bookingLoading && { opacity: 0.7 }]}
+                style={[styles.bookBtn, { backgroundColor: '#F59E0B', opacity: 0.95 }]}
+                onPress={() => CustomAlert.alert("En attente", "Le conducteur doit approuver votre demande avant que vous ne puissiez effectuer le paiement.")}
+                activeOpacity={0.85}
+              >
+                <View style={styles.btnRow}>
+                  <Ionicons name="time" size={20} color={COLORS.white} />
+                  <Text style={styles.bookBtnText}>En attente de validation...</Text>
+                </View>
+              </TouchableOpacity>
+            ) : myBooking?.status === 'pending_payment' ? (
+              // Accepté par le conducteur — Compléter le paiement
+              <TouchableOpacity
+                style={[styles.bookBtn, { backgroundColor: '#16A34A' }, bookingLoading && { opacity: 0.7 }]}
                 onPress={handleRetryPayment}
                 disabled={bookingLoading}
                 activeOpacity={0.85}
@@ -1122,11 +1121,11 @@ export default function RideDetailScreen() {
                 ) : (
                   <View style={styles.btnRow}>
                     <Ionicons name="card" size={20} color={COLORS.white} />
-                    <Text style={styles.bookBtnText}>Compléter le paiement</Text>
+                    <Text style={styles.bookBtnText}>Payer {ride.price_per_seat?.toLocaleString() ?? "0"} FCFA</Text>
                   </View>
                 )}
               </TouchableOpacity>
-            ) : ride.status === 'active' ? (
+            ) : (myBooking?.status === 'confirmed' || myBooking?.status === 'active') ? (
               <TouchableOpacity
                 style={[styles.bookBtn, styles.cancelBtn, bookingLoading && { opacity: 0.7 }]}
                 onPress={handleCancelBooking}
@@ -1146,7 +1145,7 @@ export default function RideDetailScreen() {
               <View style={[styles.bookBtn, styles.bookedBtn, { opacity: 0.8 }]}>
                 <View style={styles.btnRow}>
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
-                  <Text style={styles.bookBtnText}>Place Réservée</Text>
+                  <Text style={styles.bookBtnText}>Place Réservée ({myBooking?.status})</Text>
                 </View>
               </View>
             )
@@ -1177,6 +1176,113 @@ export default function RideDetailScreen() {
           </View>
         )}
       </View>
+
+      {/* ── Modal de Confirmation de Réservation ── */}
+      <Modal
+        visible={showBookingConfirmModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowBookingConfirmModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Confirmer la réservation</Text>
+              <TouchableOpacity onPress={() => setShowBookingConfirmModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <Text style={{ fontSize: 14, color: COLORS.textLight, marginBottom: 16 }}>
+                Veuillez vérifier les détails de votre portion de voyage avant d'envoyer votre demande au conducteur.
+              </Text>
+
+              {/* Portion recap */}
+              <View style={{ backgroundColor: '#F3F4F6', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textLight, marginBottom: 8 }}>VOTRE TRAJET :</Text>
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.success }} />
+                    <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600', flex: 1 }} numberOfLines={2}>
+                      Départ : {departure || ride.departure_location}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.error }} />
+                    <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600', flex: 1 }} numberOfLines={2}>
+                      Arrivée : {destination || ride.arrival_location}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Price & info */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingBottom: 16 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: COLORS.text }}>Tarif de votre portion :</Text>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: COLORS.primary }}>
+                  {ride.price_per_seat?.toLocaleString() ?? "0"} FCFA
+                </Text>
+              </View>
+
+              {/* Informational Warning box */}
+              <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12, marginBottom: 20, flexDirection: 'row', gap: 8 }}>
+                <Ionicons name="information-circle" size={20} color="#D97706" style={{ marginTop: 2 }} />
+                <Text style={{ fontSize: 12, color: '#B45309', flex: 1, lineHeight: 16 }}>
+                  <Text style={{ fontWeight: '700' }}>Validation préalable requise : </Text>
+                  Votre demande de réservation sera transmise à {driverName}. Vous ne réglerez le montant de {ride.price_per_seat?.toLocaleString()} FCFA en ligne qu'après son acceptation.
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <TouchableOpacity
+                style={[styles.bookBtn, { width: '100%', marginBottom: 12, backgroundColor: COLORS.success }]}
+                onPress={performBooking}
+                disabled={bookingLoading}
+              >
+                {bookingLoading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.bookBtnText}>Confirmer la demande</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.bookBtn, { width: '100%', backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border }]}
+                onPress={() => setShowBookingConfirmModal(false)}
+              >
+                <Text style={[styles.bookBtnText, { color: COLORS.textLight }]}>Retour</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal de Succès ── */}
+      <Modal
+        visible={showBookingSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowBookingSuccessModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { maxHeight: 340, padding: 24, alignItems: 'center', justifyContent: 'center' }]}>
+            <Ionicons name="checkmark-circle" size={64} color={COLORS.success} style={{ marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 8, textAlign: 'center' }}>
+              Demande envoyée !
+            </Text>
+            <Text style={{ fontSize: 14, color: COLORS.textLight, textAlign: 'center', marginBottom: 20, lineHeight: 20 }}>
+              Votre demande a été transmise à {driverName}. Vous recevrez une notification dès que le trajet sera accepté pour procéder au paiement.
+            </Text>
+            <TouchableOpacity
+              style={[styles.bookBtn, { width: '100%', backgroundColor: COLORS.primary }]}
+              onPress={() => setShowBookingSuccessModal(false)}
+            >
+              <Text style={styles.bookBtnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1348,4 +1454,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0369A1',
   },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: COLORS.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingBottom: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  modalScroll: { paddingBottom: 24 },
 });
