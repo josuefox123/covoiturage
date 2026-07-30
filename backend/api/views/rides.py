@@ -193,7 +193,7 @@ class RideViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('driver', 'vehicle')
+        queryset = super().get_queryset().select_related('driver', 'vehicle').prefetch_related('driver__vehicles')
         
         # Filtres de recherche/filtrage envoyés par le frontend
         departure = self.request.query_params.get('departure')
@@ -715,7 +715,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset().select_related('passenger', 'ride', 'ride__driver', 'ride__vehicle')
+        queryset = super().get_queryset().select_related('passenger', 'ride', 'ride__driver', 'ride__vehicle').prefetch_related('ride__driver__vehicles')
         
         if not user.is_staff:
             from django.db.models import Q

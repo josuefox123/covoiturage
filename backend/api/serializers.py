@@ -106,16 +106,21 @@ class CompactUserSerializer(serializers.ModelSerializer):
     Sérialiseur léger pour le modèle User utilisé comme relation imbriquée (N+1 queries optimization).
     """
     rides_count = serializers.SerializerMethodField()
+    vehicles = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            'id', 'full_name', 'phone', 'avatar', 'rating', 'is_verified', 'rides_count'
+            'id', 'full_name', 'phone', 'avatar', 'rating', 'is_verified', 'rides_count', 'vehicles'
         ]
 
     @extend_schema_field(int)
     def get_rides_count(self, obj):
         return obj.rides_driven.filter(status='completed').count()
+
+    @extend_schema_field(dict)
+    def get_vehicles(self, obj):
+        return VehicleSerializer(obj.vehicles.all(), many=True).data
 
 class AdminUserSerializer(serializers.ModelSerializer):
     """

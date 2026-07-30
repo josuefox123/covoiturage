@@ -46,6 +46,18 @@ const COLORS = {
  * Responsabilités :
  * - Affichage et gestion de l'état lié à RideDetailScreen.
  */
+const getHaversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+};
+
 export default function RideDetailScreen() {
   const { id, departure, destination, passenger_dep_lat, passenger_dep_lon, passenger_arr_lat, passenger_arr_lon } = useLocalSearchParams<{
     id: string;
@@ -75,6 +87,22 @@ export default function RideDetailScreen() {
   const [showBookingSuccessModal, setShowBookingSuccessModal] = useState(false);
 
   const [financialSettings, setFinancialSettings] = useState<any>(null);
+
+  // Calculer l'approche si le passager ne part pas du départ initial
+  let approachText = '';
+  if (departure && passenger_dep_lat && passenger_dep_lon && ride?.departure_latitude && ride?.departure_longitude) {
+    const lat1 = parseFloat(passenger_dep_lat);
+    const lon1 = parseFloat(passenger_dep_lon);
+    const lat2 = parseFloat(ride.departure_latitude as any);
+    const lon2 = parseFloat(ride.departure_longitude as any);
+    if (!isNaN(lat1) && !isNaN(lon1) && !isNaN(lat2) && !isNaN(lon2)) {
+      const dist = getHaversineDistance(lat2, lon2, lat1, lon1);
+      if (dist > 0.5) {
+        const durationMin = Math.max(1, Math.round((dist / 30.0) * 60.0));
+        approachText = `Le conducteur débute son trajet à ${ride.departure_location.split(',')[0]}. Vous le rejoindrez en chemin à ${departure.split(',')[0]} (environ ${dist.toFixed(1)} km du départ initial, soit ~${durationMin} min en moto/voiture).`;
+      }
+    }
+  }
 
   const fetchRide = async (showLoading = true) => {
     try {
@@ -669,6 +697,15 @@ export default function RideDetailScreen() {
                 <View style={[styles.timelineLine, { backgroundColor: COLORS.primary }]} />
                 <Text style={styles.distanceText}> Portion covoiturage · Prix ajusté</Text>
               </View>
+              
+              {approachText ? (
+                <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 8, padding: 10, marginLeft: 24, marginBottom: 12, flexDirection: 'row', gap: 6 }}>
+                  <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} style={{ marginTop: 1 }} />
+                  <Text style={{ fontSize: 12, color: '#1E40AF', flex: 1, lineHeight: 16 }}>
+                    {approachText}
+                  </Text>
+                </View>
+              ) : null}
               
               {/* Point de dépose */}
               <View style={styles.timelineItem}>
