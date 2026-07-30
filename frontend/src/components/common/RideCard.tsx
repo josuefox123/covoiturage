@@ -65,7 +65,7 @@ export default function RideCard({
     if (paymentStatus === 'pending' || status === 'pending_payment') {
       return (
         <View style={[styles.statusBadge, { backgroundColor: theme.colors.warningLight }]}>
-          <Text style={[styles.statusText, { color: theme.colors.warningDark }]}>Paiement en attente</Text>
+          <Text style={[styles.statusText, { color: theme.colors.warningDark }]}>En attente</Text>
         </View>
       );
     }

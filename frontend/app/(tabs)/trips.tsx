@@ -102,8 +102,8 @@ export default function TripsScreen() {
       const ride = role === 'passenger' ? item.ride_details : item;
       if (!ride) return false;
 
-      // Masquer les réservations passager dont le paiement n'est pas encore complété
-      if (role === 'passenger' && item.status === 'pending_payment') {
+      // Masquer les réservations passager en attente de validation ou de paiement
+      if (role === 'passenger' && (item.status === 'pending' || item.status === 'pending_payment')) {
         return false;
       }
 

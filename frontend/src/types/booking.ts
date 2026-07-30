@@ -29,4 +29,7 @@ export interface Booking {
   payment_status?: string;
   transaction_id?: string | null;
   amount_paid_online?: number;
+  departure_location?: string;
+  arrival_location?: string;
+  portion_price?: number;
 }

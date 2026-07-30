@@ -719,11 +719,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         if not user.is_staff:
             from django.db.models import Q
-            # Le passager voit ses réservations (y compris en attente pour régulariser le paiement)
-            # Le conducteur ne voit QUE les réservations ayant réellement payé (payment_status != 'pending')
+            # Le passager voit toutes ses réservations.
+            # Le conducteur voit toutes les réservations sur ses propres trajets (y compris en attente de sa validation).
             queryset = queryset.filter(
-                Q(passenger=user) | 
-                (Q(ride__driver=user) & ~Q(payment_status='pending') & Q(status__in=['confirmed', 'active', 'completed']))
+                Q(passenger=user) | Q(ride__driver=user)
             )
             
         passenger_id = self.request.query_params.get('passenger')
@@ -974,6 +973,13 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.status != 'pending':
             return Response({"error": f"Impossible d'accepter une réservation au statut actuel: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
             
+        custom_price = request.data.get('price') or request.data.get('custom_price')
+        if custom_price is not None:
+            try:
+                booking.custom_price = int(custom_price)
+            except ValueError:
+                return Response({"error": "Le prix proposé est invalide."}, status=status.HTTP_400_BAD_REQUEST)
+
         booking.status = 'pending_payment'
         booking.save()
         
@@ -981,7 +987,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         create_and_send_notification(
             user=booking.passenger,
             title="Demande acceptée par le conducteur 🚗",
-            message=f"Le conducteur a accepté votre réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}. Veuillez procéder au paiement pour la confirmer.",
+            message=f"Le conducteur a accepté votre réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location} au tarif de {booking.total_amount} FCFA. Veuillez procéder au paiement pour la confirmer.",
             data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
         )
         return Response({"status": "Réservation acceptée. En attente de paiement."})

@@ -1693,7 +1693,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   mapFullContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: SCREEN_HEIGHT * 0.28,
   },
   dragZone: {
     width: '100%',

@@ -382,6 +382,7 @@ class Booking(models.Model):
     transaction_id = models.CharField(max_length=255, blank=True, null=True)
     departure_location = models.CharField(max_length=255, blank=True, null=True)
     arrival_location = models.CharField(max_length=255, blank=True, null=True)
+    custom_price = models.IntegerField(blank=True, null=True, verbose_name="Prix personnalisé conducteur")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -405,11 +406,12 @@ class Booking(models.Model):
         
     @property
     def total_amount(self):
-        if self.departure_location and self.arrival_location:
+        base_price = self.custom_price if self.custom_price is not None else self.ride.price_per_seat
+        if self.custom_price is None and self.departure_location and self.arrival_location:
             segment_price = self.ride.get_segment_price(self.departure_location, self.arrival_location)
             if segment_price:
-                return self.seats_booked * segment_price
-        return self.seats_booked * self.ride.price_per_seat
+                base_price = segment_price
+        return self.seats_booked * base_price
 
     @property
     def zemy_commission(self):

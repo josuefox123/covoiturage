@@ -11,7 +11,7 @@
  * ==============================================================
  */
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Animated, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Animated, Image, RefreshControl, Modal, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +49,8 @@ export default function RideManagementScreen() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [customPriceText, setCustomPriceText] = useState('');
 
   // Animations
   const statusAnim = useRef(new Animated.Value(1)).current;
@@ -93,6 +95,53 @@ export default function RideManagementScreen() {
       Animated.timing(statusAnim, { toValue: 1.2, duration: 200, useNativeDriver: true }),
       Animated.spring(statusAnim, { toValue: 1, friction: 3, useNativeDriver: true })
     ]).start();
+  };
+
+  const handleAcceptBooking = async (bookingId: string, customPrice?: number) => {
+    try {
+      setLoading(true);
+      const payload: any = {};
+      if (customPrice !== undefined && !isNaN(customPrice)) {
+        payload.price = customPrice;
+      }
+      await authFetch(`/bookings/${bookingId}/accept/`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      CustomAlert.alert('Succès', 'La réservation a été acceptée. Le passager va procéder au paiement.');
+      setEditingBooking(null);
+      await loadData(false);
+    } catch (error: any) {
+      CustomAlert.alert('Erreur', error.message || "Impossible d'accepter la réservation.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectBooking = async (bookingId: string) => {
+    CustomAlert.alert(
+      'Refuser la réservation',
+      'Voulez-vous vraiment refuser cette demande ?',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui, refuser',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await authFetch(`/bookings/${bookingId}/reject/`, { method: 'POST' });
+              CustomAlert.alert('Succès', 'La demande a été déclinée.');
+              await loadData(false);
+            } catch (error: any) {
+              CustomAlert.alert('Erreur', error.message || "Impossible de refuser la réservation.");
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleCancelRide = () => {
@@ -208,10 +257,11 @@ export default function RideManagementScreen() {
     switch (status) {
       case 'confirmed':
       case 'active':
-      case 'pending':
         return { text: 'Confirmée', color: COLORS.success, bg: '#F0FDF4' };
+      case 'pending':
+        return { text: 'En attente de validation', color: COLORS.warning, bg: '#FFFBEB' };
       case 'pending_payment':
-        return { text: 'Paiement en attente', color: COLORS.warning, bg: '#FFFBEB' };
+        return { text: 'En attente de paiement', color: COLORS.warning, bg: '#FFFBEB' };
       case 'completed':
         return { text: 'Arrivé(e)', color: COLORS.primary, bg: '#EFF6FF' };
       case 'cancelled':
@@ -233,7 +283,8 @@ export default function RideManagementScreen() {
 
   if (!ride) return null;
 
-  const activeBookings = bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status));
+  const pendingRequests = bookings.filter(b => b.status === 'pending' || b.status === 'pending_payment');
+  const activeBookings = bookings.filter(b => ['confirmed', 'active', 'completed'].includes(b.status));
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled' || b.status === 'rejected');
   
   const totalRevenue = bookings.filter(b => b.payment_status !== 'pending' && (b.status === 'confirmed' || b.status === 'active' || b.status === 'completed')).reduce((sum, b) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
@@ -358,6 +409,87 @@ export default function RideManagementScreen() {
           </View>
         </View>
 
+        {/* Pending Requests */}
+        {pendingRequests.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: COLORS.warning }]}>Demandes de réservation ({pendingRequests.length})</Text>
+            {pendingRequests.map((booking) => (
+              <View key={booking.id} style={[styles.passengerCard, { borderColor: COLORS.warning, borderWidth: 1.5 }]}>
+                <View style={styles.passengerHeader}>
+                  {booking.passenger_details?.avatar ? (
+                    <Image source={{ uri: getMediaUrl(booking.passenger_details.avatar) }} style={styles.passengerAvatarImage} />
+                  ) : (
+                    <View style={[styles.passengerAvatar, { backgroundColor: '#FEF3C7' }]}>
+                      <Text style={[styles.passengerAvatarText, { color: '#D97706' }]}>
+                        {booking.passenger_details?.full_name?.substring(0, 2).toUpperCase() || 'PA'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.passengerDetails}>
+                    <Text style={styles.passengerName}>{booking.passenger_details?.full_name}</Text>
+                    <Text style={styles.passengerPhone}>{booking.passenger_details?.phone || 'Numéro masqué'}</Text>
+                    
+                    {/* Portion recherchée */}
+                    <View style={{ marginTop: 6, backgroundColor: COLORS.grayLight, borderRadius: 8, padding: 8 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: COLORS.textLight }}>PORTION DEMANDÉE :</Text>
+                      <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '700', marginTop: 2 }}>
+                        {booking.departure_location?.split(',')[0]} ➔ {booking.arrival_location?.split(',')[0]}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.ratingRow, { marginTop: 8 }]}>
+                      <Ionicons name="star" size={12} color={COLORS.warning} />
+                      <Text style={styles.ratingTextSmall}>4.8</Text>
+                      <Text style={styles.seatBadge}>{booking.seats_booked} place(s)</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: booking.status === 'pending_payment' ? '#EFF6FF' : '#FEF3C7' }]}>
+                        <Text style={[styles.statusBadgeText, { color: booking.status === 'pending_payment' ? COLORS.primary : '#D97706' }]}>
+                          {booking.status === 'pending_payment' ? 'Paiement en cours' : "En attente d'approbation"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Tarif portion :</Text>
+                  <Text style={[styles.paymentValue, { color: COLORS.primary, fontWeight: '800' }]}>
+                    {booking.portion_price || booking.amount_paid_online || (ride.price_per_seat || 0) * (booking.seats_booked || 1)} FCFA
+                  </Text>
+                </View>
+
+                {/* Validation actions */}
+                {booking.status === 'pending_payment' ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', padding: 12, borderRadius: 12, gap: 8, marginTop: 12 }}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: COLORS.textLight }}>En cours de règlement par le passager...</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.passengerActions, { marginTop: 12 }]}>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: COLORS.success, borderColor: COLORS.success }]} 
+                      onPress={() => {
+                        setEditingBooking(booking);
+                        const initialPrice = booking.portion_price ? Math.round(booking.portion_price / booking.seats_booked) : (ride?.price_per_seat || 0);
+                        setCustomPriceText(String(initialPrice));
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.white} />
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>Accepter (OUI)</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: COLORS.error, borderColor: COLORS.error }]} 
+                      onPress={() => handleRejectBooking(booking.id)}
+                    >
+                      <Ionicons name="close-circle-outline" size={20} color={COLORS.white} />
+                      <Text style={[styles.actionBtnText, { color: COLORS.white }]}>Refuser (NON)</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            ))}
+          </>
+        )}
+
         {/* Passengers */}
         <Text style={styles.sectionHeader}>Passagers ({activeBookings.length})</Text>
         
@@ -400,7 +532,9 @@ export default function RideManagementScreen() {
 
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>Paiement:</Text>
-                <Text style={styles.paymentValue}>{(ride.price_per_seat || 0) * (booking.seats_booked || 1)} FCFA</Text>
+                <Text style={styles.paymentValue}>
+                  {booking.portion_price || booking.amount_paid_online || (ride.price_per_seat || 0) * (booking.seats_booked || 1)} FCFA
+                </Text>
                 <View style={[styles.paymentBadge, { backgroundColor: ['confirmed', 'active', 'completed'].includes(booking.status) ? '#F0FDF4' : '#FFFBEB' }]}>
                   <Text style={[styles.paymentBadgeText, { color: ['confirmed', 'active', 'completed'].includes(booking.status) ? COLORS.success : COLORS.warning }]}>
                     {['confirmed', 'active', 'completed'].includes(booking.status) ? 'Payé' : 'En attente'}
@@ -559,6 +693,59 @@ export default function RideManagementScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Modal d'édition du tarif avant validation */}
+      <Modal
+        visible={editingBooking !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setEditingBooking(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { maxHeight: 380, padding: 24, justifyContent: 'center' }]}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 12 }}>
+              Ajuster le tarif de la portion
+            </Text>
+            <Text style={{ fontSize: 13, color: COLORS.textLight, marginBottom: 16, lineHeight: 18 }}>
+              Modifiez le tarif proposé par place pour ce voyage de {editingBooking?.departure_location?.split(',')[0]} vers {editingBooking?.arrival_location?.split(',')[0]}. Le passager devra valider ce montant lors de son paiement.
+            </Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 16, height: 54, marginBottom: 20 }}>
+              <TextInput
+                style={{ flex: 1, fontSize: 18, fontWeight: '700', color: COLORS.text }}
+                value={customPriceText}
+                onChangeText={setCustomPriceText}
+                keyboardType="numeric"
+                placeholder="Ex: 1500"
+              />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.textLight }}>FCFA / place</Text>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.btnSuccess, { height: 48, width: '100%', marginHorizontal: 0, marginVertical: 0 }]}
+                onPress={() => {
+                  const price = parseInt(customPriceText);
+                  if (isNaN(price) || price <= 0) {
+                    CustomAlert.alert("Erreur", "Veuillez entrer un prix valide supérieur à 0.");
+                  } else {
+                    handleAcceptBooking(editingBooking!.id, price);
+                  }
+                }}
+              >
+                <Text style={styles.btnSuccessText}>Accepter avec ce prix</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ height: 48, width: '100%', justifyContent: 'center', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: COLORS.border }}
+                onPress={() => setEditingBooking(null)}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', color: COLORS.textLight }}>Retour</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -682,4 +869,6 @@ const styles = StyleSheet.create({
   fabText: { color: COLORS.white, fontSize: 15, fontWeight: '700' },
   descriptionLabel: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
   descriptionText: { fontSize: 14, color: COLORS.textLight, fontStyle: 'italic', lineHeight: 20 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalSheet: { backgroundColor: COLORS.white, borderRadius: 24, padding: 20, maxHeight: '85%' },
 });

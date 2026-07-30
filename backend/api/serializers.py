@@ -209,11 +209,24 @@ class BookingSerializer(serializers.ModelSerializer):
     """
     passenger_details = CompactUserSerializer(source='passenger', read_only=True)
     ride_details = RideSerializer(source='ride', read_only=True)
+    portion_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = '__all__'
         read_only_fields = ['passenger']
+
+    @extend_schema_field(int)
+    def get_portion_price(self, obj):
+        if obj.custom_price is not None:
+            return obj.custom_price * obj.seats_booked
+        ride = obj.ride
+        price = ride.price_per_seat
+        if obj.departure_location and obj.arrival_location:
+            segment_price = ride.get_segment_price(obj.departure_location, obj.arrival_location)
+            if segment_price:
+                price = segment_price
+        return price * obj.seats_booked
 
 class ParcelSerializer(serializers.ModelSerializer):
     """

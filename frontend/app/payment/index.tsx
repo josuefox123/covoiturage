@@ -3,12 +3,14 @@ import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'rea
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePayment } from '../../src/hooks/usePayment';
+import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function PaymentScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { initiatePayment, loading, error } = usePayment();
+    const { authFetch } = useAuth();
     
     const bookingId = params.booking_id as string;
     const amount = Number(params.amount) || 0;
@@ -30,7 +32,19 @@ export default function PaymentScreen() {
         }
     };
 
-    const handleNavigationStateChange = (navState: any) => {
+    const resetBookingStatus = async () => {
+        if (!bookingId) return;
+        try {
+            await authFetch(`/bookings/${bookingId}/`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: 'pending' })
+            });
+        } catch (e) {
+            console.error('Failed to reset status:', e);
+        }
+    };
+
+    const handleNavigationStateChange = async (navState: any) => {
         const url = navState.url;
         console.log('WebView URL changed:', url);
         
@@ -116,6 +130,7 @@ export default function PaymentScreen() {
                 }
             } catch (err) {}
             
+            await resetBookingStatus();
             router.replace({
                 pathname: '/payment/failed',
                 params: { message: msg }
@@ -123,7 +138,7 @@ export default function PaymentScreen() {
         }
     };
 
-    const onMessage = (event: WebViewMessageEvent) => {
+    const onMessage = async (event: WebViewMessageEvent) => {
         try {
             const data = JSON.parse(event.nativeEvent.data);
             
@@ -138,6 +153,7 @@ export default function PaymentScreen() {
                     }
                 });
             } else if (data.status === 'failed') {
+                await resetBookingStatus();
                 router.replace({
                     pathname: '/payment/failed',
                     params: { message: data.message }
@@ -168,7 +184,10 @@ export default function PaymentScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+                <TouchableOpacity style={styles.backBtn} onPress={async () => {
+                    await resetBookingStatus();
+                    router.back();
+                }}>
                     <Ionicons name="close" size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Paiement Zemy</Text>

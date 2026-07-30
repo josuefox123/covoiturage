@@ -225,8 +225,11 @@ export default function RideDetailScreen() {
     switch (status) {
       case 'confirmed':
       case 'active':
-      case 'pending':
         return { text: 'Confirmée', color: COLORS.success, bg: '#F0FDF4' };
+      case 'pending':
+        return { text: 'En attente de validation', color: COLORS.warning, bg: '#FFFBEB' };
+      case 'pending_payment':
+        return { text: 'En attente de paiement', color: COLORS.warning, bg: '#FFFBEB' };
       case 'completed':
         return { text: 'Arrivé(e)', color: COLORS.primary, bg: '#EFF6FF' };
       case 'cancelled':
@@ -672,12 +675,12 @@ export default function RideDetailScreen() {
           })}
         </Text>
 
-        {/* Personalized Segment Route Card */}
-        {departure && destination && (
-          <View style={[styles.card, { borderColor: COLORS.success, borderWidth: 1.5, marginBottom: 16, overflow: 'hidden' }]}>
-            <View style={{ backgroundColor: '#F0FDF4', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#DCFCE7' }}>
-              <Ionicons name="checkmark-circle" size={18} color={COLORS.success} />
-              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.success }}>
+        {/* Unified Portion Recap Card */}
+        {departure && destination && !isOwnRide && !hasBooked && (
+          <View style={[styles.card, { borderColor: COLORS.primary, borderWidth: 1.5, marginBottom: 16, overflow: 'hidden' }]}>
+            <View style={{ backgroundColor: '#EFF6FF', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#BFDBFE' }}>
+              <Ionicons name="car-outline" size={18} color={COLORS.primary} />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.primary }}>
                 VOTRE PORTION DE VOYAGE (SÉLECTIONNÉE)
               </Text>
             </View>
@@ -697,7 +700,7 @@ export default function RideDetailScreen() {
                 <View style={[styles.timelineLine, { backgroundColor: COLORS.primary }]} />
                 <Text style={styles.distanceText}> Portion covoiturage · Prix ajusté</Text>
               </View>
-              
+
               {approachText ? (
                 <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 8, padding: 10, marginLeft: 24, marginBottom: 12, flexDirection: 'row', gap: 6 }}>
                   <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} style={{ marginTop: 1 }} />
@@ -716,6 +719,88 @@ export default function RideDetailScreen() {
                     🏁 VOTRE ARRIVÉE (Dépose)
                   </Text>
                 </View>
+              </View>
+
+              <View style={[styles.divider, { marginVertical: 12 }]} />
+
+              {/* Price line */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 6 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.text }}>Tarif portion estimé :</Text>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: COLORS.primary }}>
+                  {ride.price_per_seat?.toLocaleString() ?? "0"} FCFA
+                </Text>
+              </View>
+
+              <View style={[styles.divider, { marginVertical: 12 }]} />
+
+              {/* Warning block */}
+              <View style={{ flexDirection: 'row', gap: 8, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12 }}>
+                <Ionicons name="information-circle" size={20} color="#D97706" style={{ marginTop: 1 }} />
+                <Text style={{ fontSize: 12, color: '#B45309', flex: 1, lineHeight: 16 }}>
+                  <Text style={{ fontWeight: '700' }}>Étape de validation requise : </Text>
+                  Votre demande de réservation sera transmise à {driverName} pour approbation. Vous ne réglerez le tarif en ligne qu'après son acceptation.
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Unified Full Trip Recap Card */}
+        {(!departure || !destination) && !isOwnRide && !hasBooked && (
+          <View style={[styles.card, { borderColor: COLORS.primary, borderWidth: 1.5, marginBottom: 16, overflow: 'hidden' }]}>
+            <View style={{ backgroundColor: '#EFF6FF', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#BFDBFE' }}>
+              <Ionicons name="car-outline" size={18} color={COLORS.primary} />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.primary }}>
+                VOTRE TRAJET DE COVOITURAGE (COMPLET)
+              </Text>
+            </View>
+            <View style={{ padding: 16 }}>
+              {/* Point de départ */}
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineDotStart, { backgroundColor: COLORS.success }]} />
+                <View style={styles.timelineContent}>
+                  <Text style={[styles.locationText, { fontWeight: '700' }]}>{departure || ride.departure_location}</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.success, fontWeight: '700', marginTop: 2 }}>
+                    📍 POINT DE DÉPART (Embarquement)
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.timelineLink}>
+                <View style={[styles.timelineLine, { backgroundColor: COLORS.primary }]} />
+                <Text style={styles.distanceText}> Trajet direct </Text>
+              </View>
+              
+              {/* Point d'arrivée */}
+              <View style={styles.timelineItem}>
+                <Ionicons name="location" size={20} color={COLORS.error} style={styles.timelineIconEnd} />
+                <View style={styles.timelineContent}>
+                  <Text style={[styles.locationText, { fontWeight: '700' }]}>{destination || ride.arrival_location}</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.error, fontWeight: '700', marginTop: 2 }}>
+                    🏁 POINT D'ARRIVÉE (Dépose)
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.divider, { marginVertical: 12 }]} />
+
+              {/* Price line */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 6 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.text }}>Tarif estimé :</Text>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: COLORS.primary }}>
+                  {ride.price_per_seat?.toLocaleString() ?? "0"} FCFA
+                </Text>
+              </View>
+
+              <View style={[styles.divider, { marginVertical: 12 }]} />
+
+              {/* Warning block */}
+              <View style={{ flexDirection: 'row', gap: 8, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12 }}>
+                <Ionicons name="information-circle" size={20} color="#D97706" style={{ marginTop: 1 }} />
+                <Text style={{ fontSize: 12, color: '#B45309', flex: 1, lineHeight: 16 }}>
+                  <Text style={{ fontWeight: '700' }}>Étape de validation requise : </Text>
+                  Votre demande de réservation sera transmise à {driverName} pour approbation. Vous ne réglerez le tarif en ligne qu'après son acceptation.
+                </Text>
               </View>
             </View>
           </View>
@@ -1106,6 +1191,8 @@ export default function RideDetailScreen() {
           </>
         )}
         </View>{/* end padded content area */}
+
+
       </ScrollView>
 
       {/* Modern Footer Action Block */}
@@ -1148,7 +1235,7 @@ export default function RideDetailScreen() {
             ) : myBooking?.status === 'pending_payment' ? (
               // Accepté par le conducteur — Compléter le paiement
               <TouchableOpacity
-                style={[styles.bookBtn, { backgroundColor: '#16A34A' }, bookingLoading && { opacity: 0.7 }]}
+                style={[styles.bookBtn, { backgroundColor: COLORS.primary }, bookingLoading && { opacity: 0.7 }]}
                 onPress={handleRetryPayment}
                 disabled={bookingLoading}
                 activeOpacity={0.85}
@@ -1236,20 +1323,48 @@ export default function RideDetailScreen() {
               </Text>
 
               {/* Portion recap */}
-              <View style={{ backgroundColor: '#F3F4F6', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textLight, marginBottom: 8 }}>VOTRE TRAJET :</Text>
-                <View style={{ gap: 8 }}>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.success }} />
-                    <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600', flex: 1 }} numberOfLines={2}>
-                      Départ : {departure || ride.departure_location}
-                    </Text>
+              <View style={[styles.card, { borderColor: COLORS.primary, borderWidth: 1.5, marginBottom: 16, overflow: 'hidden', backgroundColor: COLORS.white }]}>
+                <View style={{ backgroundColor: '#EFF6FF', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#BFDBFE' }}>
+                  <Ionicons name="car-outline" size={18} color={COLORS.primary} />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.primary }}>
+                    VOTRE TRAJET DE COVOITURAGE
+                  </Text>
+                </View>
+                <View style={{ padding: 16 }}>
+                  {/* Point d'embarquement */}
+                  <View style={styles.timelineItem}>
+                    <View style={[styles.timelineDotStart, { backgroundColor: COLORS.success }]} />
+                    <View style={styles.timelineContent}>
+                      <Text style={[styles.locationText, { fontWeight: '700' }]} numberOfLines={2}>{departure || ride.departure_location}</Text>
+                      <Text style={{ fontSize: 11, color: COLORS.success, fontWeight: '700', marginTop: 2 }}>
+                        📍 VOTRE EMBARQUEMENT (Rendez-vous)
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.error }} />
-                    <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600', flex: 1 }} numberOfLines={2}>
-                      Arrivée : {destination || ride.arrival_location}
-                    </Text>
+                  
+                  <View style={styles.timelineLink}>
+                    <View style={[styles.timelineLine, { backgroundColor: COLORS.primary }]} />
+                    <Text style={styles.distanceText}> Portion sélectionnée </Text>
+                  </View>
+
+                  {approachText ? (
+                    <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 8, padding: 10, marginLeft: 24, marginBottom: 12, flexDirection: 'row', gap: 6 }}>
+                      <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} style={{ marginTop: 1 }} />
+                      <Text style={{ fontSize: 12, color: '#1E40AF', flex: 1, lineHeight: 16 }}>
+                        {approachText}
+                      </Text>
+                    </View>
+                  ) : null}
+                  
+                  {/* Point de dépose */}
+                  <View style={styles.timelineItem}>
+                    <Ionicons name="location" size={20} color={COLORS.error} style={styles.timelineIconEnd} />
+                    <View style={styles.timelineContent}>
+                      <Text style={[styles.locationText, { fontWeight: '700' }]} numberOfLines={2}>{destination || ride.arrival_location}</Text>
+                      <Text style={{ fontSize: 11, color: COLORS.error, fontWeight: '700', marginTop: 2 }}>
+                        🏁 VOTRE ARRIVÉE (Dépose)
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -1273,7 +1388,7 @@ export default function RideDetailScreen() {
 
               {/* Action Buttons */}
               <TouchableOpacity
-                style={[styles.bookBtn, { width: '100%', marginBottom: 12, backgroundColor: COLORS.success }]}
+                style={[styles.bookBtn, { width: '100%', marginBottom: 12, backgroundColor: COLORS.primary }]}
                 onPress={performBooking}
                 disabled={bookingLoading}
               >
