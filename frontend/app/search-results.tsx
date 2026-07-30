@@ -639,7 +639,14 @@ export default function SearchResultsScreen() {
                 ride={item}
                 onPress={() => router.push({
                   pathname: `/ride/${item.id}`,
-                  params: { departure, destination }
+                  params: { 
+                    departure, 
+                    destination,
+                    passenger_dep_lat: departure_latitude || '',
+                    passenger_dep_lon: departure_longitude || '',
+                    passenger_arr_lat: arrival_latitude || '',
+                    passenger_arr_lon: arrival_longitude || ''
+                  }
                 } as any)}
                 index={index}
                 searchedDeparture={departure}

@@ -47,7 +47,15 @@ const COLORS = {
  * - Affichage et gestion de l'état lié à RideDetailScreen.
  */
 export default function RideDetailScreen() {
-  const { id, departure, destination } = useLocalSearchParams<{ id: string; departure?: string; destination?: string }>();
+  const { id, departure, destination, passenger_dep_lat, passenger_dep_lon, passenger_arr_lat, passenger_arr_lon } = useLocalSearchParams<{
+    id: string;
+    departure?: string;
+    destination?: string;
+    passenger_dep_lat?: string;
+    passenger_dep_lon?: string;
+    passenger_arr_lat?: string;
+    passenger_arr_lon?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { authFetch, user } = useAuth();
@@ -399,6 +407,52 @@ export default function RideDetailScreen() {
         }
       });
 
+      // Custom markers for passenger boarding/deboarding points
+      const passDepLat = ${passenger_dep_lat ? parseFloat(passenger_dep_lat) : 'null'};
+      const passDepLon = ${passenger_dep_lon ? parseFloat(passenger_dep_lon) : 'null'};
+      const passArrLat = ${passenger_arr_lat ? parseFloat(passenger_arr_lat) : 'null'};
+      const passArrLon = ${passenger_arr_lon ? parseFloat(passenger_arr_lon) : 'null'};
+
+      if (passDepLat && passDepLon) {
+        var passDepMarker = new google.maps.Marker({
+          position: { lat: passDepLat, lng: passDepLon },
+          map: map,
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 5,
+            fillColor: '#16A34A',
+            fillOpacity: 1,
+            strokeColor: 'white',
+            strokeWeight: 2
+          }
+        });
+        var infowDep = new google.maps.InfoWindow({
+          content: '<div style="font-family: system-ui, -apple-system, sans-serif; font-size: 11px; font-weight: 700; color: #16A34A; padding: 2px;">Votre Embarquement</div>',
+          disableAutoPan: true
+        });
+        infowDep.open(map, passDepMarker);
+      }
+
+      if (passArrLat && passArrLon) {
+        var passArrMarker = new google.maps.Marker({
+          position: { lat: passArrLat, lng: passArrLon },
+          map: map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 7,
+            fillColor: '#DC2626',
+            fillOpacity: 1,
+            strokeColor: 'white',
+            strokeWeight: 2
+          }
+        });
+        var infowArr = new google.maps.InfoWindow({
+          content: '<div style="font-family: system-ui, -apple-system, sans-serif; font-size: 11px; font-weight: 700; color: #DC2626; padding: 2px;">Votre Dépose</div>',
+          disableAutoPan: true
+        });
+        infowArr.open(map, passArrMarker);
+      }
+
       // Custom markers for stopovers
       for (var i = 0; i < stopovers.length; i++) {
         var stop = stopovers[i];
@@ -602,6 +656,50 @@ export default function RideDetailScreen() {
             year: 'numeric'
           })}
         </Text>
+
+        {/* Personalized Segment Route Card */}
+        {departure && destination && (
+          <View style={[styles.card, { borderColor: COLORS.success, borderWidth: 1.5, marginBottom: 16, overflow: 'hidden' }]}>
+            <View style={{ backgroundColor: '#F0FDF4', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#DCFCE7' }}>
+              <Ionicons name="checkmark-circle" size={18} color={COLORS.success} />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.success }}>
+                VOTRE PORTION DE VOYAGE (SÉLECTIONNÉE)
+              </Text>
+            </View>
+            <View style={{ padding: 16 }}>
+              {/* Point de rendez-vous */}
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineDotStart, { backgroundColor: COLORS.success }]} />
+                <View style={styles.timelineContent}>
+                  <Text style={[styles.locationText, { fontWeight: '700' }]}>{departure}</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.success, fontWeight: '700', marginTop: 2 }}>
+                    📍 VOTRE EMBARQUEMENT (Rendez-vous)
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.timelineLink}>
+                <View style={[styles.timelineLine, { backgroundColor: COLORS.primary }]} />
+                <Text style={styles.distanceText}> Portion covoiturage · Prix ajusté</Text>
+              </View>
+              
+              {/* Point de dépose */}
+              <View style={styles.timelineItem}>
+                <Ionicons name="location" size={20} color={COLORS.error} style={styles.timelineIconEnd} />
+                <View style={styles.timelineContent}>
+                  <Text style={[styles.locationText, { fontWeight: '700' }]}>{destination}</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.error, fontWeight: '700', marginTop: 2 }}>
+                    🏁 VOTRE ARRIVÉE (Dépose)
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {departure && destination ? (
+          <Text style={styles.sectionTitle}>Itinéraire complet du conducteur</Text>
+        ) : null}
 
         {/* Timeline Route Card */}
         <View style={styles.card}>
