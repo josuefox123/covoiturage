@@ -377,8 +377,14 @@ class RideService:
 
 
 
+            # Trier tous les waypoints par leur distance depuis le départ pour garantir l'ordre chronologique exact
+            all_waypoints.sort(key=lambda wp: wp.distance_from_start_m)
+            for idx, wp in enumerate(all_waypoints):
+                wp.order = idx
+
             # Insertion en batch
             RideWaypoint.objects.bulk_create(all_waypoints, ignore_conflicts=True)
+
 
         logger.info(f"Tronçons ({num_legs}) générés avec succès pour le trajet {ride.id}. "
                     f"{len(all_waypoints)} waypoints extraits.")
