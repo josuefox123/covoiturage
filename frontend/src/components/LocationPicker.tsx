@@ -122,6 +122,7 @@ export default function LocationPicker({
   const abortRef = useRef<AbortController | null>(null);
   const searchAbort = useRef<AbortController | null>(null);
   const lastReverseRef = useRef({ lat: 0, lon: 0 });
+  const searchVersionRef = useRef(0); // Version counter to prevent stale result race conditions
 
   // Synchronise les suggestions proches et les points d'intérêt
   useEffect(() => {
@@ -507,15 +508,20 @@ export default function LocationPicker({
     return null;
   };
 
-  const searchPlaces = async (query: string) => {
+  const searchPlaces = useCallback(async (query: string) => {
     if (query.trim().length < 2) {
       setSearchResults([]);
       return;
     }
 
+    // Incrémenter le compteur de version pour détecter les résultats périmés
+    searchVersionRef.current += 1;
+    const currentVersion = searchVersionRef.current;
+
     setIsSearching(true);
     searchAbort.current?.abort();
     searchAbort.current = new AbortController();
+    const signal = searchAbort.current.signal;
 
     try {
       // Local popular places from backend
@@ -527,7 +533,9 @@ export default function LocationPicker({
         localResults = Array.isArray(localData) ? localData : localData?.results || [];
       } catch (err) {}
 
-      // Google Places Autocomplete — fast, route-aware, precise
+      // Vérifier si cette recherche est toujours la plus récente
+      if (currentVersion !== searchVersionRef.current) return;
+
       // Google Places Autocomplete — fast, route-aware, precise
       const radiusMeters = filterRadius * 1000;
       const locationBias = userLocation
@@ -540,11 +548,14 @@ export default function LocationPicker({
 
       const acResp = await fetch(
         `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_API_KEY}&language=fr&components=country:bj${locationBias}&types=${typesParam}`,
-        { signal: searchAbort.current.signal }
+        { signal }
       );
 
       if (!acResp.ok) throw new Error(`HTTP ${acResp.status}`);
       const acData = await acResp.json();
+
+      // Vérifier à nouveau après l'appel async
+      if (currentVersion !== searchVersionRef.current) return;
 
       const googleResults: any[] =
         (acData?.predictions || []).map((pred: any) => ({
@@ -579,11 +590,17 @@ export default function LocationPicker({
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Search error:', error);
+        // Afficher les résultats locaux si Google échoue
+        if (currentVersion === searchVersionRef.current) {
+          setSearchResults([]);
+        }
       }
     } finally {
-      setIsSearching(false);
+      if (currentVersion === searchVersionRef.current) {
+        setIsSearching(false);
+      }
     }
-  };
+  }, [userLocation, filterRadius, filterType]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
@@ -592,13 +609,14 @@ export default function LocationPicker({
     if (text.trim().length === 0) {
       setSearchResults([]);
       setIsSearching(false);
+      searchVersionRef.current += 1; // Invalidate any pending search
       return;
     }
 
     searchTimeoutRef.current = setTimeout(() => {
       searchPlaces(text);
-    }, 750); // Debounce increased to 750ms for Google API cost savings
-  }, [userLocation]);
+    }, 400); // Réduit à 400ms pour une meilleure réactivité
+  }, [userLocation, searchPlaces]);
 
   const handleSelectSuggestion = useCallback(
     (loc: LocationData) => {
