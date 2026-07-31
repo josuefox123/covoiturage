@@ -127,18 +127,21 @@ def _categorize_approach(distance_km):
         return 0.5, f"{max(1, int(dist_m / 83))} min à pied"
     elif distance_km <= 1.0:
         return 1.0, f"{max(1, int(dist_m / 416))} min en zem"
-    elif distance_km <= 2.0:
-        return 2.0, f"{max(1, int(dist_m / 416))} min en zem"
     elif distance_km <= 3.0:
-        return 3.0, f"{max(1, int(dist_m / 500))} min en taxi"
-    else:
+        return 3.0, f"{max(1, int(dist_m / 416))} min en zem"
+    elif distance_km <= 5.0:
         return 5.0, f"{max(1, int(dist_m / 500))} min en taxi"
+    elif distance_km <= 10.0:
+        return 10.0, f"{max(1, int(dist_m / 500))} min en taxi / zem"
+    else:
+        return 15.0, f"{max(1, int(dist_m / 500))} min en taxi"
 
 
 class SearchService:
 
     # Rayon de recherche maximal (km)
-    MAX_RADIUS_KM = 5.0
+    MAX_RADIUS_KM = 15.0
+
 
     @staticmethod
     def find_rides(departure_lat, departure_lon, arrival_lat, arrival_lon, target_date,
