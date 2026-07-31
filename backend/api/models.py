@@ -235,6 +235,10 @@ class Ride(models.Model):
     total_seats = models.IntegerField()
     seats_available = models.IntegerField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True)
+    # Suivi du tronçon en cours (BlaBlaCar-like live tracking)
+    current_leg_index = models.IntegerField(default=0, help_text="Index du tronçon en cours d'exécution")
+    # Acceptation automatique sans validation manuelle (mode Uber)
+    auto_accept = models.BooleanField(default=False, help_text="Accepter automatiquement les demandes de réservation")
     driver_latitude = models.FloatField(blank=True, null=True)
     driver_longitude = models.FloatField(blank=True, null=True)
     departure_latitude = models.FloatField(blank=True, null=True)
@@ -1059,6 +1063,15 @@ class RideLeg(models.Model):
     seats_available = models.IntegerField()
     price = models.IntegerField()
     order = models.IntegerField(help_text="Index chronologique du tronçon dans le trajet")
+    # Données réelles issues de l'API Google Directions
+    distance_m = models.IntegerField(default=0, help_text="Distance réelle du tronçon en mètres")
+    duration_sec = models.IntegerField(default=0, help_text="Durée réelle du tronçon en secondes")
+    LEG_STATUS_CHOICES = [
+        ('upcoming', 'À venir'),
+        ('active', 'En cours'),
+        ('completed', 'Terminé'),
+    ]
+    leg_status = models.CharField(max_length=20, choices=LEG_STATUS_CHOICES, default='upcoming')
 
     class Meta:
         verbose_name = "Tronçon de trajet"
@@ -1086,3 +1099,70 @@ class DirectionsCache(models.Model):
 
     def __str__(self):
         return f"Cache {self.origin_place_id} -> {self.destination_place_id}"
+
+
+class RideWaypoint(models.Model):
+    """
+    Représente un point GPS significatif (ville, quartier, carrefour) automatiquement
+    extrait de la polyline Google Directions lors de la publication d'un trajet.
+    
+    Permet la recherche BlaBlaCar-like : trouver un trajet même si le lieu
+    recherché n'est pas un arrêt déclaré mais se trouve sur la trajectoire réelle.
+    
+    Relations :
+        - ride (Ride) : Trajet parent.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='waypoints')
+    name = models.CharField(max_length=255, blank=True, help_text="Nom de la localité (extrait des steps Google ou reverse géocodé)")
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    order = models.IntegerField(help_text="Position dans l'itinéraire (index chronologique)")
+    distance_from_start_m = models.IntegerField(default=0, help_text="Distance cumulée en mètres depuis le départ du trajet")
+    leg_index = models.IntegerField(default=0, help_text="Index du RideLeg auquel appartient ce waypoint")
+    is_stopover = models.BooleanField(default=False, help_text="True si c'est un arrêt déclaré par le chauffeur")
+
+    class Meta:
+        verbose_name = "Point de passage"
+        verbose_name_plural = "Points de passage"
+        ordering = ['ride', 'order']
+        indexes = [
+            models.Index(fields=['ride', 'order']),
+            models.Index(fields=['latitude', 'longitude']),
+        ]
+
+    def __str__(self):
+        return f"{self.ride.id} - WP {self.order}: {self.name or 'Point GPS'} ({self.latitude:.4f}, {self.longitude:.4f})"
+
+
+class SearchAlert(models.Model):
+    """
+    Alerte de recherche créée par un passager quand aucun trajet n'est disponible.
+    
+    Le système notifie automatiquement le passager dès qu'un trajet compatible
+    devient disponible (nouveau trajet publié ou place libérée).
+    
+    Relations :
+        - passenger (User) : Passager ayant créé l'alerte.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    passenger = models.ForeignKey(User, on_delete=models.CASCADE, related_name='search_alerts')
+    departure_location = models.CharField(max_length=255, blank=True)
+    arrival_location = models.CharField(max_length=255, blank=True)
+    departure_latitude = models.FloatField(blank=True, null=True)
+    departure_longitude = models.FloatField(blank=True, null=True)
+    arrival_latitude = models.FloatField(blank=True, null=True)
+    arrival_longitude = models.FloatField(blank=True, null=True)
+    desired_date = models.DateField()
+    seats_needed = models.IntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Alerte de recherche"
+        verbose_name_plural = "Alertes de recherche"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Alerte {self.passenger} : {self.departure_location} → {self.arrival_location} ({self.desired_date})"

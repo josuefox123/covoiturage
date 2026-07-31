@@ -708,6 +708,121 @@ class RideViewSet(viewsets.ModelViewSet):
             
         return Response({"status": "Trajet commencé."})
 
+    @action(detail=True, methods=['post'], url_path='next_leg')
+    def next_leg(self, request, pk=None):
+        """
+        Passe au tronçon suivant du trajet (BlaBlaCar-like live tracking).
+        
+        - Marque le tronçon en cours comme 'completed'
+        - Libère les places des passagers qui descendent à cet arrêt
+        - Incrémente current_leg_index
+        - Notifie les passagers compatibles (SearchAlert)
+        
+        POST /api/rides/{id}/next_leg/
+        """
+        ride = self.get_object()
+        if ride.driver != request.user and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+
+        if ride.status not in ['active', 'started']:
+            return Response({"error": "Le trajet n'est pas en cours."}, status=status.HTTP_400_BAD_REQUEST)
+
+        legs = list(ride.legs.order_by('order'))
+        if not legs:
+            return Response({"error": "Ce trajet ne possède pas de tronçons."}, status=status.HTTP_400_BAD_REQUEST)
+
+        current_idx = ride.current_leg_index
+        total_legs = len(legs)
+
+        if current_idx >= total_legs:
+            return Response({"error": "Tous les tronçons ont déjà été parcourus."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Marquer le tronçon courant comme complété
+        current_leg = legs[current_idx]
+        current_leg.leg_status = 'completed'
+        current_leg.save(update_fields=['leg_status'])
+
+        # Identifier les bookings dont l'arrêt de descente correspond à ce leg
+        freed_seats_total = 0
+        from ..services.matching_service import MatchingService
+        alighting_passengers = []
+
+        for booking in ride.bookings.filter(status='confirmed').select_related('passenger'):
+            arr_idx = MatchingService.get_leg_indices_for_booking(
+                ride,
+                booking.departure_location or ride.departure_location,
+                booking.arrival_location or ride.arrival_location
+            )[1]
+
+            if arr_idx == current_idx:
+                # Ce passager descend ici → libérer ses places sur les legs futurs
+                dep_idx = MatchingService.get_leg_indices_for_booking(
+                    ride,
+                    booking.departure_location or ride.departure_location,
+                    booking.arrival_location or ride.arrival_location
+                )[0]
+                # Les legs futurs (après cet arrêt) regagnent des places
+                MatchingService.deallocate_seats_for_segment(
+                    ride, current_idx + 1, total_legs - 1, booking.seats_booked
+                )
+                freed_seats_total += booking.seats_booked
+                alighting_passengers.append(booking.passenger)
+
+                create_and_send_notification(
+                    user=booking.passenger,
+                    title="Arrivée à votre arrêt 📍",
+                    message=f"Vous êtes arrivé(e) à {current_leg.end_location}. Merci d'avoir voyagé avec Zemy !",
+                    data={'type': 'passenger_alighting', 'booking_id': str(booking.id), 'ride_id': str(ride.id)}
+                )
+
+        # Avancer au tronçon suivant
+        next_idx = current_idx + 1
+        ride.current_leg_index = next_idx
+        ride.status = 'started'
+
+        if next_idx < total_legs:
+            next_leg_obj = legs[next_idx]
+            next_leg_obj.leg_status = 'active'
+            next_leg_obj.save(update_fields=['leg_status'])
+        else:
+            # Tous les tronçons parcourus → marquer le trajet comme terminé
+            ride.status = 'completed'
+
+        ride.save(update_fields=['current_leg_index', 'status'])
+
+        # Notifier les SearchAlert compatibles si des places se sont libérées
+        if freed_seats_total > 0 and next_idx < total_legs:
+            try:
+                from ..tasks import notify_compatible_passengers_task
+                notify_compatible_passengers_task.apply_async(
+                    (str(ride.id), next_idx, freed_seats_total), countdown=5
+                )
+            except Exception:
+                # Si Celery n'est pas disponible, notifier directement
+                from ..services.matching_service import MatchingService as MS
+                compatible = MS.find_compatible_search_alerts(ride, next_idx, freed_seats_total)
+                for item in compatible:
+                    create_and_send_notification(
+                        user=item['passenger'],
+                        title="Place disponible sur votre trajet 🎉",
+                        message=f"Une place vient de se libérer sur le trajet {ride.departure_location} → {ride.arrival_location} ! Réservez maintenant.",
+                        data={'type': 'seat_available', 'ride_id': str(ride.id)}
+                    )
+
+        current_leg_name = current_leg.end_location
+        next_leg_name = legs[next_idx].start_location if next_idx < total_legs else "Destination finale"
+
+        return Response({
+            "status": "ok",
+            "current_leg_index": next_idx,
+            "completed_leg": current_leg_name,
+            "next_stop": next_leg_name,
+            "freed_seats": freed_seats_total,
+            "alighting_passengers": len(alighting_passengers),
+            "ride_status": ride.status,
+        })
+
+
 class BookingViewSet(viewsets.ModelViewSet):
     """
     ViewSet gérant les réservations de places dans un trajet.
