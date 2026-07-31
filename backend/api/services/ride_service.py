@@ -45,19 +45,8 @@ class RideService:
             logger.warning(f"Trajet {ride.id} sans segments valides.")
             return
 
-        # 2. Déterminer les prix de chaque tronçon
+        # 2. Déterminer les prix de chaque tronçon (déplacé après le calcul des distances)
         leg_prices = []
-        if len(stopovers) == 0:
-            # Trajet direct
-            leg_prices.append(ride.price_per_seat)
-        else:
-            # Tronçon 0: Origin -> Stopover 0
-            leg_prices.append(stopovers[0].get('price', 0))
-            # Tronçons intermédiaires: Stopover i-1 -> Stopover i
-            for i in range(1, len(stopovers)):
-                leg_prices.append(stopovers[i].get('price', 0))
-            # Dernier tronçon: Stopover final -> Destination
-            leg_prices.append(stopovers[-1].get('arrival_price', 0))
 
         # 3. Récupérer ou calculer la distance/durée de chaque tronçon
         legs_data = []
@@ -155,6 +144,19 @@ class RideService:
                     'duration_sec': int(total_duration_sec * pct),
                     'distance_m': int(dist * 1000)
                 })
+
+        # Calcul intelligent du prix de chaque segment au prorata de sa distance
+        total_distance_m = sum(leg['distance_m'] for leg in legs_data)
+        if total_distance_m > 0:
+            for leg_info in legs_data:
+                pct = leg_info['distance_m'] / total_distance_m
+                # Arrondir à 50 FCFA le plus proche
+                price_prorated = int(round((ride.price_per_seat * pct) / 50.0) * 50)
+                # Prix minimum de 100 FCFA
+                leg_prices.append(max(100, price_prorated))
+        else:
+            for _ in range(num_legs):
+                leg_prices.append(max(100, int(ride.price_per_seat / num_legs)))
 
         # 4. Construire et sauvegarder les RideLeg en BDD
         # Combiner date et heure de départ

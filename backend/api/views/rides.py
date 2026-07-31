@@ -722,6 +722,34 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        
+        # Expiration à la volée (Lazy clean-up pour défense en profondeur)
+        try:
+            from django.utils import timezone
+            from datetime import timedelta
+            limit_time = timezone.now() - timedelta(minutes=15)
+            expired_bookings = Booking.objects.filter(status='pending', created_at__lt=limit_time)
+            for b in expired_bookings:
+                b.status = 'expired'
+                b.save()
+                try:
+                    create_and_send_notification(
+                        user=b.passenger,
+                        title="Demande de réservation expirée ⏱️",
+                        message=f"Le conducteur n'a pas répondu à votre demande pour le trajet {b.ride.departure_location} -> {b.ride.arrival_location} dans la limite des 15 minutes.",
+                        data={'type': 'booking_expired', 'booking_id': str(b.id), 'screen': 'trips'}
+                    )
+                    create_and_send_notification(
+                        user=b.ride.driver,
+                        title="Demande expirée ⏱️",
+                        message=f"La demande de réservation de {b.passenger.full_name or b.passenger.phone} a expiré car vous n'avez pas répondu dans le délai de 15 minutes.",
+                        data={'type': 'booking_expired_driver', 'booking_id': str(b.id), 'screen': 'rides'}
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         queryset = super().get_queryset().select_related('passenger', 'ride', 'ride__driver', 'ride__vehicle').prefetch_related('ride__driver__vehicles')
         
         if not user.is_staff:
@@ -792,7 +820,18 @@ class BookingViewSet(viewsets.ModelViewSet):
             user=booking.ride.driver,
             title="Nouvelle demande de réservation 🚗",
             message=f"{booking.passenger.full_name or booking.passenger.phone} souhaite réserver {booking.seats_booked} place(s) sur votre trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
-            data={'type': 'new_booking_request', 'booking_id': str(booking.id), 'screen': 'rides'}
+            data={
+                'type': 'new_booking_request',
+                'booking_id': str(booking.id),
+                'screen': 'rides',
+                'passenger_name': booking.passenger.full_name or 'Passager',
+                'passenger_phone': booking.passenger.phone or '',
+                'departure_location': booking.departure_location or '',
+                'arrival_location': booking.arrival_location or '',
+                'seats_booked': str(booking.seats_booked),
+                'total_amount': str(booking.total_amount),
+                'created_at': booking.created_at.isoformat()
+            }
         )
             
         return Response(response_data, status=status.HTTP_201_CREATED)

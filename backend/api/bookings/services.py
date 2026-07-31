@@ -56,6 +56,14 @@ class BookingService:
                 departure_location=departure_location,
                 arrival_location=arrival_location
             )
+            
+            # Planifier la tâche d'expiration automatique après 15 minutes (900 secondes)
+            try:
+                from ..tasks import expire_booking_task
+                expire_booking_task.apply_async((str(booking.id),), countdown=900)
+            except Exception:
+                pass
+
             return booking, True
 
     @staticmethod

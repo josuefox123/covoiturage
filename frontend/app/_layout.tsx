@@ -20,6 +20,7 @@ import AnimatedSplash from '../src/components/AnimatedSplash';
 import { AuthProvider } from '../src/context/AuthContext';
 import { theme } from '../src/styles/theme';
 import LiveRideModal from '../src/components/LiveRideModal';
+import BookingRequestModal from '../src/components/BookingRequestModal';
 import { CustomAlertProvider } from '../src/utils/CustomAlert';
 import { useNotifications } from '../src/hooks/useNotifications';
 
@@ -72,8 +73,9 @@ export default function RootLayout() {
           <Stack.Screen name="payment" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
         </Stack>
         <LiveRideModal />
-          <CustomAlertProvider />
-        </AuthProvider>
+        <BookingRequestModal />
+        <CustomAlertProvider />
+          </AuthProvider>
         </SafeAreaProvider>
     </GestureHandlerRootView>
     </QueryClientProvider>

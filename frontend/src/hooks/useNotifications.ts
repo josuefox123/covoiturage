@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Platform, Alert } from 'react-native';
+import { Platform, Alert, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { CustomAlert } from '../utils/CustomAlert';
@@ -167,6 +167,21 @@ export function useNotifications() {
     // Notification reçue en premier plan (affichée)
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (notification: any) => {
+        const data = notification.request.content.data;
+        if (data?.type === 'new_booking_request') {
+          DeviceEventEmitter.emit('showBookingRequest', {
+            id: data.booking_id,
+            departure_location: data.departure_location || '',
+            arrival_location: data.arrival_location || '',
+            seats_booked: parseInt(data.seats_booked || '1'),
+            total_amount: parseInt(data.total_amount || '0'),
+            created_at: data.created_at || new Date().toISOString(),
+            passenger_details: {
+              full_name: data.passenger_name || 'Passager',
+              phone: data.passenger_phone || ''
+            }
+          });
+        }
       }
     );
 
