@@ -173,6 +173,50 @@ class RideService:
                             'steps': gl.get('steps', []),
                         })
 
+        osrm_polyline_points = None
+
+        if not google_success:
+            # Essayer d'utiliser OSRM (gratuit, pas de clé API requise)
+            try:
+                coords_str = ";".join(
+                    f"{node['longitude']},{node['latitude']}"
+                    for node in nodes
+                )
+                url = f"https://router.project-osrm.org/route/v1/driving/{coords_str}?overview=full&geometries=geojson&steps=true"
+                logger.info(f"Appel OSRM de secours pour le trajet {ride.id}: {url}")
+                response = requests.get(url, timeout=10)
+                if response.status_code == 200:
+                    res_json = response.json()
+                    if res_json.get('code') == 'Ok' and 'routes' in res_json and len(res_json['routes']) > 0:
+                        route = res_json['routes'][0]
+                        osrm_legs = route.get('legs', [])
+                        
+                        # Extraire la géométrie OSRM [lon, lat] et convertir en [lat, lon]
+                        coords = route.get('geometry', {}).get('coordinates', [])
+                        osrm_polyline_points = [(pt[1], pt[0]) for pt in coords]
+                        
+                        if len(osrm_legs) == num_legs:
+                            google_success = True
+                            legs_data = []
+                            for gl in osrm_legs:
+                                steps_data = []
+                                for step in gl.get('steps', []):
+                                    loc = step.get('maneuver', {}).get('location', [0, 0])
+                                    steps_data.append({
+                                        'distance': {'value': int(step.get('distance', 0))},
+                                        'duration': {'value': int(step.get('duration', 0))},
+                                        'end_location': {'lat': loc[1], 'lng': loc[0]},
+                                        'html_instructions': step.get('name', '') or step.get('ref', '')
+                                    })
+                                legs_data.append({
+                                    'duration_sec': int(gl.get('duration', 3600)),
+                                    'distance_m': int(gl.get('distance', 50000)),
+                                    'steps': steps_data
+                                })
+                            logger.info(f"Itinéraire résolu avec succès via OSRM pour le trajet {ride.id}.")
+            except Exception as e:
+                logger.error(f"Échec de l'appel OSRM pour le trajet {ride.id}: {e}")
+
         if not google_success:
             # Fallback Haversine
             total_distance_km = 0
@@ -193,6 +237,7 @@ class RideService:
                     'distance_m': int(dist * 1000),
                     'steps': [],
                 })
+
 
         # 3. Calcul intelligent du prix de chaque segment au prorata de sa distance
         leg_prices = []
@@ -320,11 +365,17 @@ class RideService:
             ))
 
             # Si aucun waypoint extrait des steps (fallback sans Google), construire depuis la polyline
-            if len(all_waypoints) <= num_legs + 1 and overview_polyline_str:
-                polyline_points = decode_polyline(overview_polyline_str)
-                RideService._add_waypoints_from_polyline(
-                    ride, polyline_points, all_waypoints, num_legs, cumulative_distance_m
-                )
+            if len(all_waypoints) <= num_legs + 1:
+                if osrm_polyline_points:
+                    RideService._add_waypoints_from_polyline(
+                        ride, osrm_polyline_points, all_waypoints, num_legs, cumulative_distance_m
+                    )
+                elif overview_polyline_str:
+                    polyline_points = decode_polyline(overview_polyline_str)
+                    RideService._add_waypoints_from_polyline(
+                        ride, polyline_points, all_waypoints, num_legs, cumulative_distance_m
+                    )
+
 
             # Insertion en batch
             RideWaypoint.objects.bulk_create(all_waypoints, ignore_conflicts=True)
