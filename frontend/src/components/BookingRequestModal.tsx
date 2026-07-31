@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity,
-  Dimensions, ActivityIndicator, DeviceEventEmitter, Vibration
+  Dimensions, ActivityIndicator, DeviceEventEmitter, Vibration,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
