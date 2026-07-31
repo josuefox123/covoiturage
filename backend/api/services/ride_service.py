@@ -420,10 +420,18 @@ class RideService:
         last_lat, last_lon = polyline_points[0]
         sampled.append((last_lat, last_lon, 0))
 
+        # Utiliser un pointeur pour le point précédent de la polyline afin de calculer la vraie distance cumulative
+        prev_lat, prev_lon = polyline_points[0]
+
         for lat, lon in polyline_points[1:]:
-            d = haversine_km(last_lat, last_lon, lat, lon) * 1000
-            cumulative += d
-            if d >= 3000:  # Point tous les 3 km
+            # Distance entre points consécutifs
+            step_d = haversine_km(prev_lat, prev_lon, lat, lon) * 1000
+            cumulative += step_d
+            prev_lat, prev_lon = lat, lon
+
+            # Distance depuis le dernier waypoint ajouté
+            d_from_last = haversine_km(last_lat, last_lon, lat, lon) * 1000
+            if d_from_last >= 3000:  # Point tous les 3 km
                 sampled.append((lat, lon, int(cumulative)))
                 last_lat, last_lon = lat, lon
 
@@ -450,4 +458,5 @@ class RideService:
                     leg_index=leg_idx,
                     is_stopover=False
                 ))
+
 
