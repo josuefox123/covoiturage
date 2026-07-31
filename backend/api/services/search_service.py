@@ -153,10 +153,25 @@ class SearchService:
             if not polyline:
                 legs = list(ride.legs.all().order_by('order'))
                 for leg in legs:
-                    polyline.append((leg.start_latitude, leg.start_longitude))
+                    # Ignorer les points à (0,0) qui sont des placeholders invalides
+                    if leg.start_latitude and leg.start_longitude and \
+                       abs(leg.start_latitude) > 0.001 and abs(leg.start_longitude) > 0.001:
+                        polyline.append((leg.start_latitude, leg.start_longitude))
                 if legs:
-                    polyline.append((legs[-1].end_latitude, legs[-1].end_longitude))
-            
+                    last = legs[-1]
+                    if last.end_latitude and last.end_longitude and \
+                       abs(last.end_latitude) > 0.001 and abs(last.end_longitude) > 0.001:
+                        polyline.append((last.end_latitude, last.end_longitude))
+
+            # Second fallback : utiliser directement les coordonnées du trajet parent
+            if not polyline:
+                if ride.departure_latitude and ride.departure_longitude and \
+                   abs(ride.departure_latitude) > 0.001 and abs(ride.departure_longitude) > 0.001:
+                    polyline.append((ride.departure_latitude, ride.departure_longitude))
+                if ride.arrival_latitude and ride.arrival_longitude and \
+                   abs(ride.arrival_latitude) > 0.001 and abs(ride.arrival_longitude) > 0.001:
+                    polyline.append((ride.arrival_latitude, ride.arrival_longitude))
+
             if not polyline:
                 continue
 

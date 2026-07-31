@@ -185,10 +185,17 @@ class RideViewSet(viewsets.ModelViewSet):
                     'approach_duration_sec': item.get('approach_duration_sec'),
                 })
 
-            return Response({
-                'directs': serialized_directs,
-                'connections': serialized_connections
-            }, status=status.HTTP_200_OK)
+            # Si la recherche GPS retourne des résultats, les renvoyer directement
+            if serialized_directs or serialized_connections:
+                return Response({
+                    'directs': serialized_directs,
+                    'connections': serialized_connections
+                }, status=status.HTTP_200_OK)
+
+            # Fallback : si la recherche GPS ne trouve rien, tenter la recherche texte
+            # (couvre les trajets publiés sans coordonnées GPS précises)
+            logger.info(f"GPS search returned 0 results, falling back to text search.")
+            return super().list(request, *args, **kwargs)
 
         return super().list(request, *args, **kwargs)
 
