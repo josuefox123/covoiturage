@@ -364,17 +364,17 @@ class RideService:
                 is_stopover=True
             ))
 
-            # Si aucun waypoint extrait des steps (fallback sans Google), construire depuis la polyline
-            if len(all_waypoints) <= num_legs + 1:
-                if osrm_polyline_points:
-                    RideService._add_waypoints_from_polyline(
-                        ride, osrm_polyline_points, all_waypoints, num_legs, cumulative_distance_m
-                    )
-                elif overview_polyline_str:
-                    polyline_points = decode_polyline(overview_polyline_str)
-                    RideService._add_waypoints_from_polyline(
-                        ride, polyline_points, all_waypoints, num_legs, cumulative_distance_m
-                    )
+            # Compléter systématiquement les waypoints avec la polyline pour assurer un maillage régulier (tous les 3 km)
+            if osrm_polyline_points:
+                RideService._add_waypoints_from_polyline(
+                    ride, osrm_polyline_points, all_waypoints, num_legs, cumulative_distance_m
+                )
+            elif overview_polyline_str:
+                polyline_points = decode_polyline(overview_polyline_str)
+                RideService._add_waypoints_from_polyline(
+                    ride, polyline_points, all_waypoints, num_legs, cumulative_distance_m
+                )
+
 
 
             # Insertion en batch
@@ -392,7 +392,23 @@ class RideService:
         if not polyline_points:
             return
 
-        # Sous-échantillonner la polyline : 1 point tous les 500m environ
+        # 1. Calculer les limites de distance cumulée de chaque leg
+        legs = list(ride.legs.all().order_by('order'))
+        leg_limits = []
+        cum = 0
+        for leg in legs:
+            cum += leg.distance_m
+            leg_limits.append(cum)
+
+        def get_leg_index(dist_m):
+            if not leg_limits:
+                return 0
+            for idx, limit in enumerate(leg_limits):
+                if dist_m <= limit:
+                    return idx
+            return max(0, len(leg_limits) - 1)
+
+        # 2. Échantillonner la polyline tous les 3 km (3000m)
         sampled = []
         cumulative = 0
         last_lat, last_lon = polyline_points[0]
@@ -401,16 +417,23 @@ class RideService:
         for lat, lon in polyline_points[1:]:
             d = haversine_km(last_lat, last_lon, lat, lon) * 1000
             cumulative += d
-            if d >= 300:  # Point tous les 300m minimum
+            if d >= 3000:  # Point tous les 3 km
                 sampled.append((lat, lon, int(cumulative)))
                 last_lat, last_lon = lat, lon
 
-        # Vérifier quels points ne sont pas déjà dans existing_waypoints
+        # 3. Éviter les doublons exacts et redondances (< 1.5 km)
         existing_positions = {(round(wp.latitude, 4), round(wp.longitude, 4)) for wp in existing_waypoints}
         order_start = max(wp.order for wp in existing_waypoints) + 1 if existing_waypoints else 0
 
         for idx, (lat, lon, dist) in enumerate(sampled):
-            if (round(lat, 4), round(lon, 4)) not in existing_positions:
+            is_redundant = False
+            for wp in existing_waypoints:
+                if haversine_km(wp.latitude, wp.longitude, lat, lon) * 1000 < 1500:
+                    is_redundant = True
+                    break
+
+            if not is_redundant and (round(lat, 4), round(lon, 4)) not in existing_positions:
+                leg_idx = get_leg_index(dist)
                 existing_waypoints.append(RideWaypoint(
                     ride=ride,
                     name='',
@@ -418,6 +441,7 @@ class RideService:
                     longitude=lon,
                     order=order_start + idx,
                     distance_from_start_m=dist,
-                    leg_index=0,
+                    leg_index=leg_idx,
                     is_stopover=False
                 ))
+
