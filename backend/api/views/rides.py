@@ -88,7 +88,67 @@ def check_availability(request):
 
     return Response(result)
 
-@extend_schema(request=dict, responses={201: dict, 400: dict}, tags=['Authentification'])
+def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_time, duration_min, current_ride_id=None):
+    """
+    Vérifie la validité du conducteur, du véhicule, et l'absence de chevauchements
+    horaires de trajets pour assurer la faisabilité réelle du trajet publié.
+    """
+    from rest_framework.exceptions import ValidationError
+    from datetime import datetime, timedelta
+    from ..models import Vehicle, Ride
+
+    # 1. Vérification identité / compte
+    if not driver.is_active:
+        raise ValidationError({"error": "Votre compte utilisateur est inactif."})
+    if not driver.is_verified:
+        raise ValidationError({"error": "Votre compte doit être vérifié pour publier un trajet."})
+
+    # 2. Vérification véhicule
+    if not vehicle_id:
+        vehicle = Vehicle.objects.filter(owner=driver).first()
+        if not vehicle:
+            raise ValidationError({"error": "Vous devez associer un véhicule à ce trajet."})
+        vehicle_id = vehicle.id
+    else:
+        vehicle = Vehicle.objects.filter(id=vehicle_id, owner=driver).first()
+        if not vehicle:
+            raise ValidationError({"error": "Le véhicule sélectionné est introuvable ou ne vous appartient pas."})
+
+    # 3. Vérification de chevauchement horaire (conflit de planning)
+    if isinstance(departure_time, str):
+        try:
+            departure_time = datetime.strptime(departure_time, "%H:%M:%S").time()
+        except ValueError:
+            try:
+                departure_time = datetime.strptime(departure_time, "%H:%M").time()
+            except ValueError:
+                pass
+
+    new_start_dt = datetime.combine(departure_date, departure_time)
+    new_duration = int(duration_min) if duration_min else 240  # 4h par défaut
+    new_end_dt = new_start_dt + timedelta(minutes=new_duration)
+
+    # Récupérer les trajets actifs pour ce jour
+    existing_rides = Ride.objects.filter(
+        driver=driver,
+        departure_date=departure_date,
+        status__in=['active', 'started']
+    )
+    if current_ride_id:
+        existing_rides = existing_rides.exclude(id=current_ride_id)
+
+    for r in existing_rides:
+        r_start_dt = datetime.combine(r.departure_date, r.departure_time)
+        r_duration = r.duration_min if r.duration_min else 240
+        r_end_dt = r_start_dt + timedelta(minutes=r_duration)
+
+        # Chevauchement si (nouveau_depart < existant_fin) et (nouveau_fin > existant_depart)
+        if new_start_dt < r_end_dt and new_end_dt > r_start_dt:
+            time_str = r.departure_time.strftime("%H:%M")
+            raise ValidationError({
+                "error": f"Vous avez déjà un trajet incompatible programmé le {departure_date.strftime('%d/%m/%Y')} (départ à {time_str} vers {r.arrival_location})."
+            })
+
 
 class RideViewSet(viewsets.ModelViewSet):
     """
@@ -147,11 +207,17 @@ class RideViewSet(viewsets.ModelViewSet):
                 ride_data = self.get_serializer(item['ride']).data
                 # Injecter les infos spécifiques au segment
                 ride_data['price_per_seat'] = item['price']
-                ride_data['departure_time'] = item['departure_time'].strftime('%H:%M:%S') if isinstance(item['departure_time'], datetime) else str(item['departure_time'])
-                ride_data['arrival_time'] = item['arrival_time'].strftime('%H:%M:%S') if isinstance(item['arrival_time'], datetime) else str(item['arrival_time'])
+                dep_t = item['departure_time']
+                arr_t = item['arrival_time']
+                ride_data['departure_time'] = dep_t.strftime('%H:%M:%S') if hasattr(dep_t, 'strftime') else str(dep_t)
+                ride_data['arrival_time'] = arr_t.strftime('%H:%M:%S') if hasattr(arr_t, 'strftime') else str(arr_t)
+                ride_data['duration_segment_min'] = item.get('duration_segment_min', ride_data.get('duration_min'))
                 ride_data['seats_available'] = item['seats_available']
                 ride_data['walk_distance_origin_km'] = round(item['walk_distance_origin_km'], 2)
                 ride_data['walk_distance_dest_km'] = round(item['walk_distance_dest_km'], 2)
+                # Injecter les indices de waypoints pour que le frontend puisse les passer
+                ride_data['dep_waypoint_order'] = item.get('dep_waypoint_order')
+                ride_data['arr_waypoint_order'] = item.get('arr_waypoint_order')
                 # Distance Matrix enrichments
                 ride_data['approach_duration_text'] = item.get('approach_duration_text')
                 ride_data['approach_duration_sec'] = item.get('approach_duration_sec')
@@ -203,14 +269,15 @@ class RideViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset().select_related('driver', 'vehicle').prefetch_related('driver__vehicles')
         
         # Filtres de recherche/filtrage envoyés par le frontend
-        departure = self.request.query_params.get('departure')
-        destination = self.request.query_params.get('destination')
-        vehicle_type = self.request.query_params.get('vehicle_type')
-        date_str = self.request.query_params.get('date')
-        seats_str = self.request.query_params.get('seats')
+        query_params = self.request.query_params if hasattr(self.request, 'query_params') else self.request.GET
+        departure = query_params.get('departure')
+        destination = query_params.get('destination')
+        vehicle_type = query_params.get('vehicle_type')
+        date_str = query_params.get('date')
+        seats_str = query_params.get('seats')
         
-        driver_id = self.request.query_params.get('driver')
-        ride_type = self.request.query_params.get('type')
+        driver_id = query_params.get('driver')
+        ride_type = query_params.get('type')
         
         user = getattr(self.request, 'user', None)
         is_staff = getattr(user, 'is_staff', False)
@@ -220,7 +287,6 @@ class RideViewSet(viewsets.ModelViewSet):
         elif getattr(self, 'action', '') == 'list' and not is_staff:
             from datetime import date, timedelta
             from django.utils.timezone import now
-            from django.db.models import Q
             one_hour_ago = now() - timedelta(hours=1)
             queryset = queryset.filter(
                 Q(departure_date__gte=date.today()) | Q(status='started')
@@ -439,8 +505,27 @@ class RideViewSet(viewsets.ModelViewSet):
             distance_km_val = request.data.get('distance_km')
             duration_min_val = request.data.get('duration_min')
 
+            departure_time_val = departure_time
+            if isinstance(departure_time_val, str):
+                try:
+                    departure_time_val = datetime.strptime(departure_time_val, "%H:%M:%S").time()
+                except ValueError:
+                    try:
+                        departure_time_val = datetime.strptime(departure_time_val, "%H:%M").time()
+                    except ValueError:
+                        pass
+
             with transaction.atomic():
                 from ..models import RideSeries, Ride, Vehicle
+                # Valider en amont le compte et le véhicule
+                validate_driver_and_vehicle(
+                    driver=request.user,
+                    vehicle_id=vehicle_id,
+                    departure_date=start_date,
+                    departure_time=departure_time_val,
+                    duration_min=duration_min_val
+                )
+
                 vehicle_obj = None
                 if vehicle_id:
                     vehicle_obj = Vehicle.objects.filter(id=vehicle_id).first()
@@ -482,6 +567,15 @@ class RideViewSet(viewsets.ModelViewSet):
                             create_this_day = True
                     
                     if create_this_day:
+                        # Validation du chevauchement pour chaque date individuelle de récurrence
+                        validate_driver_and_vehicle(
+                            driver=request.user,
+                            vehicle_id=vehicle_id,
+                            departure_date=current_date,
+                            departure_time=departure_time_val,
+                            duration_min=duration_min_val
+                        )
+
                         ride_obj = Ride.objects.create(
                             series=series,
                             driver=request.user,
@@ -534,11 +628,26 @@ class RideViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         from rest_framework.exceptions import ValidationError
-        from ..models import FinancialSettings
-        if not self.request.user.is_verified:
-            raise ValidationError({"error": "Votre compte doit être vérifié pour publier un trajet."})
-            
+        from ..models import FinancialSettings, Vehicle
+        
         driver_payout = serializer.validated_data.get('driver_payout', 0)
+        vehicle = serializer.validated_data.get('vehicle')
+        if not vehicle:
+            vehicle = Vehicle.objects.filter(owner=self.request.user).first()
+
+        departure_date = serializer.validated_data.get('departure_date')
+        departure_time = serializer.validated_data.get('departure_time')
+        duration_min = serializer.validated_data.get('duration_min')
+
+        # Valider l'identité, le véhicule et le planning (chevauchements)
+        validate_driver_and_vehicle(
+            driver=self.request.user,
+            vehicle_id=vehicle.id if vehicle else None,
+            departure_date=departure_date,
+            departure_time=departure_time,
+            duration_min=duration_min
+        )
+
         fin_settings = FinancialSettings.load()
         if fin_settings.is_commission_active:
             zemy_commission = int(driver_payout * (fin_settings.commission_percentage / 100.0))
@@ -555,6 +664,7 @@ class RideViewSet(viewsets.ModelViewSet):
         
         ride = serializer.save(
             driver=self.request.user,
+            vehicle=vehicle,
             zemy_commission=zemy_commission,
             price_per_seat=price_per_seat,
             parcels_available=max_parcels
@@ -708,6 +818,40 @@ class RideViewSet(viewsets.ModelViewSet):
             
         return Response({"status": "Trajet commencé."})
 
+    @action(detail=True, methods=['patch', 'post'], url_path='update_location')
+    def update_location(self, request, pk=None):
+        """
+        Met à jour la position GPS du conducteur pendant un trajet en cours.
+        
+        Utilise Ride.objects.get(pk) directement (sans le filtre du queryset)
+        pour éviter le 404 lors des mises à jour de position fréquentes.
+        
+        PATCH /api/rides/{id}/update_location/
+        Body: { "driver_latitude": float, "driver_longitude": float }
+        """
+        try:
+            ride = Ride.objects.get(pk=pk)
+        except Ride.DoesNotExist:
+            return Response({"error": "Trajet introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        if ride.driver != request.user and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+
+        lat = request.data.get('driver_latitude')
+        lon = request.data.get('driver_longitude')
+
+        if lat is None or lon is None:
+            return Response({"error": "driver_latitude et driver_longitude requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            ride.driver_latitude = float(lat)
+            ride.driver_longitude = float(lon)
+            ride.save(update_fields=['driver_latitude', 'driver_longitude'])
+        except (ValueError, TypeError):
+            return Response({"error": "Coordonnées GPS invalides."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"status": "ok", "driver_latitude": ride.driver_latitude, "driver_longitude": ride.driver_longitude})
+
     @action(detail=True, methods=['post'], url_path='next_leg')
     def next_leg(self, request, pk=None):
         """
@@ -790,13 +934,44 @@ class RideViewSet(viewsets.ModelViewSet):
 
         ride.save(update_fields=['current_leg_index', 'status'])
 
+        # Notifier le conducteur si des places se sont libérées
+        if freed_seats_total > 0:
+            try:
+                passenger_names = ", ".join([p.full_name or "Un passager" for p in alighting_passengers])
+                next_leg_seats = legs[next_idx].seats_available if next_idx < total_legs else 0
+                
+                seats_freed_msg = (
+                    f"{passenger_names} vient/viennent de descendre à {current_leg.end_location}. "
+                    f"Vous disposez encore de {next_leg_seats} places libres."
+                ) if next_idx < total_legs else (
+                    f"{passenger_names} vient/viennent de descendre à {current_leg.end_location}."
+                )
+                
+                create_and_send_notification(
+                    user=ride.driver,
+                    title="1 place vient d'être libérée 🚗" if freed_seats_total == 1 else "Des places viennent de se libérer 🚗",
+                    message=seats_freed_msg,
+                    data={
+                        'type': 'leg_seats_freed_driver',
+                        'ride_id': str(ride.id),
+                        'seats_available': next_leg_seats,
+                        'screen': 'rides'
+                    }
+                )
+            except Exception:
+                pass
+
         # Notifier les SearchAlert compatibles si des places se sont libérées
         if freed_seats_total > 0 and next_idx < total_legs:
             try:
                 from ..tasks import notify_compatible_passengers_task
-                notify_compatible_passengers_task.apply_async(
-                    (str(ride.id), next_idx, freed_seats_total), countdown=5
-                )
+                if hasattr(notify_compatible_passengers_task, 'apply_async'):
+                    notify_compatible_passengers_task.apply_async(
+                        (str(ride.id), next_idx, freed_seats_total), countdown=5
+                    )
+                else:
+                    # Celery non configuré ou inactif localement, exécuter la fonction en synchrone
+                    notify_compatible_passengers_task(str(ride.id), next_idx, freed_seats_total)
             except Exception:
                 # Si Celery n'est pas disponible, notifier directement
                 from ..services.matching_service import MatchingService as MS
@@ -822,6 +997,21 @@ class RideViewSet(viewsets.ModelViewSet):
             "ride_status": ride.status,
         })
 
+    @action(detail=True, methods=['get'], url_path='booking-state')
+    def ride_booking_state(self, request, pk=None):
+        """
+        Retourne l'état de réservation calculé par le backend pour le trajet
+        et le segment spécifié par les paramètres departure_order et arrival_order.
+        """
+        ride = self.get_object()
+        dep_order = request.query_params.get('departure_order')
+        arr_order = request.query_params.get('arrival_order')
+
+        from ..bookings.booking_state_service import BookingStateService
+        state = BookingStateService.get_state(request.user, ride, dep_order, arr_order)
+        return Response(state)
+
+
 
 class BookingViewSet(viewsets.ModelViewSet):
     """
@@ -837,47 +1027,24 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        
-        # Expiration à la volée (Lazy clean-up pour défense en profondeur)
-        try:
-            from django.utils import timezone
-            from datetime import timedelta
-            limit_time = timezone.now() - timedelta(minutes=15)
-            expired_bookings = Booking.objects.filter(status='pending', created_at__lt=limit_time)
-            for b in expired_bookings:
-                b.status = 'expired'
-                b.save()
-                try:
-                    create_and_send_notification(
-                        user=b.passenger,
-                        title="Demande de réservation expirée ⏱️",
-                        message=f"Le conducteur n'a pas répondu à votre demande pour le trajet {b.ride.departure_location} -> {b.ride.arrival_location} dans la limite des 15 minutes.",
-                        data={'type': 'booking_expired', 'booking_id': str(b.id), 'screen': 'trips'}
-                    )
-                    create_and_send_notification(
-                        user=b.ride.driver,
-                        title="Demande expirée ⏱️",
-                        message=f"La demande de réservation de {b.passenger.full_name or b.passenger.phone} a expiré car vous n'avez pas répondu dans le délai de 15 minutes.",
-                        data={'type': 'booking_expired_driver', 'booking_id': str(b.id), 'screen': 'rides'}
-                    )
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        # NOTE: L'expiration des réservations est gérée exclusivement par la tâche Celery
+        # `expire_booking_task`. Le lazy clean-up ici causait des requêtes N+1 et des
+        # notifications FCM dupliquées à chaque GET /bookings/. Supprimé intentionnellement.
 
         queryset = super().get_queryset().select_related('passenger', 'ride', 'ride__driver', 'ride__vehicle').prefetch_related('ride__driver__vehicles')
         
-        if not user.is_staff:
+        if not getattr(user, 'is_staff', False):
             from django.db.models import Q
             # Le passager voit toutes ses réservations.
-            # Le conducteur voit toutes les réservations sur ses propres trajets (y compris en attente de sa validation).
+            # Le conducteur voit toutes les réservations sur ses propres trajets.
             queryset = queryset.filter(
                 Q(passenger=user) | Q(ride__driver=user)
             )
             
-        passenger_id = self.request.query_params.get('passenger')
-        ride_driver_id = self.request.query_params.get('ride_driver')
-        ride_id = self.request.query_params.get('ride')
+        query_params = self.request.query_params if hasattr(self.request, 'query_params') else self.request.GET
+        passenger_id = query_params.get('passenger')
+        ride_driver_id = query_params.get('ride_driver')
+        ride_id = query_params.get('ride')
         if passenger_id:
             queryset = queryset.filter(passenger_id=passenger_id)
         if ride_driver_id:
@@ -897,6 +1064,15 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         departure_location = request.data.get('departure_location')
         arrival_location = request.data.get('arrival_location')
+        departure_latitude = request.data.get('departure_latitude')
+        departure_longitude = request.data.get('departure_longitude')
+        arrival_latitude = request.data.get('arrival_latitude')
+        arrival_longitude = request.data.get('arrival_longitude')
+
+        passenger_proposed_price = request.data.get('passenger_proposed_price')
+        negotiation_message = request.data.get('negotiation_message')
+        departure_waypoint_order = request.data.get('departure_waypoint_order')
+        arrival_waypoint_order = request.data.get('arrival_waypoint_order')
 
         from ..bookings.services import BookingService
         booking, created = BookingService.create_booking(
@@ -904,7 +1080,15 @@ class BookingViewSet(viewsets.ModelViewSet):
             ride_id=ride_id,
             seats_booked=seats_to_book,
             departure_location=departure_location,
-            arrival_location=arrival_location
+            arrival_location=arrival_location,
+            departure_latitude=departure_latitude,
+            departure_longitude=departure_longitude,
+            arrival_latitude=arrival_latitude,
+            arrival_longitude=arrival_longitude,
+            passenger_proposed_price=passenger_proposed_price,
+            negotiation_message=negotiation_message,
+            departure_waypoint_order=departure_waypoint_order,
+            arrival_waypoint_order=arrival_waypoint_order
         )
         
         if not created:
@@ -941,13 +1125,26 @@ class BookingViewSet(viewsets.ModelViewSet):
                 'screen': 'rides',
                 'passenger_name': booking.passenger.full_name or 'Passager',
                 'passenger_phone': booking.passenger.phone or '',
-                'departure_location': booking.departure_location or '',
-                'arrival_location': booking.arrival_location or '',
+                'departure_location': booking.departure_location or booking.ride.departure_location or '',
+                'arrival_location': booking.arrival_location or booking.ride.arrival_location or '',
                 'seats_booked': str(booking.seats_booked),
                 'total_amount': str(booking.total_amount),
+                'negotiation_message': booking.negotiation_message or '',
                 'created_at': booking.created_at.isoformat()
             }
         )
+
+        # Notification au passager que sa demande a été envoyée
+        if booking.status == 'pending':
+            try:
+                create_and_send_notification(
+                    user=booking.passenger,
+                    title="Demande de réservation envoyée ⏱️",
+                    message="Votre demande a été envoyée. Vous recevrez une réponse dans quelques instants.",
+                    data={'type': 'booking_request_sent_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+                )
+            except Exception:
+                pass
             
         return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -987,13 +1184,13 @@ class BookingViewSet(viewsets.ModelViewSet):
                             data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
             
-            elif new_status == 'pending_payment' and old_status == 'pending':
+            elif new_status == 'pending_payment' and old_status in ['pending', 'pending_driver']:
                 # Chauffeur accepte la demande -> Notifier le passager pour procéder au paiement
                 create_and_send_notification(
                     user=passenger,
                     title="Demande acceptée par le conducteur 🚗",
                     message=f"Votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location} a été acceptée par le conducteur ! Vous pouvez maintenant procéder au paiement.",
-                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
                 )
             
             elif new_status == 'confirmed':
@@ -1001,8 +1198,8 @@ class BookingViewSet(viewsets.ModelViewSet):
                 create_and_send_notification(
                     user=passenger,
                     title="Réservation confirmée ✅",
-                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {ride.departure_location} -> {ride.arrival_location} est confirmée !",
-                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {ride.departure_location} -> {ride.arrival_location} is confirmée !",
+                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
                 )
                 create_and_send_notification(
                     user=passenger,
@@ -1033,9 +1230,85 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.passenger != request.user and booking.ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
-        from ..services.booking_service import BookingService
+        from ..bookings.services import BookingService
         success, msg = BookingService.cancel_booking(booking, cancelled_by_user=request.user)
+        # Push WebSocket pour informer le frontend en temps réel
+        _push_booking_update(booking)
         return Response({"status": msg})
+
+    @action(detail=True, methods=['get'], url_path='state')
+    def booking_state(self, request, pk=None):
+        """
+        Retourne l'état canonique et complet d'une réservation.
+        Le frontend n'a plus à faire de logique métier — il affiche ce que cet endpoint retourne.
+        """
+        booking = self.get_object()
+        if booking.passenger != request.user and booking.ride.driver != request.user and not request.user.is_staff:
+            return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
+
+        ride = booking.ride
+        driver = ride.driver
+
+        # Calculer le moment d'expiration estimé
+        expires_at = None
+        try:
+            from django.utils import timezone as tz
+            import datetime
+            ride_datetime = tz.make_aware(
+                datetime.datetime.combine(ride.departure_date, ride.departure_time)
+            )
+            time_diff = ride_datetime - booking.created_at
+            diff_hours = time_diff.total_seconds() / 3600.0
+            if diff_hours <= 24:
+                limit_seconds = 1800
+            elif diff_hours <= 48:
+                limit_seconds = 7200
+            elif diff_hours <= 168:
+                limit_seconds = 43200
+            else:
+                limit_seconds = 86400
+            expires_at = (booking.created_at + datetime.timedelta(seconds=limit_seconds)).isoformat()
+        except Exception:
+            pass
+
+        # Déterminer les actions disponibles selon le statut
+        available_actions = []
+        if booking.status in ['pending', 'pending_driver', 'pending_passenger', 'pending_payment']:
+            available_actions.append('cancel')
+        if booking.status == 'pending_payment' and booking.payment_status not in ['escrow', 'paid']:
+            available_actions.append('pay')
+        if booking.status == 'pending_passenger':
+            available_actions.extend(['accept_offer', 'reject_offer'])
+        if booking.status in ['confirmed', 'started']:
+            available_actions.append('cancel')
+
+        return Response({
+            'booking_id': str(booking.id),
+            'status': booking.status,
+            'payment_status': booking.payment_status,
+            'amount': booking.total_amount,
+            'driver_payout': booking.amount_due_to_driver,
+            'seats_booked': booking.seats_booked,
+            'departure_location': booking.departure_location or ride.departure_location,
+            'arrival_location': booking.arrival_location or ride.arrival_location,
+            'departure_waypoint_order': booking.departure_waypoint_order,
+            'arrival_waypoint_order': booking.arrival_waypoint_order,
+            'driver': {
+                'id': str(driver.id),
+                'name': driver.full_name or driver.phone,
+                'phone': driver.phone,
+            },
+            'ride_id': str(ride.id),
+            'ride_status': ride.status,
+            'available_actions': available_actions,
+            'expires_at': expires_at,
+            'created_at': booking.created_at.isoformat(),
+            # Informations de négociation
+            'passenger_proposed_price': booking.passenger_proposed_price,
+            'driver_counter_price': booking.driver_counter_price,
+            'custom_price': booking.custom_price,
+        })
+
 
     @action(detail=True, methods=['post'], url_path='complete')
     def complete_booking(self, request, pk=None):
@@ -1125,33 +1398,49 @@ class BookingViewSet(viewsets.ModelViewSet):
     def accept_booking(self, request, pk=None):
         """
         Le conducteur accepte la demande de réservation du passager.
-        Passe le statut à 'pending_payment' (attente paiement).
+        Passe le statut à 'pending_passenger' (attente confirmation passager) ou 'pending_payment'.
         """
         booking = self.get_object()
         if booking.ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Seul le conducteur de ce trajet peut accepter cette réservation."}, status=status.HTTP_403_FORBIDDEN)
             
-        if booking.status != 'pending':
+        if booking.status not in ['pending', 'pending_driver']:
             return Response({"error": f"Impossible d'accepter une réservation au statut actuel: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
             
-        custom_price = request.data.get('price') or request.data.get('custom_price')
-        if custom_price is not None:
+        price_val = request.data.get('price') or request.data.get('custom_price') or request.data.get('driver_counter_price')
+        if price_val is not None:
             try:
-                booking.custom_price = int(custom_price)
+                booking.driver_counter_price = int(price_val)
             except ValueError:
                 return Response({"error": "Le prix proposé est invalide."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            if booking.passenger_proposed_price is not None:
+                booking.custom_price = booking.passenger_proposed_price
 
-        booking.status = 'pending_payment'
+        # Si le chauffeur a fait une contre-proposition, le passager doit valider
+        if booking.driver_counter_price is not None:
+            booking.status = 'pending_passenger'
+            title = "Nouvelle offre tarifaire 🚗"
+            message = f"Le chauffeur propose un tarif de {booking.total_amount} FCFA. Veuillez valider."
+        else:
+            # Sinon, acceptation directe sans contre-proposition -> direct au paiement
+            booking.status = 'pending_payment'
+            title = "Demande acceptée par le conducteur 🚗"
+            message = f"Votre demande de réservation a été acceptée par le conducteur ! Vous pouvez procéder au paiement."
+
         booking.save()
         
         # Notifier le passager
         create_and_send_notification(
             user=booking.passenger,
-            title="Demande acceptée par le conducteur 🚗",
-            message=f"Le conducteur a accepté votre réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location} au tarif de {booking.total_amount} FCFA. Veuillez procéder au paiement pour la confirmer.",
-            data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+            title=title,
+            message=message,
+            data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'amount': str(booking.total_amount), 'ride_id': str(booking.ride.id)}
         )
-        return Response({"status": "Réservation acceptée. En attente de paiement."})
+        # Push WebSocket temps réel
+        _push_booking_update(booking)
+        return Response({"status": "Réservation acceptée.", "booking_status": booking.status})
+
 
     @action(detail=True, methods=['post'], url_path='reject')
     def reject_booking(self, request, pk=None):
@@ -1163,7 +1452,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Seul le conducteur de ce trajet peut refuser cette réservation."}, status=status.HTTP_403_FORBIDDEN)
             
-        if booking.status not in ['pending', 'pending_payment']:
+        if booking.status not in ['pending', 'pending_passenger', 'pending_payment']:
             return Response({"error": f"Impossible de refuser une réservation déjà traitée (statut actuel: {booking.status})."}, status=status.HTTP_400_BAD_REQUEST)
             
         booking.status = 'cancelled'
@@ -1176,7 +1465,92 @@ class BookingViewSet(viewsets.ModelViewSet):
             message=f"Le conducteur a refusé votre demande de réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
             data={'type': 'booking_rejected_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
         )
+        # Push WebSocket temps réel
+        _push_booking_update(booking)
         return Response({"status": "Réservation déclinée avec succès."})
+
+
+    @action(detail=True, methods=['post'], url_path='passenger_accept')
+    def passenger_accept(self, request, pk=None):
+        """
+        Le passager accepte la proposition de prix du chauffeur.
+        Passe le statut à 'pending_payment'.
+        """
+        booking = self.get_object()
+        if booking.passenger != request.user and not request.user.is_staff:
+            return Response({"error": "Seul le passager de cette réservation peut l'accepter."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.status != 'pending_passenger':
+            return Response({"error": f"Statut invalide pour acceptation passager: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if booking.driver_counter_price is not None:
+            booking.custom_price = booking.driver_counter_price
+        booking.status = 'pending_payment'
+        booking.save()
+        
+        # Notifier le conducteur
+        create_and_send_notification(
+            user=booking.ride.driver,
+            title="Offre validée par le passager 👍",
+            message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} a accepté votre tarif de {booking.total_amount} FCFA et procède au paiement.",
+            data={'type': 'passenger_accepted_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
+        )
+        # Push WebSocket temps réel
+        _push_booking_update(booking)
+        return Response({"status": "Proposition acceptée. En attente de paiement.", "booking_status": booking.status})
+
+
+    @action(detail=True, methods=['post'], url_path='passenger_reject')
+    def passenger_reject(self, request, pk=None):
+        """
+        Le passager refuse la proposition du chauffeur.
+        Annule la réservation (statut 'cancelled').
+        """
+        booking = self.get_object()
+        if booking.passenger != request.user and not request.user.is_staff:
+            return Response({"error": "Seul le passager de cette réservation peut la refuser."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.status not in ['pending', 'pending_passenger', 'pending_payment']:
+            return Response({"error": f"Statut invalide pour refus passager: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        booking.status = 'cancelled'
+        booking.save()
+        
+        # Notifier le conducteur
+        create_and_send_notification(
+            user=booking.ride.driver,
+            title="Proposition refusée ❌",
+            message=f"{booking.passenger.full_name or booking.passenger.phone} a refusé votre proposition.",
+            data={'type': 'passenger_refused_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
+        )
+        # Push WebSocket temps réel
+        _push_booking_update(booking)
+        return Response({"status": "Proposition refusée. Réservation annulée.", "booking_status": booking.status})
+
+
+def _push_booking_update(booking):
+    """
+    Envoie une mise à jour de statut via WebSocket au passager.
+    Silencieux en cas d'erreur (Channels peut ne pas être actif en développement).
+    """
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"booking_{booking.id}",
+                {
+                    "type": "booking_update",
+                    "booking_id": str(booking.id),
+                    "status": booking.status,
+                    "amount": booking.total_amount,
+                    "payment_status": booking.payment_status,
+                }
+            )
+    except Exception:
+        pass
+
 
 
 

@@ -305,7 +305,7 @@ class Ride(models.Model):
         places = [self.departure_location]
         leg_prices = []
 
-        if self.stopovers and isinstance(self.stopovers, list):
+        if self.stopovers and isinstance(self.stopovers, list) and len(self.stopovers) > 0:
             for s in self.stopovers:
                 if isinstance(s, dict):
                     places.append(s.get('name', ''))
@@ -362,12 +362,17 @@ class Booking(models.Model):
     """
     STATUS_CHOICES = [
         ('pending', 'En attente'),
+        ('pending_driver', 'En attente de validation conducteur'),
+        ('pending_passenger', 'En attente de confirmation passager'),
         ('pending_payment', 'En attente de paiement'),
+        ('payment_processing', 'Paiement en cours'),
         ('confirmed', 'Confirmée'),
-        ('cancelled', 'Annulée'),
-        ('payment_failed', 'Échec de paiement'),
-        ('expired', 'Expirée'),
+        ('started', 'Démarrée'),
         ('completed', 'Terminée'),
+        ('cancelled', 'Annulée'),
+        ('expired', 'Expirée'),
+        ('payment_failed', 'Échec de paiement'),
+        ('payment_refunded', 'Remboursée'),
     ]
 
     PAYMENT_STATUS_CHOICES = [
@@ -386,7 +391,16 @@ class Booking(models.Model):
     transaction_id = models.CharField(max_length=255, blank=True, null=True)
     departure_location = models.CharField(max_length=255, blank=True, null=True)
     arrival_location = models.CharField(max_length=255, blank=True, null=True)
+    departure_latitude = models.FloatField(null=True, blank=True)
+    departure_longitude = models.FloatField(null=True, blank=True)
+    arrival_latitude = models.FloatField(null=True, blank=True)
+    arrival_longitude = models.FloatField(null=True, blank=True)
+    departure_waypoint_order = models.IntegerField(null=True, blank=True, help_text="Index du waypoint de montée")
+    arrival_waypoint_order = models.IntegerField(null=True, blank=True, help_text="Index du waypoint de descente")
     custom_price = models.IntegerField(blank=True, null=True, verbose_name="Prix personnalisé conducteur")
+    passenger_proposed_price = models.IntegerField(blank=True, null=True, verbose_name="Prix proposé par le passager")
+    driver_counter_price = models.IntegerField(blank=True, null=True, verbose_name="Contre-proposition du chauffeur")
+    negotiation_message = models.TextField(blank=True, null=True, verbose_name="Message de négociation")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -410,8 +424,30 @@ class Booking(models.Model):
         
     @property
     def total_amount(self):
-        base_price = self.custom_price if self.custom_price is not None else self.ride.price_per_seat
-        if self.custom_price is None and self.departure_location and self.arrival_location:
+        negotiated_price = None
+        if self.custom_price is not None:
+            negotiated_price = self.custom_price
+        elif self.driver_counter_price is not None:
+            negotiated_price = self.driver_counter_price
+        elif self.passenger_proposed_price is not None:
+            negotiated_price = self.passenger_proposed_price
+
+        if negotiated_price is not None:
+            settings = FinancialSettings.objects.first()
+            commission_pct = settings.commission_percentage if settings else 10
+            min_c = settings.min_commission if settings else 100
+            max_c = settings.max_commission if settings else None
+
+            comm = (negotiated_price * commission_pct) / 100
+            comm = max(comm, min_c)
+            if max_c is not None:
+                comm = min(comm, max_c)
+
+            unit_price = negotiated_price + comm
+            return self.seats_booked * int(unit_price)
+
+        base_price = self.ride.price_per_seat
+        if self.departure_location and self.arrival_location:
             segment_price = self.ride.get_segment_price(self.departure_location, self.arrival_location)
             if segment_price:
                 base_price = segment_price
@@ -419,15 +455,36 @@ class Booking(models.Model):
 
     @property
     def zemy_commission(self):
+        negotiated_price = None
+        if self.custom_price is not None:
+            negotiated_price = self.custom_price
+        elif self.driver_counter_price is not None:
+            negotiated_price = self.driver_counter_price
+        elif self.passenger_proposed_price is not None:
+            negotiated_price = self.passenger_proposed_price
+
         settings = FinancialSettings.objects.first()
         if not settings:
             return 0
+
+        if negotiated_price is not None:
+            commission_pct = settings.commission_percentage
+            min_c = settings.min_commission
+            max_c = settings.max_commission
+
+            comm = (negotiated_price * commission_pct) / 100
+            comm = max(comm, min_c)
+            if max_c is not None:
+                comm = min(comm, max_c)
+            return self.seats_booked * int(comm)
+
         commission_zemy = (self.total_amount * settings.commission_percentage) / 100
-        return max(commission_zemy, settings.min_commission)
+        return max(int(commission_zemy), settings.min_commission)
 
     @property
     def amount_paid_online(self):
-        return self.total_amount
+        # Le passager paie le montant hors prime Zemy
+        return self.amount_due_to_driver
 
     @property
     def amount_due_to_driver(self):
@@ -1119,8 +1176,17 @@ class RideWaypoint(models.Model):
     longitude = models.FloatField()
     order = models.IntegerField(help_text="Position dans l'itinéraire (index chronologique)")
     distance_from_start_m = models.IntegerField(default=0, help_text="Distance cumulée en mètres depuis le départ du trajet")
+    duration_from_start_sec = models.IntegerField(default=0, help_text="Durée cumulée en secondes depuis le départ du trajet")
+    waypoint_type = models.CharField(max_length=50, default="gps", choices=[
+        ("departure", "Départ"),
+        ("stopover", "Arrêt"),
+        ("city", "Ville traversée"),
+        ("gps", "Point GPS"),
+        ("arrival", "Arrivée")
+    ])
     leg_index = models.IntegerField(default=0, help_text="Index du RideLeg auquel appartient ce waypoint")
     is_stopover = models.BooleanField(default=False, help_text="True si c'est un arrêt déclaré par le chauffeur")
+    seats_available = models.IntegerField(default=4, help_text="Nombre de places disponibles sur le tronçon partant de ce waypoint")
 
     class Meta:
         verbose_name = "Point de passage"
@@ -1165,4 +1231,4 @@ class SearchAlert(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Alerte {self.passenger} : {self.departure_location} → {self.arrival_location} ({self.desired_date})"
+        return f"Alerte {self.passenger} : {self.departure_location} -> {self.arrival_location} ({self.desired_date})"
