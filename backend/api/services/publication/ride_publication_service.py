@@ -5,11 +5,9 @@ from django.db import transaction
 
 from ...models.trajet import Ride
 from ...repositories.ride_repository import RideRepository
-from ...cartographie.google.directions import GoogleDirectionsProvider
-from ...cartographie.osrm import OSRMRouteProvider
+from ...cartographie.routes import RoutesOrchestrator
 from ...calculs.calcul_distance import haversine_km
 from ...itineraire.services.calcul_itineraire import (
-    decode_polyline,
     extract_locality_from_step,
     find_cities_along_route,
     _extract_leg_distance,
@@ -40,54 +38,17 @@ class RidePublicationService:
         arr_lat = ride.arrival_latitude or 0.0
         arr_lon = ride.arrival_longitude or 0.0
 
-        # 1. Tentative d'obtention de l'itinéraire via Google Directions
-        route_data = GoogleDirectionsProvider.get_route(
+        # 1. Résolution de l'itinéraire via l'Orchestrateur (Google -> OSRM -> Haversine)
+        polyline, google_legs_raw, route_resolved = RoutesOrchestrator.get_route(
             origin_lat=dep_lat,
             origin_lon=dep_lon,
             dest_lat=arr_lat,
             dest_lon=arr_lon,
             stopovers=stopovers,
             origin_place_id=ride.departure_place_id or '',
-            dest_place_id=ride.arrival_place_id or ''
+            dest_place_id=ride.arrival_place_id or '',
+            default_duration_min=ride.duration_min or 120
         )
-
-        if route_data and 'routes' in route_data and len(route_data['routes']) > 0:
-            route = route_data['routes'][0]
-            overview_polyline_str = route.get('overview_polyline', {}).get('points', '')
-            google_legs_raw = route.get('legs', [])
-            if overview_polyline_str:
-                polyline = decode_polyline(overview_polyline_str)
-                route_resolved = True
-
-        # 2. Fallback OSRM en cas d'échec
-        if not route_resolved:
-            osrm_data = OSRMRouteProvider.get_route(
-                origin_lat=dep_lat,
-                origin_lon=dep_lon,
-                dest_lat=arr_lat,
-                dest_lon=arr_lon,
-                stopovers=stopovers
-            )
-            if osrm_data and 'routes' in osrm_data and len(osrm_data['routes']) > 0:
-                route = osrm_data['routes'][0]
-                google_legs_raw = route.get('legs', [])
-                coords = route.get('geometry', {}).get('coordinates', [])
-                polyline = [(pt[1], pt[0]) for pt in coords]
-                route_resolved = True
-
-        # 3. Fallback Haversine ligne droite
-        if not route_resolved or not polyline:
-            polyline = [
-                (dep_lat, dep_lon),
-                (arr_lat, arr_lon)
-            ]
-            total_duration_sec = (ride.duration_min or 120) * 60
-            dist_m = int(haversine_km(dep_lat, dep_lon, arr_lat, arr_lon) * 1000)
-            google_legs_raw = [{
-                'duration': {'value': total_duration_sec},
-                'distance': {'value': dist_m},
-                'steps': []
-            }]
 
         # 4. Calcul de l'avancement cumulé sur la polyline
         polyline_stats = []
