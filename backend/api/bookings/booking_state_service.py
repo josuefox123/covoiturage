@@ -12,6 +12,7 @@ Assurer une source de vérité unique pour le statut, les actions autorisées,
 le calcul de l'expiration et les tarifs. Le frontend ne fait plus de logique.
 ==============================================================
 """
+from typing import Optional
 from django.utils import timezone
 from datetime import datetime, timedelta
 from ..models import Booking, Ride, FinancialSettings
