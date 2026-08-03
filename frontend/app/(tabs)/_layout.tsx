@@ -66,7 +66,7 @@ export default function TabsLayout() {
         />
         {/* 2 - Publier */}
         <Tabs.Screen
-          name="publish/index"
+          name="publish"
           options={{
             title: 'Publier',
             tabBarIcon: ({ color, focused }) => (

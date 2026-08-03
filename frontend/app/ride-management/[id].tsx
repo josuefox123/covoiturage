@@ -3,14 +3,14 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../../src/context/AuthContext';
-import { CustomAlert } from '../../../src/utils/CustomAlert';
+import { useAuth } from '../../src/context/AuthContext';
+import { CustomAlert } from '../../src/utils/CustomAlert';
 
 // Components & Hooks
-import { useRideManagement } from './_hooks/useRideManagement';
-import { RideTimeline } from './_components/RideTimeline';
-import { BookingItem } from './_components/BookingItem';
-import { StatsGrid } from './_components/StatsGrid';
+import { useRideManagement } from '@/src/features/ride-management/hooks/useRideManagement';
+import { RideTimeline } from '@/src/features/ride-management/components/RideTimeline';
+import { BookingItem } from '@/src/features/ride-management/components/BookingItem';
+import { StatsGrid } from '@/src/features/ride-management/components/StatsGrid';
 
 const COLORS = {
   primary: '#2D9CDB',

@@ -16,21 +16,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { theme } from '../../../src/styles/theme';
-import { useAuth } from '../../../src/context/AuthContext';
-import { StepIndicator } from '../../../src/components/publish/StepIndicator';
-import LocationPicker from '../../../src/components/LocationPicker';
-import { AppBottomSheet } from '../../../src/components/AppBottomSheet';
+import { theme } from '../../src/styles/theme';
+import { useAuth } from '../../src/context/AuthContext';
+import { StepIndicator } from '../../src/components/publish/StepIndicator';
+import LocationPicker from '../../src/components/LocationPicker';
+import { AppBottomSheet } from '../../src/components/AppBottomSheet';
 
 // Subcomponents & Hook
-import { usePublishForm } from './_hooks/usePublishForm';
-import { ItineraryStep } from './_components/ItineraryStep';
-import { StopoversStep } from './_components/StopoversStep';
-import { DateTimeStep } from './_components/DateTimeStep';
-import { PriceStep } from './_components/PriceStep';
-import { PreferencesStep } from './_components/PreferencesStep';
-import { PublishSummaryModal } from './_components/PublishSummaryModal';
-import { ProfileCompletionModal } from './_components/ProfileCompletionModal';
+import { usePublishForm } from '@/src/features/publish/hooks/usePublishForm';
+import { ItineraryStep } from '@/src/features/publish/components/ItineraryStep';
+import { StopoversStep } from '@/src/features/publish/components/StopoversStep';
+import { DateTimeStep } from '@/src/features/publish/components/DateTimeStep';
+import { PriceStep } from '@/src/features/publish/components/PriceStep';
+import { PreferencesStep } from '@/src/features/publish/components/PreferencesStep';
+import { PublishSummaryModal } from '@/src/features/publish/components/PublishSummaryModal';
+import { ProfileCompletionModal } from '@/src/features/publish/components/ProfileCompletionModal';
 
 const STEP_LABELS = ['Itinéraire', 'Étapes', 'Date', 'Prix', 'Options'];
 
@@ -63,7 +63,7 @@ export default function PublishScreen() {
     var directionsRenderer;
     var directionsService;
     var directionsResponse;
-
+ 
     function getRouteSteps(r) {
       var steps = [];
       r.legs.forEach(function(l) {
@@ -81,7 +81,7 @@ export default function PublishScreen() {
       });
       return steps;
     }
-
+ 
     function getRouteLegs(r) {
       return r.legs.map(function(l) {
         return {
@@ -92,7 +92,7 @@ export default function PublishScreen() {
         };
       });
     }
-
+ 
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
         zoom: 12,
@@ -105,7 +105,7 @@ export default function PublishScreen() {
           { "featureType": "road", "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] }
         ]
       });
-
+ 
       directionsService = new google.maps.DirectionsService();
       
       directionsRenderer = new google.maps.DirectionsRenderer({
@@ -117,7 +117,7 @@ export default function PublishScreen() {
           strokeWeight: 4
         }
       });
-
+ 
       directionsService.route({
         origin: { lat: ${form.departureCords.lat}, lng: ${form.departureCords.lon} },
         destination: { lat: ${form.arrivalCords.lat}, lng: ${form.arrivalCords.lon} },
@@ -165,7 +165,7 @@ export default function PublishScreen() {
           map.fitBounds(bounds);
         }
       });
-
+ 
       new google.maps.Marker({
         position: { lat: ${form.departureCords.lat}, lng: ${form.departureCords.lon} },
         map: map,
@@ -178,7 +178,7 @@ export default function PublishScreen() {
           strokeWeight: 3
         }
       });
-
+ 
       new google.maps.Marker({
         position: { lat: ${form.arrivalCords.lat}, lng: ${form.arrivalCords.lon} },
         map: map,
@@ -191,16 +191,16 @@ export default function PublishScreen() {
           strokeWeight: 3
         }
       });
-
+ 
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
     }
-
+ 
     window.renderRoute = function(index) {
       if (directionsRenderer) {
         directionsRenderer.setRouteIndex(index);
       }
     };
-
+ 
     window.updateWaypoints = function(stopoversJson) {
       var stops = [];
       try {
@@ -208,7 +208,7 @@ export default function PublishScreen() {
       } catch (e) {
         console.error("Error parsing stops", e);
       }
-
+ 
       var waypoints = [];
       stops.forEach(function(s) {
         if (s.coords && s.coords.lat && s.coords.lon) {
@@ -218,7 +218,7 @@ export default function PublishScreen() {
           });
         }
       });
-
+ 
       directionsService.route({
         origin: { lat: ${form.departureCords.lat}, lng: ${form.departureCords.lon} },
         destination: { lat: ${form.arrivalCords.lat}, lng: ${form.arrivalCords.lon} },
@@ -231,7 +231,7 @@ export default function PublishScreen() {
           directionsResponse = response;
           directionsRenderer.setDirections(response);
           directionsRenderer.setRouteIndex(0);
-
+ 
           var routes = response.routes.map(function(r, idx) {
             var distVal = 0;
             var durVal = 0;
@@ -239,13 +239,13 @@ export default function PublishScreen() {
               distVal += l.distance.value;
               durVal += l.duration.value;
             });
-
+ 
             var distText = (distVal / 1000).toFixed(1) + ' km';
             var totalMin = Math.round(durVal / 60);
             var hrs = Math.floor(totalMin / 60);
             var mins = totalMin % 60;
             var durText = hrs > 0 ? hrs + ' h ' + mins + ' min' : mins + ' min';
-
+ 
             return {
               index: idx,
               summary: r.summary || 'Itinéraire proposé',
@@ -257,7 +257,7 @@ export default function PublishScreen() {
               legs: getRouteLegs(r)
             };
           });
-
+ 
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'routesCalculated',
             routes: routes
@@ -572,7 +572,7 @@ export default function PublishScreen() {
               ? { latitude: form.arrivalCords.lat, longitude: form.arrivalCords.lon, name: form.arrival }
               : undefined
           }
-          onLocationSelected={(loc) => {
+          onLocationSelected={(loc: any) => {
             const cords = { lat: loc.latitude, lon: loc.longitude };
             let newDep = form.departure;
             let newArr = form.arrival;
@@ -749,5 +749,6 @@ const styles = StyleSheet.create({
   publishBtn: { borderRadius: 18, overflow: 'hidden', marginTop: 8 },
   publishBtnGradient: { flexDirection: 'row', height: 64, justifyContent: 'center', alignItems: 'center', gap: 12 },
   publishBtnText: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
-  publishBtnDisabled: { opacity: 0.6 }
+  publishBtnDisabled: { opacity: 0.6 },
+  preferencesStepPlaceholderTextActive: {}
 });

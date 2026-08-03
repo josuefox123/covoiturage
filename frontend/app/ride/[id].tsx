@@ -3,20 +3,20 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '../../../src/context/AuthContext';
-import { useBooking } from '../../../src/hooks/useBooking';
-import { CustomAlert } from '../../../src/utils/CustomAlert';
-import { getRideAction } from '../../../src/utils/bookingState';
+import { useAuth } from '../../src/context/AuthContext';
+import { useBooking } from '../../src/hooks/useBooking';
+import { CustomAlert } from '../../src/utils/CustomAlert';
+import { getRideAction } from '../../src/utils/bookingState';
 
 // Subcomponents & Hooks
-import { useRideDetails } from './_hooks/useRideDetails';
-import { RideMap } from './_components/RideMap';
-import { StopoverTimeline } from './_components/StopoverTimeline';
-import { DriverCard } from './_components/DriverCard';
-import { PassengerCard } from './_components/PassengerCard';
-import { BookingConfirmModal } from './_modals/BookingConfirmModal';
-import { BookingSuccessModal } from './_modals/BookingSuccessModal';
-import { PassengerNegotiationModal } from './_modals/PassengerNegotiationModal';
+import { useRideDetails } from '@/src/features/ride/hooks/useRideDetails';
+import { RideMap } from '@/src/features/ride/components/RideMap';
+import { StopoverTimeline } from '@/src/features/ride/components/StopoverTimeline';
+import { DriverCard } from '@/src/features/ride/components/DriverCard';
+import { PassengerCard } from '@/src/features/ride/components/PassengerCard';
+import { BookingConfirmModal } from '@/src/features/ride/modals/BookingConfirmModal';
+import { BookingSuccessModal } from '@/src/features/ride/modals/BookingSuccessModal';
+import { PassengerNegotiationModal } from '@/src/features/ride/modals/PassengerNegotiationModal';
 
 const COLORS = {
   primary: '#2F80ED',
