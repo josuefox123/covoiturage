@@ -2,30 +2,23 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from django.db import transaction
-from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
 
-from ...models.trajet import Ride, RideSeries
+from ...models.trajet import Ride
 from ...models.utilisateur import Vehicle
 from ...serializers import RideSerializer
-from .helpers import validate_driver_and_vehicle
 from .ride_actions import RideActionsMixin
+from ...controllers.rides.ride_publication_controller import RidePublicationController
 
 class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
     """
     ViewSet principal pour la gestion des trajets.
     
-    Endpoints supplémentaires :
-        - GET /api/rides/suggest-price/ : Suggestion de prix basée sur la distance
-        - POST /api/rides/{id}/cancel/ : Annulation par le conducteur (hérité de RideActionsMixin)
-        - POST /api/rides/{id}/start/ : Démarrer un trajet (hérité de RideActionsMixin)
-        - POST /api/rides/{id}/complete/ : Terminer un trajet (hérité de RideActionsMixin)
-        - POST /api/rides/{id}/update_location/ : Mettre à jour la position GPS
-        - POST /api/rides/{id}/next_leg/ : Passer au tronçon suivant (hérité de RideActionsMixin)
+    Toute la logique de publication unique/récurrente a été déléguée
+    au RidePublicationController.
     """
     queryset = Ride.objects.all().order_by('-created_at')
     serializer_class = RideSerializer
@@ -147,7 +140,7 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         if seats_str:
             try:
                 queryset = queryset.filter(seats_available__gte=1)
-              except ValueError:
+            except ValueError:
                 pass
         if ride_type == 'parcel':
             queryset = queryset.filter(accepts_parcels=True)
@@ -240,255 +233,25 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         if distance_km <= 0:
             return Response({'error': 'distance_km doit être un nombre positif.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        from ...models.paiement import FinancialSettings
-        fin_settings = FinancialSettings.load()
-        price_per_km = fin_settings.price_per_km
-        margin = fin_settings.price_margin_percent
-
-        raw_price = distance_km * price_per_km
-        suggested_price = int(round(raw_price / 100.0) * 100)
-        min_price = int(round(suggested_price * (1 - margin / 100.0) / 100.0) * 100)
-        max_price = int(round(suggested_price * (1 + margin / 100.0) / 100.0) * 100)
-
-        return Response({
-            'suggested_price': suggested_price,
-            'min_price': min_price,
-            'max_price': max_price,
-            'price_per_km': price_per_km,
-            'margin_percent': margin,
-        })
+        result = RidePublicationController.suggest_price(distance_km)
+        return Response(result, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
-        from rest_framework.exceptions import ValidationError
-        
         is_recurrent = request.data.get('is_recurrent', False)
-        
+
         if is_recurrent:
-            if not request.user.is_verified:
-                raise ValidationError({"error": "Votre compte doit être vérifié pour publier un trajet."})
-                
-            start_date_str = request.data.get('start_date')
-            end_date_str = request.data.get('end_date')
-            repeat_type = request.data.get('repeat_type', 'daily')
-            week_days = request.data.get('week_days', [])
-            
-            if not start_date_str or not end_date_str:
-                raise ValidationError({"error": "Date de début et date de fin requises pour un trajet récurrent."})
-                
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-            
-            if end_date < start_date:
-                raise ValidationError({"error": "La date de fin ne peut pas être antérieure à la date de début."})
-                
-            if repeat_type == 'weekly' and not week_days:
-                raise ValidationError({"error": "Veuillez sélectionner au moins un jour pour la récurrence."})
-            
-            departure_location = request.data.get('departure_location')
-            arrival_location = request.data.get('arrival_location')
-            departure_time = request.data.get('departure_time')
-            driver_payout = int(request.data.get('driver_payout', 0))
-            
-            dep_lat = request.data.get('departure_latitude')
-            dep_lon = request.data.get('departure_longitude')
-            arr_lat = request.data.get('arrival_latitude')
-            arr_lon = request.data.get('arrival_longitude')
-            
-            from ...models.paiement import FinancialSettings
-            settings = FinancialSettings.load()
-            if settings.is_commission_active:
-                zemy_commission = int(driver_payout * (settings.commission_percentage / 100.0))
-                if zemy_commission < settings.min_commission:
-                    zemy_commission = settings.min_commission
-                if settings.max_commission and zemy_commission > settings.max_commission:
-                    zemy_commission = settings.max_commission
-            else:
-                zemy_commission = 0
-            
-            price_per_seat = driver_payout + zemy_commission
-            total_seats = request.data.get('total_seats')
-            vehicle_id = request.data.get('vehicle')
-            
-            accepts_parcels = request.data.get('accepts_parcels', False)
-            max_parcels = int(request.data.get('max_parcels', 0)) if request.data.get('max_parcels') else 0
-            max_weight_per_parcel = float(request.data.get('max_weight_per_parcel', 0.0)) if request.data.get('max_weight_per_parcel') else 0.0
-            max_dimensions = request.data.get('max_dimensions', '')
-            price_per_parcel = int(request.data.get('price_per_parcel', 0)) if request.data.get('price_per_parcel') else 0
-            allowed_parcel_types = request.data.get('allowed_parcel_types', [])
-            
-            music = request.data.get('music', True)
-            smoking = request.data.get('smoking', False)
-            chatty = request.data.get('chatty', True)
-            air_conditioner = request.data.get('air_conditioner', True)
-            pets_allowed = request.data.get('pets_allowed', False)
-            luggage_allowed = request.data.get('luggage_allowed', True)
-            stops_allowed = request.data.get('stops_allowed', True)
-            description = request.data.get('description', '')
-            distance_km_val = request.data.get('distance_km')
-            duration_min_val = request.data.get('duration_min')
-
-            departure_time_val = departure_time
-            if isinstance(departure_time_val, str):
-                try:
-                    departure_time_val = datetime.strptime(departure_time_val, "%H:%M:%S").time()
-                except ValueError:
-                    try:
-                        departure_time_val = datetime.strptime(departure_time_val, "%H:%M").time()
-                    except ValueError:
-                        pass
-
-            with transaction.atomic():
-                validate_driver_and_vehicle(
-                    driver=request.user,
-                    vehicle_id=vehicle_id,
-                    departure_date=start_date,
-                    departure_time=departure_time_val,
-                    duration_min=duration_min_val
-                )
-
-                vehicle_obj = None
-                if vehicle_id:
-                    vehicle_obj = Vehicle.objects.filter(id=vehicle_id).first()
-                
-                series = RideSeries.objects.create(
-                    driver=request.user,
-                    start_date=start_date,
-                    end_date=end_date,
-                    repeat_type=repeat_type,
-                    week_days=week_days,
-                    departure_time=departure_time,
-                    departure_location=departure_location,
-                    arrival_location=arrival_location,
-                    price_per_seat=price_per_seat,
-                    driver_payout=driver_payout,
-                    zemy_commission=zemy_commission,
-                    total_seats=total_seats,
-                    vehicle=vehicle_obj,
-                    accepts_parcels=accepts_parcels,
-                    max_parcels=max_parcels,
-                    max_weight_per_parcel=max_weight_per_parcel,
-                    max_dimensions=max_dimensions,
-                    price_per_parcel=price_per_parcel,
-                    allowed_parcel_types=allowed_parcel_types,
-                    departure_latitude=dep_lat,
-                    departure_longitude=dep_lon,
-                    arrival_latitude=arr_lat,
-                    arrival_longitude=arr_lon
-                )
-                
-                current_date = start_date
-                created_count = 0
-                while current_date <= end_date:
-                    create_this_day = False
-                    if repeat_type == 'daily':
-                        create_this_day = True
-                    elif repeat_type == 'weekly':
-                        if current_date.weekday() in week_days:
-                            create_this_day = True
-                    
-                    if create_this_day:
-                        validate_driver_and_vehicle(
-                            driver=request.user,
-                            vehicle_id=vehicle_id,
-                            departure_date=current_date,
-                            departure_time=departure_time_val,
-                            duration_min=duration_min_val
-                        )
-
-                        ride_obj = Ride.objects.create(
-                            series=series,
-                            driver=request.user,
-                            vehicle=vehicle_obj,
-                            departure_location=departure_location,
-                            arrival_location=arrival_location,
-                            departure_date=current_date,
-                            departure_time=departure_time,
-                            price_per_seat=price_per_seat,
-                            driver_payout=driver_payout,
-                            zemy_commission=zemy_commission,
-                            total_seats=total_seats,
-                            seats_available=total_seats,
-                            accepts_parcels=accepts_parcels,
-                            max_parcels=max_parcels,
-                            parcels_available=max_parcels,
-                            max_weight_per_parcel=max_weight_per_parcel,
-                            max_dimensions=max_dimensions,
-                            price_per_parcel=price_per_parcel,
-                            allowed_parcel_types=allowed_parcel_types,
-                            departure_latitude=dep_lat,
-                            departure_longitude=dep_lon,
-                            arrival_latitude=arr_lat,
-                            arrival_longitude=arr_lon,
-                            music=music,
-                            smoking=smoking,
-                            chatty=chatty,
-                            air_conditioner=air_conditioner,
-                            pets_allowed=pets_allowed,
-                            luggage_allowed=luggage_allowed,
-                            stops_allowed=stops_allowed,
-                            description=description,
-                            distance_km=float(distance_km_val) if distance_km_val else None,
-                            duration_min=int(duration_min_val) if duration_min_val else None,
-                        )
-                        from api.services.ride_service import RideService
-                        try:
-                            RideService.generate_legs(ride_obj)
-                        except Exception as e:
-                            logger.error(f"Error generating legs for recurring ride {ride_obj.id}: {e}")
-                        created_count += 1
-                        
-                    current_date += timedelta(days=1)
-            
-            return Response({"message": f"{created_count} trajets générés avec succès."}, status=status.HTTP_201_CREATED)
-            
+            result = RidePublicationController.publish_recurrent_rides(
+                user=request.user,
+                data=request.data
+            )
+            return Response(result, status=status.HTTP_201_CREATED)
         else:
-            return super().create(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        from ...models.paiement import FinancialSettings
-        
-        driver_payout = serializer.validated_data.get('driver_payout', 0)
-        vehicle = serializer.validated_data.get('vehicle')
-        if not vehicle:
-            vehicle = Vehicle.objects.filter(owner=self.request.user).first()
-
-        departure_date = serializer.validated_data.get('departure_date')
-        departure_time = serializer.validated_data.get('departure_time')
-        duration_min = serializer.validated_data.get('duration_min')
-
-        validate_driver_and_vehicle(
-            driver=self.request.user,
-            vehicle_id=vehicle.id if vehicle else None,
-            departure_date=departure_date,
-            departure_time=departure_time,
-            duration_min=duration_min
-        )
-
-        fin_settings = FinancialSettings.load()
-        if fin_settings.is_commission_active:
-            zemy_commission = int(driver_payout * (fin_settings.commission_percentage / 100.0))
-            if zemy_commission < fin_settings.min_commission:
-                zemy_commission = fin_settings.min_commission
-            if fin_settings.max_commission and zemy_commission > fin_settings.max_commission:
-                zemy_commission = fin_settings.max_commission
-        else:
-            zemy_commission = 0
-            
-        price_per_seat = driver_payout + zemy_commission
-        max_parcels = serializer.validated_data.get('max_parcels', 0)
-        
-        ride = serializer.save(
-            driver=self.request.user,
-            vehicle=vehicle,
-            zemy_commission=zemy_commission,
-            price_per_seat=price_per_seat,
-            parcels_available=max_parcels
-        )
-        from api.services.ride_service import RideService
-        try:
-            RideService.generate_legs(ride)
-        except Exception as e:
-            logger.error(f"Error generating legs for ride {ride.id}: {e}")
+            result = RidePublicationController.publish_ride(
+                user=request.user,
+                data=request.data,
+                serializer_class=RideSerializer
+            )
+            return Response(result, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['patch', 'post'], url_path='update_location')
     def update_location(self, request, pk=None):
