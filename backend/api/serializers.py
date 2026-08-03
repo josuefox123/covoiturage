@@ -210,6 +210,7 @@ class BookingSerializer(serializers.ModelSerializer):
     passenger_details = CompactUserSerializer(source='passenger', read_only=True)
     ride_details = RideSerializer(source='ride', read_only=True)
     portion_price = serializers.SerializerMethodField()
+    pricing_breakdown = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -218,15 +219,22 @@ class BookingSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(int)
     def get_portion_price(self, obj):
-        if obj.custom_price is not None:
-            return obj.custom_price * obj.seats_booked
-        ride = obj.ride
-        price = ride.price_per_seat
-        if obj.departure_location and obj.arrival_location:
-            segment_price = ride.get_segment_price(obj.departure_location, obj.arrival_location)
-            if segment_price:
-                price = segment_price
-        return price * obj.seats_booked
+        """Prix total payé par le passager (driver_price + commission)."""
+        return obj.total_amount
+
+    @extend_schema_field(dict)
+    def get_pricing_breakdown(self, obj):
+        """Décomposition complète du prix pour l'affichage frontend."""
+        from .services.pricing_service import PricingService
+        r = PricingService.compute_for_booking(obj)
+        return {
+            'driver_price': r.driver_price,
+            'commission': r.commission,
+            'total_to_pay': r.total_to_pay,
+            'driver_amount': r.driver_amount,
+            'zemy_amount': r.zemy_amount,
+            'seats': r.seats,
+        }
 
 class ParcelSerializer(serializers.ModelSerializer):
     """

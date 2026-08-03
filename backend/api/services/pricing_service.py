@@ -1,174 +1,157 @@
-"""
+﻿"""
 ========================================================
-Fichier :
 pricing_service.py
 
-Description :
-Service de calcul de prix intelligent au prorata du km.
-Utilisé lors de la recherche pour calculer le prix exact
-d'un segment passager sur un trajet conducteur.
+REGLE FONDAMENTALE (BlaBlaCar-style) :
+  - driver_price  = ce que le conducteur souhaite recevoir
+  - commission    = Zemy applique sa commission SUR driver_price
+  - total_to_pay  = driver_price + commission  (ce que paie le passager)
+  - driver_amount = driver_price               (ce que recoit le conducteur)
+  - zemy_amount   = commission                 (ce que garde Zemy)
 
-Projet :
-Zemy
+Il n existe qu une seule fonction de calcul : PricingService.compute()
+Tous les autres helpers l appellent.
 ========================================================
 """
 import logging
+from dataclasses import dataclass
 from ..models import Ride, RideLeg, RideWaypoint, FinancialSettings
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class PricingResult:
+    """Resultat immuable d un calcul de prix."""
+    driver_price: int
+    commission: int
+    total_to_pay: int
+    driver_amount: int
+    zemy_amount: int
+    seats: int
+    segment_distance_m: int
+    segment_distance_km: float
+
+    def to_dict(self) -> dict:
+        return {
+            'driver_price': self.driver_price,
+            'commission': self.commission,
+            'total_to_pay': self.total_to_pay,
+            'driver_amount': self.driver_amount,
+            'zemy_amount': self.zemy_amount,
+            'seats': self.seats,
+            'segment_distance_m': self.segment_distance_m,
+            'segment_distance_km': self.segment_distance_km,
+        }
+
+
 class PricingService:
-    """
-    Calcule le prix d'un segment passager au prorata de la distance réelle.
-    
-    Exemple :
-        Trajet Calavi → Parakou, 7000 FCFA, 400 km
-        Passager Allada → Bohicon = 60 km
-        Prix = (60 / 400) * 7000 = 1050 FCFA → arrondi à 1050 FCFA
-    """
+    @staticmethod
+    def compute(driver_price: int, seats: int = 1, segment_distance_m: int = 0) -> 'PricingResult':
+        if driver_price < 0:
+            driver_price = 0
+        try:
+            settings = FinancialSettings.objects.first()
+        except Exception:
+            settings = None
+        commission = PricingService._apply_commission_rules(driver_price, settings)
+        unit_total = driver_price + commission
+        total_to_pay = unit_total * seats
+        driver_amount = driver_price * seats
+        zemy_amount = commission * seats
+        return PricingResult(
+            driver_price=driver_price,
+            commission=commission,
+            total_to_pay=total_to_pay,
+            driver_amount=driver_amount,
+            zemy_amount=zemy_amount,
+            seats=seats,
+            segment_distance_m=segment_distance_m,
+            segment_distance_km=round(segment_distance_m / 1000, 1),
+        )
 
     @staticmethod
-    def calculate_segment_price(
-        ride: Ride,
-        dep_waypoint_order: int,
-        arr_waypoint_order: int,
-        seats: int = 1
-    ) -> dict:
-        """
-        Calcule le prix d'un segment entre deux waypoints (par leur order).
-        
-        Retourne un dict avec :
-            - base_price : Prix brut (sans commission) en FCFA
-            - commission : Commission Zemy en FCFA
-            - total_price : Prix final à payer par le passager
-            - driver_payout : Montant net au conducteur
-            - price_per_km : Prix au km appliqué
-            - segment_distance_m : Distance du segment en mètres
-        """
+    def compute_for_booking(booking) -> 'PricingResult':
+        driver_price = (
+            booking.custom_price
+            or booking.driver_counter_price
+            or booking.passenger_proposed_price
+            or booking.ride.price_per_seat
+        )
+        return PricingService.compute(driver_price=int(driver_price), seats=booking.seats_booked)
+
+    @staticmethod
+    def compute_for_segment(ride, dep_waypoint_order: int, arr_waypoint_order: int, seats: int = 1) -> 'PricingResult':
         try:
-            # Récupérer tous les waypoints ordonnés
             waypoints = list(ride.waypoints.order_by('order'))
             if not waypoints:
-                # Fallback : prix complet du trajet
-                return PricingService._fallback_price(ride, seats)
-
-            # Trouver les waypoints de départ et d'arrivée
+                return PricingService._fallback(ride, seats)
             dep_wp = next((w for w in waypoints if w.order == dep_waypoint_order), None)
             arr_wp = next((w for w in waypoints if w.order == arr_waypoint_order), None)
-
             if not dep_wp or not arr_wp or dep_waypoint_order >= arr_waypoint_order:
-                return PricingService._fallback_price(ride, seats)
-
-            # Calculer la distance du segment depuis distance_from_start_m
+                return PricingService._fallback(ride, seats)
             segment_distance_m = arr_wp.distance_from_start_m - dep_wp.distance_from_start_m
             if segment_distance_m <= 0:
-                return PricingService._fallback_price(ride, seats)
-
-            # Distance totale du trajet (dernier waypoint)
+                return PricingService._fallback(ride, seats)
             total_distance_m = waypoints[-1].distance_from_start_m
             if total_distance_m <= 0:
-                # Fallback via legs
-                total_distance_m = sum(
-                    leg.distance_m for leg in ride.legs.all()
-                ) or 1
-
-            # Calcul au prorata
+                total_distance_m = sum(leg.distance_m for leg in ride.legs.all()) or 1
             ratio = segment_distance_m / total_distance_m
-            base_price_raw = ride.price_per_seat * ratio * seats
-
-            # Arrondi à 50 FCFA le plus proche, minimum 100 FCFA
-            base_price = max(100, int(round(base_price_raw / 50.0) * 50))
-
-            # Calcul de la commission Zemy
-            commission, driver_payout = PricingService._calculate_commission(base_price)
-
-            # Prix au km
-            price_per_km = (base_price / (segment_distance_m / 1000)) if segment_distance_m > 0 else 0
-
-            return {
-                'base_price': base_price,
-                'commission': commission,
-                'total_price': base_price,  # Le passager paie base_price (commission incluse dans le split)
-                'driver_payout': driver_payout,
-                'price_per_km': round(price_per_km, 1),
-                'segment_distance_m': segment_distance_m,
-                'segment_distance_km': round(segment_distance_m / 1000, 1),
-            }
-
+            driver_price_raw = ride.price_per_seat * ratio
+            driver_price = max(100, int(round(driver_price_raw / 50.0) * 50))
+            return PricingService.compute(driver_price=driver_price, seats=seats, segment_distance_m=int(segment_distance_m))
         except Exception as e:
-            logger.error(f"PricingService.calculate_segment_price error for ride {ride.id}: {e}")
-            return PricingService._fallback_price(ride, seats)
+            logger.error(f"PricingService.compute_for_segment error for ride {ride.id}: {e}")
+            return PricingService._fallback(ride, seats)
 
     @staticmethod
-    def calculate_price_by_legs(ride: Ride, dep_leg_idx: int, arr_leg_idx: int, seats: int = 1) -> dict:
-        """
-        Calcule le prix d'un segment en cumulant les prix des RideLeg couverts.
-        Méthode alternative plus rapide si les waypoints ne sont pas disponibles.
-        """
+    def compute_for_legs(ride, dep_leg_idx: int, arr_leg_idx: int, seats: int = 1) -> 'PricingResult':
         try:
             legs = list(ride.legs.order_by('order'))
             if not legs:
-                return PricingService._fallback_price(ride, seats)
-
+                return PricingService._fallback(ride, seats)
             dep_leg_idx = max(0, dep_leg_idx)
             arr_leg_idx = min(arr_leg_idx, len(legs) - 1)
-
-            total_price = 0
+            total_leg_price = 0
             total_distance_m = 0
             for i in range(dep_leg_idx, arr_leg_idx + 1):
                 if i < len(legs):
-                    total_price += legs[i].price
+                    total_leg_price += legs[i].price
                     total_distance_m += legs[i].distance_m
-
-            total_price = max(100, total_price * seats)
-            commission, driver_payout = PricingService._calculate_commission(total_price)
-
-            price_per_km = (total_price / (total_distance_m / 1000)) if total_distance_m > 0 else 0
-
-            return {
-                'base_price': total_price,
-                'commission': commission,
-                'total_price': total_price,
-                'driver_payout': driver_payout,
-                'price_per_km': round(price_per_km, 1),
-                'segment_distance_m': total_distance_m,
-                'segment_distance_km': round(total_distance_m / 1000, 1),
-            }
-
+            driver_price = max(100, total_leg_price)
+            return PricingService.compute(driver_price=driver_price, seats=seats, segment_distance_m=int(total_distance_m))
         except Exception as e:
-            logger.error(f"PricingService.calculate_price_by_legs error: {e}")
-            return PricingService._fallback_price(ride, seats)
+            logger.error(f"PricingService.compute_for_legs error: {e}")
+            return PricingService._fallback(ride, seats)
 
     @staticmethod
-    def _calculate_commission(base_price: int) -> tuple:
-        """Retourne (commission, driver_payout) en FCFA."""
+    def _apply_commission_rules(driver_price: int, settings) -> int:
         try:
-            settings_obj = FinancialSettings.objects.first()
-            if settings_obj and settings_obj.is_commission_active:
-                commission = int((base_price * settings_obj.commission_percentage) / 100)
-                commission = max(commission, settings_obj.min_commission)
-                if settings_obj.max_commission:
-                    commission = min(commission, settings_obj.max_commission)
-            else:
-                commission = max(100, int(base_price * 0.10))
+            if settings and settings.is_commission_active:
+                commission = int(driver_price * settings.commission_percentage / 100)
+                commission = max(commission, settings.min_commission)
+                if settings.max_commission:
+                    commission = min(commission, settings.max_commission)
+                return commission
         except Exception:
-            commission = max(100, int(base_price * 0.10))
-
-        driver_payout = base_price - commission
-        return commission, driver_payout
+            pass
+        return max(100, int(driver_price * 0.10))
 
     @staticmethod
-    def _fallback_price(ride: Ride, seats: int = 1) -> dict:
-        """Prix de secours = prix_par_place * places."""
-        base_price = ride.price_per_seat * seats
-        commission, driver_payout = PricingService._calculate_commission(base_price)
-        return {
-            'base_price': base_price,
-            'commission': commission,
-            'total_price': base_price,
-            'driver_payout': driver_payout,
-            'price_per_km': 0,
-            'segment_distance_m': 0,
-            'segment_distance_km': 0,
-        }
+    def _fallback(ride, seats: int) -> 'PricingResult':
+        return PricingService.compute(driver_price=ride.price_per_seat, seats=seats, segment_distance_m=0)
+
+    # Retro-compatibilite
+    @staticmethod
+    def calculate_segment_price(ride, dep_waypoint_order: int, arr_waypoint_order: int, seats: int = 1) -> dict:
+        r = PricingService.compute_for_segment(ride, dep_waypoint_order, arr_waypoint_order, seats)
+        return {'base_price': r.driver_price, 'commission': r.commission, 'total_price': r.total_to_pay,
+                'driver_payout': r.driver_amount, 'price_per_km': 0,
+                'segment_distance_m': r.segment_distance_m, 'segment_distance_km': r.segment_distance_km}
+
+    @staticmethod
+    def calculate_price_by_legs(ride, dep_leg_idx: int, arr_leg_idx: int, seats: int = 1) -> dict:
+        r = PricingService.compute_for_legs(ride, dep_leg_idx, arr_leg_idx, seats)
+        return {'base_price': r.driver_price, 'commission': r.commission, 'total_price': r.total_to_pay,
+                'driver_payout': r.driver_amount, 'price_per_km': 0,
+                'segment_distance_m': r.segment_distance_m, 'segment_distance_km': r.segment_distance_km}

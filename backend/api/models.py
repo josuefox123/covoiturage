@@ -422,73 +422,36 @@ class Booking(models.Model):
                 )
         return super().delete(using=using, keep_parents=keep_parents)
         
+    def _pricing(self):
+        """
+        Calcule le prix via PricingService (source de verite unique).
+        Appel mis en cache sur l instance pour eviter les requetes multiples.
+        """
+        if not hasattr(self, '_pricing_cache'):
+            from .services.pricing_service import PricingService
+            self._pricing_cache = PricingService.compute_for_booking(self)
+        return self._pricing_cache
+
     @property
     def total_amount(self):
-        negotiated_price = None
-        if self.custom_price is not None:
-            negotiated_price = self.custom_price
-        elif self.driver_counter_price is not None:
-            negotiated_price = self.driver_counter_price
-        elif self.passenger_proposed_price is not None:
-            negotiated_price = self.passenger_proposed_price
-
-        if negotiated_price is not None:
-            settings = FinancialSettings.objects.first()
-            commission_pct = settings.commission_percentage if settings else 10
-            min_c = settings.min_commission if settings else 100
-            max_c = settings.max_commission if settings else None
-
-            comm = (negotiated_price * commission_pct) / 100
-            comm = max(comm, min_c)
-            if max_c is not None:
-                comm = min(comm, max_c)
-
-            unit_price = negotiated_price + comm
-            return self.seats_booked * int(unit_price)
-
-        base_price = self.ride.price_per_seat
-        if self.departure_location and self.arrival_location:
-            segment_price = self.ride.get_segment_price(self.departure_location, self.arrival_location)
-            if segment_price:
-                base_price = segment_price
-        return self.seats_booked * base_price
+        """Montant total paye par le passager (driver_price + commission) x places."""
+        return self._pricing().total_to_pay
 
     @property
     def zemy_commission(self):
-        negotiated_price = None
-        if self.custom_price is not None:
-            negotiated_price = self.custom_price
-        elif self.driver_counter_price is not None:
-            negotiated_price = self.driver_counter_price
-        elif self.passenger_proposed_price is not None:
-            negotiated_price = self.passenger_proposed_price
-
-        settings = FinancialSettings.objects.first()
-        if not settings:
-            return 0
-
-        if negotiated_price is not None:
-            commission_pct = settings.commission_percentage
-            min_c = settings.min_commission
-            max_c = settings.max_commission
-
-            comm = (negotiated_price * commission_pct) / 100
-            comm = max(comm, min_c)
-            if max_c is not None:
-                comm = min(comm, max_c)
-            return self.seats_booked * int(comm)
-
-        commission_zemy = (self.total_amount * settings.commission_percentage) / 100
-        return max(int(commission_zemy), settings.min_commission)
+        """Commission totale conservee par Zemy (commission unitaire x places)."""
+        return self._pricing().zemy_amount
 
     @property
     def amount_paid_online(self):
-        # Le passager paie le montant hors prime Zemy
-        return self.amount_due_to_driver
+        """Montant debite via FeexPay = total_amount (driver + commission)."""
+        return self._pricing().total_to_pay
 
     @property
     def amount_due_to_driver(self):
-        return self.total_amount - self.zemy_commission
+        """Montant verse au conducteur = driver_price x places (sans commission)."""
+        return self._pricing().driver_amount
+
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
