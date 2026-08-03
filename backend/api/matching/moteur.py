@@ -61,9 +61,21 @@ class MatchingEngine:
             'departure_date': target_date,
             'status__in': ['active', 'started'],
         }
+        
         candidate_rides = (
             Ride.objects
             .filter(**base_filters)
+        )
+
+        # Si la recherche est pour aujourd'hui, exclure les trajets déjà partis
+        now_local = timezone.localtime(timezone.now())
+        if target_date == now_local.date():
+            # Laisser une marge de 10 minutes pour les départs imminents
+            cutoff_time = (now_local - timedelta(minutes=10)).time()
+            candidate_rides = candidate_rides.filter(departure_time__gte=cutoff_time)
+
+        candidate_rides = (
+            candidate_rides
             .select_related('driver', 'vehicle')
             .prefetch_related('legs', 'waypoints')
         )

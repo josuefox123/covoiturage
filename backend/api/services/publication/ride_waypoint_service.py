@@ -38,7 +38,7 @@ class RideWaypointService:
             
             waypoint_instances.append(RideWaypoint(
                 ride=ride,
-                name=w['name'][:255],
+                name=(w.get('name') or '')[:255],
                 latitude=w['latitude'],
                 longitude=w['longitude'],
                 order=idx,
