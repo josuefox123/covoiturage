@@ -18,6 +18,27 @@ from ..models import Booking, Ride, FinancialSettings
 
 class BookingStateService:
     @staticmethod
+    def calculate_expires_at(booking: Booking, ride: Ride) -> Optional[str]:
+        """Calcule le moment d'expiration estimé pour une réservation."""
+        try:
+            ride_datetime = timezone.make_aware(
+                datetime.combine(ride.departure_date, ride.departure_time)
+            )
+            time_diff = ride_datetime - booking.created_at
+            diff_hours = time_diff.total_seconds() / 3600.0
+            if diff_hours <= 24:
+                limit_seconds = 1800
+            elif diff_hours <= 48:
+                limit_seconds = 7200
+            elif diff_hours <= 168:
+                limit_seconds = 43200
+            else:
+                limit_seconds = 86400
+            return (booking.created_at + timedelta(seconds=limit_seconds)).isoformat()
+        except Exception:
+            return None
+
+    @staticmethod
     def get_state(passenger, ride, departure_order=None, arrival_order=None):
         """
         Calcule et retourne l'état d'affichage complet pour un trajet,
@@ -135,24 +156,7 @@ class BookingStateService:
         amount = booking_pricing.total_to_pay
 
         # Calculer le moment d'expiration estimé
-        expires_at = None
-        try:
-            ride_datetime = timezone.make_aware(
-                datetime.combine(ride.departure_date, ride.departure_time)
-            )
-            time_diff = ride_datetime - booking.created_at
-            diff_hours = time_diff.total_seconds() / 3600.0
-            if diff_hours <= 24:
-                limit_seconds = 1800
-            elif diff_hours <= 48:
-                limit_seconds = 7200
-            elif diff_hours <= 168:
-                limit_seconds = 43200
-            else:
-                limit_seconds = 86400
-            expires_at = (booking.created_at + timedelta(seconds=limit_seconds)).isoformat()
-        except Exception:
-            pass
+        expires_at = BookingStateService.calculate_expires_at(booking, ride)
 
         # Déterminer l'action et le label du bouton
         action = "reserve"

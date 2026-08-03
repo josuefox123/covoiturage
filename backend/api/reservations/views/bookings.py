@@ -229,26 +229,8 @@ class BookingViewSet(viewsets.ModelViewSet):
         ride = booking.ride
         driver = ride.driver
 
-        expires_at = None
-        try:
-            from django.utils import timezone as tz
-            import datetime
-            ride_datetime = tz.make_aware(
-                datetime.datetime.combine(ride.departure_date, ride.departure_time)
-            )
-            time_diff = ride_datetime - booking.created_at
-            diff_hours = time_diff.total_seconds() / 3600.0
-            if diff_hours <= 24:
-                limit_seconds = 1800
-            elif diff_hours <= 48:
-                limit_seconds = 7200
-            elif diff_hours <= 168:
-                limit_seconds = 43200
-            else:
-                limit_seconds = 86400
-            expires_at = (booking.created_at + datetime.timedelta(seconds=limit_seconds)).isoformat()
-        except Exception:
-            pass
+        from api.bookings.booking_state_service import BookingStateService
+        expires_at = BookingStateService.calculate_expires_at(booking, ride)
 
         available_actions = []
         if booking.status in ['pending', 'pending_driver', 'pending_passenger', 'pending_payment']:
