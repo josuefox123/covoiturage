@@ -23,14 +23,14 @@ import LocationPicker from '../../../src/components/LocationPicker';
 import { AppBottomSheet } from '../../../src/components/AppBottomSheet';
 
 // Subcomponents & Hook
-import { usePublishForm } from './hooks/usePublishForm';
-import { ItineraryStep } from './components/ItineraryStep';
-import { StopoversStep } from './components/StopoversStep';
-import { DateTimeStep } from './components/DateTimeStep';
-import { PriceStep } from './components/PriceStep';
-import { PreferencesStep } from './components/PreferencesStep';
-import { PublishSummaryModal } from './components/PublishSummaryModal';
-import { ProfileCompletionModal } from './components/ProfileCompletionModal';
+import { usePublishForm } from './_hooks/usePublishForm';
+import { ItineraryStep } from './_components/ItineraryStep';
+import { StopoversStep } from './_components/StopoversStep';
+import { DateTimeStep } from './_components/DateTimeStep';
+import { PriceStep } from './_components/PriceStep';
+import { PreferencesStep } from './_components/PreferencesStep';
+import { PublishSummaryModal } from './_components/PublishSummaryModal';
+import { ProfileCompletionModal } from './_components/ProfileCompletionModal';
 
 const STEP_LABELS = ['Itinéraire', 'Étapes', 'Date', 'Prix', 'Options'];
 

@@ -7,10 +7,10 @@ import { useAuth } from '../../../src/context/AuthContext';
 import { CustomAlert } from '../../../src/utils/CustomAlert';
 
 // Components & Hooks
-import { useRideManagement } from './hooks/useRideManagement';
-import { RideTimeline } from './components/RideTimeline';
-import { BookingItem } from './components/BookingItem';
-import { StatsGrid } from './components/StatsGrid';
+import { useRideManagement } from './_hooks/useRideManagement';
+import { RideTimeline } from './_components/RideTimeline';
+import { BookingItem } from './_components/BookingItem';
+import { StatsGrid } from './_components/StatsGrid';
 
 const COLORS = {
   primary: '#2D9CDB',

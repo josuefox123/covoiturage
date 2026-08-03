@@ -9,14 +9,14 @@ import { CustomAlert } from '../../../src/utils/CustomAlert';
 import { getRideAction } from '../../../src/utils/bookingState';
 
 // Subcomponents & Hooks
-import { useRideDetails } from './hooks/useRideDetails';
-import { RideMap } from './components/RideMap';
-import { StopoverTimeline } from './components/StopoverTimeline';
-import { DriverCard } from './components/DriverCard';
-import { PassengerCard } from './components/PassengerCard';
-import { BookingConfirmModal } from './modals/BookingConfirmModal';
-import { BookingSuccessModal } from './modals/BookingSuccessModal';
-import { PassengerNegotiationModal } from './modals/PassengerNegotiationModal';
+import { useRideDetails } from './_hooks/useRideDetails';
+import { RideMap } from './_components/RideMap';
+import { StopoverTimeline } from './_components/StopoverTimeline';
+import { DriverCard } from './_components/DriverCard';
+import { PassengerCard } from './_components/PassengerCard';
+import { BookingConfirmModal } from './_modals/BookingConfirmModal';
+import { BookingSuccessModal } from './_modals/BookingSuccessModal';
+import { PassengerNegotiationModal } from './_modals/PassengerNegotiationModal';
 
 const COLORS = {
   primary: '#2F80ED',
