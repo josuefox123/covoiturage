@@ -215,7 +215,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.passenger != request.user and booking.ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
-        from api.bookings.services import BookingService
+        from api.services.booking_service import BookingService
         success, msg = BookingService.cancel_booking(booking, cancelled_by_user=request.user)
         _push_booking_update(booking)
         return Response({"status": msg})
