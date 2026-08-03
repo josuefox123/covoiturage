@@ -13,7 +13,7 @@ class OSRMRouteProvider:
         origin_lon: float,
         dest_lat: float,
         dest_lon: float,
-        stopovers: List[Dict[str, Any]] = None
+        stopovers: Optional[List[Dict[str, Any]]] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Requête l'itinéraire auprès de l'API publique OSRM.

@@ -16,7 +16,7 @@ class RoutesOrchestrator:
         origin_lon: float,
         dest_lat: float,
         dest_lon: float,
-        stopovers: List[Dict[str, Any]] = None,
+        stopovers: Optional[List[Dict[str, Any]]] = None,
         origin_place_id: str = '',
         dest_place_id: str = '',
         default_duration_min: int = 120
