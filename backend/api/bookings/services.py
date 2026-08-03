@@ -265,11 +265,14 @@ class BookingService:
                 wp.seats_available -= booking.seats_booked
                 wp.save(update_fields=['seats_available'])
                 
-            # 2. Mettre à jour les legs macro pour la rétrocompatibilité
+            # 2. Mettre à jour les legs macro pour la rétrocompatibilité (verrouillés)
             booked_legs = BookingService.get_legs_for_booking(ride, booking.departure_location, booking.arrival_location)
-            for leg in booked_legs:
-                leg.seats_available = max(0, leg.seats_available - booking.seats_booked)
-                leg.save(update_fields=['seats_available'])
+            if booked_legs:
+                leg_ids = [lg.id for lg in booked_legs]
+                locked_legs = list(ride.legs.select_for_update().filter(id__in=leg_ids))
+                for leg in locked_legs:
+                    leg.seats_available = max(0, leg.seats_available - booking.seats_booked)
+                    leg.save(update_fields=['seats_available'])
                 
             # 3. Mettre à jour la disponibilité globale du trajet (min de tous les waypoints)
             all_wps = list(ride.waypoints.all())
@@ -301,11 +304,14 @@ class BookingService:
                 wp.seats_available += booking.seats_booked
                 wp.save(update_fields=['seats_available'])
                 
-            # 2. Ré-incrémenter sur les legs
+            # 2. Ré-incrémenter sur les legs (verrouillés)
             booked_legs = BookingService.get_legs_for_booking(ride, booking.departure_location, booking.arrival_location)
-            for leg in booked_legs:
-                leg.seats_available += booking.seats_booked
-                leg.save(update_fields=['seats_available'])
+            if booked_legs:
+                leg_ids = [lg.id for lg in booked_legs]
+                locked_legs = list(ride.legs.select_for_update().filter(id__in=leg_ids))
+                for leg in locked_legs:
+                    leg.seats_available += booking.seats_booked
+                    leg.save(update_fields=['seats_available'])
                 
             # 3. Ré-calculer la dispo globale
             all_wps = list(ride.waypoints.all())
