@@ -138,9 +138,9 @@ class PaymentService:
                 if booking.ride.driver:
                     create_and_send_notification(
                         user=booking.ride.driver,
-                        title="Nouvelle Réservation 🚗",
-                        message=f"{booking.passenger.full_name or booking.passenger.phone} a réservé {booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
-                        data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
+                        title="Nouvelle Réservation Payée 💰",
+                        message=f"{booking.passenger.full_name or booking.passenger.phone} vient de payer sa réservation. Votre gain de {amount_due} FCFA est sécurisé.",
+                        data={'type': 'passenger_paid_driver', 'booking_id': str(booking.id), 'screen': 'rides'}
                     )
                 
                 return payment, "Paiement validé avec succès."

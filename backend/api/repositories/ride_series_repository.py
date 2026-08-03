@@ -1,5 +1,5 @@
 from typing import Optional
-from ...models.trajet import RideSeries
+from ..models.trajet import RideSeries
 
 class RideSeriesRepository:
     """Repository pour l'accès aux données du modèle RideSeries (Récurrence)."""

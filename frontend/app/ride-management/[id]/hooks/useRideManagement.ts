@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ride, Booking } from '../../../src/types';
-import { CustomAlert } from '../../../src/utils/CustomAlert';
+import { Ride, Booking } from '../../../../src/types';
+import { CustomAlert } from '../../../../src/utils/CustomAlert';
 
 export function useRideManagement(id: string, authFetch: any, user: any) {
   const router = useRouter();

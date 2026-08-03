@@ -645,7 +645,9 @@ export default function SearchResultsScreen() {
                     passenger_dep_lat: departure_latitude || '',
                     passenger_dep_lon: departure_longitude || '',
                     passenger_arr_lat: arrival_latitude || '',
-                    passenger_arr_lon: arrival_longitude || ''
+                    passenger_arr_lon: arrival_longitude || '',
+                    dep_waypoint_order: item.dep_waypoint_order !== undefined ? String(item.dep_waypoint_order) : '',
+                    arr_waypoint_order: item.arr_waypoint_order !== undefined ? String(item.arr_waypoint_order) : ''
                   }
                 } as any)}
                 index={index}

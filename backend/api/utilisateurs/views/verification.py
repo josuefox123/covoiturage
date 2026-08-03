@@ -3,7 +3,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 
-from ...models.utilisateur import VerificationRequest, Notification
+from ...models import VerificationRequest, Notification
 from ...serializers import VerificationRequestSerializer
 from ...fcm import send_fcm_to_user
 

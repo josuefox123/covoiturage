@@ -72,15 +72,15 @@ class Command(BaseCommand):
         for i, ride in enumerate(rides_to_process, 1):
             try:
                 self.stdout.write(
-                    f"[{i}/{total}] Trajet {ride.id} ({ride.departure_location} → {ride.arrival_location}, {ride.departure_date})...",
+                    f"[{i}/{total}] Trajet {ride.id} ({ride.departure_location} -> {ride.arrival_location}, {ride.departure_date})...",
                     ending=' '
                 )
                 RideService.generate_legs(ride)
                 wp_count = ride.waypoints.count()
-                self.stdout.write(self.style.SUCCESS(f"✓ {wp_count} waypoints"))
+                self.stdout.write(self.style.SUCCESS(f"OK ({wp_count} waypoints)"))
                 success += 1
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"✗ Erreur: {e}"))
+                self.stdout.write(self.style.ERROR(f"ERREUR: {e}"))
                 errors += 1
 
         self.stdout.write("")

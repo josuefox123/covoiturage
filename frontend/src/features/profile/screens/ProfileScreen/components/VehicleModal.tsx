@@ -5,7 +5,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
+import { getMediaUrl } from '../../../../../utils/media';
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -307,14 +309,33 @@ export function VehicleModal({
               />
             )}
 
-            <TouchableOpacity style={[styles.imagePickerBtn, { backgroundColor: theme.colors.white }]} onPress={pickLicensePhoto}>
+            <TouchableOpacity style={[styles.imagePickerBtn, { backgroundColor: theme.colors.white, height: driverLicensePhoto ? 160 : 54, padding: 0, overflow: 'hidden' }]} onPress={pickLicensePhoto}>
               {driverLicensePhoto ? (
-                <Text style={styles.imagePickerTextSuccess}>Photo du permis ajoutée</Text>
+                <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+                  <Image
+                    source={{ uri: getMediaUrl(driverLicensePhoto) }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    paddingVertical: 6,
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                      Modifier la photo du permis
+                    </Text>
+                  </View>
+                </View>
               ) : (
-                <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: '100%', width: '100%' }}>
                   <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
                   <Text style={styles.imagePickerText}>Ajouter la photo du permis</Text>
-                </>
+                </View>
               )}
             </TouchableOpacity>
           </View>

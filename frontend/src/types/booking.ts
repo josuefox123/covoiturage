@@ -32,4 +32,8 @@ export interface Booking {
   departure_location?: string;
   arrival_location?: string;
   portion_price?: number;
+  passenger_proposed_price?: number;
+  driver_counter_price?: number;
+  negotiation_message?: string;
+  custom_price?: number;
 }

@@ -1,11 +1,16 @@
 from datetime import date
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
-from ..models import Booking, Ride
+from ..models import Booking, Ride, RideWaypoint
+from ..services.ride_service import haversine_km
 
 class BookingService:
     @staticmethod
-    def create_booking(passenger, ride_id, seats_booked, departure_location=None, arrival_location=None):
+    def create_booking(passenger, ride_id, seats_booked, departure_location=None, arrival_location=None,
+                       departure_latitude=None, departure_longitude=None,
+                       arrival_latitude=None, arrival_longitude=None,
+                       passenger_proposed_price=None, negotiation_message=None,
+                       departure_waypoint_order=None, arrival_waypoint_order=None):
         """
         Crée une réservation sécurisée à l'état initial 'pending'.
         Aucune place n'est décrémentée à ce stade.
@@ -30,37 +35,166 @@ class BookingService:
             if ride.status in ['started', 'completed', 'cancelled']:
                 raise ValidationError({"error": "Ce trajet n'est plus disponible pour la réservation."})
 
-            # Vérifier s'il reste assez de places
+            # Vérifier s'il reste assez de places globalement
             if ride.seats_available < seats_booked:
                 raise ValidationError({"error": "Nombre de places disponibles insuffisant."})
 
-            # Vérifier si l'utilisateur a déjà une réservation active ou en attente pour ce trajet
-            existing_booking = Booking.objects.filter(
-                ride=ride, 
-                passenger=passenger
-            ).exclude(status__in=['cancelled', 'payment_failed', 'expired']).first()
-            
-            if existing_booking:
-                # S'il y a déjà une réservation existante en attente de paiement, on la retourne au lieu de recréer
-                if existing_booking.status in ['pending_payment', 'pending']:
-                    return existing_booking, False
-                raise ValidationError({"error": "Vous avez déjà une réservation en cours pour ce trajet."})
+            # Trouver les index des waypoints de montée et descente
+            wps = list(ride.waypoints.all().order_by('order'))
+            if not wps:
+                from ..services.ride_service import RideService
+                try:
+                    RideService.generate_legs(ride)
+                    wps = list(ride.waypoints.all().order_by('order'))
+                except Exception:
+                    pass
 
-            # Créer la réservation à l'état initial 'pending' (En attente de validation chauffeur)
+            def clean_str(s):
+                if not s: return ""
+                return "".join(c for c in s.split(',')[0].strip().lower() if c.isalnum())
+
+            dep_order = None
+            arr_order = None
+
+            # Si le frontend a passé directement les waypoint orders, on les utilise en priorité absolue
+            if departure_waypoint_order is not None and arrival_waypoint_order is not None:
+                try:
+                    dep_order = int(departure_waypoint_order)
+                    arr_order = int(arrival_waypoint_order)
+                except (ValueError, TypeError):
+                    pass
+
+            # Sinon, résolution départ
+            if dep_order is None:
+                if departure_latitude is not None and departure_longitude is not None:
+                    dep_wp = min(wps, key=lambda wp: haversine_km(wp.latitude, wp.longitude, float(departure_latitude), float(departure_longitude)))
+                    dep_order = dep_wp.order
+                elif departure_location:
+                    dep_clean = clean_str(departure_location)
+                    for wp in wps:
+                        wp_clean = clean_str(wp.name)
+                        if dep_clean and (dep_clean in wp_clean or wp_clean in dep_clean):
+                            dep_order = wp.order
+                            break
+            
+            # Sinon, résolution arrivée
+            if arr_order is None:
+                if arrival_latitude is not None and arrival_longitude is not None:
+                    arr_wp = min(wps, key=lambda wp: haversine_km(wp.latitude, wp.longitude, float(arrival_latitude), float(arrival_longitude)))
+                    arr_order = arr_wp.order
+                elif arrival_location:
+                    arr_clean = clean_str(arrival_location)
+                    for wp in reversed(wps):
+                        wp_clean = clean_str(wp.name)
+                        if arr_clean and (arr_clean in wp_clean or wp_clean in arr_clean):
+                            arr_order = wp.order
+                            break
+
+            # Fallbacks par défaut
+            if dep_order is None:
+                dep_order = 0
+            if arr_order is None:
+                arr_order = max(1, len(wps) - 1) if wps else 1
+
+            if dep_order >= arr_order:
+                if dep_order > 0:
+                    dep_order, arr_order = arr_order, dep_order
+                else:
+                    arr_order = dep_order + 1
+
+            # Vérifier la disponibilité par waypoint micro-segment
+            segment_wps = [wp for wp in wps if dep_order <= wp.order < arr_order]
+            if segment_wps:
+                min_seats = min(wp.seats_available for wp in segment_wps)
+            else:
+                min_seats = ride.seats_available
+
+            if min_seats < seats_booked:
+                raise ValidationError({"error": "Nombre de places disponibles insuffisant sur ce segment de trajet."})
+
+            # Vérifier si l'utilisateur a déjà une réservation ACTIVE pour CE SEGMENT PRÉCIS
+            # (dep_order + arr_order sont déjà calculés plus haut)
+            # Deux réservations sur le même ride mais des segments différents sont autorisées.
+            existing_booking_same_segment = Booking.objects.filter(
+                ride=ride,
+                passenger=passenger,
+                departure_waypoint_order=dep_order,
+                arrival_waypoint_order=arr_order,
+            ).exclude(status__in=['cancelled', 'payment_failed', 'expired']).first()
+
+            if existing_booking_same_segment:
+                # Même segment, même trajet : retourner l'existant
+                if existing_booking_same_segment.status in ['pending_payment', 'pending', 'pending_passenger', 'pending_driver']:
+                    return existing_booking_same_segment, False
+                raise ValidationError({"error": "Vous avez déjà une réservation en cours pour ce segment de trajet."})
+
+            # Vérifier aussi qu'il n'y a pas une réservation CONFIRMÉE sur ce même trajet
+            # (on ne peut pas avoir deux réservations confirmées sur le même ride)
+            existing_confirmed = Booking.objects.filter(
+                ride=ride,
+                passenger=passenger,
+                status__in=['confirmed', 'started', 'payment_processing'],
+            ).first()
+            if existing_confirmed:
+                raise ValidationError({"error": "Vous avez déjà une réservation confirmée sur ce trajet."})
+
+            # Déterminer si c'est un trajet classique complet ou intermédiaire
+            is_classic = False
+            if wps:
+                last_idx = len(wps) - 1
+                if dep_order == 0 and arr_order >= last_idx:
+                    is_classic = True
+            else:
+                is_classic = True  # Fallback si aucun waypoint
+
+            initial_status = 'pending_payment' if is_classic else 'pending'
+
+            # Créer la réservation à l'état initial
             booking = Booking.objects.create(
                 ride=ride,
                 passenger=passenger,
                 seats_booked=seats_booked,
-                status='pending',
+                status=initial_status,
                 payment_status='pending',
                 departure_location=departure_location,
-                arrival_location=arrival_location
+                arrival_location=arrival_location,
+                departure_latitude=departure_latitude,
+                departure_longitude=departure_longitude,
+                arrival_latitude=arrival_latitude,
+                arrival_longitude=arrival_longitude,
+                departure_waypoint_order=dep_order,
+                arrival_waypoint_order=arr_order,
+                passenger_proposed_price=passenger_proposed_price,
+                negotiation_message=negotiation_message
             )
             
-            # Planifier la tâche d'expiration automatique après 15 minutes (900 secondes)
+            # Planifier la tâche d'expiration automatique avec délai intelligent
+            try:
+                from django.utils import timezone
+                import datetime
+                now = timezone.now()
+                ride_datetime = timezone.make_aware(
+                    datetime.datetime.combine(ride.departure_date, ride.departure_time)
+                )
+                time_diff = ride_datetime - now
+                diff_hours = time_diff.total_seconds() / 3600.0
+
+                if diff_hours <= 0:
+                    countdown_secs = 1800
+                elif diff_hours <= 24:
+                    countdown_secs = 1800
+                elif diff_hours <= 48:
+                    countdown_secs = 7200
+                elif diff_hours <= 168:
+                    countdown_secs = 43200
+                else:
+                    countdown_secs = 86400
+            except Exception:
+                countdown_secs = 86400
+
             try:
                 from ..tasks import expire_booking_task
-                expire_booking_task.apply_async((str(booking.id),), countdown=900)
+                expire_booking_task.apply_async((str(booking.id),), countdown=countdown_secs)
             except Exception:
                 pass
 
@@ -113,26 +247,39 @@ class BookingService:
         Retourne True si l'allocation est réussie, False sinon.
         """
         ride = booking.ride
-        booked_legs = BookingService.get_legs_for_booking(ride, booking.departure_location, booking.arrival_location)
+        dep_order = booking.departure_waypoint_order
+        arr_order = booking.arrival_waypoint_order
         
-        # Vérifier la disponibilité sur tous les segments concernés
-        for leg in booked_legs:
-            if leg.seats_available < booking.seats_booked:
-                return False
-                
-        # Décrémenter les places sur chaque segment
-        for leg in booked_legs:
-            leg.seats_available -= booking.seats_booked
-            leg.save()
+        if dep_order is None or arr_order is None:
+            dep_order = 0
+            arr_order = max(1, ride.waypoints.count() - 1)
             
-        # Mettre à jour la disponibilité globale du trajet
-        all_legs = list(ride.legs.all())
-        if all_legs:
-            ride.seats_available = min(l.seats_available for l in all_legs)
-        else:
-            ride.seats_available -= booking.seats_booked
-        ride.save()
-        return True
+        with transaction.atomic():
+            # 1. Mettre à jour les micro-segments RideWaypoint
+            wps = list(ride.waypoints.select_for_update().filter(order__gte=dep_order, order__lt=arr_order))
+            for wp in wps:
+                if wp.seats_available < booking.seats_booked:
+                    return False
+            
+            for wp in wps:
+                wp.seats_available -= booking.seats_booked
+                wp.save(update_fields=['seats_available'])
+                
+            # 2. Mettre à jour les legs macro pour la rétrocompatibilité
+            booked_legs = BookingService.get_legs_for_booking(ride, booking.departure_location, booking.arrival_location)
+            for leg in booked_legs:
+                leg.seats_available = max(0, leg.seats_available - booking.seats_booked)
+                leg.save(update_fields=['seats_available'])
+                
+            # 3. Mettre à jour la disponibilité globale du trajet (min de tous les waypoints)
+            all_wps = list(ride.waypoints.all())
+            if all_wps:
+                ride.seats_available = min(w.seats_available for w in all_wps)
+            else:
+                ride.seats_available = max(0, ride.seats_available - booking.seats_booked)
+            ride.save(update_fields=['seats_available'])
+            
+            return True
 
     @staticmethod
     def deallocate_seats(booking):
@@ -140,16 +287,32 @@ class BookingService:
         Restitue les places sur les segments concernés par la réservation.
         """
         ride = booking.ride
-        booked_legs = BookingService.get_legs_for_booking(ride, booking.departure_location, booking.arrival_location)
+        dep_order = booking.departure_waypoint_order
+        arr_order = booking.arrival_waypoint_order
         
-        for leg in booked_legs:
-            leg.seats_available += booking.seats_booked
-            leg.save()
+        if dep_order is None or arr_order is None:
+            dep_order = 0
+            arr_order = max(1, ride.waypoints.count() - 1)
             
-        all_legs = list(ride.legs.all())
-        if all_legs:
-            ride.seats_available = min(l.seats_available for l in all_legs)
-        else:
-            ride.seats_available += booking.seats_booked
-        ride.save()
+        with transaction.atomic():
+            # 1. Ré-incrémenter sur les waypoints
+            wps = list(ride.waypoints.select_for_update().filter(order__gte=dep_order, order__lt=arr_order))
+            for wp in wps:
+                wp.seats_available += booking.seats_booked
+                wp.save(update_fields=['seats_available'])
+                
+            # 2. Ré-incrémenter sur les legs
+            booked_legs = BookingService.get_legs_for_booking(ride, booking.departure_location, booking.arrival_location)
+            for leg in booked_legs:
+                leg.seats_available += booking.seats_booked
+                leg.save(update_fields=['seats_available'])
+                
+            # 3. Ré-calculer la dispo globale
+            all_wps = list(ride.waypoints.all())
+            if all_wps:
+                ride.seats_available = min(w.seats_available for w in all_wps)
+            else:
+                ride.seats_available += booking.seats_booked
+            ride.save(update_fields=['seats_available'])
+
 

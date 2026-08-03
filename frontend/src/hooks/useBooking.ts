@@ -11,12 +11,26 @@ export const useBooking = () => {
         rideId: string,
         seatsBooked: number,
         departureLocation?: string,
-        arrivalLocation?: string
+        arrivalLocation?: string,
+        passengerProposedPrice?: number,
+        negotiationMessage?: string,
+        departureWaypointOrder?: number,
+        arrivalWaypointOrder?: number
     ): Promise<BookingResponse | null> => {
         setLoading(true);
         setError(null);
         try {
-            const booking = await BookingService.createBooking(authFetch, rideId, seatsBooked, departureLocation, arrivalLocation);
+            const booking = await BookingService.createBooking(
+                authFetch,
+                rideId,
+                seatsBooked,
+                departureLocation,
+                arrivalLocation,
+                passengerProposedPrice,
+                negotiationMessage,
+                departureWaypointOrder,
+                arrivalWaypointOrder
+            );
             return booking;
         } catch (err: any) {
             const errMsg = err.error || err.message || "Erreur lors de la création de la réservation.";

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Ride } from '../../../src/types';
+import { Ride } from '../../../../src/types';
 
 interface BookingConfirmModalProps {
   visible: boolean;

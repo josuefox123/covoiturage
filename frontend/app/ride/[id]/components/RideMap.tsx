@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { Ride } from '../../../src/types';
+import { Ride } from '../../../../src/types';
 
 interface RideMapProps {
   ride: Ride;

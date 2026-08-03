@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Ride } from '../../../src/types';
-import { getMediaUrl } from '../../../src/utils/media';
+import { Ride } from '../../../../src/types';
+import { getMediaUrl } from '../../../../src/utils/media';
 
 interface DriverCardProps {
   ride: Ride;

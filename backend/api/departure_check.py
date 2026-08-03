@@ -35,12 +35,16 @@ def check_upcoming_departures():
             now = timezone.now()
             
             # ==========================================
-            # 1. Nettoyage des réservations non payées (> 30 secondes)
+            # 1. Nettoyage des réservations non payées (> 30 minutes)
             # ==========================================
-            expired_time = now - timedelta(seconds=30)
+            expired_time = now - timedelta(minutes=30)
             
-            # Nettoyer les réservations de passagers
-            expired_bookings = Booking.objects.filter(payment_status='pending', created_at__lt=expired_time)
+            # Nettoyer les réservations de passagers (uniquement celles en attente de paiement 'pending_payment')
+            expired_bookings = Booking.objects.filter(
+                payment_status='pending',
+                status='pending_payment',
+                created_at__lt=expired_time
+            )
             for eb in expired_bookings:
                 try:
                     eb.delete()
@@ -48,7 +52,7 @@ def check_upcoming_departures():
                 except Exception as e:
                     logger.error(f"[Cleanup] Erreur lors de la suppression de la réservation {eb.id}: {e}")
 
-            # Nettoyer les réservations de colis
+            # Nettoyer les réservations de colis (donner 30 minutes pour payer également)
             expired_parcels = Parcel.objects.filter(payment_status='pending', created_at__lt=expired_time)
             for ep in expired_parcels:
                 try:

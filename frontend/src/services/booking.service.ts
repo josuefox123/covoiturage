@@ -15,7 +15,11 @@ export const BookingService = {
         rideId: string,
         seatsBooked: number,
         departureLocation?: string,
-        arrivalLocation?: string
+        arrivalLocation?: string,
+        passengerProposedPrice?: number,
+        negotiationMessage?: string,
+        departureWaypointOrder?: number,
+        arrivalWaypointOrder?: number
     ): Promise<BookingResponse> => {
         try {
             const response = await authFetch('/bookings/', {
@@ -24,7 +28,11 @@ export const BookingService = {
                     ride: rideId,
                     seats_booked: seatsBooked,
                     departure_location: departureLocation,
-                    arrival_location: arrivalLocation
+                    arrival_location: arrivalLocation,
+                    passenger_proposed_price: passengerProposedPrice,
+                    negotiation_message: negotiationMessage,
+                    departure_waypoint_order: departureWaypointOrder,
+                    arrival_waypoint_order: arrivalWaypointOrder
                 })
             });
             return response;

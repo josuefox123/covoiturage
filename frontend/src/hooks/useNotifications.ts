@@ -25,6 +25,7 @@ import { Platform, Alert, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { CustomAlert } from '../utils/CustomAlert';
+import * as Speech from 'expo-speech';
 
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
@@ -68,6 +69,7 @@ export function useNotifications() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
+  const activeProposalAlerts = useRef<Set<string>>(new Set());
 
   const registerForPushNotifications = useCallback(async () => {
     if (!Notifications || !Device) {
@@ -168,6 +170,28 @@ export function useNotifications() {
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (notification: any) => {
         const data = notification.request.content.data;
+        const title = notification.request.content.title || '';
+        const body = notification.request.content.body || '';
+
+        // Liste des types importants nécessitant une annonce vocale
+        const speakTypes = [
+          'new_booking_request',
+          'booking_accepted_passenger',
+          'passenger_paid_driver',
+          'passenger_refused_offer',
+          'leg_seats_freed_driver',
+          'booking_cancelled',
+          'booking_expired'
+        ];
+        
+        if (data?.type && speakTypes.includes(data.type)) {
+          try {
+            Speech.speak(body || title, { language: 'fr' });
+          } catch (e) {
+            console.warn("TTS Error:", e);
+          }
+        }
+
         if (data?.type === 'new_booking_request') {
           DeviceEventEmitter.emit('showBookingRequest', {
             id: data.booking_id,
@@ -176,11 +200,17 @@ export function useNotifications() {
             seats_booked: parseInt(data.seats_booked || '1'),
             total_amount: parseInt(data.total_amount || '0'),
             created_at: data.created_at || new Date().toISOString(),
+            negotiation_message: data.negotiation_message || '',
             passenger_details: {
               full_name: data.passenger_name || 'Passager',
               phone: data.passenger_phone || ''
             }
           });
+        } else if (data?.type === 'booking_accepted_passenger') {
+          // Ne pas afficher d'alerte pop-up bloquante OUI/NON globale ici.
+          // La synthèse vocale TTS et le bandeau de push standard suffisent.
+          // L'utilisateur pourra accepter/décliner en ouvrant le trajet.
+          DeviceEventEmitter.emit('refreshRideDetails');
         }
       }
     );
@@ -193,6 +223,8 @@ export function useNotifications() {
         // Deep linking vers la bonne page
         if (data?.screen === 'chat' && data?.conversation_id) {
           router.push(`/chat/${data.conversation_id}`);
+        } else if (data?.ride_id) {
+          router.push(`/ride/${data.ride_id}`);
         } else if (data?.screen === 'notifications') {
           router.push('/notifications');
         } else if (data?.screen === 'home') {
@@ -224,10 +256,59 @@ export function useNotifications() {
             lastSeenNotifId.current = latest.id;
           } else if (latest.id !== lastSeenNotifId.current && !latest.is_read) {
             lastSeenNotifId.current = latest.id;
-            CustomAlert.alert(
-              latest.title || 'Nouvelle notification 🔔',
-              latest.message || ''
-            );
+            
+            let dataObj: any = {};
+            if (latest.data) {
+              try {
+                dataObj = typeof latest.data === 'string' ? JSON.parse(latest.data) : latest.data;
+              } catch (e) {
+                dataObj = {};
+              }
+            }
+
+            // Liste des types importants nécessitant une annonce vocale
+            const speakTypes = [
+              'new_booking_request',
+              'booking_accepted_passenger',
+              'passenger_paid_driver',
+              'passenger_refused_offer',
+              'leg_seats_freed_driver',
+              'booking_cancelled',
+              'booking_expired'
+            ];
+            
+            if (dataObj?.type && speakTypes.includes(dataObj.type)) {
+              try {
+                Speech.speak(latest.message || latest.title, { language: 'fr' });
+              } catch (e) {
+                console.warn("TTS Error:", e);
+              }
+            }
+
+            if (dataObj?.type === 'booking_accepted_passenger') {
+              // Ne pas afficher d'alerte pop-up bloquante OUI/NON globale ici.
+              // La synthèse vocale TTS (déjà déclenchée au-dessus) et le bandeau de push standard suffisent.
+              DeviceEventEmitter.emit('refreshRideDetails');
+            } else if (dataObj?.type === 'new_booking_request') {
+              DeviceEventEmitter.emit('showBookingRequest', {
+                id: dataObj.booking_id,
+                departure_location: dataObj.departure_location || '',
+                arrival_location: dataObj.arrival_location || '',
+                seats_booked: parseInt(dataObj.seats_booked || '1'),
+                total_amount: parseInt(dataObj.total_amount || '0'),
+                created_at: dataObj.created_at || new Date().toISOString(),
+                negotiation_message: dataObj.negotiation_message || '',
+                passenger_details: {
+                  full_name: dataObj.passenger_name || 'Passager',
+                  phone: dataObj.passenger_phone || ''
+                }
+              });
+            } else {
+              CustomAlert.alert(
+                latest.title || 'Nouvelle notification 🔔',
+                latest.message || ''
+              );
+            }
           }
         }
       } catch (e) {

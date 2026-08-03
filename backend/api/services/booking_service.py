@@ -9,7 +9,8 @@ from .feexpay_service import FeexPayService
 
 class BookingService:
     @staticmethod
-    def create_booking(passenger, ride_id, seats_booked, payment_status='pending', departure_location=None, arrival_location=None):
+    def create_booking(passenger, ride_id, seats_booked, payment_status='pending', departure_location=None, arrival_location=None,
+                       passenger_proposed_price=None, negotiation_message=None):
         """
         Gère la création sécurisée d'une réservation avec gestion des race conditions,
         de la disponibilité des sièges et de la validation FeexPay.
@@ -88,13 +89,38 @@ class BookingService:
                 payment_status=payment_status,
                 status='pending',
                 departure_location=departure_location,
-                arrival_location=arrival_location
+                arrival_location=arrival_location,
+                passenger_proposed_price=passenger_proposed_price,
+                negotiation_message=negotiation_message
             )
             
-            # Planifier la tâche d'expiration automatique après 15 minutes (900 secondes)
+            # Planifier la tâche d'expiration automatique avec délai intelligent
+            try:
+                from django.utils import timezone
+                import datetime
+                now = timezone.now()
+                ride_datetime = timezone.make_aware(
+                    datetime.datetime.combine(ride.departure_date, ride.departure_time)
+                )
+                time_diff = ride_datetime - now
+                diff_hours = time_diff.total_seconds() / 3600.0
+
+                if diff_hours <= 0:
+                    countdown_secs = 1800
+                elif diff_hours <= 24:
+                    countdown_secs = 1800
+                elif diff_hours <= 48:
+                    countdown_secs = 7200
+                elif diff_hours <= 168:
+                    countdown_secs = 43200
+                else:
+                    countdown_secs = 86400
+            except Exception:
+                countdown_secs = 86400
+
             try:
                 from ..tasks import expire_booking_task
-                expire_booking_task.apply_async((str(booking.id),), countdown=900)
+                expire_booking_task.apply_async((str(booking.id),), countdown=countdown_secs)
             except Exception:
                 pass
             
@@ -115,7 +141,8 @@ class BookingService:
         
         # Restituer les places si la réservation était confirmée et qu'on l'annule
         if old_status == 'confirmed':
-            BookingService.deallocate_seats(booking)
+            from ..bookings.services import BookingService as CoreBookingService
+            CoreBookingService.deallocate_seats(booking)
                 
             ride = booking.ride
             passenger = booking.passenger

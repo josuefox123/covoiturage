@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Booking } from '../../../src/types';
+import { Booking } from '../../../../src/types';
 
 interface PassengerNegotiationModalProps {
   visible: boolean;

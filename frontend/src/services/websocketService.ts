@@ -166,3 +166,117 @@ export function buildWsUrl(apiBaseUrl: string, conversationId: string): string {
 
   return `${wsBase}/ws/chat/${conversationId}/`;
 }
+
+/**
+ * Construit l'URL WebSocket pour les notifications de statut de réservation.
+ */
+export function buildBookingWsUrl(apiBaseUrl: string, bookingId: string): string {
+  let wsBase = apiBaseUrl
+    .replace(/^https:\/\//, 'wss://')
+    .replace(/^http:\/\//, 'ws://')
+    .replace(/\/+$/, '');
+
+  if (wsBase.endsWith('/api')) {
+    wsBase = wsBase.substring(0, wsBase.length - 4);
+  }
+
+  return `${wsBase}/ws/booking/${bookingId}/`;
+}
+
+export type BookingWSMessage = {
+  type: 'booking_status_update';
+  booking_id: string;
+  status: string;
+  amount?: number;
+  payment_status?: string;
+};
+
+/**
+ * Service WebSocket léger pour les mises à jour de statut de réservation.
+ *
+ * Usage :
+ *   const ws = new BookingWebSocketService(bookingId, token, apiBaseUrl);
+ *   ws.onUpdate = (msg) => { /* mettre à jour le state * / };
+ *   ws.connect();
+ *   // Nettoyage :
+ *   ws.disconnect();
+ */
+export class BookingWebSocketService {
+  private ws: WebSocket | null = null;
+  private url: string;
+  private token: string;
+  private shouldReconnect = true;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectDelay = 2000;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+
+  onUpdate: ((msg: BookingWSMessage) => void) | null = null;
+  onOpen: (() => void) | null = null;
+  onClose: (() => void) | null = null;
+
+  constructor(bookingId: string, token: string, apiBaseUrl: string) {
+    this.url = buildBookingWsUrl(apiBaseUrl, bookingId);
+    this.token = token;
+  }
+
+  connect() {
+    if (this.ws?.readyState === WebSocket.OPEN) return;
+
+    const fullUrl = `${this.url}?token=${this.token}`;
+    this.ws = new WebSocket(fullUrl);
+
+    this.ws.onopen = () => {
+      this.reconnectAttempts = 0;
+      this.reconnectDelay = 2000;
+      this.onOpen?.();
+    };
+
+    this.ws.onmessage = (event) => {
+      try {
+        const data: BookingWSMessage = JSON.parse(event.data);
+        if (data.type === 'booking_status_update') {
+          this.onUpdate?.(data);
+        }
+      } catch (e) {
+        console.error('[BookingWS] Erreur parsing:', e);
+      }
+    };
+
+    this.ws.onclose = (event) => {
+      this.onClose?.();
+      if (!this.shouldReconnect || event.code === 4001 || event.code === 4003) return;
+      this._scheduleReconnect();
+    };
+
+    this.ws.onerror = () => {
+      // Erreur silencieuse — la reconnexion est gérée par onclose
+    };
+  }
+
+  disconnect() {
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.ws) {
+      this.ws.close(1000, 'Fermeture volontaire');
+      this.ws = null;
+    }
+  }
+
+  get isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  private _scheduleReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, this.reconnectDelay);
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 16000);
+  }
+}

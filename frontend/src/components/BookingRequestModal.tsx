@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity,
   Dimensions, ActivityIndicator, DeviceEventEmitter, Vibration,
-  KeyboardAvoidingView, Platform
+  KeyboardAvoidingView, Platform, TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
@@ -22,6 +22,7 @@ interface BookingData {
   seats_booked: number;
   total_amount: number;
   created_at: string;
+  negotiation_message?: string;
 }
 
 export default function BookingRequestModal() {
@@ -29,25 +30,35 @@ export default function BookingRequestModal() {
   const [visible, setVisible] = useState(false);
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<string>('15:00');
+  const [timeLeft, setTimeLeft] = useState<string>('72h 00m');
+  const [pricePerSeatInput, setPricePerSeatInput] = useState<string>('');
   
+  const [queue, setQueue] = useState<BookingData[]>([]);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  
+  const queueRef = useRef<BookingData[]>([]);
+  const currentIndexRef = useRef<number>(0);
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const speechIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const vibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeBookingId = useRef<string | null>(null);
 
+  // Mettre à jour les refs à chaque rendu pour le polling/notifications sans re-render d'écouteurs
+  useEffect(() => {
+    queueRef.current = queue;
+    currentIndexRef.current = currentIndex;
+  }, [queue, currentIndex]);
+
   // Fonction pour démarrer la synthèse vocale et les alertes continues
   const startAlerts = (passengerName: string, from: string, to: string) => {
-    // Nettoyer les alertes précédentes au cas où
     stopAlerts();
 
     const speakText = `Vous avez une nouvelle demande de réservation de ${passengerName} pour le trajet ${from.split(',')[0]} vers ${to.split(',')[0]}.`;
     
-    // Premier appel immédiat
     Speech.speak(speakText, { language: 'fr', pitch: 1.0, rate: 0.9 });
     Vibration.vibrate([0, 500, 200, 500, 200, 500]);
 
-    // Répétition toutes les 8 secondes (sonore + vocal + vibration)
     speechIntervalRef.current = setInterval(() => {
       Speech.speak(speakText, { language: 'fr', pitch: 1.0, rate: 0.9 });
     }, 8000);
@@ -63,39 +74,110 @@ export default function BookingRequestModal() {
     Speech.stop();
   };
 
-  const openModal = (data: BookingData) => {
-    setBooking(data);
-    activeBookingId.current = data.id;
-    setVisible(true);
-    
-    // Nom à énoncer
-    const passengerName = data.passenger_details?.full_name || 'un passager';
-    startAlerts(passengerName, data.departure_location, data.arrival_location);
-
-    // Initialiser le compte à rebours de 15 minutes
+  const initTimer = (createdAt: string) => {
     if (timerRef.current) clearInterval(timerRef.current);
+    const createdAtTime = new Date(createdAt).getTime();
     
-    const createdAtTime = new Date(data.created_at).getTime();
-    
-    timerRef.current = setInterval(() => {
+    const updateTime = () => {
       const now = new Date().getTime();
       const diffMs = now - createdAtTime;
-      const totalDurationMs = 15 * 60 * 1000; // 15 minutes
+      const totalDurationMs = 72 * 60 * 60 * 1000; // 72 heures
       const remainingMs = totalDurationMs - diffMs;
 
       if (remainingMs <= 0) {
-        // Expiré
-        if (timerRef.current) clearInterval(timerRef.current);
-        stopAlerts();
-        setVisible(false);
-        setBooking(null);
-        activeBookingId.current = null;
+        setTimeLeft('Expiré');
       } else {
-        const minutes = Math.floor(remainingMs / 60000);
+        const hours = Math.floor(remainingMs / 3600000);
+        const minutes = Math.floor((remainingMs % 3600000) / 60000);
         const seconds = Math.floor((remainingMs % 60000) / 1000);
-        setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+        if (hours > 0) {
+          setTimeLeft(`${hours}h ${minutes.toString().padStart(2, '0')}m`);
+        } else {
+          setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+        }
       }
-    }, 1000);
+    };
+
+    updateTime();
+    timerRef.current = setInterval(updateTime, 1000);
+  };
+
+  const updateQueue = (newList: BookingData[]) => {
+    if (newList.length === 0) {
+      if (queueRef.current.length > 0) {
+        closeModal();
+      }
+      return;
+    }
+
+    const currentIds = queueRef.current.map(b => b.id).join(',');
+    const newIds = newList.map(b => b.id).join(',');
+    
+    if (currentIds !== newIds) {
+      setQueue(newList);
+      setVisible(true);
+
+      let newIdx = currentIndexRef.current;
+      if (newIdx >= newList.length) {
+        newIdx = newList.length - 1;
+        setCurrentIndex(newIdx);
+      }
+
+      const currentBooking = newList[newIdx];
+      if (currentBooking) {
+        activeBookingId.current = currentBooking.id;
+        
+        const defaultPricePerSeat = currentBooking.seats_booked > 0 
+          ? Math.round(currentBooking.total_amount / currentBooking.seats_booked) 
+          : currentBooking.total_amount;
+        setPricePerSeatInput(String(defaultPricePerSeat));
+
+        if (booking?.id !== currentBooking.id) {
+          setBooking(currentBooking);
+          const passengerName = currentBooking.passenger_details?.full_name || 'un passager';
+          startAlerts(passengerName, currentBooking.departure_location, currentBooking.arrival_location);
+          initTimer(currentBooking.created_at);
+        }
+      }
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      const newIdx = currentIndex - 1;
+      setCurrentIndex(newIdx);
+      const targetBooking = queue[newIdx];
+      if (targetBooking) {
+        setBooking(targetBooking);
+        activeBookingId.current = targetBooking.id;
+        const defaultPricePerSeat = targetBooking.seats_booked > 0 
+          ? Math.round(targetBooking.total_amount / targetBooking.seats_booked) 
+          : targetBooking.total_amount;
+        setPricePerSeatInput(String(defaultPricePerSeat));
+        const passengerName = targetBooking.passenger_details?.full_name || 'un passager';
+        startAlerts(passengerName, targetBooking.departure_location, targetBooking.arrival_location);
+        initTimer(targetBooking.created_at);
+      }
+    }
+  };
+
+  const handleNext = () => {
+    if (currentIndex < queue.length - 1) {
+      const newIdx = currentIndex + 1;
+      setCurrentIndex(newIdx);
+      const targetBooking = queue[newIdx];
+      if (targetBooking) {
+        setBooking(targetBooking);
+        activeBookingId.current = targetBooking.id;
+        const defaultPricePerSeat = targetBooking.seats_booked > 0 
+          ? Math.round(targetBooking.total_amount / targetBooking.seats_booked) 
+          : targetBooking.total_amount;
+        setPricePerSeatInput(String(defaultPricePerSeat));
+        const passengerName = targetBooking.passenger_details?.full_name || 'un passager';
+        startAlerts(passengerName, targetBooking.departure_location, targetBooking.arrival_location);
+        initTimer(targetBooking.created_at);
+      }
+    }
   };
 
   // Fermer le modal proprement
@@ -104,21 +186,46 @@ export default function BookingRequestModal() {
     if (timerRef.current) clearInterval(timerRef.current);
     setVisible(false);
     setBooking(null);
+    setQueue([]);
+    setCurrentIndex(0);
     activeBookingId.current = null;
   };
 
   // Répondre à la demande (Accept / Reject)
-  const handleResponse = async (statusType: 'accept' | 'reject') => {
+  const handleResponse = async (statusType: 'accept' | 'reject', customPrice?: number) => {
     if (!booking) return;
     setLoading(true);
     try {
+      const bodyPayload = statusType === 'accept' && customPrice !== undefined && !isNaN(customPrice)
+        ? JSON.stringify({ price: customPrice })
+        : undefined;
       const response = await authFetch(`/bookings/${booking.id}/${statusType}/`, {
         method: 'POST',
+        body: bodyPayload
       });
-      if (response && !response.error) {
+      
+      const filteredQueue = queue.filter(b => b.id !== booking.id);
+      if (filteredQueue.length === 0) {
         closeModal();
       } else {
-        closeModal();
+        let newIdx = currentIndex;
+        if (newIdx >= filteredQueue.length) {
+          newIdx = filteredQueue.length - 1;
+        }
+        setCurrentIndex(newIdx);
+        setQueue(filteredQueue);
+        const nextBooking = filteredQueue[newIdx];
+        setBooking(nextBooking);
+        activeBookingId.current = nextBooking.id;
+        
+        const defaultPricePerSeat = nextBooking.seats_booked > 0 
+          ? Math.round(nextBooking.total_amount / nextBooking.seats_booked) 
+          : nextBooking.total_amount;
+        setPricePerSeatInput(String(defaultPricePerSeat));
+        
+        const passengerName = nextBooking.passenger_details?.full_name || 'un passager';
+        startAlerts(passengerName, nextBooking.departure_location, nextBooking.arrival_location);
+        initTimer(nextBooking.created_at);
       }
     } catch (error) {
       closeModal();
@@ -129,46 +236,42 @@ export default function BookingRequestModal() {
 
   // Écouter les événements de notification et le polling des réservations en attente
   useEffect(() => {
-    // 1. Écouteur d'événement local déclenché par useNotifications
     const sub = DeviceEventEmitter.addListener('showBookingRequest', (data: BookingData) => {
-      openModal(data);
+      setQueue((prev) => {
+        if (prev.some(b => b.id === data.id)) return prev;
+        const updated = [...prev, data];
+        updateQueue(updated);
+        return updated;
+      });
     });
 
-    // 2. Polling régulier si l'utilisateur est connecté et est conducteur
     let isMounted = true;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     if (token && user) {
       pollInterval = setInterval(async () => {
         try {
-          // Récupérer les bookings en attente dont le conducteur est l'utilisateur connecté
           const data = await authFetch(`/bookings/?ride_driver=${user.id}`);
           const list = Array.isArray(data) ? data : data?.results || [];
           
-          // Chercher une demande de statut 'pending'
-          const pendingRequest = list.find((b: any) => b.status === 'pending');
-          
-          if (pendingRequest && isMounted) {
-            // Si le modal n'est pas déjà affiché pour cette réservation
-            if (activeBookingId.current !== pendingRequest.id) {
-              openModal({
-                id: pendingRequest.id,
-                passenger_details: pendingRequest.passenger_details,
-                departure_location: pendingRequest.departure_location,
-                arrival_location: pendingRequest.arrival_location,
-                seats_booked: pendingRequest.seats_booked,
-                total_amount: pendingRequest.portion_price || pendingRequest.total_amount,
-                created_at: pendingRequest.created_at,
-              });
-            }
-          } else if (!pendingRequest && visible && isMounted) {
-            // Si la réservation n'est plus en attente (annulée ou validée par ailleurs), fermer
-            closeModal();
+          const pendingRequests = list.filter((b: any) => b.status === 'pending').map((b: any) => ({
+            id: b.id,
+            passenger_details: b.passenger_details,
+            departure_location: b.departure_location || b.ride?.departure_location || '',
+            arrival_location: b.arrival_location || b.ride?.arrival_location || '',
+            seats_booked: b.seats_booked,
+            // Le conducteur voit le prix conducteur (sans commission Zemy)
+            total_amount: b.pricing_breakdown?.driver_price ?? b.passenger_proposed_price ?? b.portion_price ?? b.total_amount,
+            created_at: b.created_at,
+            negotiation_message: b.negotiation_message || '',
+          }));
+
+          if (isMounted) {
+            updateQueue(pendingRequests);
           }
         } catch (error) {
-          // Silencieux
         }
-      }, 10000); // Polling toutes les 10 secondes
+      }, 10000);
     }
 
     return () => {
@@ -200,7 +303,9 @@ export default function BookingRequestModal() {
               <View style={styles.bellIconCircle}>
                 <Ionicons name="notifications" size={32} color="#FFFFFF" />
               </View>
-              <Text style={styles.headerTitle}>Nouvelle Demande !</Text>
+              <Text style={styles.headerTitle}>
+                Nouvelle Demande ! {queue.length > 1 ? `(${currentIndex + 1}/${queue.length})` : ''}
+              </Text>
               <Text style={styles.timerText}>Expire dans : {timeLeft}</Text>
             </View>
 
@@ -228,16 +333,83 @@ export default function BookingRequestModal() {
                 </View>
               </View>
 
+              {/* Message de négociation du passager */}
+              {!!booking.negotiation_message && (
+                <View style={{
+                  marginTop: 12,
+                  backgroundColor: '#FFF7ED',
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  borderRadius: 12,
+                  padding: 12,
+                  width: '100%',
+                }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#92400E', textTransform: 'uppercase', marginBottom: 4 }}>
+                    💬 Message du passager
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#78350F', lineHeight: 18 }}>
+                    {booking.negotiation_message}
+                  </Text>
+                </View>
+              )}
+
+              {/* Navigation entre plusieurs demandes */}
+              {queue.length > 1 && (
+                <View style={styles.navigationRow}>
+                  <TouchableOpacity
+                    style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
+                    onPress={handlePrev}
+                    disabled={currentIndex === 0}
+                  >
+                    <Ionicons name="chevron-back" size={20} color={currentIndex === 0 ? "#A1A1AA" : "#0066FF"} />
+                    <Text style={[styles.navButtonText, currentIndex === 0 && styles.navButtonTextDisabled]}>Précédente</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.navButton, currentIndex === queue.length - 1 && styles.navButtonDisabled]}
+                    onPress={handleNext}
+                    disabled={currentIndex === queue.length - 1}
+                  >
+                    <Text style={[styles.navButtonText, currentIndex === queue.length - 1 && styles.navButtonTextDisabled]}>Suivante</Text>
+                    <Ionicons name="chevron-forward" size={20} color={currentIndex === queue.length - 1 ? "#A1A1AA" : "#0066FF"} />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Détails places & prix */}
               <View style={styles.detailsRow}>
                 <View style={styles.detailBox}>
                   <Text style={styles.detailLabel}>Places</Text>
                   <Text style={styles.detailValue}>{booking.seats_booked}</Text>
                 </View>
-                <View style={styles.detailBox}>
-                  <Text style={styles.detailLabel}>Tarif</Text>
-                  <Text style={styles.detailValuePrice}>{booking.total_amount} FCFA</Text>
+                <View style={[styles.detailBox, { flex: 2, alignItems: 'center' }]}>
+                  <Text style={styles.detailLabel}>Prix par place (FCFA)</Text>
+                  <TextInput
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '800',
+                      color: '#0066FF',
+                      textAlign: 'center',
+                      borderWidth: 1.5,
+                      borderColor: '#CBD5E1',
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      minWidth: 100,
+                      marginTop: 4,
+                      backgroundColor: '#FFFFFF'
+                    }}
+                    keyboardType="numeric"
+                    value={pricePerSeatInput}
+                    onChangeText={setPricePerSeatInput}
+                  />
                 </View>
+              </View>
+
+              <View style={{ marginTop: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '600' }}>
+                  Total proposé : {((parseInt(pricePerSeatInput) || 0) * booking.seats_booked).toLocaleString()} FCFA
+                </Text>
               </View>
             </View>
 
@@ -258,7 +430,14 @@ export default function BookingRequestModal() {
 
                   <TouchableOpacity
                     style={[styles.btn, styles.btnAccept]}
-                    onPress={() => handleResponse('accept')}
+                    onPress={() => {
+                      const p = parseInt(pricePerSeatInput);
+                      if (isNaN(p) || p <= 0) {
+                        Vibration.vibrate(200);
+                      } else {
+                        handleResponse('accept', p);
+                      }
+                    }}
                     activeOpacity={0.8}
                   >
                     <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
@@ -428,5 +607,35 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  navigationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 12,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+  navButtonDisabled: {
+    opacity: 0.5,
+  },
+  navButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0066FF',
+  },
+  navButtonTextDisabled: {
+    color: '#A1A1AA',
   },
 });

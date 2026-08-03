@@ -64,14 +64,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         logger.info(f"WS connecté: user={user.id} conversation={self.conversation_id}")
 
-    async def disconnect(self, close_code):
+    async def disconnect(self, code):
         if hasattr(self, 'group_name'):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
-        logger.info(f"WS déconnecté: code={close_code} conversation={self.conversation_id}")
+        logger.info(f"WS déconnecté: code={code} conversation={self.conversation_id}")
 
-    async def receive(self, text_data):
+    async def receive(self, text_data=None, bytes_data=None):
         """Reçoit un message du client WebSocket et le diffuse au groupe."""
-        if not self.user:
+        if not self.user or not text_data:
             return
 
         try:
@@ -146,7 +146,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def typing_indicator(self, event):
         """Envoie l'indicateur de frappe au client."""
         # Ne pas renvoyer à l'émetteur lui-même
-        if event.get('user_id') != str(self.user.id):
+        if self.user and event.get('user_id') != str(self.user.id):
             await self.send(text_data=json.dumps({
                 'type': 'typing',
                 'user_id': event['user_id'],
@@ -155,7 +155,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def read_receipt(self, event):
         """Notifie que les messages ont été lus."""
-        if event.get('user_id') != str(self.user.id):
+        if self.user and event.get('user_id') != str(self.user.id):
             await self.send(text_data=json.dumps({
                 'type': 'read',
                 'user_id': event['user_id'],
@@ -181,7 +181,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return None
 
         try:
-            access_token = AccessToken(token_str)
+            access_token = AccessToken(token_str)  # type: ignore
             user_id = access_token.get('user_id')
             return User.objects.get(id=user_id, is_active=True)
         except (TokenError, User.DoesNotExist, Exception) as e:
@@ -201,6 +201,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _save_message(self, content):
         """Sauvegarde le message en base et retourne ses données sérialisées."""
+        if not self.user:
+            return None
         from .models import Conversation, Message
 
         try:
@@ -232,6 +234,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _mark_messages_read(self):
         """Marque tous les messages non lus (envoyés par l'autre) comme lus."""
+        if not self.user:
+            return
         from .models import Message
         Message.objects.filter(
             conversation_id=self.conversation_id,
@@ -241,6 +245,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _notify_recipient(self, content):
         """Envoie une notification FCM au destinataire de la conversation."""
+        if not self.user:
+            return
         from .models import Conversation
         from .fcm import send_fcm_to_user
 
@@ -272,3 +278,90 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         except Exception as e:
             logger.error(f"Erreur notification FCM WS: {e}")
+
+
+class BookingConsumer(AsyncWebsocketConsumer):
+    """
+    Consumer WebSocket pour les mises à jour de statut de réservation en temps réel.
+
+    Connexion : ws://host/ws/booking/<booking_id>/?token=<JWT>
+
+    Événements reçus :
+      - type: 'booking_update' → statut changé côté serveur
+        → diffuse au passager et au conducteur connectés
+    """
+
+    async def connect(self):
+        self.booking_id = self.scope['url_route']['kwargs']['booking_id']
+        self.group_name = f"booking_{self.booking_id}"
+        self.user = None
+
+        # Authentification JWT
+        user = await self._authenticate()
+        if user is None:
+            await self.close(code=4001)
+            return
+
+        # Vérifier que l'utilisateur est bien passager ou conducteur de cette réservation
+        is_authorized = await self._is_authorized(user, self.booking_id)
+        if not is_authorized:
+            await self.close(code=4003)
+            return
+
+        self.user = user
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+        logger.info(f"BookingWS connecté: user={user.id} booking={self.booking_id}")
+
+    async def disconnect(self, code):
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def receive(self, text_data=None, bytes_data=None):
+        # Le client ne peut pas envoyer de données sur ce canal (lecture seule)
+        pass
+
+    async def booking_update(self, event):
+        """Reçoit un update de statut du serveur et l'envoie au client WebSocket."""
+        await self.send(text_data=json.dumps({
+            'type': 'booking_status_update',
+            'booking_id': event['booking_id'],
+            'status': event['status'],
+            'amount': event.get('amount'),
+            'payment_status': event.get('payment_status'),
+        }))
+
+    @database_sync_to_async
+    def _authenticate(self):
+        """Extrait et vérifie le JWT depuis la query string."""
+        from rest_framework_simplejwt.tokens import AccessToken
+        from rest_framework_simplejwt.exceptions import TokenError
+
+        query_string = self.scope.get('query_string', b'').decode()
+        token_str = None
+        for part in query_string.split('&'):
+            if part.startswith('token='):
+                token_str = part[6:]
+                break
+
+        if not token_str:
+            return None
+
+        try:
+            access_token = AccessToken(token_str)  # type: ignore
+            user_id = access_token.get('user_id')
+            return User.objects.get(id=user_id, is_active=True)
+        except (TokenError, User.DoesNotExist, Exception) as e:
+            logger.debug(f"Auth BookingWS échouée: {e}")
+            return None
+
+    @database_sync_to_async
+    def _is_authorized(self, user, booking_id):
+        """Vérifie que l'utilisateur est passager ou conducteur de cette réservation."""
+        from .models import Booking
+        try:
+            booking = Booking.objects.select_related('passenger', 'ride__driver').get(id=booking_id)
+            return booking.passenger == user or booking.ride.driver == user or user.is_staff
+        except (Booking.DoesNotExist, Exception):
+            return False
+

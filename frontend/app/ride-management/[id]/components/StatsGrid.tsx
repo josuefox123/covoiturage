@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ride } from '../../../src/types';
+import { Ride } from '../../../../src/types';
 
 interface StatsGridProps {
   ride: Ride;

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Zemy — Modeles Paiement : FinancialSettings, RefundRequest, Transaction, Payment, DriverPayout
 """
 from django.db import models
@@ -58,7 +58,7 @@ class RefundRequest(models.Model):
         ('rejected', 'RejetÃ©e'),
     ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='refund_requests')
+    booking = models.ForeignKey('Booking', on_delete=models.CASCADE, related_name='refund_requests')
     passenger = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refund_requests_as_passenger')
     driver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refund_requests_as_driver')
     amount = models.IntegerField()

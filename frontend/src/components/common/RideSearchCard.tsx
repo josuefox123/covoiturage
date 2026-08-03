@@ -92,7 +92,24 @@ export default function RideSearchCard({
 
   const driverName = ride.driver_details?.full_name || 'Conducteur';
   
-  const price = (ride.original_price_per_seat ?? ride.price_per_seat)?.toLocaleString() || '0';
+  const calcCommission = (driverPayout: number) => {
+    const pct = 10;
+    const minC = 100;
+    let comm = Math.floor(driverPayout * (pct / 100));
+    if (comm < minC) comm = minC;
+    return comm;
+  };
+
+  const getDisplayPrice = () => {
+    const isSegment = searchedDeparture && searchedDestination && (ride.price_per_seat !== ride.original_price_per_seat);
+    if (isSegment) {
+      const comm = calcCommission(ride.price_per_seat);
+      return ride.price_per_seat + comm;
+    }
+    return ride.original_price_per_seat ?? ride.price_per_seat;
+  };
+
+  const price = getDisplayPrice().toLocaleString() || '0';
   const priceUnit = 'par place';
   const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
   const seatsLeft = ride.seats_available || 0;
@@ -120,6 +137,13 @@ export default function RideSearchCard({
       isIntermediateDropoff = true;
     }
   }
+
+  const isSegment = !!(ride.price_per_seat && ride.original_price_per_seat && ride.price_per_seat !== ride.original_price_per_seat);
+  const isIntermediate = !!(
+    (searchedDeparture && (extractCity(searchedDeparture) !== extractCity(ride.departure_location))) ||
+    (searchedDestination && (extractCity(searchedDestination) !== extractCity(ride.arrival_location))) ||
+    isSegment
+  );
 
   return (
     <Animated.View
@@ -156,8 +180,19 @@ export default function RideSearchCard({
               </View>
             </View>
             <View style={styles.priceSection}>
-              <Text style={styles.priceValue}>{price} FCFA</Text>
-              <Text style={styles.priceUnit}>{priceUnit}</Text>
+              {isIntermediate ? (
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.priceValue, { fontSize: 13, color: '#D97706', fontWeight: '800' }]}>À confirmer</Text>
+                  <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '600', marginTop: 2 }}>
+                    avec le chauffeur
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.priceValue}>{price} FCFA</Text>
+                  <Text style={styles.priceUnit}>{priceUnit}</Text>
+                </>
+              )}
             </View>
           </View>
 
@@ -272,6 +307,17 @@ export default function RideSearchCard({
                   </View>
                 );
               })()}
+
+              {/* Badge Kilométrage et Durée */}
+              {ride.distance_km ? (
+                <View style={styles.vehicleBadgeContainer}>
+                  <Ionicons name="map-outline" size={13} color="#4B5563" />
+                  <Text style={styles.vehicleBadgeText}>
+                    {ride.distance_km} km
+                    {ride.duration_min ? ` (${Math.floor(ride.duration_min / 60) > 0 ? `${Math.floor(ride.duration_min / 60)}h` : ''}${ride.duration_min % 60}m)` : ''}
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <View style={styles.viewButton}>
               <Text style={styles.viewButtonText}>Voir détail</Text>

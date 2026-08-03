@@ -35,12 +35,17 @@ class RidePublicationService:
         route_resolved = False
         overview_polyline_str = ''
 
+        dep_lat = ride.departure_latitude or 0.0
+        dep_lon = ride.departure_longitude or 0.0
+        arr_lat = ride.arrival_latitude or 0.0
+        arr_lon = ride.arrival_longitude or 0.0
+
         # 1. Tentative d'obtention de l'itinéraire via Google Directions
         route_data = GoogleDirectionsProvider.get_route(
-            origin_lat=ride.departure_latitude,
-            origin_lon=ride.departure_longitude,
-            dest_lat=ride.arrival_latitude,
-            dest_lon=ride.arrival_longitude,
+            origin_lat=dep_lat,
+            origin_lon=dep_lon,
+            dest_lat=arr_lat,
+            dest_lon=arr_lon,
             stopovers=stopovers,
             origin_place_id=ride.departure_place_id or '',
             dest_place_id=ride.arrival_place_id or ''
@@ -57,10 +62,10 @@ class RidePublicationService:
         # 2. Fallback OSRM en cas d'échec
         if not route_resolved:
             osrm_data = OSRMRouteProvider.get_route(
-                origin_lat=ride.departure_latitude,
-                origin_lon=ride.departure_longitude,
-                dest_lat=ride.arrival_latitude,
-                dest_lon=ride.arrival_longitude,
+                origin_lat=dep_lat,
+                origin_lon=dep_lon,
+                dest_lat=arr_lat,
+                dest_lon=arr_lon,
                 stopovers=stopovers
             )
             if osrm_data and 'routes' in osrm_data and len(osrm_data['routes']) > 0:
@@ -73,11 +78,11 @@ class RidePublicationService:
         # 3. Fallback Haversine ligne droite
         if not route_resolved or not polyline:
             polyline = [
-                (ride.departure_latitude, ride.departure_longitude),
-                (ride.arrival_latitude, ride.arrival_longitude)
+                (dep_lat, dep_lon),
+                (arr_lat, arr_lon)
             ]
             total_duration_sec = (ride.duration_min or 120) * 60
-            dist_m = int(haversine_km(ride.departure_latitude, ride.departure_longitude, ride.arrival_latitude, ride.arrival_longitude) * 1000)
+            dist_m = int(haversine_km(dep_lat, dep_lon, arr_lat, arr_lon) * 1000)
             google_legs_raw = [{
                 'duration': {'value': total_duration_sec},
                 'distance': {'value': dist_m},
@@ -142,8 +147,8 @@ class RidePublicationService:
         if polyline:
             detected_cities = find_cities_along_route(polyline)
             for city in detected_cities:
-                d_start = haversine_km(ride.departure_latitude, ride.departure_longitude, city['latitude'], city['longitude'])
-                d_end = haversine_km(ride.arrival_latitude, ride.arrival_longitude, city['latitude'], city['longitude'])
+                d_start = haversine_km(dep_lat, dep_lon, city['latitude'], city['longitude'])
+                d_end = haversine_km(arr_lat, arr_lon, city['latitude'], city['longitude'])
                 if d_start > 8.0 and d_end > 8.0:
                     auto_stopovers.append({
                         'name': city['name'],
@@ -197,8 +202,8 @@ class RidePublicationService:
         nodes = []
         nodes.append({
             'name': ride.departure_location,
-            'latitude': ride.departure_latitude,
-            'longitude': ride.departure_longitude,
+            'latitude': dep_lat,
+            'longitude': dep_lon,
             'place_id': ride.departure_place_id or '',
             'waypoint_type': 'departure'
         })
@@ -212,8 +217,8 @@ class RidePublicationService:
             })
         nodes.append({
             'name': ride.arrival_location,
-            'latitude': ride.arrival_latitude,
-            'longitude': ride.arrival_longitude,
+            'latitude': arr_lat,
+            'longitude': arr_lon,
             'place_id': ride.arrival_place_id or '',
             'waypoint_type': 'arrival'
         })
@@ -249,11 +254,11 @@ class RidePublicationService:
 
         # 8. Préparation des points de passage candidats
         candidates = []
-        d_dist, d_dur = get_polyline_match(ride.departure_latitude, ride.departure_longitude)
+        d_dist, d_dur = get_polyline_match(dep_lat, dep_lon)
         candidates.append({
             'name': ride.departure_location,
-            'latitude': ride.departure_latitude,
-            'longitude': ride.departure_longitude,
+            'latitude': dep_lat,
+            'longitude': dep_lon,
             'waypoint_type': 'departure',
             'is_stopover': True,
             'distance': d_dist,
@@ -306,11 +311,11 @@ class RidePublicationService:
                     })
                     last_sampled_dist = ps['dist_m']
 
-        a_dist, a_dur = get_polyline_match(ride.arrival_latitude, ride.arrival_longitude)
+        a_dist, a_dur = get_polyline_match(arr_lat, arr_lon)
         candidates.append({
             'name': ride.arrival_location,
-            'latitude': ride.arrival_latitude,
-            'longitude': ride.arrival_longitude,
+            'latitude': arr_lat,
+            'longitude': arr_lon,
             'waypoint_type': 'arrival',
             'is_stopover': True,
             'distance': a_dist,

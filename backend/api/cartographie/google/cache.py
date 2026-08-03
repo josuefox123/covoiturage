@@ -1,5 +1,5 @@
 import hashlib
-from typing import Optional, dict
+from typing import Optional, Dict
 from ...models.trajet import DirectionsCache
 
 class DirectionsLocalCache:

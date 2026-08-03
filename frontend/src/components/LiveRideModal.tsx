@@ -365,7 +365,7 @@ export default function LiveRideModal() {
         const latestActiveRide = activeRideRef.current;
         const latestIsDriver = isDriverRef.current;
         if (latestIsDriver && latestActiveRide && latestActiveRide.status === 'started') {
-          authFetch(`/rides/${latestActiveRide.id}/`, {
+          authFetch(`/rides/${latestActiveRide.id}/update_location/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
