@@ -1,9 +1,11 @@
+from typing import Optional
+
 def calculer_commission_zemy(
     driver_payout: int,
     is_commission_active: bool,
     commission_percentage: float,
     min_commission: int,
-    max_commission: int = None
+    max_commission: Optional[int] = None
 ) -> int:
     """
     Calcule la commission de Zemy sur la base du gain du conducteur
