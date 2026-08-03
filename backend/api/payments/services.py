@@ -125,6 +125,9 @@ class PaymentService:
                 booking.transaction_id = transaction_reference
                 booking.save()
 
+                from api.websocket.handlers import push_booking_update
+                push_booking_update(booking)
+
                 # Créer le ticket
                 ticket_number = f"T-{booking.id.hex[:8].upper()}"
                 
@@ -152,6 +155,8 @@ class PaymentService:
 
             booking.status = 'payment_failed'
             booking.save()
+            from api.websocket.handlers import push_booking_update
+            push_booking_update(booking)
             return payment, "Paiement refusé."
             
         elif tx_status in ['CANCELLED', 'CANCELED']:
@@ -161,6 +166,8 @@ class PaymentService:
 
             booking.status = 'cancelled'
             booking.save()
+            from api.websocket.handlers import push_booking_update
+            push_booking_update(booking)
             return payment, "Paiement annulé."
             
         else:

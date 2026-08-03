@@ -19,6 +19,9 @@ def expire_booking_task(booking_id):
             booking.status = 'expired'
             booking.save()
 
+            from api.websocket.handlers import push_booking_update
+            push_booking_update(booking)
+
             # Calculer la limite d'expiration réelle pour afficher le bon message
             try:
                 import datetime

@@ -446,20 +446,5 @@ class BookingViewSet(viewsets.ModelViewSet):
         return Response({"status": "Proposition refusée. Réservation annulée.", "booking_status": booking.status})
 
 def _push_booking_update(booking):
-    try:
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
-        channel_layer = get_channel_layer()
-        if channel_layer:
-            async_to_sync(channel_layer.group_send)(
-                f"booking_{booking.id}",
-                {
-                    "type": "booking_update",
-                    "booking_id": str(booking.id),
-                    "status": booking.status,
-                    "amount": booking.total_amount,
-                    "payment_status": booking.payment_status,
-                }
-            )
-    except Exception:
-        pass
+    from api.websocket.handlers import push_booking_update
+    push_booking_update(booking)
