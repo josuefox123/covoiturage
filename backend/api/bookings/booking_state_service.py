@@ -45,7 +45,7 @@ class BookingStateService:
         Calcule et retourne l'état d'affichage complet pour un trajet,
         un passager donné, et éventuellement un segment (indices des waypoints).
         """
-        if not passenger:
+        if not passenger or passenger.is_anonymous:
             return {"action": "reserve", "label": "Réserver", "can_cancel": False, "can_pay": False}
 
         # 1. Si le passager est le conducteur du trajet
