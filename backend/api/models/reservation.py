@@ -111,6 +111,8 @@ class Booking(models.Model):
 
 
     def save(self, *args, **kwargs):
+        if hasattr(self, '_pricing_cache'):
+            delattr(self, '_pricing_cache')
         super().save(*args, **kwargs)
         if self.status == 'confirmed':
             try:
