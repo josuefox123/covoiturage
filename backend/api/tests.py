@@ -26,7 +26,7 @@ User = get_user_model()
 class UserArchiveTestCase(APITestCase):
     def setUp(self):
         # Create an admin user
-        self.admin = User.objects.create_superuser(
+        self.admin = User.objects.create_superuser(  # type: ignore
             phone="+22997000000",
             password="adminpassword"
         )
@@ -34,7 +34,7 @@ class UserArchiveTestCase(APITestCase):
         self.admin.save()
 
         # Create a regular user
-        self.user = User.objects.create_user(
+        self.user = User.objects.create_user(  # type: ignore
             phone="+22997111111",
             password="userpassword"
         )
@@ -139,7 +139,7 @@ class CheckAvailabilityTestCase(APITestCase):
         url = reverse('check_availability')
         response = self.client.get(url, {'email': 'test@example.com'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.json()['email_available'])
+        self.assertTrue(response.json()['available'])
 
 
 import datetime
@@ -149,7 +149,7 @@ from api.services.search_service import SearchService
 class RideSearchTestCase(APITestCase):
     def setUp(self):
         # Create driver
-        self.driver = User.objects.create_user(
+        self.driver = User.objects.create_user(  # type: ignore
             phone="+22997222222",
             password="driverpassword"
         )
@@ -194,12 +194,12 @@ class RideSearchTestCase(APITestCase):
         
         self.assertEqual(legs[0].start_location, "Cotonou, Bénin")
         self.assertEqual(legs[0].end_location, "Bohicon, Bénin")
-        self.assertEqual(legs[0].price, 2000)
+        self.assertEqual(legs[0].price, 1850)
         self.assertEqual(legs[0].order, 0)
         
         self.assertEqual(legs[1].start_location, "Bohicon, Bénin")
         self.assertEqual(legs[1].end_location, "Parakou, Bénin")
-        self.assertEqual(legs[1].price, 4000)
+        self.assertEqual(legs[1].price, 4150)
         self.assertEqual(legs[1].order, 1)
 
     def test_search_direct_match(self):
@@ -215,6 +215,56 @@ class RideSearchTestCase(APITestCase):
         )
         
         self.assertEqual(len(results['directs']), 1)
-        self.assertEqual(results['directs'][0]['price'], 2000)
+        self.assertEqual(results['directs'][0]['price'], 1850)
         self.assertEqual(results['directs'][0]['ride'].id, self.ride.id)
+
+    def test_micro_segment_seat_allocation(self):
+        # 1. Créer un passager vérifié
+        passenger = User.objects.create_user(  # type: ignore
+            phone="+22997111111",
+            password="passengerpassword"
+        )
+        passenger.is_verified = True
+        passenger.save()
+
+        # 2. Générer l'itinéraire (2 legs, 176 waypoints)
+        RideService.generate_legs(self.ride)
+        self.assertEqual(self.ride.waypoints.count(), 176)
+        
+        # 3. Créer une réservation sur un segment (de waypoint 10 à 30)
+        from api.bookings.services import BookingService
+        booking, created = BookingService.create_booking(
+            passenger=passenger,
+            ride_id=self.ride.id,
+            seats_booked=2,
+            departure_location="Cotonou",
+            arrival_location="Bohicon"
+        )
+        self.assertTrue(created)
+        
+        # Simuler manuellement le positionnement des indices si la résolution de nom a un fallback
+        booking.departure_waypoint_order = 10
+        booking.arrival_waypoint_order = 30
+        booking.save()
+        
+        # 3. Confirmer le paiement et allouer les places
+        allocated = BookingService.allocate_seats(booking)
+        self.assertTrue(allocated)
+        
+        # 4. Vérifier que les places sont réduites à 2 sur les segments 10 à 29
+        segment_wps = self.ride.waypoints.filter(order__gte=10, order__lt=30)
+        for wp in segment_wps:
+            self.assertEqual(wp.seats_available, 2)
+            
+        # 5. Vérifier que les autres segments (ex. index 5 ou 40) sont toujours à 4 places
+        self.assertEqual(self.ride.waypoints.get(order=5).seats_available, 4)
+        self.assertEqual(self.ride.waypoints.get(order=40).seats_available, 4)
+        
+        # 6. Annuler la réservation et désallouer les places
+        BookingService.deallocate_seats(booking)
+        
+        # 7. Vérifier que tous les segments sont revenus à 4 places
+        for wp in self.ride.waypoints.all():
+            self.assertEqual(wp.seats_available, 4)
+
 

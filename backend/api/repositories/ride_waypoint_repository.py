@@ -1,11 +1,12 @@
+from typing import Any
 from django.db.models import QuerySet
-from ...models.trajet import RideWaypoint
+from ..models.trajet import RideWaypoint
 
 class RideWaypointRepository:
     """Repository pour l'accès aux données du modèle RideWaypoint (Point de passage)."""
 
     @staticmethod
-    def filter_by_ride(ride_id: str) -> QuerySet:
+    def filter_by_ride(ride_id: Any) -> QuerySet:
         """Récupère tous les points de passage associés à un trajet."""
         return RideWaypoint.objects.filter(ride_id=ride_id).order_by('order')
 
@@ -15,6 +16,6 @@ class RideWaypointRepository:
         return RideWaypoint.objects.bulk_create(waypoints)
 
     @staticmethod
-    def delete_for_ride(ride_id: str) -> None:
+    def delete_for_ride(ride_id: Any) -> None:
         """Supprime tous les points de passage associés à un trajet."""
         RideWaypoint.objects.filter(ride_id=ride_id).delete()
