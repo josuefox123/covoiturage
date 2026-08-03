@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Ride, Booking } from '../../../src/types';
-import { CustomAlert } from '../../../src/utils/CustomAlert';
-import { BookingWebSocketService } from '../../../src/services/websocketService';
-import { API_URL } from '../../../src/services/api';
+import { Ride, Booking } from '../../../../src/types';
+import { CustomAlert } from '../../../../src/utils/CustomAlert';
+import { BookingWebSocketService } from '../../../../src/services/websocketService';
+import { API_URL } from '../../../../src/services/api';
 
 export function useRideDetails(
   id: string,

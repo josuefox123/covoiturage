@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   recapText: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
   recapTextSub: { fontSize: 12, fontWeight: '600', color: theme.colors.textMuted },
   checklistCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 14, paddingVertical: 4, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
-  checklistItem: { flexDirection: 'row', alignItems: 'center', justifyComposite: 'space-between', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  checklistItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   checklistText: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
   checkboxSquare: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   checkboxSquareActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },

@@ -210,6 +210,7 @@ const styles = StyleSheet.create({
   luggageOptBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1' },
   luggageOptBtnActive: { backgroundColor: `${theme.colors.primary}15`, borderColor: theme.colors.primary },
   luggageOptText: { fontSize: 11, fontWeight: '700', color: theme.colors.textMuted },
+  luggageOptTextActive: { color: theme.colors.primary },
   weightInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   weightInputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 10, borderWidth: 1, borderColor: '#CBD5E1', paddingHorizontal: 10, height: 36 },
   weightInputField: { fontSize: 14, fontWeight: '800', color: theme.colors.text, width: 40, textAlign: 'center' },
