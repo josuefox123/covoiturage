@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-from ...models.trajet import Ride
+from ...models import Ride
 from ...models.paiement import RefundRequest, Transaction
 from ...fcm import create_and_send_notification
 

@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from ...models.trajet import Ride
+from ...models import Ride
 from ...models.utilisateur import Vehicle
 from ...serializers import RideSerializer
 from .ride_actions import RideActionsMixin

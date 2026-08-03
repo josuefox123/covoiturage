@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional, List
 from django.utils import timezone
 from django.core.cache import cache
 
-from ..models.trajet import Ride
+from ..models import Ride
 from .waypoints import WaypointMatcher
 from .corridor import CorridorMatcher
 from .segments import SegmentMatcher
