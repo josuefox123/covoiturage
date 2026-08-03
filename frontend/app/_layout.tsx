@@ -66,7 +66,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
           <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-          <Stack.Screen name="ride/[id]" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="ride/[id]/index" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
           <Stack.Screen name="chat/[id]" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="support_chat" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
           <Stack.Screen name="weather" options={{ presentation: 'card', headerShown: false, animation: 'slide_from_right' }} />
