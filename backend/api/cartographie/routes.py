@@ -40,7 +40,7 @@ class RoutesOrchestrator:
                 origin_lon=origin_lon,
                 dest_lat=dest_lat,
                 dest_lon=dest_lon,
-                stopovers=stopovers,
+                stopovers=stopovers or [],
                 origin_place_id=origin_place_id,
                 dest_place_id=dest_place_id
             )
@@ -62,7 +62,7 @@ class RoutesOrchestrator:
                     origin_lon=origin_lon,
                     dest_lat=dest_lat,
                     dest_lon=dest_lon,
-                    stopovers=stopovers
+                    stopovers=stopovers or []
                 )
                 if osrm_data and 'routes' in osrm_data and len(osrm_data['routes']) > 0:
                     route = osrm_data['routes'][0]
