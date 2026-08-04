@@ -1,18 +1,6 @@
-/**
- * ==============================================================
- * Fichier :
- * trips.tsx
- *
- * Description :
- * Composant ou logique de l'application Zemy.
- *
- * Projet :
- * Zemy
- * ==============================================================
- */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/styles/theme';
@@ -20,57 +8,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTrips } from '../../src/hooks/useTrips';
 import { CustomAlert } from '../../src/utils/CustomAlert';
-import RideCard from '../../src/components/common/RideCard';
+import { MissionCard } from '../../src/features/trip-mission/MissionCard';
+import { MissionResolver } from '../../src/features/trip-mission/MissionResolver';
+import { rideSessionManager } from '../../src/features/ride-session/manager/RideSessionManager';
 
-const isItTimeForLiveRide = (dateStr: string, timeStr: string) => {
-  if (!dateStr || !timeStr) return false;
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const departureDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-  const now = new Date();
-  const tenMinutesBefore = new Date(departureDate.getTime() - 10 * 60 * 1000);
-  return now.getTime() >= tenMinutesBefore.getTime();
-};
-
-/**
- * Composant TripsScreen.
- *
- * Responsabilités :
- * - Affichage et gestion de l'état lié à TripsScreen.
- */
 export default function TripsScreen() {
   const router = useRouter();
   const { user, authFetch } = useAuth();
-  const { fetchPassengerBookings, fetchDriverRides, loading: tripsLoading } = useTrips();
-  const [activeTab, setActiveTab] = useState<'passenger' | 'driver'>('passenger');
-  const [filterTab, setFilterTab] = useState<'active' | 'archived'>('active');
+  const { fetchPassengerBookings, fetchDriverRides } = useTrips();
+  
+  const [roleTab, setRoleTab] = useState<'passenger' | 'driver'>('passenger');
+  const [missionFilter, setMissionFilter] = useState<'upcoming' | 'live' | 'completed'>('upcoming');
   
   const [passengerTrips, setPassengerTrips] = useState<any[]>([]);
   const [driverTrips, setDriverTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [contactingId, setContactingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       fetchTrips();
     }, [user, fetchPassengerBookings, fetchDriverRides])
   );
-
-  const contactDriver = async (rideId: string) => {
-    setContactingId(rideId);
-    try {
-      const conv = await authFetch('/conversations/ride-chat/', {
-        method: 'POST',
-        body: JSON.stringify({ ride_id: rideId }),
-      });
-      router.push(`/chat/${conv.id}`);
-    } catch (error: any) {
-      CustomAlert.alert('Messagerie', error.message || 'Impossible d\'ouvrir la conversation.');
-    } finally {
-      setContactingId(null);
-    }
-  };
 
   const fetchTrips = async (isRefreshing = false) => {
     if (!user) {
@@ -88,8 +47,8 @@ export default function TripsScreen() {
         fetchPassengerBookings(),
         fetchDriverRides(),
       ]);
-      setPassengerTrips(bookings);
-      setDriverTrips(rides);
+      setPassengerTrips(bookings || []);
+      setDriverTrips(rides || []);
     } catch (error) {
       console.error('Error fetching trips:', error);
       CustomAlert.alert('Erreur', 'Impossible de charger vos trajets.');
@@ -103,148 +62,138 @@ export default function TripsScreen() {
     fetchTrips(true);
   }, [user, fetchPassengerBookings, fetchDriverRides]);
 
-  // Logic removed since it's now in RideCard
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      setLoading(true);
+      await authFetch(`/bookings/${bookingId}/cancel/`, { method: 'POST' });
+      CustomAlert.alert('Succès', 'Votre réservation a été annulée.');
+      await fetchTrips(false);
+    } catch (err: any) {
+      CustomAlert.alert('Erreur', err.message || 'Impossible d\'annuler la réservation.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const getFilteredTrips = (trips: any[], role: 'passenger' | 'driver') => {
-    const now = new Date();
-
-    return trips.filter(item => {
-      const ride = role === 'passenger' ? item.ride_details : item;
-      if (!ride) return false;
-
-      // Masquer les réservations passager en attente de validation ou de paiement
-      if (role === 'passenger' && (item.status === 'pending' || item.status === 'pending_payment')) {
-        return false;
+  const handleAcceptOffer = async (bookingId: string) => {
+    try {
+      setLoading(true);
+      const data = await authFetch(`/bookings/${bookingId}/passenger_accept/`, { method: 'POST' });
+      if (data && !data.error) {
+        router.push({
+          pathname: '/payment',
+          params: {
+            booking_id: String(bookingId),
+            amount: String(data.amount_paid_online || data.price || 0)
+          }
+        });
       }
+      await fetchTrips(false);
+    } catch (err: any) {
+      CustomAlert.alert('Erreur', err.message || 'Impossible d\'accepter l\'offre.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Status completed ou cancelled -> toujours dans Archives
-      if (ride.status === 'completed' || ride.status === 'cancelled') {
-        return filterTab === 'archived';
-      }
+  const handleRejectOffer = async (bookingId: string) => {
+    try {
+      setLoading(true);
+      await authFetch(`/bookings/${bookingId}/passenger_reject/`, { method: 'POST' });
+      CustomAlert.alert('Annulée', 'La proposition a été refusée.');
+      await fetchTrips(false);
+    } catch (err: any) {
+      CustomAlert.alert('Erreur', err.message || 'Impossible de refuser la proposition.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Trajet explicitement démarré par le conducteur -> toujours Actif
-      if (ride.status === 'started') {
-        return filterTab === 'active';
-      }
+  // Filter items by Mission Category
+  const getFilteredItems = () => {
+    const rawList = roleTab === 'passenger' ? passengerTrips : driverTrips;
 
-      // Calcul de l'heure d'arrivée estimée (départ + durée + 2h de marge)
-      let endDateTime: Date;
-      if (ride.departure_date && ride.departure_time) {
-        const [h, m] = (ride.departure_time as string).split(':').map(Number);
-        const dep = new Date(ride.departure_date);
-        dep.setHours(h, m, 0, 0);
-        const durationMin = ride.duration_min || 240; // 4h par défaut si non spécifié
-        endDateTime = new Date(dep.getTime() + (durationMin + 120) * 60 * 1000);
-      } else {
-        endDateTime = new Date(ride.departure_date);
-        endDateTime.setHours(23, 59, 59, 999);
-      }
-
-      const isActiveTrip = now <= endDateTime;
-
-      if (filterTab === 'active') {
-        return isActiveTrip;
-      } else {
-        return !isActiveTrip;
-      }
+    return rawList.filter((item) => {
+      const mission = MissionResolver.resolveMission(item, roleTab);
+      return mission.category === missionFilter;
     });
   };
 
-  const filteredPassengerTrips = getFilteredTrips(passengerTrips, 'passenger');
-  const filteredDriverTrips = getFilteredTrips(driverTrips, 'driver');
-
-  if (!user) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
-  }
-
-  if (!user.is_verified) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }]}>
-        <Ionicons name="shield-checkmark-outline" size={80} color={theme.colors.textMuted} />
-        <Text style={[styles.headerTitle, { color: theme.colors.text, marginTop: 16 }]}>Compte non vérifié</Text>
-        <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted, textAlign: 'center', marginBottom: 24, marginTop: 8 }]}>
-          Votre compte doit être vérifié pour accéder à vos trajets.
-        </Text>
-        <TouchableOpacity 
-          style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 }} 
-          onPress={() => router.push('/verify-identity')}
-        >
-          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Se faire vérifier</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
+  const filteredItems = getFilteredItems();
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <View>
-          <Text style={styles.headerTitle}>Mes trajets</Text>
-          <Text style={styles.headerSubtitle}>Gérez vos réservations</Text>
-        </View>
-        {activeTab === 'driver' && (
-          <TouchableOpacity
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={() => router.push('/publish')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={24} color="white" />
-          </TouchableOpacity>
-        )}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Mes Trajets</Text>
       </View>
 
-      <View style={styles.tabContainer}>
+      {/* Role Switcher Tabs */}
+      <View style={styles.roleTabsContainer}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'passenger' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('passenger')}
+          style={[styles.roleTab, roleTab === 'passenger' && styles.roleTabActive]}
+          onPress={() => setRoleTab('passenger')}
         >
-          <Text style={[styles.tabText, activeTab === 'passenger' && styles.tabTextActive]}>
-            Passager
+          <Ionicons
+            name="person-outline"
+            size={16}
+            color={roleTab === 'passenger' ? theme.colors.primary : theme.colors.textLight}
+          />
+          <Text style={[styles.roleTabText, roleTab === 'passenger' && styles.roleTabTextActive]}>
+            Passager ({passengerTrips.length})
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'driver' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('driver')}
+          style={[styles.roleTab, roleTab === 'driver' && styles.roleTabActive]}
+          onPress={() => setRoleTab('driver')}
         >
-          <Text style={[styles.tabText, activeTab === 'driver' && styles.tabTextActive]}>
-            Conducteur
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.subTabContainer}>
-        <TouchableOpacity
-          style={[styles.subTabButton, filterTab === 'active' && styles.subTabButtonActive]}
-          onPress={() => setFilterTab('active')}
-        >
-          <Text style={[styles.subTabText, filterTab === 'active' && styles.subTabTextActive]}>
-            Actifs
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.subTabButton, filterTab === 'archived' && styles.subTabButtonActive]}
-          onPress={() => setFilterTab('archived')}
-        >
-          <Text style={[styles.subTabText, filterTab === 'archived' && styles.subTabTextActive]}>
-            Archives
+          <Ionicons
+            name="car-sport-outline"
+            size={16}
+            color={roleTab === 'driver' ? theme.colors.primary : theme.colors.textLight}
+          />
+          <Text style={[styles.roleTabText, roleTab === 'driver' && styles.roleTabTextActive]}>
+            Conducteur ({driverTrips.length})
           </Text>
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {/* Mission Category Filters */}
+      <View style={styles.filterBar}>
+        <TouchableOpacity
+          style={[styles.filterChip, missionFilter === 'upcoming' && styles.filterChipActive]}
+          onPress={() => setMissionFilter('upcoming')}
+        >
+          <Text style={[styles.filterChipText, missionFilter === 'upcoming' && styles.filterChipTextActive]}>
+            À venir
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterChip, missionFilter === 'live' && styles.filterChipActive]}
+          onPress={() => setMissionFilter('live')}
+        >
+          <Text style={[styles.filterChipText, missionFilter === 'live' && styles.filterChipTextActive]}>
+            En cours
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterChip, missionFilter === 'completed' && styles.filterChipActive]}
+          onPress={() => setMissionFilter('completed')}
+        >
+          <Text style={[styles.filterChipText, missionFilter === 'completed' && styles.filterChipTextActive]}>
+            Terminés
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Chargement de vos missions...</Text>
         </View>
       ) : (
         <ScrollView
@@ -254,84 +203,34 @@ export default function TripsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={theme.colors.primary}
               colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
             />
           }
         >
-          {activeTab === 'passenger' ? (
-            <View style={styles.listContainer}>
-              {filteredPassengerTrips.length === 0 ? (
-                <Text style={styles.emptyText}>Aucun trajet {filterTab === 'active' ? 'actif' : 'archivé'} en tant que passager.</Text>
-              ) : (
-                filteredPassengerTrips.map((booking: any) => {
-                  const ride = booking.ride_details;
-                  if (!ride) return null;
-                  const isActiveRightNow = (ride.status === 'active' || ride.status === 'started') &&
-                                           isItTimeForLiveRide(ride.departure_date, ride.departure_time) &&
-                                           booking.status === 'confirmed';
-                  
-                  return (
-                    <RideCard
-                      key={booking.id}
-                      ride={ride}
-                      role="passenger"
-                      bookingStatus={booking.status}
-                      paymentStatus={booking.payment_status}
-                      isActiveRightNow={isActiveRightNow}
-                      primaryActionLabel="Contacter"
-                      onPressPrimary={() => contactDriver(ride.id)}
-                      isPrimaryLoading={contactingId === ride.id}
-                      secondaryActionLabel="Détails"
-                      onPressSecondary={() => router.push(`/ride/${ride.id}` as any)}
-                    />
-                  );
-                })
-              )}
+          {filteredItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="map-outline" size={48} color={theme.colors.grayDark} />
+              <Text style={styles.emptyTitle}>Aucune mission dans cette catégorie</Text>
+              <Text style={styles.emptySubtitle}>
+                {missionFilter === 'upcoming'
+                  ? 'Vos réservations et départs à venir s\'afficheront ici.'
+                  : missionFilter === 'live'
+                  ? 'Aucun trajet actuellement en cours de route.'
+                  : 'Historique de vos trajets et réservations terminés.'}
+              </Text>
             </View>
           ) : (
-            <View style={styles.listContainer}>
-              {filteredDriverTrips.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
-                  <Text style={styles.emptyText}>Aucun trajet {filterTab === 'active' ? 'actif' : 'archivé'} en tant que conducteur.</Text>
-                  {filterTab === 'active' && (
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: theme.colors.primary,
-                        paddingHorizontal: 20,
-                        paddingVertical: 12,
-                        borderRadius: 12,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 8,
-                      }}
-                      onPress={() => router.push('/publish')}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="add-circle-outline" size={20} color="white" />
-                      <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>Créer un trajet</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ) : (
-                filteredDriverTrips.map((ride: any) => {
-                  const isActiveRightNow = (ride.status === 'active' || ride.status === 'started') &&
-                                           isItTimeForLiveRide(ride.departure_date, ride.departure_time);
-                  return (
-                    <RideCard
-                      key={ride.id}
-                      ride={ride}
-                      role="driver"
-                      isActiveRightNow={isActiveRightNow}
-                      primaryActionLabel="Gérer"
-                      onPressPrimary={() => router.push(`/ride-management/${ride.id}` as any)}
-                      secondaryActionLabel="Détails"
-                      onPressSecondary={() => router.push(`/ride/${ride.id}` as any)}
-                    />
-                  );
-                })
-              )}
-            </View>
+            filteredItems.map((item, index) => (
+              <MissionCard
+                key={item.id ? `${item.id}-${index}` : `mission-${index}`}
+                item={item}
+                role={roleTab}
+                onCancelBooking={handleCancelBooking}
+                onAcceptOffer={handleAcceptOffer}
+                onRejectOffer={handleRejectOffer}
+              />
+            ))
           )}
         </ScrollView>
       )}
@@ -340,196 +239,109 @@ export default function TripsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#F9FAFB'
   },
   header: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl + theme.spacing.md,
-    backgroundColor: theme.colors.primary,
-    borderBottomLeftRadius: theme.borderRadius.xl,
-    borderBottomRightRadius: theme.borderRadius.xl,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6'
   },
   headerTitle: {
-    ...theme.typography.h1,
-    color: theme.colors.white,
-    marginBottom: theme.spacing.xs,
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.textDark
   },
-  headerSubtitle: {
-    ...theme.typography.bodyMedium,
-    color: theme.colors.primaryLight,
-  },
-  tabContainer: {
+  roleTabsContainer: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.card,
-    marginHorizontal: theme.spacing.lg,
-    marginTop: -theme.spacing.xl,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.xs,
-    ...theme.shadows.md,
-    zIndex: 10,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: theme.spacing.md,
-    alignItems: 'center',
-    borderRadius: theme.borderRadius.md,
-  },
-  tabButtonActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  tabText: {
-    ...theme.typography.button,
-    color: theme.colors.textLight,
-  },
-  tabTextActive: {
-    color: theme.colors.white,
-  },
-  subTabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    gap: 12,
-  },
-  subTabButton: {
-    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 12
   },
-  subTabButtonActive: {
-    backgroundColor: theme.colors.primaryLight,
-    borderColor: theme.colors.primary,
+  roleTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    gap: 6
   },
-  subTabText: {
-    ...theme.typography.bodyMedium,
-    color: theme.colors.textLight,
+  roleTabActive: {
+    backgroundColor: theme.colors.primaryLight
   },
-  subTabTextActive: {
+  roleTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textLight
+  },
+  roleTabTextActive: {
     color: theme.colors.primary,
-    fontWeight: '700',
+    fontWeight: '700'
+  },
+  filterBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB'
+  },
+  filterChipActive: {
+    backgroundColor: theme.colors.primary
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textDark
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700'
   },
   scrollContent: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
+    padding: 16
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 30
   },
-  emptyText: {
-    ...theme.typography.bodyLarge,
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: theme.colors.textLight
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+    marginTop: 12,
+    marginBottom: 6,
+    textAlign: 'center'
+  },
+  emptySubtitle: {
+    fontSize: 13,
     color: theme.colors.textLight,
     textAlign: 'center',
-    marginTop: theme.spacing.xl,
-  },
-  listContainer: {
-    gap: theme.spacing.md,
-  },
-  card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
-    ...theme.shadows.sm,
-    borderColor: theme.colors.border,
-  },
-  activeCard: {
-    borderColor: theme.colors.success,
-    borderWidth: 2,
-    backgroundColor: theme.colors.successLightest,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  driverInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: theme.colors.white,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  driverName: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.warningDark,
-    fontWeight: '600',
-  },
-  statusBadge: {
-    backgroundColor: theme.colors.successLight,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.full,
-  },
-  statusText: {
-    ...theme.typography.caption,
-    color: theme.colors.success,
-  },
-  tripDetails: {
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.lg,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  detailText: {
-    ...theme.typography.bodyMedium,
-    color: theme.colors.textLight,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    ...theme.typography.button,
-    color: theme.colors.white,
-  },
-  secondaryButton: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.grayLight,
-    borderRadius: theme.borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    ...theme.typography.button,
-    color: theme.colors.textLight,
-  },
+    lineHeight: 18
+  }
 });

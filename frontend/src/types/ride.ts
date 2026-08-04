@@ -52,4 +52,6 @@ export interface Ride {
     price?: number;
     arrival_price?: number;
   }[];
+  vehicle_details?: any;
+  bookings?: any[];
 }
