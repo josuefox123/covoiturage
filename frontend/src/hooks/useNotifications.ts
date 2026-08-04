@@ -229,6 +229,22 @@ export function useNotifications() {
       (response: any) => {
         const data = response.notification.request.content.data;
 
+        if (data?.type === 'new_booking_request') {
+          DeviceEventEmitter.emit('showBookingRequest', {
+            id: data.booking_id,
+            departure_location: data.departure_location || '',
+            arrival_location: data.arrival_location || '',
+            seats_booked: parseInt(data.seats_booked || '1'),
+            total_amount: parseInt(data.total_amount || '0'),
+            created_at: data.created_at || new Date().toISOString(),
+            negotiation_message: data.negotiation_message || '',
+            passenger_details: {
+              full_name: data.passenger_name || 'Passager',
+              phone: data.passenger_phone || ''
+            }
+          });
+        }
+
         // Deep linking vers la bonne page
         if (data?.screen === 'chat' && data?.conversation_id) {
           router.push(`/chat/${data.conversation_id}`);
