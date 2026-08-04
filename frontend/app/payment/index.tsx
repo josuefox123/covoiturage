@@ -6,14 +6,18 @@ import { usePayment } from '../../src/hooks/usePayment';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
+import { rideSessionManager } from '../../src/features/ride-session/manager/RideSessionManager';
+
 export default function PaymentScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const { initiatePayment, loading, error } = usePayment();
     const { authFetch } = useAuth();
     
-    const bookingId = params.booking_id as string;
-    const amount = Number(params.amount) || 0;
+    // Preference: Active RideSession booking ID over route params
+    const activeSession = rideSessionManager.getCurrentSession();
+    const bookingId = activeSession?.payment?.bookingId || (params.booking_id as string);
+    const amount = activeSession?.payment?.amountPaidOnline || Number(params.amount) || 0;
 
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
     const [txRef, setTxRef] = useState<string | null>(null);

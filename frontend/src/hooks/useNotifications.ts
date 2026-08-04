@@ -25,6 +25,7 @@ import { Platform, Alert, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { CustomAlert } from '../utils/CustomAlert';
+import { rideEventBus } from '../features/ride-session/manager/EventBus';
 import * as Speech from 'expo-speech';
 
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -211,6 +212,14 @@ export function useNotifications() {
           // La synthèse vocale TTS et le bandeau de push standard suffisent.
           // L'utilisateur pourra accepter/décliner en ouvrant le trajet.
           DeviceEventEmitter.emit('refreshRideDetails');
+          if (data?.ride_id) {
+            rideEventBus.emit({
+              type: 'SessionReloadRequested',
+              rideId: String(data.ride_id),
+              bookingId: data.booking_id ? String(data.booking_id) : undefined,
+              timestamp: Date.now()
+            });
+          }
         }
       }
     );
