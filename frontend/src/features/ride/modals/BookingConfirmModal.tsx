@@ -26,10 +26,24 @@ export function BookingConfirmModal({
   const [proposeCustomPrice, setProposeCustomPrice] = useState(false);
   const [proposedPriceText, setProposedPriceText] = useState('');
   const [passengerMessageText, setPassengerMessageText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleConfirm = () => {
-    const customPrice = proposeCustomPrice && proposedPriceText ? parseInt(proposedPriceText) : undefined;
-    onConfirm(seatsToBook, customPrice, passengerMessageText);
+  // Reset submitting state when modal visibility changes
+  React.useEffect(() => {
+    if (!visible) {
+      setSubmitting(false);
+    }
+  }, [visible]);
+
+  const handleConfirm = async () => {
+    if (submitting || bookingLoading) return;
+    setSubmitting(true);
+    try {
+      const customPrice = proposeCustomPrice && proposedPriceText ? parseInt(proposedPriceText) : undefined;
+      await onConfirm(seatsToBook, customPrice, passengerMessageText);
+    } catch (e) {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -180,12 +194,20 @@ export function BookingConfirmModal({
             </View>
 
             <TouchableOpacity
-              style={[styles.bookBtn, { width: '100%', marginBottom: 12, backgroundColor: '#2F80ED' }]}
+              style={[
+                styles.bookBtn,
+                { width: '100%', marginBottom: 12, backgroundColor: '#2F80ED' },
+                (submitting || bookingLoading) && { opacity: 0.65 }
+              ]}
               onPress={handleConfirm}
-              disabled={bookingLoading}
+              disabled={submitting || bookingLoading}
+              activeOpacity={0.8}
             >
-              {bookingLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+              {submitting || bookingLoading ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text style={styles.bookBtnText}>ENVOI EN COURS...</Text>
+                </View>
               ) : (
                 <Text style={styles.bookBtnText}>CONTINUER</Text>
               )}

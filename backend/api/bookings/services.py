@@ -150,7 +150,8 @@ class BookingService:
             if passenger_proposed_price is not None or negotiation_message:
                 is_classic = False
 
-            initial_status = 'pending_payment' if is_classic else 'pending'
+            # Toute nouvelle réservation naît obligatoirement à l'état 'pending' (en attente du conducteur)
+            initial_status = 'pending'
 
             # Créer la réservation à l'état initial
             booking = Booking.objects.create(

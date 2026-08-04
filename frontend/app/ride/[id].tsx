@@ -489,16 +489,16 @@ export default function RideDetailScreen() {
           ) : (
             <>
               <Text style={styles.sectionTitle}>
-                Passagers ({bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).length})
+                Passagers ({bookings.filter((b: any) => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).length})
               </Text>
               
-              {bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).length === 0 ? (
+              {bookings.filter((b: any) => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="people" size={40} color={COLORS.border} />
                   <Text style={styles.emptyText}>Aucun passager pour l'instant</Text>
                 </View>
               ) : (
-                bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).map((booking) => (
+                bookings.filter((b: any) => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)).map((booking: any) => (
                   <PassengerCard
                     key={booking.id}
                     booking={booking}
@@ -683,7 +683,7 @@ export default function RideDetailScreen() {
         driverName={driverName}
         onClose={() => {
           setShowBookingSuccessModal(false);
-          fetchRide(true);
+          fetchRide();
         }}
       />
 

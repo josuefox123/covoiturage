@@ -100,7 +100,7 @@ class FunctionalSearchPaymentTestCase(APITestCase):
         res_pub = RidePublicationController.publish_ride(self.driver1, data, RideSerializer)
         ride = Ride.objects.get(id=res_pub["id"])
 
-        # 2. Créer une réservation classique (va directement à pending_payment)
+        # 2. Créer une réservation (statut initial: pending)
         self.client.force_authenticate(user=self.passenger)
         res_book = self.client.post("/api/bookings/", {
             "ride": str(ride.id),
@@ -111,7 +111,13 @@ class FunctionalSearchPaymentTestCase(APITestCase):
         self.assertEqual(res_book.status_code, status.HTTP_201_CREATED)
         booking_id = res_book.json()["id"]
 
+        # 2b. Le conducteur accepte la demande (statut passe à pending_payment)
+        self.client.force_authenticate(user=self.driver1)
+        res_accept = self.client.post(f"/api/bookings/{booking_id}/accept/", format="json")
+        self.assertEqual(res_accept.status_code, status.HTTP_200_OK)
+
         # 3. Le passager initie le paiement (statut pending_payment)
+        self.client.force_authenticate(user=self.passenger)
         res_pay = self.client.post("/api/payments/initiate/", {
             "booking_id": booking_id
         }, format="json")

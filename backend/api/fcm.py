@@ -18,6 +18,7 @@ Utilitaire Firebase Cloud Messaging (FCM).
 Utilise firebase_admin (déjà initialisé dans views.py).
 """
 import logging
+import threading
 import requests
 from firebase_admin import messaging
 
@@ -224,6 +225,7 @@ def send_fcm_to_all_users(title: str, body: str, data: dict = None, exclude_ids:
 def create_and_send_notification(user, title: str, message: str, data: dict = None):
     """
     Enregistre une notification en base de données et l'envoie sur le mobile de l'utilisateur via FCM.
+    L'envoi sur les serveurs de push (Expo / Firebase) est exécuté en arrière-plan (non-bloquant).
     """
     try:
         from .models import Notification
@@ -236,13 +238,16 @@ def create_and_send_notification(user, title: str, message: str, data: dict = No
     except Exception as e:
         logger.error(f"Erreur création Notification en BD: {e}")
         
-    try:
-        send_fcm_to_user(
-            user=user,
-            title=title,
-            body=message,
-            data=data or {'screen': 'notifications'}
-        )
-    except Exception as e:
-        logger.error(f"Erreur envoi notification FCM: {e}")
+    def _send_push_async():
+        try:
+            send_fcm_to_user(
+                user=user,
+                title=title,
+                body=message,
+                data=data or {'screen': 'notifications'}
+            )
+        except Exception as e:
+            logger.error(f"Erreur envoi notification FCM async: {e}")
+
+    threading.Thread(target=_send_push_async, daemon=True).start()
 

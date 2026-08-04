@@ -51,7 +51,7 @@ export default function RideManagementScreen() {
   } = useRideManagement(id as string, authFetch, user);
 
   const handleContactPassengers = () => {
-    const activeBookings = bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status));
+    const activeBookings = bookings.filter((b: any) => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status));
     if (activeBookings.length === 0) return;
     if (activeBookings.length === 1) {
       const pId = activeBookings[0].passenger_details?.id;
@@ -59,7 +59,7 @@ export default function RideManagementScreen() {
       return;
     }
     
-    const options = activeBookings.map(b => ({
+    const options = activeBookings.map((b: any) => ({
       text: b.passenger_details?.full_name || 'Passager',
       onPress: () => {
         const pId = b.passenger_details?.id;
@@ -93,11 +93,11 @@ export default function RideManagementScreen() {
 
   if (!ride) return null;
 
-  const pendingRequests = bookings.filter(b => ['pending', 'pending_driver', 'pending_passenger', 'pending_payment', 'payment_processing'].includes(b.status));
-  const activeBookings = bookings.filter(b => ['confirmed', 'active', 'started', 'completed'].includes(b.status));
-  const cancelledBookings = bookings.filter(b => ['cancelled', 'rejected', 'payment_failed', 'expired'].includes(b.status));
+  const pendingRequests = bookings.filter((b: any) => ['pending', 'pending_driver', 'pending_passenger', 'pending_payment', 'payment_processing'].includes(b.status));
+  const activeBookings = bookings.filter((b: any) => ['confirmed', 'active', 'started', 'completed'].includes(b.status));
+  const cancelledBookings = bookings.filter((b: any) => ['cancelled', 'rejected', 'payment_failed', 'expired'].includes(b.status));
   
-  const totalRevenue = bookings.filter(b => b.payment_status !== 'pending' && ['confirmed', 'active', 'started', 'completed'].includes(b.status)).reduce((sum, b) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
+  const totalRevenue = bookings.filter((b: any) => b.payment_status !== 'pending' && ['confirmed', 'active', 'started', 'completed'].includes(b.status)).reduce((sum: number, b: any) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
   const seatsBooked = ride.total_seats - ride.seats_available;
 
   const getStatusDisplay = () => {
