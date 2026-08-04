@@ -17,7 +17,13 @@ export default function PaymentFailedScreen() {
                 <Text style={styles.title}>Paiement Échoué</Text>
                 <Text style={styles.message}>{message}</Text>
                 
-                <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+                <TouchableOpacity style={styles.button} onPress={() => {
+                    if (router.canGoBack()) {
+                        router.back();
+                    } else {
+                        router.replace('/(tabs)/trips');
+                    }
+                }}>
                     <Text style={styles.buttonText}>Retourner à la réservation</Text>
                 </TouchableOpacity>
                 

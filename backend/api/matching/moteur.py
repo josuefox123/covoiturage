@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class MatchingEngine:
     """Moteur de recherche et de matching de trajets intelligent."""
 
-    MAX_RADIUS_KM = 2.0
+    MAX_RADIUS_KM = 8.0
 
     @classmethod
     def find_rides(

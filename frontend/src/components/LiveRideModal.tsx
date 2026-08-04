@@ -175,7 +175,6 @@ export default function LiveRideModal() {
     try {
       Speech.speak(text, { language: 'fr', pitch: 1.0, rate: 0.95 });
     } catch (e) {
-      console.log('Speech error:', e);
     }
   };
 
@@ -305,7 +304,6 @@ export default function LiveRideModal() {
       if (dep) setDepartCoords(dep);
       if (dest) setDestCoords(dest);
     } catch (err) {
-      console.log('Error setting ride coords:', err);
     }
   };
 
@@ -332,7 +330,7 @@ export default function LiveRideModal() {
           driver_latitude: pos.lat,
           driver_longitude: pos.lon
         })
-      }).catch(err => console.log('Error updating driver initial location:', err));
+      }).catch(() => {});
     }
 
     watchRef.current = await Location.watchPositionAsync(
@@ -372,7 +370,7 @@ export default function LiveRideModal() {
               driver_latitude: newPos.lat,
               driver_longitude: newPos.lon
             })
-          }).catch(err => console.log('Error updating driver location:', err));
+          }).catch(() => {});
         }
       }
     );
@@ -460,7 +458,6 @@ export default function LiveRideModal() {
       }
       sendToMap({ type: 'setStopovers', stopovers: stops });
     } catch (err) {
-      console.log('Error parsing stopovers in LiveRideModal:', err);
     }
   }, [activeRide, mapReady]);
 
@@ -528,7 +525,7 @@ export default function LiveRideModal() {
         });
         return Linking.openURL(fallbackUrl!);
       }
-    }).catch(err => console.log(err));
+    }).catch(() => {});
   };
 
   const handleStartRide = () => {

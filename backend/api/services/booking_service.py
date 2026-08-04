@@ -120,7 +120,10 @@ class BookingService:
 
             try:
                 from ..tasks import expire_booking_task
-                expire_booking_task.apply_async((str(booking.id),), countdown=countdown_secs)
+                if hasattr(expire_booking_task, 'apply_async'):
+                    expire_booking_task.apply_async((str(booking.id),), countdown=countdown_secs)
+                elif callable(expire_booking_task):
+                    pass
             except Exception:
                 pass
             
@@ -229,5 +232,15 @@ class BookingService:
                     )
                     
         return True, "Réservation annulée avec succès."
+
+    @staticmethod
+    def allocate_seats(booking):
+        from api.bookings.services import BookingService as CoreBookingService
+        return CoreBookingService.allocate_seats(booking)
+
+    @staticmethod
+    def deallocate_seats(booking):
+        from api.bookings.services import BookingService as CoreBookingService
+        return CoreBookingService.deallocate_seats(booking)
 
 

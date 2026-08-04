@@ -12,7 +12,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/styles/theme';
@@ -48,6 +48,7 @@ export default function TripsScreen() {
   const [passengerTrips, setPassengerTrips] = useState<any[]>([]);
   const [driverTrips, setDriverTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [contactingId, setContactingId] = useState<string | null>(null);
 
   useFocusEffect(
@@ -71,13 +72,17 @@ export default function TripsScreen() {
     }
   };
 
-  const fetchTrips = async () => {
+  const fetchTrips = async (isRefreshing = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
     
-    setLoading(true);
+    if (isRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const [bookings, rides] = await Promise.all([
         fetchPassengerBookings(),
@@ -90,8 +95,13 @@ export default function TripsScreen() {
       CustomAlert.alert('Erreur', 'Impossible de charger vos trajets.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = useCallback(() => {
+    fetchTrips(true);
+  }, [user, fetchPassengerBookings, fetchDriverRides]);
 
   // Logic removed since it's now in RideCard
 
@@ -237,7 +247,18 @@ export default function TripsScreen() {
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
+            />
+          }
+        >
           {activeTab === 'passenger' ? (
             <View style={styles.listContainer}>
               {filteredPassengerTrips.length === 0 ? (
@@ -304,8 +325,8 @@ export default function TripsScreen() {
                       isActiveRightNow={isActiveRightNow}
                       primaryActionLabel="Gérer"
                       onPressPrimary={() => router.push(`/ride-management/${ride.id}` as any)}
-                      secondaryActionLabel="Annuler"
-                      onPressSecondary={() => {}}
+                      secondaryActionLabel="Détails"
+                      onPressSecondary={() => router.push(`/ride/${ride.id}` as any)}
                     />
                   );
                 })

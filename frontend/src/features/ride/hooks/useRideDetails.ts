@@ -182,7 +182,7 @@ export function useRideDetails(
     const connectBookingWs = async () => {
       try {
         const { default: SecureStore } = await import('expo-secure-store');
-        const storedToken = await SecureStore.getItemAsync('accessToken');
+        const storedToken = await SecureStore.getItemAsync('zemy_access_token');
         if (!storedToken) return;
 
         bookingWsRef.current?.disconnect();

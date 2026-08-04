@@ -305,7 +305,7 @@ def sync_payments(request):
                     "status": new_status,
                 })
         except Exception as e:
-            print(f"Error syncing transaction {transaction_id}: {e}")
+            logger.error(f"Error syncing transaction {transaction_id}: {e}")
             pass
             
     return Response({

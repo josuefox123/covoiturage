@@ -108,7 +108,7 @@ class BookingStateService:
         estimated_passage_time = None
         if dep_order is not None:
             try:
-                wps = list(ride.waypoints.all().order_by('order'))
+                wps = list(ride.waypoints.all().order_by('order')) if hasattr(ride, 'waypoints') else []
                 if wps and dep_order < len(wps):
                     dep_wp = wps[dep_order]
                     total_dist_m = ride.distance_km * 1000 if ride.distance_km else 0
