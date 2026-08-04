@@ -119,10 +119,10 @@ class BookingService:
                 countdown_secs = 86400
 
             try:
-                from ..tasks import expire_booking_task
-                if hasattr(expire_booking_task, 'apply_async'):
-                    expire_booking_task.apply_async((str(booking.id),), countdown=countdown_secs)
-                elif callable(expire_booking_task):
+                from ..tasks.expire_booking import expire_booking_task as _expire_task
+                if hasattr(_expire_task, 'apply_async'):
+                    _expire_task.apply_async((str(booking.id),), countdown=countdown_secs)  # type: ignore[union-attr]
+                elif callable(_expire_task):
                     pass
             except Exception:
                 pass
