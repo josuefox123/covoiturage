@@ -64,7 +64,7 @@ export function useRideManagement(id: string, authFetch: any, user: any) {
       setLoading(true);
       const payload: any = {};
       if (customPrice !== undefined && !isNaN(customPrice)) {
-        payload.price = customPrice;
+        payload.custom_price = customPrice;
       }
       await authFetch(`/bookings/${bookingId}/accept/`, {
         method: 'POST',

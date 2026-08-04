@@ -35,19 +35,16 @@ export default function PaymentScreen() {
     const resetBookingStatus = async () => {
         if (!bookingId) return;
         try {
-            await authFetch(`/bookings/${bookingId}/`, {
-                method: 'PATCH',
-                body: JSON.stringify({ status: 'pending' })
+            await authFetch(`/bookings/${bookingId}/cancel/`, {
+                method: 'POST'
             });
         } catch (e) {
-            console.error('Failed to reset status:', e);
+            console.error('Failed to cancel booking:', e);
         }
     };
 
     const handleNavigationStateChange = async (navState: any) => {
         const url = navState.url;
-        console.log('WebView URL changed:', url);
-        
         const lowerUrl = url.toLowerCase();
         
         // Détecter la réussite par URL
@@ -186,7 +183,11 @@ export default function PaymentScreen() {
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={async () => {
                     await resetBookingStatus();
-                    router.back();
+                    if (router.canGoBack()) {
+                        router.back();
+                    } else {
+                        router.replace('/(tabs)/trips');
+                    }
                 }}>
                     <Ionicons name="close" size={24} color="#1F2937" />
                 </TouchableOpacity>

@@ -223,6 +223,14 @@ export function useNotifications() {
         // Deep linking vers la bonne page
         if (data?.screen === 'chat' && data?.conversation_id) {
           router.push(`/chat/${data.conversation_id}`);
+        } else if (data?.screen === 'trips' && data?.booking_id) {
+          router.push(`/(tabs)/trips`);
+        } else if (data?.screen === 'rides' && data?.ride_id) {
+          router.push(`/(tabs)/rides`);
+        } else if (data?.screen === 'rides') {
+          router.push(`/(tabs)/rides`);
+        } else if (data?.screen === 'trips') {
+          router.push(`/(tabs)/trips`);
         } else if (data?.ride_id) {
           router.push(`/ride/${data.ride_id}`);
         } else if (data?.screen === 'notifications') {

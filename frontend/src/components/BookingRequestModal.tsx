@@ -197,7 +197,7 @@ export default function BookingRequestModal() {
     setLoading(true);
     try {
       const bodyPayload = statusType === 'accept' && customPrice !== undefined && !isNaN(customPrice)
-        ? JSON.stringify({ price: customPrice })
+        ? JSON.stringify({ custom_price: customPrice })
         : undefined;
       const response = await authFetch(`/bookings/${booking.id}/${statusType}/`, {
         method: 'POST',
