@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Mission, MissionState, MissionData, MissionAction } from './MissionTypes';
 import { theme } from '../../styles/theme';
 
