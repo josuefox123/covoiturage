@@ -160,7 +160,7 @@ export class MissionResolver {
         });
       }
 
-      if (action === 'pay_now' || bookingStatus === 'pending_payment' || (bookingStatus === 'accepted' && paymentStatus === 'pending')) {
+      if (action === 'pay_now' || bookingStatus === 'pending_payment') {
         return this.createMission({
           state: 'PAYMENT',
           title: 'Paiement requis',
