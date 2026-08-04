@@ -4,7 +4,7 @@ export class RideSessionService {
   public static async fetchRideAndBookingState(
     authFetch: any,
     segment: SegmentIdentifier
-  ): { ride: any; bookingState: any } {
+  ): Promise<{ ride: any; bookingState: any }> {
     if (!authFetch || !segment.rideId) {
       throw new Error('authFetch et rideId requis');
     }
