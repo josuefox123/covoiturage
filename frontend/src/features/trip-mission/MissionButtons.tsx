@@ -46,7 +46,7 @@ export function MissionButtons({
       {mission.actions.map((action, index) => {
         const isPrimary = action.isPrimary;
         const btnBgColor = action.color || (isPrimary ? theme.colors.primary : '#F3F4F6');
-        const btnTextColor = isPrimary || action.color ? '#FFFFFF' : theme.colors.textDark;
+        const btnTextColor = isPrimary || action.color ? '#FFFFFF' : theme.colors.text;
 
         return (
           <TouchableOpacity

@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    color: theme.colors.textDark,
+    color: theme.colors.text,
     flex: 1
   },
   description: {
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   routeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.textDark,
+    color: theme.colors.text,
     flexShrink: 1
   },
   timeRow: {

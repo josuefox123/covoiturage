@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: theme.colors.textDark
+    color: theme.colors.text
   },
   roleTabsContainer: {
     flexDirection: 'row',
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.textDark
+    color: theme.colors.text
   },
   filterChipTextActive: {
     color: '#FFFFFF',
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: theme.colors.textDark,
+    color: theme.colors.text,
     marginTop: 12,
     marginBottom: 6,
     textAlign: 'center'
