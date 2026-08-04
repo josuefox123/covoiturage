@@ -25,7 +25,7 @@ from firebase_admin import messaging
 logger = logging.getLogger(__name__)
 
 
-def send_fcm_notification(token: str, title: str, body: str, data: dict = None) -> bool:
+def send_fcm_notification(token: str, title: str, body: str, data: dict | None = None) -> bool:
     """
     Envoie une notification Push (Expo Push API ou FCM direct) à un seul device.
 
@@ -115,7 +115,7 @@ def send_fcm_notification(token: str, title: str, body: str, data: dict = None) 
         return False
 
 
-def send_fcm_to_user(user, title: str, body: str, data: dict = None) -> bool:
+def send_fcm_to_user(user, title: str, body: str, data: dict | None = None) -> bool:
     """
     Envoie une notification FCM / Expo Push à un utilisateur spécifique.
 
@@ -132,7 +132,7 @@ def send_fcm_to_user(user, title: str, body: str, data: dict = None) -> bool:
     return send_fcm_notification(token, title, body, data)
 
 
-def send_fcm_to_all_users(title: str, body: str, data: dict = None, exclude_ids: list = None):
+def send_fcm_to_all_users(title: str, body: str, data: dict | None = None, exclude_ids: list | None = None):
     """
     Envoie une notification Push à tous les utilisateurs actifs qui ont un token.
 
@@ -222,7 +222,7 @@ def send_fcm_to_all_users(title: str, body: str, data: dict = None, exclude_ids:
                 logger.error(f"Erreur FCM broadcast lot {i}: {e}")
 
 
-def create_and_send_notification(user, title: str, message: str, data: dict = None):
+def create_and_send_notification(user, title: str, message: str, data: dict | None = None):
     """
     Enregistre une notification en base de données et l'envoie sur le mobile de l'utilisateur via FCM.
     L'envoi sur les serveurs de push (Expo / Firebase) est exécuté en arrière-plan (non-bloquant).
