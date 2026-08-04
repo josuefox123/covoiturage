@@ -138,11 +138,18 @@ export class RideSessionManager {
       this.notify();
 
       const seg = this.currentSession.segment;
+      // Utiliser les locations du segment réservé (depuis bookingState) plutôt que les locations du ride complet
+      const sessionBookingState = this.currentSession.bookingStateRaw;
+      const departureLocation = sessionBookingState?.departure_location
+        || this.currentSession.ride?.departure_location;
+      const arrivalLocation = sessionBookingState?.arrival_location
+        || this.currentSession.ride?.arrival_location;
+
       const res = await RideSessionService.createBooking(authFetch, {
         rideId: seg.rideId,
         seatsBooked: seatsToBook,
-        departureLocation: this.currentSession.ride?.departure_location,
-        arrivalLocation: this.currentSession.ride?.arrival_location,
+        departureLocation,
+        arrivalLocation,
         customPrice,
         message,
         departureWaypointOrder: seg.departureWaypointOrder,

@@ -667,6 +667,7 @@ export default function RideDetailScreen() {
         departure={departure}
         destination={destination}
         bookingLoading={bookingLoading}
+        pricePerSeat={bookingState?.price ?? ride?.price_per_seat}
         onClose={() => setShowBookingConfirmModal(false)}
         onConfirm={async (seats, customPrice, msg) => {
           const success = await performBooking(seats, customPrice, msg);

@@ -9,6 +9,7 @@ interface BookingConfirmModalProps {
   departure?: string;
   destination?: string;
   bookingLoading: boolean;
+  pricePerSeat?: number; // Prix par place avec frais Zemy inclus (depuis le backend)
   onClose: () => void;
   onConfirm: (seats: number, customPrice?: number, message?: string) => void;
 }
@@ -19,6 +20,7 @@ export function BookingConfirmModal({
   departure,
   destination,
   bookingLoading,
+  pricePerSeat,
   onClose,
   onConfirm
 }: BookingConfirmModalProps) {
@@ -104,9 +106,12 @@ export function BookingConfirmModal({
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingBottom: 16 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>TOTAL :</Text>
+              <View>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>TOTAL :</Text>
+                <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Frais Zemy inclus</Text>
+              </View>
               <Text style={{ fontSize: 22, fontWeight: '800', color: '#2F80ED' }}>
-                {((ride?.price_per_seat || 0) * seatsToBook).toLocaleString()} FCFA
+                {((pricePerSeat ?? ride?.price_per_seat ?? 0) * seatsToBook).toLocaleString()} FCFA
               </Text>
             </View>
 
