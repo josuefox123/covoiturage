@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { CustomAlert } from '../../../../src/utils/CustomAlert';
-import { useRideSession } from '../../../ride-session/hooks/useRideSession';
-import { useRideSynchronization } from '../../../ride-session/hooks/useRideSynchronization';
+import { useRideSession } from '../../ride-session/hooks/useRideSession';
+import { useRideSynchronization } from '../../ride-session/hooks/useRideSynchronization';
 
 export function useRideDetails(
   id: string,
