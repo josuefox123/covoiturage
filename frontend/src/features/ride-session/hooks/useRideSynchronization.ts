@@ -10,7 +10,7 @@ export function useRideSynchronization(segment: SegmentIdentifier, bookingId?: s
 
   // Start synchronizer lifecycle
   useEffect(() => {
-    if (!segment.rideId || !authFetch) return;
+    if (!segment.rideId) return;
 
     rideSynchronizer.start(authFetch, user, segment);
 
@@ -32,9 +32,9 @@ export function useRideSynchronization(segment: SegmentIdentifier, bookingId?: s
   // Handle Screen Focus re-fetch
   useFocusEffect(
     useCallback(() => {
-      if (segment.rideId && authFetch) {
+      if (segment.rideId) {
         rideSynchronizer.triggerAtomicSync('FocusEffect');
       }
-    }, [segment.rideId, authFetch])
+    }, [segment.rideId])
   );
 }

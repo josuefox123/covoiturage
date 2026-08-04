@@ -87,7 +87,6 @@ export function useRideDetails(
   };
 
   const openChat = async () => {
-    if (!authFetch) return;
     setChatLoading(true);
     try {
       const conv = await authFetch('/conversations/ride-chat/', {
@@ -103,7 +102,7 @@ export function useRideDetails(
   };
 
   const handleChatWithPassenger = async (passengerId: string) => {
-    if (!authFetch || !user) return;
+    if (!user) return;
     try {
       setChatLoading(true);
       const conversationsList = await authFetch('/conversations/');
@@ -199,7 +198,7 @@ export function useRideDetails(
     hasBooked: Boolean(booking?.id),
     bookingId: booking?.id || null,
     myBooking: booking,
-    bookings: ride?.bookings || [],
+    bookings: (ride as any)?.bookings || [],
     bookingLoading: loading,
     chatLoading,
     bookingState: session?.bookingStateRaw || null,
