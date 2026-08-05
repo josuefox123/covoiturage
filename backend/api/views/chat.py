@@ -335,6 +335,38 @@ class MessageViewSet(viewsets.ModelViewSet):
             
         conversation_id = getattr(self.request, 'query_params', self.request.GET).get('conversation')
         if conversation_id:
+            try:
+                conversation = Conversation.objects.get(pk=conversation_id)
+                if conversation.conversation_type == 'ride' and conversation.ride:
+                    welcome_exists = Message.objects.filter(
+                        conversation=conversation,
+                        content__contains="Bienvenue dans votre espace de discussion"
+                    ).exists()
+                    if not welcome_exists:
+                        driver = conversation.ride.driver
+                        passenger = conversation.participant_1 if conversation.participant_1 != driver else conversation.participant_2
+                        if passenger:
+                            booking = Booking.objects.filter(ride=conversation.ride, passenger=passenger).exclude(status='cancelled').first()
+                            dep_loc = (booking.departure_location if booking and booking.departure_location else conversation.ride.departure_location) or ''
+                            arr_loc = (booking.arrival_location if booking and booking.arrival_location else conversation.ride.arrival_location) or ''
+                            system_message = (
+                                f"🤝 Bienvenue dans votre espace de discussion !\n\n"
+                                f"Trajet : {dep_loc} -> {arr_loc} "
+                                f"le {conversation.ride.departure_date} à {str(conversation.ride.departure_time)[:5]}.\n\n"
+                                f"Rappel des règles :\n"
+                                f"• Ne partagez pas votre numéro de téléphone ici\n"
+                                f"• Soyez respectueux et ponctuel\n"
+                                f"• En cas de problème, contactez le support\n\n"
+                                f"Bonne route !"
+                            )
+                            Message.objects.create(
+                                conversation=conversation,
+                                sender=driver,
+                                content=system_message,
+                                message_type='text',
+                            )
+            except Exception:
+                pass
             queryset = queryset.filter(conversation_id=conversation_id)
         return queryset
 
