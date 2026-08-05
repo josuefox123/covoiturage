@@ -32,7 +32,7 @@ export class MissionResolver {
       proposedPrice: booking?.passenger_proposed_price,
       counterPrice: booking?.driver_counter_price || booking?.custom_price,
       seatsBooked: booking?.seats_booked || 1,
-      otpCode: booking?.otp_code || booking?.validation_code,
+      otpCode: booking?.id ? `T-${booking.id.substring(0, 8).toUpperCase()}` : (booking?.otp_code || booking?.validation_code),
       departureLocation: ride.departure_location || booking?.departure_location || 'Départ',
       arrivalLocation: ride.arrival_location || booking?.arrival_location || 'Arrivée',
       departureTime: ride.departure_time || '00:00',

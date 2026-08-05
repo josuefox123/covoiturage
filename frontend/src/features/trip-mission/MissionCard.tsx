@@ -102,7 +102,7 @@ export function MissionCard({
         {data.otpCode ? (
           <View style={styles.otpChip}>
             <Ionicons name="key-outline" size={14} color={theme.colors.primary} />
-            <Text style={styles.otpLabel}>Code OTP : </Text>
+            <Text style={styles.otpLabel}>{data.otpCode.startsWith('T-') ? 'N° Ticket : ' : 'Code OTP : '}</Text>
             <Text style={styles.otpValue}>{data.otpCode}</Text>
           </View>
         ) : null}
