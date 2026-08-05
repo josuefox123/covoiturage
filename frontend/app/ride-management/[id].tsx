@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { CustomAlert } from '../../src/utils/CustomAlert';
-import { Camera, CameraView } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 // Components & Hooks
 import { useRideManagement } from '@/src/features/ride-management/hooks/useRideManagement';
@@ -57,16 +57,7 @@ export default function RideManagementScreen() {
   const [showCodeInputModal, setShowCodeInputModal] = React.useState(false);
   const [selectedBookingForManualCode, setSelectedBookingForManualCode] = React.useState<any>(null);
   
-  // Envelopper le hook useCameraPermissions dans un try-catch au cas où
-  let cameraPermission: any = null;
-  let requestCameraPermission: any = () => {};
-  try {
-    const [perm, reqPerm] = Camera.useCameraPermissions();
-    cameraPermission = perm;
-    requestCameraPermission = reqPerm;
-  } catch (e) {
-    console.warn('Camera permissions not available:', e);
-  }
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const handleBoardWithCode = async (bookingId: string) => {
     if (!selectedBookingForManualCode) return;
