@@ -143,6 +143,19 @@ class BookingStateService:
                     segment_distance_km=0.0
                 )
 
+            # Résoudre les locations spécifiques au passager depuis les waypoints
+            passenger_departure_location = ride.departure_location
+            passenger_arrival_location = ride.arrival_location
+            try:
+                wps = list(ride.waypoints.all().order_by('order')) if hasattr(ride, 'waypoints') else []
+                if wps:
+                    if dep_order is not None and dep_order < len(wps):
+                        passenger_departure_location = wps[dep_order].name or ride.departure_location
+                    if arr_order is not None and arr_order < len(wps):
+                        passenger_arrival_location = wps[arr_order].name or ride.arrival_location
+            except Exception:
+                pass
+
             is_started = ride.status == 'started'
             is_full = ride.seats_available <= 0
 
@@ -152,6 +165,8 @@ class BookingStateService:
                 "price": pricing.total_to_pay,
                 "pricing_breakdown": pricing.to_dict(),
                 "seats_available": ride.seats_available,
+                "departure_location": passenger_departure_location,
+                "arrival_location": passenger_arrival_location,
                 "can_cancel": False,
                 "can_pay": False,
                 "is_started": is_started,
