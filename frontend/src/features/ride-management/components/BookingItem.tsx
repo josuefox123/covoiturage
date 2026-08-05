@@ -10,6 +10,7 @@ interface BookingItemProps {
   ridePrice: number;
   onAccept?: () => void;
   onReject?: () => void;
+  onBoard?: () => void;
   onMessage: (passengerId: string) => void;
   onCall: (phone?: string) => void;
 }
@@ -33,7 +34,7 @@ const getBookingStatusDisplay = (status: string) => {
     case 'payment_refunded':
       return { text: 'Remboursée', color: '#6B7280', bg: '#F3F4F6' };
     case 'started':
-      return { text: 'Trajet démarré', color: '#16A34A', bg: '#F0FDF4' };
+      return { text: 'Embarqué', color: '#16A34A', bg: '#F0FDF4' };
     case 'completed':
       return { text: 'Arrivé(e)', color: '#2D9CDB', bg: '#EFF6FF' };
     case 'cancelled':
@@ -51,6 +52,7 @@ export function BookingItem({
   ridePrice,
   onAccept,
   onReject,
+  onBoard,
   onMessage,
   onCall
 }: BookingItemProps) {
@@ -137,21 +139,33 @@ export function BookingItem({
           )}
         </>
       ) : (
-        !['cancelled', 'rejected', 'payment_failed', 'expired', 'payment_refunded'].includes(booking.status) ? (
-          <View style={styles.passengerActions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => {
-              const pId = booking.passenger_details?.id;
-              if (pId) onMessage(pId);
-            }}>
-              <Ionicons name="chatbubble-outline" size={20} color="#2D9CDB" />
-              <Text style={[styles.actionBtnText, { color: '#2D9CDB' }]}>Message</Text>
+        <View style={{ gap: 8, width: '100%' }}>
+          {!['cancelled', 'rejected', 'payment_failed', 'expired', 'payment_refunded'].includes(booking.status) ? (
+            <View style={styles.passengerActions}>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => {
+                const pId = booking.passenger_details?.id;
+                if (pId) onMessage(pId);
+              }}>
+                <Ionicons name="chatbubble-outline" size={20} color="#2D9CDB" />
+                <Text style={[styles.actionBtnText, { color: '#2D9CDB' }]}>Message</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => onCall(booking.passenger_details?.phone)}>
+                <Ionicons name="call-outline" size={20} color="#16A34A" />
+                <Text style={[styles.actionBtnText, { color: '#16A34A' }]}>Appeler</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {booking.status === 'confirmed' && onBoard && (
+            <TouchableOpacity 
+              style={[styles.actionBtn, { backgroundColor: '#2D9CDB', borderColor: '#2D9CDB', flex: 0, width: '100%', height: 44, marginTop: 4 }]} 
+              onPress={onBoard}
+            >
+              <Ionicons name="qr-code-outline" size={20} color="#FFFFFF" />
+              <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>Valider l'embarquement (Scan/Code)</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onCall(booking.passenger_details?.phone)}>
-              <Ionicons name="call-outline" size={20} color="#16A34A" />
-              <Text style={[styles.actionBtnText, { color: '#16A34A' }]}>Appeler</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null
+          )}
+        </View>
       )}
     </View>
   );

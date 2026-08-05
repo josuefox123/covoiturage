@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { CustomAlert } from '../../src/utils/CustomAlert';
+import { Camera, CameraView } from 'expo-camera';
 
 // Components & Hooks
 import { useRideManagement } from '@/src/features/ride-management/hooks/useRideManagement';
@@ -49,6 +50,117 @@ export default function RideManagementScreen() {
     handleCompleteRide,
     handleChatWithPassenger,
   } = useRideManagement(id as string, authFetch, user);
+
+  const [showScanner, setShowScanner] = React.useState(false);
+  const [scanned, setScanned] = React.useState(false);
+  const [manualCode, setManualCode] = React.useState('');
+  const [showCodeInputModal, setShowCodeInputModal] = React.useState(false);
+  const [selectedBookingForManualCode, setSelectedBookingForManualCode] = React.useState<any>(null);
+  
+  // Envelopper le hook useCameraPermissions dans un try-catch au cas où
+  let cameraPermission: any = null;
+  let requestCameraPermission: any = () => {};
+  try {
+    const [perm, reqPerm] = Camera.useCameraPermissions();
+    cameraPermission = perm;
+    requestCameraPermission = reqPerm;
+  } catch (e) {
+    console.warn('Camera permissions not available:', e);
+  }
+
+  const handleBoardWithCode = async (bookingId: string) => {
+    if (!selectedBookingForManualCode) return;
+    
+    const cleanCode = manualCode.trim().replace('T-', '').toUpperCase();
+    const expectedPrefix = selectedBookingForManualCode.id.substring(0, 8).toUpperCase();
+    const fullIdMatch = manualCode.trim() === selectedBookingForManualCode.id;
+    
+    if (cleanCode !== expectedPrefix && !fullIdMatch) {
+      CustomAlert.alert('Code incorrect', 'Le code saisi ne correspond pas à ce passager.');
+      return;
+    }
+
+    try {
+      await authFetch(`/bookings/${bookingId}/board/`, {
+        method: 'POST'
+      });
+      CustomAlert.alert('Succès', 'Embarquement validé avec succès !');
+      setShowCodeInputModal(false);
+      setManualCode('');
+      setSelectedBookingForManualCode(null);
+      await onRefresh();
+    } catch (err: any) {
+      CustomAlert.alert('Erreur', err.message || "Impossible de valider l'embarquement.");
+    }
+  };
+
+  const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
+    setScanned(true);
+    let bookingId = '';
+    let passengerName = 'le passager';
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.booking) {
+        bookingId = parsed.booking;
+        passengerName = parsed.passenger || 'le passager';
+      } else {
+        bookingId = data;
+      }
+    } catch (e) {
+      bookingId = data;
+    }
+
+    if (!bookingId || bookingId.length < 10) {
+      CustomAlert.alert('Erreur', 'QR code invalide.', [
+        { text: 'OK', onPress: () => setScanned(false) }
+      ]);
+      return;
+    }
+
+    // Trouver si le passager fait partie de ce trajet
+    const booking = bookings.find((b: any) => b.id === bookingId);
+    if (!booking) {
+      CustomAlert.alert('Erreur', "Ce ticket ne correspond à aucune réservation confirmée sur ce trajet.", [
+        { text: 'OK', onPress: () => setScanned(false) }
+      ]);
+      return;
+    }
+
+    if (booking.status === 'started') {
+      CustomAlert.alert('Info', "Ce passager a déjà été marqué comme embarqué.", [
+        { text: 'OK', onPress: () => {
+          setShowScanner(false);
+          setScanned(false);
+        }}
+      ]);
+      return;
+    }
+
+    CustomAlert.alert(
+      'Validation d\'embarquement',
+      `Voulez-vous valider l'embarquement de ${passengerName} ?`,
+      [
+        { text: 'Annuler', style: 'cancel', onPress: () => setScanned(false) },
+        {
+          text: 'Confirmer',
+          onPress: async () => {
+            try {
+              await authFetch(`/bookings/${bookingId}/board/`, {
+                method: 'POST'
+              });
+              CustomAlert.alert('Succès', 'Embarquement validé avec succès !');
+              setShowScanner(false);
+              await onRefresh();
+            } catch (err: any) {
+              CustomAlert.alert('Erreur', err.message || "Erreur lors de la validation.");
+            } finally {
+              setScanned(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const handleContactPassengers = () => {
     const activeBookings = bookings.filter((b: any) => b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status));
@@ -188,7 +300,34 @@ export default function RideManagementScreen() {
         )}
 
         {/* Passengers */}
-        <Text style={styles.sectionHeader}>Passagers ({activeBookings.length})</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeader}>Passagers ({activeBookings.length})</Text>
+          {activeBookings.some((b: any) => b.status === 'confirmed') && (
+            <TouchableOpacity 
+              style={styles.scanHeaderBtn} 
+              onPress={async () => {
+                if (!cameraPermission) {
+                  const res = await requestCameraPermission();
+                  if (!res.granted) {
+                    CustomAlert.alert('Permission requise', "L'accès à l'appareil photo est nécessaire pour scanner.");
+                    return;
+                  }
+                } else if (!cameraPermission.granted) {
+                  const res = await requestCameraPermission();
+                  if (!res.granted) {
+                    CustomAlert.alert('Permission requise', "L'accès à l'appareil photo est nécessaire pour scanner.");
+                    return;
+                  }
+                }
+                setScanned(false);
+                setShowScanner(true);
+              }}
+            >
+              <Ionicons name="qr-code-outline" size={16} color={COLORS.white} />
+              <Text style={styles.scanHeaderBtnText}>Scanner QR</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         
         {activeBookings.length === 0 ? (
           <View style={styles.emptyState}>
@@ -204,6 +343,10 @@ export default function RideManagementScreen() {
               ridePrice={ride.price_per_seat}
               onMessage={handleChatWithPassenger}
               onCall={handleCallPassenger}
+              onBoard={() => {
+                setSelectedBookingForManualCode(booking);
+                setShowCodeInputModal(true);
+              }}
             />
           ))
         )}
@@ -390,6 +533,90 @@ export default function RideManagementScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Scanner Modal */}
+      <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
+        <SafeAreaView style={styles.scannerContainer}>
+          <View style={styles.scannerHeader}>
+            <TouchableOpacity onPress={() => setShowScanner(false)} style={styles.scannerCloseBtn}>
+              <Ionicons name="close" size={28} color={COLORS.white} />
+            </TouchableOpacity>
+            <Text style={styles.scannerTitle}>Scanner le ticket QR</Text>
+          </View>
+          
+          <View style={styles.cameraContainer}>
+            {!cameraPermission ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : !cameraPermission.granted ? (
+              <View style={styles.permissionContainer}>
+                <Text style={styles.permissionText}>L'application a besoin de l'accès à votre appareil photo pour scanner les billets.</Text>
+                <TouchableOpacity style={styles.permissionBtn} onPress={requestCameraPermission}>
+                  <Text style={styles.permissionBtnText}>Autoriser la caméra</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <CameraView
+                style={StyleSheet.absoluteFillObject}
+                facing="back"
+                onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                barcodeScannerSettings={{
+                  barcodeTypes: ['qr'],
+                }}
+              />
+            )}
+            {cameraPermission?.granted && (
+              <View style={styles.scannerOverlay}>
+                <View style={styles.scannerTarget} />
+                <Text style={styles.scannerHelpText}>Cadrez le QR Code à l'intérieur du carré</Text>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Manual Code Validation Modal */}
+      <Modal visible={showCodeInputModal} transparent animationType="fade" onRequestClose={() => {
+        setShowCodeInputModal(false);
+        setManualCode('');
+        setSelectedBookingForManualCode(null);
+      }}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Saisir le code du ticket</Text>
+            <Text style={styles.modalSubtitle}>
+              Saisissez le code de ticket du passager {selectedBookingForManualCode?.passenger_details?.full_name} (ex: T-XXXXXXXX ou l'ID complet).
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Code (ex: T-A1B2C3D4)"
+              placeholderTextColor={COLORS.textLight}
+              value={manualCode}
+              onChangeText={setManualCode}
+              autoCapitalize="characters"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => {
+                setShowCodeInputModal(false);
+                setManualCode('');
+                setSelectedBookingForManualCode(null);
+              }}>
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalConfirmBtn, !manualCode.trim() && { backgroundColor: COLORS.border }]} 
+                disabled={!manualCode.trim()}
+                onPress={() => {
+                  if (selectedBookingForManualCode) {
+                    handleBoardWithCode(selectedBookingForManualCode.id);
+                  }
+                }}
+              >
+                <Text style={styles.modalConfirmText}>Valider</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -465,4 +692,164 @@ const styles = StyleSheet.create({
   descriptionText: { fontSize: 14, color: COLORS.textLight, fontStyle: 'italic', lineHeight: 20 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   modalSheet: { backgroundColor: COLORS.white, borderRadius: 24, padding: 20, maxHeight: '85%' },
+
+  // Boarding and Scanning styles
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+    paddingRight: 4
+  },
+  scanHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6
+  },
+  scanHeaderBtnText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000000'
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.8)'
+  },
+  scannerCloseBtn: {
+    padding: 4
+  },
+  scannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 16
+  },
+  cameraContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative'
+  },
+  permissionContainer: {
+    padding: 32,
+    alignItems: 'center',
+    gap: 16
+  },
+  permissionText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22
+  },
+  permissionBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12
+  },
+  permissionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700'
+  },
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)'
+  },
+  scannerTarget: {
+    width: 240,
+    height: 240,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderRadius: 16
+  },
+  scannerHelpText: {
+    color: '#FFFFFF',
+    marginTop: 24,
+    fontSize: 14,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 24,
+    gap: 16
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    textAlign: 'center'
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    lineHeight: 20
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: COLORS.text,
+    textAlign: 'center',
+    fontWeight: '600'
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textLight
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12
+  },
+  modalConfirmText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white
+  }
 });
