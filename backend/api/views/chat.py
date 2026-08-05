@@ -95,7 +95,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
                     dep_loc = (booking.departure_location if booking and booking.departure_location else conversation.ride.departure_location) or ''
                     arr_loc = (booking.arrival_location if booking and booking.arrival_location else conversation.ride.arrival_location) or ''
                     system_message = (
-                        f"🤝 Bienvenue dans votre espace de discussion !\n\n"
+                        f"Bienvenue dans votre espace de discussion !\n\n"
                         f"Trajet : {dep_loc} -> {arr_loc} "
                         f"le {conversation.ride.departure_date} à {str(conversation.ride.departure_time)[:5]}.\n\n"
                         f"Rappel des règles :\n"
@@ -280,7 +280,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             dep_loc = (booking.departure_location if booking and booking.departure_location else ride.departure_location) or ''
             arr_loc = (booking.arrival_location if booking and booking.arrival_location else ride.arrival_location) or ''
             system_message = (
-                f"🤝 Bienvenue dans votre espace de discussion !\n\n"
+                f"Bienvenue dans votre espace de discussion !\n\n"
                 f"Trajet : {dep_loc} -> {arr_loc} "
                 f"le {ride.departure_date} à {str(ride.departure_time)[:5]}.\n\n"
                 f"Rappel des règles :\n"
@@ -350,7 +350,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                             dep_loc = (booking.departure_location if booking and booking.departure_location else conversation.ride.departure_location) or ''
                             arr_loc = (booking.arrival_location if booking and booking.arrival_location else conversation.ride.arrival_location) or ''
                             system_message = (
-                                f"🤝 Bienvenue dans votre espace de discussion !\n\n"
+                                f"Bienvenue dans votre espace de discussion !\n\n"
                                 f"Trajet : {dep_loc} -> {arr_loc} "
                                 f"le {conversation.ride.departure_date} à {str(conversation.ride.departure_time)[:5]}.\n\n"
                                 f"Rappel des règles :\n"

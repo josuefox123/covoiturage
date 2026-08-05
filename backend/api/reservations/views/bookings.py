@@ -287,7 +287,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         create_and_send_notification(
             user=booking.passenger,
-            title="Vous avez embarqué ! 🚗",
+            title="Vous avez embarqué !",
             message=f"Le conducteur a validé votre embarquement. Bon voyage !",
             data={'type': 'passenger_boarded', 'booking_id': str(booking.id), 'screen': 'trips'}
         )

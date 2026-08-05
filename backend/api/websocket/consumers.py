@@ -244,7 +244,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             send_fcm_to_user(
                 recipient,
-                title=f"💬 {sender_name}",
+                title=f"Message de {sender_name}",
                 body=content[:100] + ('...' if len(content) > 100 else ''),
                 data={
                     'type': 'new_message',

@@ -227,7 +227,7 @@ export default function ChatScreen() {
   };
 
   // ── Rendu des messages ────────────────────────────────────────────────
-  const isSystemMessage = (item: any) => item.content?.startsWith('🤝');
+  const isSystemMessage = (item: any) => item.content?.startsWith('Bienvenue dans votre espace') || item.content?.startsWith('🤝');
 
   const otherUser = conversation?.participant_1_details?.id === user?.id
     ? conversation?.participant_2_details

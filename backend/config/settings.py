@@ -296,7 +296,7 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
 
 JAZZMIN_SETTINGS = {
     "site_title": "Zemy Admin",
-    "site_header": "🚗 Zemy",
+    "site_header": "Zemy",
     "site_brand": "Zemy",
     "site_icon": "images/favicon.png",
     "welcome_sign": "Bienvenue sur l'administration",

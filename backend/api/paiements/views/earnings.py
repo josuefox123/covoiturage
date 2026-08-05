@@ -181,7 +181,7 @@ class DriverPayoutViewSet(viewsets.ModelViewSet):
             
         create_and_send_notification(
             user=payout.driver,
-            title="Virement effectué 💰",
+            title="Virement effectué",
             message=f"Votre virement de {payout.amount} FCFA a été versé sur le numéro {payout.phone_number}.",
             data={'type': 'payout_completed', 'payout_id': str(payout.id)}
         )

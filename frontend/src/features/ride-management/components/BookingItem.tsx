@@ -85,12 +85,12 @@ export function BookingItem({
             <View style={{ marginTop: 6, gap: 4 }}>
               {booking.departure_location ? (
                 <Text style={{ fontSize: 11, color: '#4B5563', lineHeight: 15 }}>
-                  🟢 <Text style={{ fontWeight: '700' }}>Embarquement :</Text> {booking.departure_location}
+                  • <Text style={{ fontWeight: '700' }}>Embarquement :</Text> {booking.departure_location}
                 </Text>
               ) : null}
               {booking.arrival_location ? (
                 <Text style={{ fontSize: 11, color: '#4B5563', lineHeight: 15 }}>
-                  🔴 <Text style={{ fontWeight: '700' }}>Débarquement :</Text> {booking.arrival_location}
+                  • <Text style={{ fontWeight: '700' }}>Débarquement :</Text> {booking.arrival_location}
                 </Text>
               ) : null}
             </View>

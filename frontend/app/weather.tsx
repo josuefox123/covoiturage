@@ -80,9 +80,9 @@ const getDriveQuality = (code: number) => {
 };
 
 const getSecurityIndicator = (code: number) => {
-  if (code >= 95) return { label: '🔴 Déconseillées', color: '#EF4444' };
-  if (code >= 61) return { label: '🟡 Prudence', color: '#F59E0B' };
-  return { label: '🟢 Favorables', color: '#10B981' };
+  if (code >= 95) return { label: 'Déconseillées', color: '#EF4444' };
+  if (code >= 61) return { label: 'Prudence', color: '#F59E0B' };
+  return { label: 'Favorables', color: '#10B981' };
 };
 
 const getTravelTips = (code: number) => {

@@ -64,7 +64,7 @@ class Command(BaseCommand):
                                 amount_due = int(booking.amount_due_to_driver)
                                 create_and_send_notification(
                                     user=booking.passenger,
-                                    title="Réservation confirmée ✅",
+                                    title="Réservation confirmée",
                                     message=f"Paiement de {booking.total_amount} FCFA validé. Votre réservation est confirmée.",
                                     data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                                 )
@@ -72,7 +72,7 @@ class Command(BaseCommand):
                                 if booking.ride.driver:
                                     create_and_send_notification(
                                         user=booking.ride.driver,
-                                        title="Nouvelle Réservation Payée 💰",
+                                        title="Nouvelle Réservation Payée",
                                         message=f"{booking.passenger.full_name or booking.passenger.phone} vient de payer sa réservation. Votre gain de {amount_due} FCFA est sécurisé.",
                                         data={'type': 'passenger_paid_driver', 'booking_id': str(booking.id), 'screen': 'rides'}
                                     )
@@ -88,7 +88,7 @@ class Command(BaseCommand):
                                 amount_due = parcel.driver_payout
                                 create_and_send_notification(
                                     user=parcel.ride.driver,
-                                    title="Nouveau Colis Confirmé 📦",
+                                    title="Nouveau Colis Confirmé",
                                     message=f"{parcel.sender_name} a confirmé l'envoi d'un colis.",
                                     data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
                                 )

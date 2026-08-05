@@ -198,7 +198,7 @@ class UserViewSet(viewsets.ModelViewSet):
         
         create_and_send_notification(
             user=user_to_rate,
-            title="Avis reçu ⭐",
+            title="Avis reçu",
             message=f"Vous avez reçu une nouvelle note de {rating}/5 de la part d'un utilisateur.",
             data={'type': 'rating_received', 'screen': 'profile'}
         )

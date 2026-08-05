@@ -290,7 +290,7 @@ export default function ProfileScreen() {
                   ? user.rating.toFixed(1)
                   : '–'}
               </Text>
-              <Text style={styles.statLabel}>Note ⭐</Text>
+              <Text style={styles.statLabel}>Note / 5</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>

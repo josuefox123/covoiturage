@@ -112,7 +112,7 @@ class PromotionViewSet(viewsets.ModelViewSet):
         promotion = serializer.save()
         # Notifier tous les utilisateurs de la nouvelle promotion
         send_fcm_to_all_users(
-            title="🎉 Nouvelle promotion disponible !",
+            title="Nouvelle promotion disponible !",
             body=promotion.title,
             data={'type': 'new_promotion', 'screen': 'home'},
         )

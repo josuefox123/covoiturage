@@ -54,14 +54,14 @@ class BookingService:
                                 amount_due = int(existing_booking.amount_due_to_driver)
                                 create_and_send_notification(
                                     user=existing_booking.passenger,
-                                    title="Réservation confirmée ✅",
+                                    title="Réservation confirmée",
                                     message=f"Paiement de {existing_booking.total_amount} FCFA validé. Votre réservation est confirmée.",
                                     data={'type': 'payment_confirmed', 'booking_id': str(existing_booking.id), 'screen': 'trips'}
                                 )
                                 if ride.driver:
                                     create_and_send_notification(
                                         user=ride.driver,
-                                        title="Nouvelle réservation 🚗",
+                                        title="Nouvelle réservation",
                                         message=f"{existing_booking.passenger.full_name or existing_booking.passenger.phone} a réservé {existing_booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
                                         data={'type': 'new_booking', 'booking_id': str(existing_booking.id), 'screen': 'rides'}
                                     )

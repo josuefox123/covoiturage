@@ -182,7 +182,7 @@ def confirm_payment(request):
                     amount_due = parcel.driver_payout
                     create_and_send_notification(
                         user=parcel.ride.driver,
-                        title="Nouveau Colis Confirmé 📦",
+                        title="Nouveau Colis Confirmé",
                         message=f"{parcel.sender_name} a confirmé l'envoi d'un colis. Vous recevrez {amount_due} FCFA en espèces.",
                         data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
                     )
@@ -190,7 +190,7 @@ def confirm_payment(request):
                     if parcel.sender_user:
                         create_and_send_notification(
                             user=parcel.sender_user,
-                            title="Colis payé et validé 📦",
+                            title="Colis payé et validé",
                             message=f"Le paiement de votre colis a été validé. Le conducteur transportera votre colis sur le trajet.",
                             data={'type': 'parcel_confirmed_sender', 'parcel_id': str(parcel.id), 'screen': 'trips'}
                         )
