@@ -297,15 +297,9 @@ export default function RideManagementScreen() {
             <TouchableOpacity 
               style={styles.scanHeaderBtn} 
               onPress={async () => {
-                if (!cameraPermission) {
+                if (!cameraPermission || !cameraPermission.granted) {
                   const res = await requestCameraPermission();
-                  if (!res.granted) {
-                    CustomAlert.alert('Permission requise', "L'accès à l'appareil photo est nécessaire pour scanner.");
-                    return;
-                  }
-                } else if (!cameraPermission.granted) {
-                  const res = await requestCameraPermission();
-                  if (!res.granted) {
+                  if (!res || !res.granted) {
                     CustomAlert.alert('Permission requise', "L'accès à l'appareil photo est nécessaire pour scanner.");
                     return;
                   }
