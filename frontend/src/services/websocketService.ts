@@ -62,41 +62,10 @@ export class WebSocketService {
   }
 
   connect() {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
-
-    const fullUrl = `${this.url}?token=${this.token}`;
-    this.ws = new WebSocket(fullUrl);
-
-    this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
-      this.reconnectDelay = 1000;
-      this.onOpen?.();
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        const data: WSMessage = JSON.parse(event.data);
-        this.onMessage?.(data);
-      } catch (e) {
-        console.error('[WS] Erreur parsing message:', e);
-      }
-    };
-
-    this.ws.onclose = (event) => {
-      this.onClose?.();
-
-      // Ne pas se reconnecter si fermeture volontaire (4001=auth, 4003=forbidden)
-      if (!this.shouldReconnect || event.code === 4001 || event.code === 4003) {
-        return;
-      }
-
-      this._scheduleReconnect();
-    };
-
-    this.ws.onerror = (error) => {
-      console.error('[WS] Erreur:', error);
-      this.onError?.(error);
-    };
+    // Désactivé temporairement en raison des limitations de handshake Upgrade sur LiteSpeed (PlanetHoster N0C)
+    // Utilisation du fallback HTTP REST pour le chat.
+    console.log('[WS] WebSocket Chat désactivé temporairement. Utilisation du fallback HTTP REST.');
+    return;
   }
 
   disconnect() {
@@ -221,37 +190,10 @@ export class BookingWebSocketService {
   }
 
   connect() {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
-
-    const fullUrl = `${this.url}?token=${this.token}`;
-    this.ws = new WebSocket(fullUrl);
-
-    this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
-      this.reconnectDelay = 2000;
-      this.onOpen?.();
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        const data: BookingWSMessage = JSON.parse(event.data);
-        if (data.type === 'booking_status_update') {
-          this.onUpdate?.(data);
-        }
-      } catch (e) {
-        console.error('[BookingWS] Erreur parsing:', e);
-      }
-    };
-
-    this.ws.onclose = (event) => {
-      this.onClose?.();
-      if (!this.shouldReconnect || event.code === 4001 || event.code === 4003) return;
-      this._scheduleReconnect();
-    };
-
-    this.ws.onerror = () => {
-      // Erreur silencieuse — la reconnexion est gérée par onclose
-    };
+    // Désactivé temporairement en raison des limitations de handshake Upgrade sur LiteSpeed (PlanetHoster N0C)
+    // Le synchronisateur utilisera automatiquement le fallback HTTP polling de 30 secondes.
+    console.log('[BookingWS] WebSocket Réservation désactivé temporairement. Utilisation du fallback HTTP polling.');
+    return;
   }
 
   disconnect() {
