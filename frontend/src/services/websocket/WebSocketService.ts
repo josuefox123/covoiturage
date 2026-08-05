@@ -89,6 +89,11 @@ export class WebSocketService {
 
       if (payload.type === 'pong') return; // Accusé de réception heartbeat
 
+      if (payload.type === 'connected') {
+        console.log('[WebSocket] Message de bienvenue reçu du serveur :', payload.message);
+        return;
+      }
+
       if (payload.type === 'notification') {
         const { title, message, data } = payload;
 
