@@ -293,7 +293,7 @@ export default function RideManagementScreen() {
           )}
         </View>
 
-        {/* Main Actions */}
+        {/* Main Actions - Masqués pour le moment
         {ride.status === 'active' && (
           <View style={styles.mainActions}>
             <TouchableOpacity style={styles.btnSuccess} onPress={handleCompleteRide} activeOpacity={0.8}>
@@ -307,6 +307,7 @@ export default function RideManagementScreen() {
             </TouchableOpacity>
           </View>
         )}
+        */}
         
         <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
