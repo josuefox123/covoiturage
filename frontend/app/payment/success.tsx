@@ -26,7 +26,7 @@ export default function PaymentSuccessScreen() {
         if (!bookingId) return;
         try {
             setDownloading(true);
-            const FileSystem = require('expo-file-system');
+            const FileSystem = require('expo-file-system/legacy');
             const Sharing = require('expo-sharing');
             const SecureStore = require('expo-secure-store');
 

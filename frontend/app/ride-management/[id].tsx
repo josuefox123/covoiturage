@@ -91,7 +91,7 @@ export default function RideManagementScreen() {
   const handleDownloadManifest = async (bookingId: string) => {
     try {
       setDownloadingManifestId(bookingId);
-      const FileSystem = require('expo-file-system');
+      const FileSystem = require('expo-file-system/legacy');
       const Sharing = require('expo-sharing');
       const SecureStore = require('expo-secure-store');
 

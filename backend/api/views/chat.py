@@ -131,6 +131,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
         participant_1_id = request.data.get('participant_1')
         participant_2_id = request.data.get('participant_2')
         
+        # Check if conversation already exists
+        existing_conv = Conversation.objects.filter(
+            ride=ride,
+            conversation_type='ride'
+        ).filter(
+            (Q(participant_1_id=participant_1_id) & Q(participant_2_id=participant_2_id)) |
+            (Q(participant_1_id=participant_2_id) & Q(participant_2_id=participant_1_id))
+        ).first()
+        
+        if existing_conv:
+            serializer = self.get_serializer(existing_conv)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
         # Trouver qui est le passager (celui qui n'est pas le conducteur)
         passenger_id = None
         if participant_1_id and int(participant_1_id) != ride.driver.id:
