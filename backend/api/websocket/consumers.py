@@ -394,8 +394,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         try:
             access_token = AccessToken(token_str)  # type: ignore
             user_id = access_token.get('user_id')
+            from ..models import User
             return User.objects.get(id=user_id, is_active=True)
-        except (TokenError, User.DoesNotExist, Exception) as e:
-            logger.debug(f"Auth NotificationWS échouée: {e}")
+        except Exception as e:
+            logger.error(f"Auth NotificationWS échouée (token={token_str[:15]}...): {e}")
             return None
 
