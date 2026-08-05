@@ -341,10 +341,38 @@ class ConversationSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     has_urgent_unread = serializers.SerializerMethodField()
+    booking_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
         fields = '__all__'
+
+    @extend_schema_field(dict)
+    def get_booking_details(self, obj):
+        if obj.conversation_type != 'ride' or not obj.ride:
+            return None
+        
+        # Le passager est le participant qui n'est pas le conducteur (driver) du trajet.
+        driver_id = obj.ride.driver_id
+        passenger = None
+        if obj.participant_1_id != driver_id:
+            passenger = obj.participant_1
+        elif obj.participant_2_id != driver_id:
+            passenger = obj.participant_2
+            
+        if not passenger:
+            return None
+            
+        booking = Booking.objects.filter(ride=obj.ride, passenger=passenger).first()
+        if booking:
+            return {
+                'id': str(booking.id),
+                'status': booking.status,
+                'departure_location': booking.departure_location,
+                'arrival_location': booking.arrival_location,
+                'seats_booked': booking.seats_booked,
+            }
+        return None
 
     @extend_schema_field(dict)
     def get_last_message(self, obj):

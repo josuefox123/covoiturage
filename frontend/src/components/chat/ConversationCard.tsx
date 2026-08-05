@@ -100,9 +100,10 @@ export default function ConversationCard({ item, currentUserId, onArchive, onDel
     );
   };
 
-  // Ride info
+  // Booking info if passenger portion exists, otherwise fallback to ride info
+  const booking = item.booking_details;
   const ride = item.ride_details;
-  const rideStatus = ride?.status || 'Terminé';
+  const rideStatus = booking?.status || ride?.status || 'Terminé';
 
   return (
     <Swipeable
@@ -134,14 +135,28 @@ export default function ConversationCard({ item, currentUserId, onArchive, onDel
             </Text>
           </View>
           
-          {ride && (
+          {(booking || ride) && (
             <View style={styles.rideRow}>
               <Ionicons name="car-outline" size={14} color={theme.colors.textMuted} />
               <Text style={styles.rideText} numberOfLines={1}>
-                {ride.departure_location?.split(',')[0]} → {ride.arrival_location?.split(',')[0]}
+                {booking 
+                  ? `${booking.departure_location?.split(',')[0]} → ${booking.arrival_location?.split(',')[0]}`
+                  : `${ride.departure_location?.split(',')[0]} → ${ride.arrival_location?.split(',')[0]}`}
               </Text>
-              <View style={[styles.badge, rideStatus === 'confirmed' ? styles.badgeSuccess : styles.badgeDefault]}>
-                <Text style={styles.badgeText}>{rideStatus === 'confirmed' ? 'Confirmé' : 'Terminé'}</Text>
+              <View style={[
+                styles.badge, 
+                ['confirmed', 'active', 'started'].includes(rideStatus) 
+                  ? styles.badgeSuccess 
+                  : (rideStatus.startsWith('pending') ? styles.badgeWarning : styles.badgeDefault)
+              ]}>
+                <Text style={[
+                  styles.badgeText,
+                  rideStatus.startsWith('pending') && { color: '#B45309' }
+                ]}>
+                  {['confirmed', 'active', 'started'].includes(rideStatus) 
+                    ? 'Confirmé' 
+                    : (rideStatus.startsWith('pending') ? 'En attente' : 'Terminé')}
+                </Text>
               </View>
             </View>
           )}
@@ -251,6 +266,9 @@ const styles = StyleSheet.create({
   },
   badgeDefault: {
     backgroundColor: theme.colors.border,
+  },
+  badgeWarning: {
+    backgroundColor: '#FEF3C7', // light amber background
   },
   badgeSuccess: {
     backgroundColor: theme.colors.success + '20', // transparent green

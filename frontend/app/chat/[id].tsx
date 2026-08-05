@@ -138,6 +138,37 @@ export default function ChatScreen() {
     };
   }, [id, token]);
 
+  // ── Polling de repli (HTTP REST) si le WebSocket est déconnecté ─────────
+  useEffect(() => {
+    if (!id || wsConnected) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const msgsData = await authFetch(`/messages/?conversation=${id}`);
+        if (Array.isArray(msgsData)) {
+          const sorted = [...msgsData].sort(
+            (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          
+          setMessages(prev => {
+            if (sorted.length !== prev.length || sorted.some((m, idx) => !prev[idx] || prev[idx].id !== m.id)) {
+              // Marquer comme lus car l'utilisateur est actif sur l'écran
+              authFetch(`/messages/${id}/mark-read/`, { method: 'POST' }).catch(() => {});
+              // Scroller vers le bas si un nouveau message arrive
+              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+              return sorted;
+            }
+            return prev;
+          });
+        }
+      } catch (error) {
+        console.error('[Chat] Erreur lors du polling de messages:', error);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [id, wsConnected, authFetch]);
+
   // ── Gestion de l'input ────────────────────────────────────────────────
   const handleInputChange = (text: string) => {
     setInputText(text);
