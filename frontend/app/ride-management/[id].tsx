@@ -255,41 +255,57 @@ export default function RideManagementScreen() {
 
           <View style={styles.divider} />
 
-          {ride.driver_details?.preference ? (
+          { (ride.music !== undefined || ride.driver_details?.preference) ? (
             <View style={styles.preferencesSection}>
               <Text style={styles.subSectionTitle}>Préférences de voyage</Text>
               <View style={styles.prefTagsContainer}>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.music ? "Musique autorisée" : "Pas de musique"}</Text>
+                  <Text style={styles.prefTagText}>
+                    { (ride.music ?? ride.driver_details?.preference?.music) ? "Musique autorisée" : "Pas de musique" }
+                  </Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.smoking ? "Fumeur" : "Non-fumeur"}</Text>
+                  <Text style={styles.prefTagText}>
+                    { (ride.smoking ?? ride.driver_details?.preference?.smoking) ? "Fumeur" : "Non-fumeur" }
+                  </Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.chatty ? "Discussion" : "Calme"}</Text>
+                  <Text style={styles.prefTagText}>
+                    { (ride.chatty ?? ride.driver_details?.preference?.chatty) ? "Discussion" : "Calme" }
+                  </Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.air_conditioner ? "Climatisation" : "Pas de clim"}</Text>
+                  <Text style={styles.prefTagText}>
+                    { (ride.air_conditioner ?? ride.driver_details?.preference?.air_conditioner) ? "Climatisation" : "Pas de clim" }
+                  </Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.pets_allowed ? "Animaux admis" : "Sans animaux"}</Text>
+                  <Text style={styles.prefTagText}>
+                    { (ride.pets_allowed ?? ride.driver_details?.preference?.pets_allowed) ? "Animaux admis" : "Sans animaux" }
+                  </Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.luggage_allowed ? "Bagages admis" : "Bagages limités"}</Text>
+                  <Text style={styles.prefTagText}>
+                    { (ride.luggage_allowed ?? ride.driver_details?.preference?.luggage_allowed) ? "Bagages admis" : "Bagages limités" }
+                  </Text>
                 </View>
                 <View style={styles.prefTagItem}>
-                  <Text style={styles.prefTagText}>{ride.driver_details.preference.stops_allowed ? "Arrêts possibles" : "Direct (sans arrêts)"}</Text>
+                  <Text style={styles.prefTagText}>
+                    { (ride.stops_allowed ?? ride.driver_details?.preference?.stops_allowed) ? "Arrêts possibles" : "Direct (sans arrêts)" }
+                  </Text>
                 </View>
               </View>
-              {ride.driver_details.preference.notes ? (
+              { (ride.description || ride.driver_details?.preference?.notes) ? (
                 <View style={styles.notesContainer}>
                   <Text style={styles.notesLabel}>Notes complémentaires :</Text>
-                  <Text style={styles.notesText}>"{ride.driver_details.preference.notes}"</Text>
+                  <Text style={styles.notesText}>
+                    "{ride.description || ride.driver_details?.preference?.notes}"
+                  </Text>
                 </View>
               ) : null}
             </View>
           ) : (
-            <Text style={styles.noVehicleText}>Aucune préférence enregistrée dans le profil.</Text>
+            <Text style={styles.noVehicleText}>Aucune préférence enregistrée pour ce trajet.</Text>
           )}
         </View>
 
