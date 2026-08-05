@@ -26,7 +26,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { CustomAlert } from '../utils/CustomAlert';
 import { API_URL } from '../services/api';
-import { wsService } from '../services/websocket/WebSocketService';
+// import { wsService } from '../services/websocket/WebSocketService'; // Désactivé temporairement
 import { rideEventBus } from '../features/ride-session/manager/EventBus';
 import * as Speech from 'expo-speech';
 
@@ -161,12 +161,12 @@ export function useNotifications() {
   // Initialiser les notifications quand l'utilisateur est authentifié
   useEffect(() => {
     if (!token) {
-      wsService.disconnect();
+      // wsService.disconnect(); // Désactivé temporairement en raison des limitations de handshake Upgrade sur LiteSpeed
       return;
     }
 
     // Connecter le WebSocket direct pour les notifications 0ms en direct
-    wsService.connect(token, API_URL);
+    // wsService.connect(token, API_URL); // Désactivé temporairement car LiteSpeed réécrit Connection: Keep-Alive au lieu de Upgrade
 
     if (!Notifications) return;
 
