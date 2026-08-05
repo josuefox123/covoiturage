@@ -156,7 +156,7 @@ export class WebSocketService {
     console.warn('[WebSocket] Erreur survenue :', event);
   }
 
-  private handleClose(event: WebSocketCloseEvent) {
+  private handleClose(event: any) {
     console.log('[WebSocket] Fermeture :', {
       code: event.code,
       reason: event.reason,
