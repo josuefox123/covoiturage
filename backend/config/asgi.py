@@ -29,7 +29,6 @@ django.setup()
 
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
 from api.routing import websocket_urlpatterns
 
 application = ProtocolTypeRouter({
@@ -37,7 +36,5 @@ application = ProtocolTypeRouter({
     'http': get_asgi_application(),
 
     # Connexions WebSocket → NotificationConsumer / ChatConsumer
-    'websocket': AuthMiddlewareStack(
-        URLRouter(websocket_urlpatterns)
-    ),
+    'websocket': URLRouter(websocket_urlpatterns),
 })
