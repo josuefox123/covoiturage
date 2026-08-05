@@ -26,12 +26,22 @@ const isLocationMatch = (loc1?: string, loc2?: string) => {
 };
 
 export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
-  // Filtrer les réservations valides/actives
+  // Inclure toutes les réservations actives et en attente (exclure uniquement les annulées/rejetées/échouées)
   const activeBookings = bookings.filter((b: any) => 
-    ['confirmed', 'active', 'started', 'completed'].includes(b.status)
+    !['cancelled', 'rejected', 'payment_failed', 'expired'].includes(b.status)
   );
 
   const stopoversLength = ride.stopovers && Array.isArray(ride.stopovers) ? ride.stopovers.length : 0;
+
+  const getStatusLabel = (status: string) => {
+    if (['confirmed', 'active', 'started', 'completed'].includes(status)) {
+      return '';
+    }
+    if (status === 'pending_payment' || status === 'payment_processing') {
+      return ' (Règlement en cours)';
+    }
+    return ' (À valider)';
+  };
 
   const renderLocationPassengers = (locationName: string, orderIndex: number) => {
     // Priorité absolue à la comparaison par index de waypoint résolu par le backend
@@ -53,36 +63,42 @@ export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
 
     return (
       <View style={styles.passengersContainer}>
-        {boarding.map((b: any, idx: number) => (
-          <View key={`b-${idx}`} style={styles.passengerRow}>
-            <Ionicons name="enter" size={16} color="#16A34A" style={{ marginTop: 2 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.boardingText}>
-                Prendre : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.)
-              </Text>
-              {b.departure_location ? (
-                <Text style={styles.addressText} numberOfLines={2}>
-                  ➔ {b.departure_location}
+        {boarding.map((b: any, idx: number) => {
+          const isPending = !['confirmed', 'active', 'started', 'completed'].includes(b.status);
+          return (
+            <View key={`b-${idx}`} style={styles.passengerRow}>
+              <Ionicons name="enter" size={16} color={isPending ? '#F59E0B' : '#16A34A'} style={{ marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.boardingText, isPending && { color: '#F59E0B' }]}>
+                  Prendre : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.){getStatusLabel(b.status)}
                 </Text>
-              ) : null}
+                {b.departure_location ? (
+                  <Text style={styles.addressText} numberOfLines={2}>
+                    ➔ {b.departure_location}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          </View>
-        ))}
-        {alighting.map((b: any, idx: number) => (
-          <View key={`a-${idx}`} style={styles.passengerRow}>
-            <Ionicons name="exit" size={16} color="#DC2626" style={{ marginTop: 2 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.alightingText}>
-                Déposer : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.)
-              </Text>
-              {b.arrival_location ? (
-                <Text style={styles.addressText} numberOfLines={2}>
-                  ➔ {b.arrival_location}
+          );
+        })}
+        {alighting.map((b: any, idx: number) => {
+          const isPending = !['confirmed', 'active', 'started', 'completed'].includes(b.status);
+          return (
+            <View key={`a-${idx}`} style={styles.passengerRow}>
+              <Ionicons name="exit" size={16} color={isPending ? '#F59E0B' : '#DC2626'} style={{ marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.alightingText, isPending && { color: '#F59E0B' }]}>
+                  Déposer : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.){getStatusLabel(b.status)}
                 </Text>
-              ) : null}
+                {b.arrival_location ? (
+                  <Text style={styles.addressText} numberOfLines={2}>
+                    ➔ {b.arrival_location}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
     );
   };
