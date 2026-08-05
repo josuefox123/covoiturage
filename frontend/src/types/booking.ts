@@ -36,4 +36,6 @@ export interface Booking {
   driver_counter_price?: number;
   negotiation_message?: string;
   custom_price?: number;
+  departure_waypoint_order?: number | null;
+  arrival_waypoint_order?: number | null;
 }

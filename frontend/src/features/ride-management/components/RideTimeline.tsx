@@ -31,9 +31,23 @@ export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
     ['confirmed', 'active', 'started', 'completed'].includes(b.status)
   );
 
-  const renderLocationPassengers = (locationName: string) => {
-    const boarding = activeBookings.filter(b => isLocationMatch(b.departure_location, locationName));
-    const alighting = activeBookings.filter(b => isLocationMatch(b.arrival_location, locationName));
+  const stopoversLength = ride.stopovers && Array.isArray(ride.stopovers) ? ride.stopovers.length : 0;
+
+  const renderLocationPassengers = (locationName: string, orderIndex: number) => {
+    // Priorité absolue à la comparaison par index de waypoint résolu par le backend
+    const boarding = activeBookings.filter(b => {
+      if (b.departure_waypoint_order !== undefined && b.departure_waypoint_order !== null) {
+        return b.departure_waypoint_order === orderIndex;
+      }
+      return isLocationMatch(b.departure_location, locationName);
+    });
+
+    const alighting = activeBookings.filter(b => {
+      if (b.arrival_waypoint_order !== undefined && b.arrival_waypoint_order !== null) {
+        return b.arrival_waypoint_order === orderIndex;
+      }
+      return isLocationMatch(b.arrival_location, locationName);
+    });
 
     if (boarding.length === 0 && alighting.length === 0) return null;
 
@@ -68,7 +82,7 @@ export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
         <View style={styles.timelineContent}>
           <Text style={styles.locationText}>{ride.departure_location}</Text>
           <Text style={styles.timeText}>{ride.departure_time?.substring(0, 5)}</Text>
-          {renderLocationPassengers(ride.departure_location)}
+          {renderLocationPassengers(ride.departure_location, 0)}
         </View>
       </View>
 
@@ -83,7 +97,7 @@ export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
               <View style={styles.timelineContent}>
                 <Text style={styles.locationText}>{stop.name}</Text>
                 <Text style={styles.timeText}>Arrêt de {stopDuration} min</Text>
-                {renderLocationPassengers(stop.name)}
+                {renderLocationPassengers(stop.name, idx + 1)}
               </View>
             </View>
           );
@@ -96,7 +110,7 @@ export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
         <View style={styles.timelineContent}>
           <Text style={styles.locationText}>{ride.arrival_location}</Text>
           <Text style={styles.timeText}>Estimation {ride.distance_km ? '~' + Math.round(ride.distance_km / 60) + 'h' : '--:--'}</Text>
-          {renderLocationPassengers(ride.arrival_location)}
+          {renderLocationPassengers(ride.arrival_location, stopoversLength + 1)}
         </View>
       </View>
     </View>
