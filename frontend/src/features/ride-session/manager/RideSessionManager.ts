@@ -145,9 +145,10 @@ export class RideSessionManager {
       // Priorité 3 : locations complètes du trajet (fallback)
       const sessionBookingState = this.currentSession.bookingStateRaw;
       const isIntermediateDep = seg.departureWaypointOrder !== undefined && seg.departureWaypointOrder > 0;
+      const rideWaypoints = (this.currentSession.ride as any)?.waypoints;
       const isIntermediateArr = seg.arrivalWaypointOrder !== undefined &&
-        this.currentSession.ride?.waypoints?.length &&
-        seg.arrivalWaypointOrder < (this.currentSession.ride.waypoints.length - 1);
+        rideWaypoints?.length &&
+        seg.arrivalWaypointOrder < (rideWaypoints.length - 1);
 
       const departureLocation =
         searchedDeparture ||

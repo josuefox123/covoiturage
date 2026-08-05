@@ -54,4 +54,5 @@ export interface Ride {
   }[];
   vehicle_details?: any;
   bookings?: any[];
+  waypoints?: any[];
 }
