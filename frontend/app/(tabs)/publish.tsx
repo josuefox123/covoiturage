@@ -481,6 +481,36 @@ export default function PublishScreen() {
     </SafeAreaView>
   );
 
+  if (!form.hasVehicle) {
+    if (form.showExpiredLicenseWarning) {
+      return (
+        <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }]}>
+          <Ionicons name="warning-outline" size={80} color={theme.colors.error} />
+          <Text style={styles.notLoggedTitle}>Permis invalide</Text>
+          <Text style={styles.notLoggedText}>Les informations de votre permis de conduire sont manquantes ou expirées.</Text>
+          <TouchableOpacity style={styles.notLoggedButton} onPress={() => router.push('/(tabs)/profile')}>
+            <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.notLoggedGradient}>
+              <Text style={styles.notLoggedButtonText}>Mettre à jour le permis</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </SafeAreaView>
+      );
+    }
+
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }]}>
+        <Ionicons name="car-sport-outline" size={80} color={theme.colors.textMuted} />
+        <Text style={styles.notLoggedTitle}>Véhicule requis</Text>
+        <Text style={styles.notLoggedText}>Vous devez enregistrer un véhicule dans votre profil pour pouvoir proposer un trajet.</Text>
+        <TouchableOpacity style={styles.notLoggedButton} onPress={() => router.push('/(tabs)/profile')}>
+          <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.notLoggedGradient}>
+            <Text style={styles.notLoggedButtonText}>Aller au profil</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
