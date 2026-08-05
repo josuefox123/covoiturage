@@ -44,11 +44,17 @@ export function PriceStep({
 }: PriceStepProps) {
   const priceNum = parseInt(price, 10) || 0;
 
-  // Calcul commission
   const calcCommission = (driverPayout: number) => {
-    if (!financialSettings || !financialSettings.is_commission_active) return 0;
-    const pct = financialSettings.commission_percentage || 10;
-    const minC = financialSettings.min_commission || 100;
+    if (!financialSettings) {
+      const pct = 10;
+      const minC = 100;
+      let commission = Math.floor(driverPayout * (pct / 100));
+      if (commission < minC) commission = minC;
+      return commission;
+    }
+    if (!financialSettings.is_commission_active) return 0;
+    const pct = financialSettings.commission_percentage !== undefined ? financialSettings.commission_percentage : 10;
+    const minC = financialSettings.min_commission !== undefined ? financialSettings.min_commission : 100;
     const maxC = financialSettings.max_commission;
     let commission = Math.floor(driverPayout * (pct / 100));
     if (commission < minC) commission = minC;
@@ -240,7 +246,7 @@ export function PriceStep({
             <Text style={styles.commissionValue}>{priceNum.toLocaleString()} FCFA</Text>
           </View>
           <View style={styles.commissionRow}>
-            <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage || 10}%)</Text>
+            <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage ?? 10}%)</Text>
             <Text style={styles.commissionValueSub}>+{commission.toLocaleString()} FCFA</Text>
           </View>
           <View style={styles.commissionDivider} />

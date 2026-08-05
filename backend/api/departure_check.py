@@ -143,7 +143,7 @@ def check_upcoming_departures():
                     )
                 
                 # 2. Alerte Passagers confirmés
-                bookings = ride.bookings.filter(status='confirmed')
+                bookings = Booking.objects.filter(ride=ride, status='confirmed')
                 for booking in bookings:
                     has_passenger_notified = Notification.objects.filter(
                         user=booking.passenger,

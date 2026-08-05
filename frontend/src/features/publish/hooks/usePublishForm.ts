@@ -217,7 +217,10 @@ export function usePublishForm(authCtx: any) {
     const fetchSettings = async () => {
       try {
         const data = await authFetch('/financial-settings/');
-        if (data && data.length > 0) setFinancialSettings(data[0]);
+        const results = Array.isArray(data) ? data : data.results || [];
+        if (results.length > 0) {
+          setFinancialSettings(results[0]);
+        }
       } catch (_) { }
     };
     fetchSettings();
@@ -753,9 +756,16 @@ export function usePublishForm(authCtx: any) {
   };
 
   const calcCommission = (driverPayout: number) => {
-    if (!financialSettings || !financialSettings.is_commission_active) return 0;
-    const pct = financialSettings.commission_percentage || 10;
-    const minC = financialSettings.min_commission || 100;
+    if (!financialSettings) {
+      const pct = 10;
+      const minC = 100;
+      let commission = Math.floor(driverPayout * (pct / 100));
+      if (commission < minC) commission = minC;
+      return commission;
+    }
+    if (!financialSettings.is_commission_active) return 0;
+    const pct = financialSettings.commission_percentage !== undefined ? financialSettings.commission_percentage : 10;
+    const minC = financialSettings.min_commission !== undefined ? financialSettings.min_commission : 100;
     const maxC = financialSettings.max_commission;
     let commission = Math.floor(driverPayout * (pct / 100));
     if (commission < minC) commission = minC;

@@ -15,4 +15,7 @@ class FinancialSettingsViewSet(viewsets.ModelViewSet):
         return [permissions.IsAdminUser()]
 
     def get_queryset(self):
+        from ...models.paiement import FinancialSettings
+        # Charger ou créer l'unique instance (singleton) des paramètres financiers
+        FinancialSettings.load()
         return self.queryset.filter(pk=1)

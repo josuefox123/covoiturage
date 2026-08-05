@@ -74,11 +74,17 @@ export function PublishSummaryModal({
 }: PublishSummaryModalProps) {
   const priceNum = parseInt(price, 10) || 0;
   
-  // Calcul commission
   const calcCommission = (driverPayout: number) => {
-    if (!financialSettings || !financialSettings.is_commission_active) return 0;
-    const pct = financialSettings.commission_percentage || 10;
-    const minC = financialSettings.min_commission || 100;
+    if (!financialSettings) {
+      const pct = 10;
+      const minC = 100;
+      let commission = Math.floor(driverPayout * (pct / 100));
+      if (commission < minC) commission = minC;
+      return commission;
+    }
+    if (!financialSettings.is_commission_active) return 0;
+    const pct = financialSettings.commission_percentage !== undefined ? financialSettings.commission_percentage : 10;
+    const minC = financialSettings.min_commission !== undefined ? financialSettings.min_commission : 100;
     const maxC = financialSettings.max_commission;
     let commission = Math.floor(driverPayout * (pct / 100));
     if (commission < minC) commission = minC;
@@ -187,14 +193,20 @@ export function PublishSummaryModal({
             <Text style={[styles.summarySectionTitle, { color: '#059669' }]}>TARIFICATION</Text>
           </View>
 
-          <View style={styles.summaryPriceRow}>
-            <Text style={{ fontSize: 13, color: theme.colors.text }}>Prix par place (votre gain)</Text>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: theme.colors.text }}>{priceNum.toLocaleString()} FCFA</Text>
-          </View>
-
-          <View style={styles.summaryPriceRow}>
-            <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Prix payé par le passager</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.primary }}>{totalPassenger.toLocaleString()} FCFA</Text>
+          <View style={styles.commissionCard}>
+            <View style={styles.commissionRow}>
+              <Text style={styles.commissionLabel}>Vous recevrez par place</Text>
+              <Text style={styles.commissionValue}>{priceNum.toLocaleString()} FCFA</Text>
+            </View>
+            <View style={styles.commissionRow}>
+              <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage ?? 10}%)</Text>
+              <Text style={styles.commissionValueSub}>+{commission.toLocaleString()} FCFA</Text>
+            </View>
+            <View style={styles.commissionDivider} />
+            <View style={styles.commissionRow}>
+              <Text style={styles.commissionLabelTotal}>Le passager paiera par place</Text>
+              <Text style={styles.commissionValueTotal}>{totalPassenger.toLocaleString()} FCFA</Text>
+            </View>
           </View>
 
           <View style={styles.summaryTotalCard}>
@@ -304,5 +316,14 @@ const styles = StyleSheet.create({
   summaryEditBtnText: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
   summaryConfirmBtn: { flex: 1, borderRadius: 14, overflow: 'hidden' },
   summaryConfirmGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
-  summaryConfirmBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' }
+  summaryConfirmBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+  commissionCard: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16, width: '100%' },
+  commissionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  commissionLabel: { flex: 1, marginRight: 8, fontSize: 14, fontWeight: '600', color: theme.colors.text },
+  commissionValue: { fontSize: 15, fontWeight: '800', color: theme.colors.text },
+  commissionLabelSub: { flex: 1, marginRight: 8, fontSize: 12, color: theme.colors.textLight },
+  commissionValueSub: { fontSize: 13, color: theme.colors.textLight, fontWeight: '600' },
+  commissionDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 8 },
+  commissionLabelTotal: { flex: 1, marginRight: 8, fontSize: 15, fontWeight: '800', color: theme.colors.primary },
+  commissionValueTotal: { fontSize: 18, fontWeight: '900', color: theme.colors.primary }
 });
