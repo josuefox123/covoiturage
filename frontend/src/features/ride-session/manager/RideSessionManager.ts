@@ -129,7 +129,9 @@ export class RideSessionManager {
     user: any,
     seatsToBook: number,
     customPrice?: number,
-    message?: string
+    message?: string,
+    searchedDeparture?: string,
+    searchedDestination?: string
   ): Promise<boolean> {
     if (!this.currentSession || !authFetch) return false;
 
@@ -138,12 +140,18 @@ export class RideSessionManager {
       this.notify();
 
       const seg = this.currentSession.segment;
-      // Utiliser les locations du segment réservé (depuis bookingState) plutôt que les locations du ride complet
+      // Priorité 1 : locations renvoyées par le backend dans bookingState (résolution via waypoints)
+      // Priorité 2 : locations recherchées par le passager (passées depuis la page)
+      // Priorité 3 : locations complètes du trajet (fallback)
       const sessionBookingState = this.currentSession.bookingStateRaw;
-      const departureLocation = sessionBookingState?.departure_location
-        || this.currentSession.ride?.departure_location;
-      const arrivalLocation = sessionBookingState?.arrival_location
-        || this.currentSession.ride?.arrival_location;
+      const departureLocation =
+        sessionBookingState?.departure_location ||
+        searchedDeparture ||
+        this.currentSession.ride?.departure_location;
+      const arrivalLocation =
+        sessionBookingState?.arrival_location ||
+        searchedDestination ||
+        this.currentSession.ride?.arrival_location;
 
       const res = await RideSessionService.createBooking(authFetch, {
         rideId: seg.rideId,

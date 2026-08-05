@@ -255,13 +255,16 @@ export default function RideSearchCard({
           {/* Bannière d'arrêt intermédiaire */}
           {(isIntermediatePickup || isIntermediateDropoff) && (
             <View style={styles.intermediateBanner}>
-              <Ionicons name="information-circle" size={14} color="#D97706" style={{ marginRight: 6 }} />
-              <Text style={styles.intermediateBannerText} numberOfLines={1}>
+              <View style={styles.intermediateBannerLeft}>
+                <Ionicons name="information-circle" size={15} color="#D97706" />
+                <Text style={styles.intermediateBannerNB}>NB</Text>
+              </View>
+              <Text style={styles.intermediateBannerText}>
                 {isIntermediatePickup && isIntermediateDropoff
-                  ? `Arrêts sur trajet ${ride.departure_location} ➔ ${ride.arrival_location}`
+                  ? `Arrêts intermédiaires sur le trajet ${ride.departure_location} ➔ ${ride.arrival_location}`
                   : isIntermediatePickup
-                    ? `Prise en charge (Départ initial: ${ride.departure_location})`
-                    : `Dépose intermédiaire (Destination finale: ${ride.arrival_location})`}
+                    ? `Votre départ n'est pas l'origine du trajet (Départ initial : ${ride.departure_location})`
+                    : `Votre arrivée n'est pas la destination finale (Destination : ${ride.arrival_location})`}
               </Text>
             </View>
           )}
@@ -547,20 +550,34 @@ const styles = StyleSheet.create({
   },
   intermediateBanner: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#FCD34D',
+    gap: 10,
+  },
+  intermediateBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingTop: 1,
+  },
+  intermediateBannerNB: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#D97706',
+    letterSpacing: 0.5,
   },
   intermediateBannerText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#92400E',
+    fontWeight: '500',
+    color: '#78350F',
     flex: 1,
+    lineHeight: 17,
   },
   warningSeatsBadge: {
     flexDirection: 'row',

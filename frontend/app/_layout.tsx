@@ -18,6 +18,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AnimatedSplash from '../src/components/AnimatedSplash';
 import { AuthProvider } from '../src/context/AuthContext';
+import { BadgeProvider } from '../src/context/BadgeContext';
 import { theme } from '../src/styles/theme';
 import LiveRideModal from '../src/components/LiveRideModal';
 import BookingRequestModal from '../src/components/BookingRequestModal';
@@ -49,6 +50,7 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <AuthProvider>
+            <BadgeProvider>
         <StatusBar style="dark" />
 
         {/* Initialisation silencieuse des notifications push */}
@@ -75,6 +77,7 @@ export default function RootLayout() {
         <LiveRideModal />
         <BookingRequestModal />
         <CustomAlertProvider />
+            </BadgeProvider>
           </AuthProvider>
         </SafeAreaProvider>
     </GestureHandlerRootView>

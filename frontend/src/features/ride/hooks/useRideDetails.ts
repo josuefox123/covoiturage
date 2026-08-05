@@ -135,7 +135,7 @@ export function useRideDetails(
   };
 
   const performBooking = async (seatsToBook: number, customPrice?: number, message?: string) => {
-    const success = await executeBooking(seatsToBook, customPrice, message);
+    const success = await executeBooking(seatsToBook, customPrice, message, departure, destination);
     if (!success && error) {
       CustomAlert.alert('Erreur', error || "Impossible de créer la réservation. Veuillez réessayer.");
     }
