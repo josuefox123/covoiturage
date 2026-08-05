@@ -316,7 +316,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         # Envoyer une notification push au destinataire
         recipient = conv.participant_2 if conv.participant_1 == self.request.user else conv.participant_1
         if recipient and recipient != self.request.user:
-            sender_name = self.request.user.full_name or "Un utilisateur"
+            sender_name = getattr(self.request.user, 'full_name', None) or getattr(self.request.user, 'phone', 'Un utilisateur')
             content_preview = msg.content if msg.message_type == 'text' else f"[{msg.message_type.capitalize()}]"
             create_and_send_notification(
                 user=recipient,
