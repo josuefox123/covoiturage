@@ -288,20 +288,27 @@ export default function ChatScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerUser}>
-          {otherUser?.avatar ? (
-            <Image source={{ uri: getMediaUrl(otherUser.avatar) }} style={styles.avatarMiniImage} />
-          ) : (
-            <View style={styles.avatarMini}>
-              <Text style={styles.avatarMiniText}>{partnerInitials}</Text>
-            </View>
-          )}
+          <View style={{ position: 'relative' }}>
+            {otherUser?.avatar ? (
+              <Image source={{ uri: getMediaUrl(otherUser.avatar) }} style={styles.avatarMiniImage} />
+            ) : (
+              <View style={styles.avatarMini}>
+                <Text style={styles.avatarMiniText}>{partnerInitials}</Text>
+              </View>
+            )}
+            <View style={[
+              styles.onlineMiniDot,
+              { backgroundColor: otherUser?.is_online ? '#22C55E' : '#9CA3AF' }
+            ]} />
+          </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerName}>{partnerName}</Text>
+            <Text style={styles.headerName} numberOfLines={1}>{partnerName}</Text>
             {(conversation?.booking_details || rideInfo) && (
               <Text style={styles.rideInfoText} numberOfLines={1}>
                 {conversation?.booking_details
                   ? `${conversation.booking_details.departure_location?.split(',')[0]} → ${conversation.booking_details.arrival_location?.split(',')[0]}`
                   : `${rideInfo.departure_location?.split(',')[0]} → ${rideInfo.arrival_location?.split(',')[0]}`}
+                {` • ${otherUser?.is_online ? 'En ligne' : 'Hors ligne'}`}
               </Text>
             )}
           </View>
@@ -316,14 +323,6 @@ export default function ChatScreen() {
             <Ionicons name="call" size={18} color={theme.colors.primary} />
           </TouchableOpacity>
         )}
-
-        {/* Indicateur de connexion WebSocket */}
-        <View style={[styles.wsIndicator, wsConnected ? styles.wsConnected : styles.wsDisconnected]}>
-          <View style={[styles.wsDot, wsConnected ? styles.wsDotConnected : styles.wsDotDisconnected]} />
-          <Text style={[styles.wsText, wsConnected ? styles.wsTextConnected : styles.wsTextDisconnected]}>
-            {wsConnected ? 'Live' : 'Hors ligne'}
-          </Text>
-        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -459,6 +458,17 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
+  },
+  onlineMiniDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#22C55E', // success green
+    borderWidth: 1.5,
+    borderColor: theme.colors.card,
   },
   callButton: {
     width: 34,

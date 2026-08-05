@@ -39,6 +39,7 @@ interface AuthContextData {
   token: string | null;
   isLoading: boolean;
   hasStartedVerification: boolean;
+  userLocation: { latitude: number; longitude: number } | null;
   loginWithPassword: (identifier: string, password: string) => Promise<void>;
   registerWithPassword: (data: any) => Promise<void>;
   logout: () => void;
@@ -53,6 +54,7 @@ const defaultContext: AuthContextData = {
   token: null,
   isLoading: true,
   hasStartedVerification: false,
+  userLocation: null,
   loginWithPassword: async () => {},
   registerWithPassword: async () => {},
   logout: () => {},
@@ -72,6 +74,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true); // true = checking saved session
   const [hasStartedVerification, setHasStartedVerificationState] = useState<boolean>(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Récupérer la position de l'utilisateur dès qu'il est connecté ou restauré
+  useEffect(() => {
+    if (!user) {
+      setUserLocation(null);
+      return;
+    }
+
+    const getUserLocation = async () => {
+      try {
+        const Location = require('expo-location');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ 
+            accuracy: Location.Accuracy.Balanced 
+          });
+          if (loc && loc.coords) {
+            const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            setUserLocation(coords);
+            console.log('[Location] Position utilisateur récupérée :', coords);
+          }
+        }
+      } catch (err) {
+        console.warn('[Location] Échec de la récupération de la position de départ :', err);
+      }
+    };
+
+    getUserLocation();
+  }, [user]);
 
   useEffect(() => {
     AsyncStorage.getItem('@zemy_started_verification').then(val => {
@@ -227,6 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     token,
     isLoading,
     hasStartedVerification,
+    userLocation,
     loginWithPassword,
     registerWithPassword,
     logout,
@@ -234,7 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateUser,
     refreshUser,
     setHasStartedVerification
-  }), [user, token, isLoading, hasStartedVerification, loginWithPassword, registerWithPassword, logout, authFetch, updateUser, refreshUser, setHasStartedVerification]);
+  }), [user, token, isLoading, hasStartedVerification, userLocation, loginWithPassword, registerWithPassword, logout, authFetch, updateUser, refreshUser, setHasStartedVerification]);
 
   return (
     <AuthContext.Provider value={contextValue}>
