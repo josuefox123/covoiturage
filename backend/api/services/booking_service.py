@@ -193,17 +193,28 @@ class BookingService:
                 if cancelled_by_user == driver:
                     create_and_send_notification(
                         user=passenger,
-                        title="Réservation annulée ❌",
+                        title="Réservation annulée",
                         message=f"Le conducteur a annulé votre réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}. Remboursement intégral garanti.",
                         data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
                     )
                     
-                    conversation, _ = Conversation.objects.get_or_create(
-                        conversation_type='ride',
+                    from django.db.models import Q
+                    conversation = Conversation.objects.filter(
                         ride=ride,
-                        participant_1=passenger if passenger.id < driver.id else driver,
-                        participant_2=driver if passenger.id < driver.id else passenger
-                    )
+                        conversation_type='ride'
+                    ).filter(
+                        Q(participant_1=passenger, participant_2=driver) |
+                        Q(participant_1=driver, participant_2=passenger)
+                    ).first()
+                    
+                    if not conversation:
+                        conversation = Conversation.objects.create(
+                            conversation_type='ride',
+                            ride=ride,
+                            participant_1=passenger,
+                            participant_2=driver
+                        )
+                        
                     Message.objects.create(
                         conversation=conversation,
                         sender=driver,
@@ -213,17 +224,28 @@ class BookingService:
                 else:
                     create_and_send_notification(
                         user=driver,
-                        title="Réservation annulée ❌",
+                        title="Réservation annulée",
                         message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
                         data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
                     )
                     
-                    conversation, _ = Conversation.objects.get_or_create(
-                        conversation_type='ride',
+                    from django.db.models import Q
+                    conversation = Conversation.objects.filter(
                         ride=ride,
-                        participant_1=passenger if passenger.id < driver.id else driver,
-                        participant_2=driver if passenger.id < driver.id else passenger
-                    )
+                        conversation_type='ride'
+                    ).filter(
+                        Q(participant_1=passenger, participant_2=driver) |
+                        Q(participant_1=driver, participant_2=passenger)
+                    ).first()
+                    
+                    if not conversation:
+                        conversation = Conversation.objects.create(
+                            conversation_type='ride',
+                            ride=ride,
+                            participant_1=passenger,
+                            participant_2=driver
+                        )
+                        
                     Message.objects.create(
                         conversation=conversation,
                         sender=passenger,

@@ -68,7 +68,23 @@ class ConversationViewSet(viewsets.ModelViewSet):
         query_type = getattr(self.request, 'query_params', self.request.GET).get('type')
         if getattr(user, 'is_staff', False) and query_type == 'support':
             return qs.filter(conversation_type='support').order_by('-updated_at')
-        return (qs.filter(participant_1=user) | qs.filter(participant_2=user)).order_by('-updated_at')
+            
+        user_convs = (qs.filter(participant_1=user) | qs.filter(participant_2=user)).order_by('-updated_at')
+        
+        # Deduplication in memory keeping the most recent one
+        seen_pairs = set()
+        ids_to_keep = []
+        for conv in user_convs:
+            if conv.conversation_type == 'ride' and conv.ride_id:
+                p1 = min(conv.participant_1_id, conv.participant_2_id)
+                p2 = max(conv.participant_1_id, conv.participant_2_id)
+                pair_key = (conv.ride_id, p1, p2)
+                if pair_key in seen_pairs:
+                    continue
+                seen_pairs.add(pair_key)
+            ids_to_keep.append(conv.id)
+            
+        return qs.filter(id__in=ids_to_keep).order_by('-updated_at')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
