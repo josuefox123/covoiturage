@@ -355,6 +355,17 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         if hasattr(self, 'group_name'):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
+    async def receive(self, text_data=None, bytes_data=None):
+        """Gère les messages entrants du client (ex: heartbeat ping)."""
+        if not text_data:
+            return
+        try:
+            data = json.loads(text_data)
+            if data.get('type') == 'ping':
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+        except Exception:
+            pass
+
     async def send_realtime_notification(self, event):
         """Envoie la notification en JSON au client mobile via WebSocket."""
         await self.send(text_data=json.dumps({
