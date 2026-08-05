@@ -74,4 +74,5 @@ export interface Mission {
   data: MissionData;
   progress: number; // Percentage 0 - 100%
   category: 'upcoming' | 'live' | 'completed';
+  role?: 'passenger' | 'driver';
 }

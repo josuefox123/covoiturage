@@ -39,7 +39,11 @@ export function MissionCard({
     if (onPressCard) {
       onPressCard();
     } else if (data.rideId) {
-      router.push(`/ride/${data.rideId}`);
+      if (role === 'driver') {
+        router.push(`/ride-management/${data.rideId}`);
+      } else {
+        router.push(`/ride/${data.rideId}`);
+      }
     }
   };
 

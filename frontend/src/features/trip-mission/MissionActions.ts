@@ -33,20 +33,32 @@ export class MissionActionsHandler {
       case 'view_details':
       case 'view_ticket':
         if (data.rideId) {
-          router.push(`/ride/${data.rideId}`);
+          if (mission.role === 'driver') {
+            router.push(`/ride-management/${data.rideId}`);
+          } else {
+            router.push(`/ride/${data.rideId}`);
+          }
         }
         break;
 
       case 'track_live':
       case 'view_position':
         if (data.rideId) {
-          router.push(`/ride/${data.rideId}`);
+          if (mission.role === 'driver') {
+            router.push(`/ride-management/${data.rideId}`);
+          } else {
+            router.push(`/ride/${data.rideId}`);
+          }
         }
         break;
 
       case 'contact':
         if (data.rideId) {
-          router.push(`/ride/${data.rideId}`);
+          if (mission.role === 'driver') {
+            router.push(`/ride-management/${data.rideId}`);
+          } else {
+            router.push(`/ride/${data.rideId}`);
+          }
         }
         break;
 

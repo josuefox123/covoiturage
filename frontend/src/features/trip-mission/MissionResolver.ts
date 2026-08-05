@@ -4,6 +4,12 @@ import { theme } from '../../styles/theme';
 
 export class MissionResolver {
   public static resolveMission(item: any, role: 'passenger' | 'driver' = 'passenger'): Mission {
+    const mission = this.doResolveMission(item, role);
+    mission.role = role;
+    return mission;
+  }
+
+  private static doResolveMission(item: any, role: 'passenger' | 'driver'): Mission {
     if (!item) {
       return this.createEmptyMission();
     }
