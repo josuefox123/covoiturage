@@ -155,9 +155,18 @@ class BookingService:
             resolved_arrival_location = arrival_location
             if wps:
                 if dep_order is not None and dep_order < len(wps):
-                    resolved_departure_location = wps[dep_order].name or departure_location
+                    wp_dep_name = wps[dep_order].name
+                    if not departure_location or (dep_order > 0 and departure_location == ride.departure_location):
+                        resolved_departure_location = wp_dep_name or departure_location or ride.departure_location
+                    else:
+                        resolved_departure_location = departure_location
+
                 if arr_order is not None and arr_order < len(wps):
-                    resolved_arrival_location = wps[arr_order].name or arrival_location
+                    wp_arr_name = wps[arr_order].name
+                    if not arrival_location or (arr_order < len(wps) - 1 and arrival_location == ride.arrival_location):
+                        resolved_arrival_location = wp_arr_name or arrival_location or ride.arrival_location
+                    else:
+                        resolved_arrival_location = arrival_location
 
             if not resolved_departure_location:
                 resolved_departure_location = ride.departure_location

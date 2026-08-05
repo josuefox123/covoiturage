@@ -108,18 +108,21 @@ class BookingViewSet(viewsets.ModelViewSet):
         if existing_conv:
             response_data['conversation_id'] = str(existing_conv.id)
             
+        dep_loc = booking.departure_location or booking.ride.departure_location or ''
+        arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
+
         create_and_send_notification(
             user=booking.ride.driver,
             title="Nouvelle demande de réservation 🚗",
-            message=f"{booking.passenger.full_name or booking.passenger.phone} souhaite réserver {booking.seats_booked} place(s) sur votre trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+            message=f"{booking.passenger.full_name or booking.passenger.phone} souhaite réserver {booking.seats_booked} place(s) sur votre trajet {dep_loc} -> {arr_loc}.",
             data={
                 'type': 'new_booking_request',
                 'booking_id': str(booking.id),
                 'screen': 'rides',
                 'passenger_name': booking.passenger.full_name or 'Passager',
                 'passenger_phone': booking.passenger.phone or '',
-                'departure_location': booking.departure_location or booking.ride.departure_location or '',
-                'arrival_location': booking.arrival_location or booking.ride.arrival_location or '',
+                'departure_location': dep_loc,
+                'arrival_location': arr_loc,
                 'seats_booked': str(booking.seats_booked),
                 'total_amount': str(booking.total_amount),
                 'negotiation_message': booking.negotiation_message or '',
@@ -150,6 +153,8 @@ class BookingViewSet(viewsets.ModelViewSet):
             ride = booking.ride
             passenger = booking.passenger
             driver = ride.driver
+            dep_loc = booking.departure_location or ride.departure_location or ''
+            arr_loc = booking.arrival_location or ride.arrival_location or ''
             
             if new_status == 'cancelled' and old_status != 'cancelled':
                 if old_status == 'confirmed':
@@ -162,14 +167,14 @@ class BookingViewSet(viewsets.ModelViewSet):
                         create_and_send_notification(
                             user=passenger,
                             title="Demande de réservation refusée ❌",
-                            message=f"Le conducteur a décliné votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                            message=f"Le conducteur a décliné votre demande de réservation pour le trajet {dep_loc} -> {arr_loc}.",
                             data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
                     else:
                         create_and_send_notification(
                             user=driver,
                             title="Réservation annulée ❌",
-                            message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {ride.departure_location} -> {ride.arrival_location}.",
+                            message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {dep_loc} -> {arr_loc}.",
                             data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
             
@@ -177,7 +182,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 create_and_send_notification(
                     user=passenger,
                     title="Demande acceptée par le conducteur 🚗",
-                    message=f"Votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location} a été acceptée par le conducteur ! Vous pouvez maintenant procéder au paiement.",
+                    message=f"Votre demande de réservation pour le trajet {dep_loc} -> {arr_loc} a été acceptée par le conducteur ! Vous pouvez maintenant procéder au paiement.",
                     data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
                 )
             
@@ -185,13 +190,13 @@ class BookingViewSet(viewsets.ModelViewSet):
                 create_and_send_notification(
                     user=passenger,
                     title="Réservation confirmée ✅",
-                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {ride.departure_location} -> {ride.arrival_location} is confirmée !",
+                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {dep_loc} -> {arr_loc} est confirmée !",
                     data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
                 )
                 create_and_send_notification(
                     user=passenger,
                     title="Paiement confirmé 💳",
-                    message=f"Le paiement pour votre réservation sur le trajet {ride.departure_location} -> {ride.arrival_location} a été validé avec succès.",
+                    message=f"Le paiement pour votre réservation sur le trajet {dep_loc} -> {arr_loc} a été validé avec succès.",
                     data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
             
@@ -205,7 +210,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 create_and_send_notification(
                     user=passenger,
                     title="Trajet terminé 🏁",
-                    message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} est terminé. Merci d'avoir voyagé avec nous !",
+                    message=f"Votre trajet {dep_loc} -> {arr_loc} est terminé. Merci d'avoir voyagé avec nous !",
                     data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
 

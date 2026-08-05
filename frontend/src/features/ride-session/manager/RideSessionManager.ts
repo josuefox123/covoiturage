@@ -144,14 +144,20 @@ export class RideSessionManager {
       // Priorité 2 : locations recherchées par le passager (passées depuis la page)
       // Priorité 3 : locations complètes du trajet (fallback)
       const sessionBookingState = this.currentSession.bookingStateRaw;
+      const isIntermediateDep = seg.departureWaypointOrder !== undefined && seg.departureWaypointOrder > 0;
+      const isIntermediateArr = seg.arrivalWaypointOrder !== undefined &&
+        this.currentSession.ride?.waypoints?.length &&
+        seg.arrivalWaypointOrder < (this.currentSession.ride.waypoints.length - 1);
+
       const departureLocation =
-        sessionBookingState?.departure_location ||
         searchedDeparture ||
-        this.currentSession.ride?.departure_location;
+        sessionBookingState?.departure_location ||
+        (isIntermediateDep ? undefined : this.currentSession.ride?.departure_location);
+
       const arrivalLocation =
-        sessionBookingState?.arrival_location ||
         searchedDestination ||
-        this.currentSession.ride?.arrival_location;
+        sessionBookingState?.arrival_location ||
+        (isIntermediateArr ? undefined : this.currentSession.ride?.arrival_location);
 
       const res = await RideSessionService.createBooking(authFetch, {
         rideId: seg.rideId,

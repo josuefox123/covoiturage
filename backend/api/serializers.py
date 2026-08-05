@@ -238,24 +238,20 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        # Si la location de départ ou d'arrivée n'est pas renseignée (ex: anciennes réservations),
-        # on la résout dynamiquement à partir des waypoints du trajet.
-        if not ret.get('departure_location') or not ret.get('arrival_location'):
-            ride = instance.ride
-            wps = list(ride.waypoints.all().order_by('order')) if hasattr(ride, 'waypoints') else []
+        ride = getattr(instance, 'ride', None)
+        if ride and hasattr(ride, 'waypoints'):
+            wps = list(ride.waypoints.all().order_by('order'))
             if wps:
                 dep_order = instance.departure_waypoint_order
                 arr_order = instance.arrival_waypoint_order
                 
-                if dep_order is not None and dep_order < len(wps):
-                    ret['departure_location'] = wps[dep_order].name or ride.departure_location
-                else:
-                    ret['departure_location'] = ride.departure_location
-                    
-                if arr_order is not None and arr_order < len(wps):
-                    ret['arrival_location'] = wps[arr_order].name or ride.arrival_location
-                else:
-                    ret['arrival_location'] = ride.arrival_location
+                if dep_order is not None and 0 <= dep_order < len(wps):
+                    if not ret.get('departure_location') or (dep_order > 0 and ret.get('departure_location') == ride.departure_location):
+                        ret['departure_location'] = wps[dep_order].name or ride.departure_location
+                        
+                if arr_order is not None and 0 <= arr_order < len(wps):
+                    if not ret.get('arrival_location') or (arr_order < len(wps) - 1 and ret.get('arrival_location') == ride.arrival_location):
+                        ret['arrival_location'] = wps[arr_order].name or ride.arrival_location
             else:
                 if not ret.get('departure_location'):
                     ret['departure_location'] = ride.departure_location
