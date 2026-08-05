@@ -397,10 +397,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.status = 'cancelled'
         booking.save()
         
+        dep_loc = booking.departure_location or booking.ride.departure_location or ''
+        arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
         create_and_send_notification(
             user=booking.passenger,
             title="Demande de réservation déclinée",
-            message=f"Le conducteur a refusé votre demande de réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
+            message=f"Le conducteur a refusé votre demande de réservation pour le trajet {dep_loc} -> {arr_loc}.",
             data={'type': 'booking_rejected_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
         )
         _push_booking_update(booking)

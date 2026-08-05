@@ -47,10 +47,12 @@ class RideActionsMixin:
                 status='approved'
             )
             
+            b_dep = booking.departure_location or ride.departure_location or ''
+            b_arr = booking.arrival_location or ride.arrival_location or ''
             create_and_send_notification(
                 user=booking.passenger,
-                title="Réservation annulée ❌",
-                message=f"Le conducteur a annulé le trajet de {ride.departure_location} vers {ride.arrival_location}. Remboursement garanti.",
+                title="Réservation annulée",
+                message=f"Le conducteur a annulé le trajet de {b_dep} vers {b_arr}. Remboursement garanti.",
                 data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
             
@@ -64,7 +66,7 @@ class RideActionsMixin:
             if parcel.sender_user:
                 create_and_send_notification(
                     user=parcel.sender_user,
-                    title="Envoi de colis annulé ❌",
+                    title="Envoi de colis annulé",
                     message=f"Le conducteur a annulé le trajet de {ride.departure_location} vers {ride.arrival_location}. Remboursement garanti.",
                     data={'type': 'parcel_cancelled', 'parcel_id': str(parcel.id), 'screen': 'trips'}
                 )
@@ -98,15 +100,17 @@ class RideActionsMixin:
                     status='completed'
                 )
 
+            b_dep = booking.departure_location or ride.departure_location or ''
+            b_arr = booking.arrival_location or ride.arrival_location or ''
             create_and_send_notification(
                 user=booking.passenger,
-                title="Trajet terminé 🏁",
-                message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} est terminé. Merci d'avoir voyagé avec nous !",
+                title="Trajet terminé",
+                message=f"Votre trajet {b_dep} -> {b_arr} est terminé. Merci d'avoir voyagé avec nous !",
                 data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
             create_and_send_notification(
                 user=ride.driver,
-                title="Passager arrivé 🏁",
+                title="Passager arrivé",
                 message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} est bien arrivé à destination.",
                 data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
@@ -126,23 +130,25 @@ class RideActionsMixin:
             
         create_and_send_notification(
             user=ride.driver,
-            title="Trajet commencé 🚗",
+            title="Trajet commencé",
             message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} a commencé. Bonne route !",
             data={'type': 'ride_started_driver', 'ride_id': str(ride.id), 'screen': 'trips'}
         )
         
         bookings = ride.bookings.filter(status__in=['pending', 'confirmed'])
         for booking in bookings:
+            b_dep = booking.departure_location or ride.departure_location or ''
+            b_arr = booking.arrival_location or ride.arrival_location or ''
             create_and_send_notification(
                 user=booking.passenger,
-                title="Conducteur en route 🚗",
-                message=f"Le conducteur {ride.driver.full_name or ride.driver.phone} est en route pour le trajet {ride.departure_location} -> {ride.arrival_location}.",
+                title="Conducteur en route",
+                message=f"Le conducteur {ride.driver.full_name or ride.driver.phone} est en route pour le trajet {b_dep} -> {b_arr}.",
                 data={'type': 'driver_en_route', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
             create_and_send_notification(
                 user=booking.passenger,
-                title="Trajet commencé 🚀",
-                message=f"Le trajet {ride.departure_location} -> {ride.arrival_location} a commencé. Voyagez en toute sécurité !",
+                title="Trajet commencé",
+                message=f"Le trajet {b_dep} -> {b_arr} a commencé. Voyagez en toute sécurité !",
                 data={'type': 'ride_started_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
             
@@ -228,7 +234,7 @@ class RideActionsMixin:
                 
                 create_and_send_notification(
                     user=ride.driver,
-                    title="1 place vient d'être libérée 🚗" if freed_seats_total == 1 else "Des places viennent de se libérer 🚗",
+                    title="1 place vient d'être libérée" if freed_seats_total == 1 else "Des places viennent de se libérer",
                     message=seats_freed_msg,
                     data={
                         'type': 'leg_seats_freed_driver',
@@ -255,7 +261,7 @@ class RideActionsMixin:
                 for item in compatible:
                     create_and_send_notification(
                         user=item['passenger'],
-                        title="Place disponible sur votre trajet 🎉",
+                        title="Place disponible sur votre trajet",
                         message=f"Une place vient de se libérer sur le trajet {ride.departure_location} → {ride.arrival_location} ! Réservez maintenant.",
                         data={'type': 'seat_available', 'ride_id': str(ride.id)}
                     )
