@@ -1,5 +1,6 @@
+# pyrefly: ignore [missing-import]
 import os
-from fpdf import FPDF
+from fpdf import FPDF  # type: ignore
 from django.conf import settings
 
 class ZemyPDF(FPDF):
