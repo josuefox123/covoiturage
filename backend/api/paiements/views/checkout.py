@@ -249,7 +249,7 @@ def sync_payments(request):
                             amount_due = int(booking.amount_due_to_driver)
                             create_and_send_notification(
                                 user=booking.passenger,
-                                title="Réservation confirmée ✅",
+                                title="Réservation confirmée",
                                 message=f"Paiement de {booking.total_amount} FCFA validé. Votre réservation est confirmée.",
                                 data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                             )
@@ -257,7 +257,7 @@ def sync_payments(request):
                             if booking.ride.driver:
                                 create_and_send_notification(
                                     user=booking.ride.driver,
-                                    title="Nouvelle Réservation 🚗",
+                                    title="Nouvelle Réservation",
                                     message=f"{booking.passenger.full_name} a réservé {booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
                                     data={'type': 'new_booking', 'booking_id': str(booking.id), 'screen': 'rides'}
                                 )
@@ -272,7 +272,7 @@ def sync_payments(request):
                             amount_due = parcel.driver_payout
                             create_and_send_notification(
                                 user=parcel.ride.driver,
-                                title="Nouveau Colis Confirmé 📦",
+                                title="Nouveau Colis Confirmé",
                                 message=f"{parcel.sender_name} a confirmé l'envoi d'un colis.",
                                 data={'type': 'parcel_confirmed', 'parcel_id': str(parcel.id), 'screen': 'rides'}
                             )

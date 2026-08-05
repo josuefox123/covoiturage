@@ -239,15 +239,18 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
         # If newly created, add a system welcome message
         if created:
+            booking = Booking.objects.filter(ride=ride, passenger=passenger).exclude(status='cancelled').first()
+            dep_loc = (booking.departure_location if booking and booking.departure_location else ride.departure_location) or ''
+            arr_loc = (booking.arrival_location if booking and booking.arrival_location else ride.arrival_location) or ''
             system_message = (
-                f"🤝 Bienvenue dans votre espace de discussion !\n\n"
-                f"Trajet : {ride.departure_location} → {ride.arrival_location} "
+                f"Bienvenue dans votre espace de discussion !\n\n"
+                f"Trajet : {dep_loc} -> {arr_loc} "
                 f"le {ride.departure_date} à {str(ride.departure_time)[:5]}.\n\n"
-                f"📋 Rappel des règles :\n"
+                f"Rappel des règles :\n"
                 f"• Ne partagez pas votre numéro de téléphone ici\n"
                 f"• Soyez respectueux et ponctuel\n"
                 f"• En cas de problème, contactez le support\n\n"
-                f"Bonne route ! 🚗"
+                f"Bonne route !"
             )
             Message.objects.create(
                 conversation=conversation,

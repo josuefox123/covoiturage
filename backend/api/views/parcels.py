@@ -120,7 +120,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
         # Notifications
         create_and_send_notification(
             user=ride.driver,
-            title="Nouveau colis 📦",
+            title="Nouveau colis",
             message=f"Une nouvelle demande de colis a été effectuée sur votre trajet.",
             data={'type': 'new_parcel', 'parcel_id': str(parcel.id), 'screen': 'trips'}
         )
@@ -186,7 +186,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
             if parcel.sender_user:
                 create_and_send_notification(
                     user=parcel.sender_user,
-                    title="Colis récupéré 📦",
+                    title="Colis récupéré",
                     message=f"Le conducteur a récupéré votre colis.",
                     data={'type': 'parcel_picked_up', 'parcel_id': str(parcel.id), 'screen': 'trips'}
                 )
@@ -216,7 +216,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
             if parcel.sender_user:
                 create_and_send_notification(
                     user=parcel.sender_user,
-                    title="Colis livré ✅",
+                    title="Colis livré",
                     message=f"Votre colis a été livré avec succès.",
                     data={'type': 'parcel_delivered', 'parcel_id': str(parcel.id), 'screen': 'trips'}
                 )
