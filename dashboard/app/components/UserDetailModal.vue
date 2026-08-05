@@ -50,7 +50,7 @@ Zemy
                 </div>
                 <div class="flex items-center mt-1">
                   <Icon name="ph:star-fill" class="text-warning w-4 h-4 mr-1" />
-                  <span class="text-sm text-textLight">{{ user.rating || '4.5' }}/5</span>
+                  <span class="text-sm text-textLight">{{ user.rating != null ? user.rating : '–' }}{{ user.rating != null ? '/5' : '' }}</span>
                 </div>
               </div>
             </div>

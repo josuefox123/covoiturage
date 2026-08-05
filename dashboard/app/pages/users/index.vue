@@ -247,7 +247,7 @@ Zemy
                         </div>
                         <div class="flex items-center text-xs text-textMuted">
                           <Icon name="ph:star-fill" class="text-warning mr-0.5 w-3 h-3" />
-                          {{ user.rating || '4.5' }}
+                          {{ user.rating != null ? user.rating : '–' }}
                         </div>
                       </div>
                     </div>
