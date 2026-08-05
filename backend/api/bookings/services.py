@@ -150,18 +150,29 @@ class BookingService:
             if passenger_proposed_price is not None or negotiation_message:
                 is_classic = False
 
-            # Toute nouvelle réservation naît obligatoirement à l'état 'pending' (en attente du conducteur)
-            initial_status = 'pending'
+            # Résoudre les locations précises depuis les waypoints s'ils existent
+            resolved_departure_location = departure_location
+            resolved_arrival_location = arrival_location
+            if wps:
+                if dep_order is not None and dep_order < len(wps):
+                    resolved_departure_location = wps[dep_order].name or departure_location
+                if arr_order is not None and arr_order < len(wps):
+                    resolved_arrival_location = wps[arr_order].name or arrival_location
+
+            if not resolved_departure_location:
+                resolved_departure_location = ride.departure_location
+            if not resolved_arrival_location:
+                resolved_arrival_location = ride.arrival_location
 
             # Créer la réservation à l'état initial
             booking = Booking.objects.create(
                 ride=ride,
                 passenger=passenger,
                 seats_booked=seats_booked,
-                status=initial_status,
+                status='pending',
                 payment_status='pending',
-                departure_location=departure_location,
-                arrival_location=arrival_location,
+                departure_location=resolved_departure_location,
+                arrival_location=resolved_arrival_location,
                 departure_latitude=departure_latitude,
                 departure_longitude=departure_longitude,
                 arrival_latitude=arrival_latitude,
