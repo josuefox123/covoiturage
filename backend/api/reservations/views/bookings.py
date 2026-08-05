@@ -113,7 +113,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         create_and_send_notification(
             user=booking.ride.driver,
-            title="Nouvelle demande de réservation 🚗",
+            title="Nouvelle demande de réservation",
             message=f"{booking.passenger.full_name or booking.passenger.phone} souhaite réserver {booking.seats_booked} place(s) sur votre trajet {dep_loc} -> {arr_loc}.",
             data={
                 'type': 'new_booking_request',
@@ -134,7 +134,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             try:
                 create_and_send_notification(
                     user=booking.passenger,
-                    title="Demande de réservation envoyée ⏱️",
+                    title="Demande de réservation envoyée",
                     message="Votre demande a été envoyée. Vous recevrez une réponse dans quelques instants.",
                     data={'type': 'booking_request_sent_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
@@ -166,14 +166,14 @@ class BookingViewSet(viewsets.ModelViewSet):
                     if request_user == driver:
                         create_and_send_notification(
                             user=passenger,
-                            title="Demande de réservation refusée ❌",
+                            title="Demande de réservation refusée",
                             message=f"Le conducteur a décliné votre demande de réservation pour le trajet {dep_loc} -> {arr_loc}.",
                             data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
                     else:
                         create_and_send_notification(
                             user=driver,
-                            title="Réservation annulée ❌",
+                            title="Réservation annulée",
                             message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {dep_loc} -> {arr_loc}.",
                             data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
@@ -181,7 +181,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             elif new_status == 'pending_payment' and old_status in ['pending', 'pending_driver']:
                 create_and_send_notification(
                     user=passenger,
-                    title="Demande acceptée par le conducteur 🚗",
+                    title="Demande acceptée par le conducteur",
                     message=f"Votre demande de réservation pour le trajet {dep_loc} -> {arr_loc} a été acceptée par le conducteur ! Vous pouvez maintenant procéder au paiement.",
                     data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
                 )
@@ -189,13 +189,13 @@ class BookingViewSet(viewsets.ModelViewSet):
             elif new_status == 'confirmed':
                 create_and_send_notification(
                     user=passenger,
-                    title="Réservation confirmée ✅",
+                    title="Réservation confirmée",
                     message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {dep_loc} -> {arr_loc} est confirmée !",
                     data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
                 )
                 create_and_send_notification(
                     user=passenger,
-                    title="Paiement confirmé 💳",
+                    title="Paiement confirmé",
                     message=f"Le paiement pour votre réservation sur le trajet {dep_loc} -> {arr_loc} a été validé avec succès.",
                     data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
@@ -203,13 +203,13 @@ class BookingViewSet(viewsets.ModelViewSet):
             elif new_status == 'completed':
                 create_and_send_notification(
                     user=driver,
-                    title="Passager arrivé 🏁",
+                    title="Passager arrivé",
                     message=f"Le passager {passenger.full_name or passenger.phone} est bien arrivé à destination.",
                     data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
                 create_and_send_notification(
                     user=passenger,
-                    title="Trajet terminé 🏁",
+                    title="Trajet terminé",
                     message=f"Votre trajet {dep_loc} -> {arr_loc} est terminé. Merci d'avoir voyagé avec nous !",
                     data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
                 )
@@ -367,11 +367,11 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         if booking.driver_counter_price is not None:
             booking.status = 'pending_passenger'
-            title = "Nouvelle offre tarifaire 🚗"
+            title = "Nouvelle offre tarifaire"
             message = f"Le chauffeur propose un tarif de {booking.total_amount} FCFA. Veuillez valider."
         else:
             booking.status = 'pending_payment'
-            title = "Demande acceptée par le conducteur 🚗"
+            title = "Demande acceptée par le conducteur"
             message = f"Votre demande de réservation a été acceptée par le conducteur ! Vous pouvez procéder au paiement."
 
         booking.save()
@@ -399,7 +399,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         create_and_send_notification(
             user=booking.passenger,
-            title="Demande de réservation déclinée ❌",
+            title="Demande de réservation déclinée",
             message=f"Le conducteur a refusé votre demande de réservation pour le trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}.",
             data={'type': 'booking_rejected_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
         )
@@ -422,7 +422,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         create_and_send_notification(
             user=booking.ride.driver,
-            title="Offre validée par le passager 👍",
+            title="Offre validée par le passager",
             message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} a accepté votre tarif de {booking.total_amount} FCFA et procède au paiement.",
             data={'type': 'passenger_accepted_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
         )
@@ -443,7 +443,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         create_and_send_notification(
             user=booking.ride.driver,
-            title="Proposition refusée ❌",
+            title="Proposition refusée",
             message=f"{booking.passenger.full_name or booking.passenger.phone} a refusé votre proposition.",
             data={'type': 'passenger_refused_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
         )

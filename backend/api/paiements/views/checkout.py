@@ -141,7 +141,7 @@ def confirm_payment(request):
                     arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
                     create_and_send_notification(
                         user=booking.passenger,
-                        title="Réservation confirmée ✅",
+                        title="Réservation confirmée",
                         message=f"Paiement de {booking.total_amount} FCFA validé. Votre réservation est confirmée pour le trajet {dep_loc} -> {arr_loc}.",
                         data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
                     )
@@ -149,7 +149,7 @@ def confirm_payment(request):
                     if booking.ride.driver:
                         create_and_send_notification(
                             user=booking.ride.driver,
-                            title="Nouvelle Réservation Payée 💰",
+                            title="Nouvelle Réservation Payée",
                             message=f"{booking.passenger.full_name or booking.passenger.phone} vient de payer sa réservation. Votre gain de {amount_due} FCFA est sécurisé.",
                             data={'type': 'passenger_paid_driver', 'booking_id': str(booking.id), 'screen': 'rides'}
                         )

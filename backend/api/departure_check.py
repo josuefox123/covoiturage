@@ -93,7 +93,7 @@ def check_upcoming_departures():
                         try:
                             create_and_send_notification(
                                 user=pb.passenger,
-                                title="Demande de réservation expirée ⏱️",
+                                title="Demande de réservation expirée",
                                 message=f"Votre demande de réservation pour le trajet {dep_loc} -> {arr_loc} a expiré car l'heure de départ est dépassée.",
                                 data={'type': 'booking_expired', 'booking_id': str(pb.id), 'screen': 'trips'}
                             )
@@ -104,7 +104,7 @@ def check_upcoming_departures():
                         try:
                             create_and_send_notification(
                                 user=ride.driver,
-                                title="Demande expirée ⏱️",
+                                title="Demande expirée",
                                 message=f"La demande de réservation de {pb.passenger.full_name or pb.passenger.phone} ({dep_loc} -> {arr_loc}) a expiré car l'heure de départ du trajet est dépassée.",
                                 data={'type': 'booking_expired_driver', 'booking_id': str(pb.id), 'screen': 'rides'}
                             )
@@ -132,14 +132,14 @@ def check_upcoming_departures():
                 # 1. Alerte Conducteur
                 has_driver_notified = Notification.objects.filter(
                     user=ride.driver,
-                    title="Départ dans 30 min ⏰",
+                    title="Départ dans 30 min",
                     message__contains=ride.departure_location
                 ).exists()
                 
                 if not has_driver_notified:
                     create_and_send_notification(
                         user=ride.driver,
-                        title="Départ dans 30 min ⏰",
+                        title="Départ dans 30 min",
                         message=f"Rappel : Votre trajet {ride.departure_location} -> {ride.arrival_location} commence dans environ 30 minutes. Préparez-vous !",
                         data={'type': 'departure_warning_driver', 'ride_id': str(ride.id), 'screen': 'trips'}
                     )
@@ -151,14 +151,14 @@ def check_upcoming_departures():
                     b_arr = booking.arrival_location or ride.arrival_location or ''
                     has_passenger_notified = Notification.objects.filter(
                         user=booking.passenger,
-                        title="Départ dans 30 min ⏰",
+                        title="Départ dans 30 min",
                         message__contains=b_dep
                     ).exists()
                     
                     if not has_passenger_notified:
                         create_and_send_notification(
                             user=booking.passenger,
-                            title="Départ dans 30 min ⏰",
+                            title="Départ dans 30 min",
                             message=f"Rappel : Votre départ pour le trajet {b_dep} -> {b_arr} est prévu dans environ 30 minutes !",
                             data={'type': 'departure_warning_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )

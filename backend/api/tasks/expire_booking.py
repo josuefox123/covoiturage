@@ -56,7 +56,7 @@ def expire_booking_task(booking_id):
             # Notifier le passager
             create_and_send_notification(
                 user=booking.passenger,
-                title="Demande de réservation expirée ⏱️",
+                title="Demande de réservation expirée",
                 message=passenger_msg,
                 data={'type': 'booking_expired', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
@@ -70,7 +70,7 @@ def expire_booking_task(booking_id):
             # Notifier le conducteur que la demande a expiré
             create_and_send_notification(
                 user=booking.ride.driver,
-                title="Demande expirée ⏱️",
+                title="Demande expirée",
                 message=driver_msg,
                 data={'type': 'booking_expired_driver', 'booking_id': str(booking.id), 'screen': 'rides'}
             )

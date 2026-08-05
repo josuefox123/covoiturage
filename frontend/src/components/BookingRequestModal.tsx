@@ -345,7 +345,7 @@ export default function BookingRequestModal() {
                   width: '100%',
                 }}>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: '#92400E', textTransform: 'uppercase', marginBottom: 4 }}>
-                    💬 Message du passager
+                    Message du passager
                   </Text>
                   <Text style={{ fontSize: 13, color: '#78350F', lineHeight: 18 }}>
                     {booking.negotiation_message}
