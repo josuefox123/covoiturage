@@ -1,19 +1,25 @@
-﻿"""
+"""
 Zemy — Modeles Messagerie : Conversation, Message, ModerationLog
 """
 from django.db import models
 import uuid
+from typing import TYPE_CHECKING, Any
 from .utilisateur import User
 from .trajet import Ride
 
+if TYPE_CHECKING:
+    from .messagerie import Message
+
 class Conversation(models.Model):
     """
-    ModÃ¨le reprÃ©sentant une conversation de messagerie.
+    Modèle représentant une conversation de messagerie.
     
-    RÃ´le :
-        Regroupe les messages Ã©changÃ©s entre deux utilisateurs,
+    Rôle :
+        Regroupe les messages échangés entre deux utilisateurs,
         soit pour un trajet, soit pour le support.
     """
+    if TYPE_CHECKING:
+        messages: models.Manager['Message'] | Any
     CONVERSATION_TYPE_CHOICES = [
         ('ride', 'Ride'),
         ('support', 'Support'),
