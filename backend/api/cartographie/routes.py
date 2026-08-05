@@ -1,14 +1,13 @@
 import logging
 from typing import List, Dict, Tuple, Optional, Any
 from .google.directions import GoogleDirectionsProvider
-from .osrm.engine import OSRMRouteProvider
 from .polyline import decode_polyline
 from ..calculs.calcul_distance import haversine_km
 
 logger = logging.getLogger(__name__)
 
 class RoutesOrchestrator:
-    """Orchestrateur unifié pour la cartographie avec fallback de Google Maps vers OSRM."""
+    """Orchestrateur unifié pour la cartographie utilisant 100% l'API Google Maps."""
 
     @staticmethod
     def get_route(
@@ -22,18 +21,14 @@ class RoutesOrchestrator:
         default_duration_min: int = 120
     ) -> Tuple[List[Tuple[float, float]], List[Dict[str, Any]], bool]:
         """
-        Calcule l'itinéraire :
-        1. Via Google Directions API.
-        2. Fallback OSRM en cas d'erreur/absence de clé.
-        3. Fallback Haversine en ligne droite si tout échoue.
-        
+        Calcule l'itinéraire via l'API Google Directions officielle.
         Retourne un tuple (polyline_points, legs_raw, resolved).
         """
         route_resolved = False
         polyline = []
         legs_raw = []
 
-        # 1. Tentative Google Directions
+        # 1. Google Directions API officiel
         try:
             route_data = GoogleDirectionsProvider.get_route(
                 origin_lat=origin_lat,
@@ -52,28 +47,9 @@ class RoutesOrchestrator:
                     polyline = decode_polyline(overview_polyline_str)
                     route_resolved = True
         except Exception as e:
-            logger.warning(f"Google Directions API failed: {e}")
+            logger.warning(f"Google Directions API execution failed: {e}")
 
-        # 2. Fallback OSRM
-        if not route_resolved:
-            try:
-                osrm_data = OSRMRouteProvider.get_route(
-                    origin_lat=origin_lat,
-                    origin_lon=origin_lon,
-                    dest_lat=dest_lat,
-                    dest_lon=dest_lon,
-                    stopovers=stopovers or []
-                )
-                if osrm_data and 'routes' in osrm_data and len(osrm_data['routes']) > 0:
-                    route = osrm_data['routes'][0]
-                    legs_raw = route.get('legs', [])
-                    coords = route.get('geometry', {}).get('coordinates', [])
-                    polyline = [(pt[1], pt[0]) for pt in coords]
-                    route_resolved = True
-            except Exception as e:
-                logger.warning(f"OSRM engine fallback failed: {e}")
-
-        # 3. Fallback Haversine (ligne droite)
+        # 2. Fallback de secours minimal si coordonnées invalides
         if not route_resolved or not polyline:
             polyline = [
                 (origin_lat, origin_lon),

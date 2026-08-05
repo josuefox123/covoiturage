@@ -458,7 +458,7 @@ LOGGING = {
 # USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc')
 
 # Configuration de Celery & Redis
 CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')

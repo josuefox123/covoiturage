@@ -53,7 +53,7 @@ export function useRideDetails(
 
   useRideSynchronization(segment, booking?.id);
 
-  // Fetch portion metrics (OSRM)
+  // Fetch portion metrics via Google Directions API
   useEffect(() => {
     const fetchMetrics = async () => {
       if (passenger_dep_lat && passenger_dep_lon && passenger_arr_lat && passenger_arr_lon) {
@@ -63,15 +63,18 @@ export function useRideDetails(
           const lat2 = parseFloat(passenger_arr_lat);
           const lon2 = parseFloat(passenger_arr_lon);
           if (!isNaN(lat1) && !isNaN(lon1) && !isNaN(lat2) && !isNaN(lon2)) {
-            const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false`;
+            const apiKey = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
+            const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${lat1},${lon1}&destination=${lat2},${lon2}&key=${apiKey}`;
             const resp = await fetch(url);
             const data = await resp.json();
-            if (data.routes && data.routes.length > 0) {
-              const r = data.routes[0];
-              setPortionMetrics({
-                distanceKm: Math.round(r.distance / 1000),
-                durationMin: Math.round(r.duration / 60)
-              });
+            if (data.status === 'OK' && data.routes && data.routes.length > 0) {
+              const leg = data.routes[0].legs[0];
+              if (leg) {
+                setPortionMetrics({
+                  distanceKm: Math.round(leg.distance.value / 1000),
+                  durationMin: Math.round(leg.duration.value / 60)
+                });
+              }
             }
           }
         } catch (err) {

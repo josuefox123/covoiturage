@@ -45,24 +45,48 @@ const DEFAULT_ZOOM = 13;
 
 interface Coords { lat: number; lon: number; }
 
+const GOOGLE_MAPS_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
+
+function decodeGooglePolyline(encoded: string): [number, number][] {
+  let points: [number, number][] = [];
+  let index = 0, len = encoded.length;
+  let lat = 0, lng = 0;
+
+  while (index < len) {
+    let b, shift = 0, result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+
+    points.push([lat / 1e5, lng / 1e5]);
+  }
+  return points;
+}
+
 async function geocodeBenin(place: string): Promise<Coords | null> {
   try {
     const query = encodeURIComponent(`${place}, Bénin`);
     const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=3&countrycodes=bj&addressdetails=1`,
-      { headers: { 'User-Agent': 'CovoitBeninApp/1.0' } }
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&components=country:bj&key=${GOOGLE_MAPS_KEY}&language=fr`
     );
     const data = await resp.json();
-    if (data && data.length > 0) {
-      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-    }
-    const resp2 = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
-      { headers: { 'User-Agent': 'CovoitBeninApp/1.0' } }
-    );
-    const data2 = await resp2.json();
-    if (data2 && data2.length > 0) {
-      return { lat: parseFloat(data2[0].lat), lon: parseFloat(data2[0].lon) };
+    if (data.status === 'OK' && data.results && data.results.length > 0) {
+      const loc = data.results[0].geometry.location;
+      return { lat: loc.lat, lon: loc.lng };
     }
     return null;
   } catch (err) {
@@ -93,18 +117,22 @@ const formatDistance = (meters: number): string => {
 
 async function getRoutes(from: Coords, to: Coords): Promise<RouteData[] | null> {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson&alternatives=true`;
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${from.lat},${from.lon}&destination=${to.lat},${to.lon}&alternatives=true&key=${GOOGLE_MAPS_KEY}`;
     const resp = await fetch(url);
     const data = await resp.json();
-    if (data.routes && data.routes.length > 0) {
+    if (data.status === 'OK' && data.routes && data.routes.length > 0) {
       return data.routes.map((r: any) => {
-        const coords: [number, number][] = r.geometry.coordinates.map(
-          ([lon, lat]: [number, number]) => [lat, lon]
-        );
+        let distance = 0;
+        let duration = 0;
+        (r.legs || []).forEach((leg: any) => {
+          distance += leg.distance?.value || 0;
+          duration += leg.duration?.value || 0;
+        });
+        const points = r.overview_polyline?.points ? decodeGooglePolyline(r.overview_polyline.points) : [];
         return {
-          coords,
-          distance: r.distance,
-          duration: r.duration
+          coords: points,
+          distance,
+          duration
         };
       });
     }
