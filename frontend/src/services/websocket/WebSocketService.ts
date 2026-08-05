@@ -47,8 +47,7 @@ export class WebSocketService {
     this.baseUrl = apiBaseUrl;
     this.isExplicitlyClosed = false;
 
-    if (this.socket && this.token === token && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
-      console.log('[WebSocket] Connexion déjà active.');
+    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
@@ -60,7 +59,7 @@ export class WebSocketService {
 
     try {
       // Construire l'URL WebSocket sécurisée (wss:// pour https://, ws:// pour http://)
-      let wsUrl = this.baseUrl.replace(/^http/, 'ws').replace(/\/+$/, '').replace(/\/api$/, '');
+      let wsUrl = this.baseUrl.replace(/^http/, 'ws').replace(/\/+$/, '');
       const fullWsUrl = `${wsUrl}/ws/notifications/?token=${encodeURIComponent(this.token)}`;
 
       console.log('[WebSocket] Connexion en cours vers :', fullWsUrl);
@@ -89,11 +88,6 @@ export class WebSocketService {
       const payload = JSON.parse(event.data);
 
       if (payload.type === 'pong') return; // Accusé de réception heartbeat
-
-      if (payload.type === 'connected') {
-        console.log('[WebSocket] Message de bienvenue reçu du serveur :', payload.message);
-        return;
-      }
 
       if (payload.type === 'notification') {
         const { title, message, data } = payload;
@@ -156,12 +150,8 @@ export class WebSocketService {
     console.warn('[WebSocket] Erreur survenue :', event);
   }
 
-  private handleClose(event: any) {
-    console.log('[WebSocket] Fermeture :', {
-      code: event.code,
-      reason: event.reason,
-      wasClean: event.wasClean
-    });
+  private handleClose(event: WebSocketCloseEvent) {
+    console.log(`[WebSocket] Déconnecté (code: ${event.code})`);
     this.stopHeartbeat();
     DeviceEventEmitter.emit('wsStatusChange', { connected: false });
 
@@ -187,7 +177,7 @@ export class WebSocketService {
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         this.socket.send(JSON.stringify({ type: 'ping' }));
       }
-    }, 15000);
+    }, 25000);
   }
 
   private stopHeartbeat() {
