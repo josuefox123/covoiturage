@@ -332,8 +332,7 @@ export class MissionResolver {
       badgeBgColor: theme.colors.primaryLight,
       badgeTextColor: theme.colors.primary,
       actions: [
-        { type: 'start_trip', label: 'Démarrer le trajet', isPrimary: true },
-        { type: 'view_details', label: 'Gérer les réservations' }
+        { type: 'view_details', label: 'Gérer les réservations', isPrimary: true }
       ],
       data,
       progress: 20,
