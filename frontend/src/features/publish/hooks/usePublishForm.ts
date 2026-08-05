@@ -227,7 +227,10 @@ export function usePublishForm(authCtx: any) {
   }, [authFetch]);
 
   // Fetch suggested price
+  const lastPriceFetchKmRef = useRef<number | null>(null);
   const fetchPriceSuggestion = async (distanceKm: number) => {
+    if (lastPriceFetchKmRef.current === distanceKm) return;
+    lastPriceFetchKmRef.current = distanceKm;
     setPriceLoading(true);
     try {
       const data = await authFetch(`/rides/suggest-price/?distance_km=${distanceKm}`);
@@ -290,8 +293,10 @@ export function usePublishForm(authCtx: any) {
     const activeRoute = googleRoutes[selectedRouteIndex];
     const numLegs = stopovers.length + 1;
 
+    let computedLegs: any[] = [];
+
     if (activeRoute && activeRoute.legs && activeRoute.legs.length === numLegs) {
-      const newLegs = activeRoute.legs.map((googleLeg: any, idx: number) => {
+      computedLegs = activeRoute.legs.map((googleLeg: any, idx: number) => {
         const startLoc = idx === 0 ? departure : stopovers[idx - 1].name;
         const endLoc = idx === numLegs - 1 ? arrival : stopovers[idx].name;
         const distVal = googleLeg.distanceValue || googleLeg.distance?.value || 0;
@@ -306,44 +311,48 @@ export function usePublishForm(authCtx: any) {
           durationMin: durMin,
         };
       });
-      setLegs(newLegs);
-      return;
-    }
-
-    if (stopovers.length === 0) {
-      setLegs([
+    } else if (stopovers.length === 0) {
+      computedLegs = [
         {
           start_location: departure,
           end_location: arrival,
           distanceKm: totalDist,
           durationMin: totalDur,
         }
-      ]);
-      return;
+      ];
+    } else {
+      const legDist = Math.round(totalDist / numLegs);
+      const legDur = Math.round(totalDur / numLegs);
+      for (let i = 0; i < numLegs; i++) {
+        const startLoc = i === 0 ? departure : stopovers[i - 1].name;
+        const endLoc = i === numLegs - 1 ? arrival : stopovers[i].name;
+        computedLegs.push({
+          start_location: startLoc,
+          end_location: endLoc,
+          distanceKm: legDist,
+          durationMin: legDur,
+        });
+      }
     }
 
-    const legDist = Math.round(totalDist / numLegs);
-    const legDur = Math.round(totalDur / numLegs);
-    const newLegs = [];
-    for (let i = 0; i < numLegs; i++) {
-      const startLoc = i === 0 ? departure : stopovers[i - 1].name;
-      const endLoc = i === numLegs - 1 ? arrival : stopovers[i].name;
-      newLegs.push({
-        start_location: startLoc,
-        end_location: endLoc,
-        distanceKm: legDist,
-        durationMin: legDur,
-      });
-    }
-    setLegs(newLegs);
+    setLegs((prevLegs) => {
+      if (JSON.stringify(prevLegs) === JSON.stringify(computedLegs)) return prevLegs;
+      return computedLegs;
+    });
   }, [stopovers, departure, arrival, estimation, googleRoutes, selectedRouteIndex]);
 
   // Sync leg prices
   useEffect(() => {
     if (legs && legs.length > 0) {
-      setLegPrices(legs.map(() => 0));
+      setLegPrices((prevPrices) => {
+        if (prevPrices.length === legs.length) return prevPrices;
+        return legs.map(() => 0);
+      });
     } else {
-      setLegPrices([]);
+      setLegPrices((prevPrices) => {
+        if (prevPrices.length === 0) return prevPrices;
+        return [];
+      });
     }
   }, [legs]);
 
@@ -403,7 +412,7 @@ export function usePublishForm(authCtx: any) {
 
       if (isNearRoute) {
         suggestions.push({
-          id: Math.random().toString(),
+          id: `stopover_${cityObj.name.toLowerCase()}`,
           name: cityObj.name,
           coords: { lat: cityObj.lat, lon: cityObj.lon },
           stopDurationMin: 15
@@ -412,8 +421,21 @@ export function usePublishForm(authCtx: any) {
     });
 
     const checkedStatus = suggestions.map(s => ({ ...s, checked: true }));
-    setDetectedStopovers(checkedStatus);
-    setStopovers(checkedStatus.map(s => ({ id: s.id, name: s.name, coords: s.coords, stopDurationMin: s.stopDurationMin })));
+    const newStopovers = checkedStatus.map(s => ({ id: s.id, name: s.name, coords: s.coords, stopDurationMin: s.stopDurationMin }));
+
+    setDetectedStopovers((prev) => {
+      const prevKey = prev.map(p => p.id).sort().join(',');
+      const nextKey = checkedStatus.map(n => n.id).sort().join(',');
+      if (prevKey === nextKey) return prev;
+      return checkedStatus;
+    });
+
+    setStopovers((prev) => {
+      const prevKey = prev.map(p => p.id).sort().join(',');
+      const nextKey = newStopovers.map(n => n.id).sort().join(',');
+      if (prevKey === nextKey) return prev;
+      return newStopovers;
+    });
   };
 
   const handleSelectRoute = (idx: number) => {
@@ -437,13 +459,21 @@ export function usePublishForm(authCtx: any) {
         setGoogleRoutes(data.routes);
         const firstRoute = data.routes[0];
         if (firstRoute) {
-          setEstimation({
-            distanceKm: Math.round(firstRoute.distanceValue / 1000),
-            durationMin: Math.round(firstRoute.durationValue / 60)
+          const distKm = Math.round(firstRoute.distanceValue / 1000);
+          const durMin = Math.round(firstRoute.durationValue / 60);
+
+          setEstimation((prev) => {
+            if (prev && prev.distanceKm === distKm && prev.durationMin === durMin) return prev;
+            return { distanceKm: distKm, durationMin: durMin };
           });
-          fetchPriceSuggestion(Math.round(firstRoute.distanceValue / 1000));
+
+          fetchPriceSuggestion(distKm);
           suggestStopoversForRoute(firstRoute);
-          setLegs(firstRoute.legs || []);
+          setLegs((prevLegs) => {
+            const nextLegs = firstRoute.legs || [];
+            if (JSON.stringify(prevLegs) === JSON.stringify(nextLegs)) return prevLegs;
+            return nextLegs;
+          });
         }
         setEstimationLoading(false);
       } else if (data.type === 'routesFailed') {
@@ -455,7 +485,10 @@ export function usePublishForm(authCtx: any) {
           const straightKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const distanceKm = Math.round(straightKm * 1.35);
           const durationMin = Math.round((distanceKm / 45) * 60);
-          setEstimation({ distanceKm, durationMin });
+          setEstimation((prev) => {
+            if (prev && prev.distanceKm === distanceKm && prev.durationMin === durationMin) return prev;
+            return { distanceKm, durationMin };
+          });
           fetchPriceSuggestion(distanceKm);
         }
         setEstimationLoading(false);

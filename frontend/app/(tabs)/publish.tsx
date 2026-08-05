@@ -290,9 +290,12 @@ export default function PublishScreen() {
   };
 
   // Sync waypoints with maps
+  const lastInjectedWaypointsRef = React.useRef<string>('');
   React.useEffect(() => {
     if (form.mapReady && form.departureCords && form.arrivalCords && webviewRef.current) {
-      const stopoversJson = JSON.stringify(form.stopovers);
+      const stopoversJson = JSON.stringify(form.stopovers.map((s: any) => ({ name: s.name, coords: s.coords })));
+      if (lastInjectedWaypointsRef.current === stopoversJson) return;
+      lastInjectedWaypointsRef.current = stopoversJson;
       webviewRef.current.injectJavaScript(
         `window.updateWaypoints && window.updateWaypoints(${JSON.stringify(stopoversJson)}); true;`
       );
