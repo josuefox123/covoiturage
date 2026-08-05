@@ -137,19 +137,21 @@ export function BookingItem({
           )}
         </>
       ) : (
-        <View style={styles.passengerActions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => {
-            const pId = booking.passenger_details?.id;
-            if (pId) onMessage(pId);
-          }}>
-            <Ionicons name="chatbubble-outline" size={20} color="#2D9CDB" />
-            <Text style={[styles.actionBtnText, { color: '#2D9CDB' }]}>Message</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => onCall(booking.passenger_details?.phone)}>
-            <Ionicons name="call-outline" size={20} color="#16A34A" />
-            <Text style={[styles.actionBtnText, { color: '#16A34A' }]}>Appeler</Text>
-          </TouchableOpacity>
-        </View>
+        !['cancelled', 'rejected', 'payment_failed', 'expired', 'payment_refunded'].includes(booking.status) ? (
+          <View style={styles.passengerActions}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => {
+              const pId = booking.passenger_details?.id;
+              if (pId) onMessage(pId);
+            }}>
+              <Ionicons name="chatbubble-outline" size={20} color="#2D9CDB" />
+              <Text style={[styles.actionBtnText, { color: '#2D9CDB' }]}>Message</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onCall(booking.passenger_details?.phone)}>
+              <Ionicons name="call-outline" size={20} color="#16A34A" />
+              <Text style={[styles.actionBtnText, { color: '#16A34A' }]}>Appeler</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null
       )}
     </View>
   );
