@@ -172,7 +172,7 @@ class BookingStateService:
             can_pay = False
         elif status == 'pending_passenger':
             action = "offer_received"
-            label = f"Proposition reçue — {booking_pricing.driver_price:,} FCFA (OUI / NON)".replace(",", " ")
+            label = f"Proposition reçue — {(booking_pricing.driver_price + booking_pricing.commission):,} FCFA (OUI / NON)".replace(",", " ")
             can_cancel = True
             can_pay = False
         elif status == 'pending_payment':
