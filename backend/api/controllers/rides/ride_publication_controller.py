@@ -34,22 +34,51 @@ class RidePublicationController:
             max_commission=settings.max_commission
         )
 
+    @staticmethod
+    def extract_commission_and_payout(total_price: int):
+        """
+        Extrait la commission de Zemy et le gain du conducteur à partir du prix total saisi.
+        Le prix saisi à la publication correspond au prix total que paiera le passager.
+        """
+        settings = FinancialSettings.load()
+        if not settings.is_commission_active or total_price <= 0:
+            return 0, total_price
+            
+        pct = settings.commission_percentage
+        min_c = settings.min_commission
+        max_c = settings.max_commission
+        
+        commission = int(total_price * (pct / 100))
+        commission = max(commission, min_c)
+        if max_c is not None:
+            commission = min(commission, max_c)
+            
+        if commission > total_price:
+            commission = total_price
+            
+        driver_payout = total_price - commission
+        return commission, driver_payout
+
     @classmethod
     def publish_ride(cls, user, data: Dict[str, Any], serializer_class) -> Dict[str, Any]:
         """Publie un trajet simple (non récurrent)."""
-        driver_payout = int(data.get('driver_payout', 0))
-        zemy_commission = cls.calculate_commission(driver_payout)
-        price_per_seat = driver_payout + zemy_commission
+        total_price = int(data.get('driver_payout', 0))
+        zemy_commission, driver_payout = cls.extract_commission_and_payout(total_price)
+        price_per_seat = total_price
+
+        # Mettre à jour les données pour le validateur du sérialiseur
+        mutable_data = data.copy()
+        mutable_data['driver_payout'] = driver_payout
 
         # Utilisation du serializer pour valider l'entrée et enregistrer le trajet
-        serializer = serializer_class(data=data)
+        serializer = serializer_class(data=mutable_data)
         serializer.is_valid(raise_exception=True)
 
         ride = serializer.save(
             driver=user,
             zemy_commission=zemy_commission,
             price_per_seat=price_per_seat,
-            parcels_available=data.get('max_parcels', 0)
+            parcels_available=mutable_data.get('max_parcels', 0)
         )
 
         try:
@@ -64,10 +93,10 @@ class RidePublicationController:
         """Publie une série de trajets récurrents."""
         start_date = datetime.strptime(data['start_date'], "%Y-%m-%d").date()
         end_date = datetime.strptime(data['end_date'], "%Y-%m-%d").date()
-        driver_payout = int(data.get('driver_payout', 0))
+        total_price = int(data.get('driver_payout', 0))
         
-        zemy_commission = cls.calculate_commission(driver_payout)
-        price_per_seat = driver_payout + zemy_commission
+        zemy_commission, driver_payout = cls.extract_commission_and_payout(total_price)
+        price_per_seat = total_price
 
         created_count = RideSeriesService.create_recurrent_rides(
             driver=user,

@@ -74,11 +74,11 @@ export function PublishSummaryModal({
 }: PublishSummaryModalProps) {
   const priceNum = parseInt(price, 10) || 0;
   
-  const calcCommission = (driverPayout: number) => {
+  const calcCommission = (totalPrice: number) => {
     if (!financialSettings) {
       const pct = 10;
       const minC = 100;
-      let commission = Math.floor(driverPayout * (pct / 100));
+      let commission = Math.floor(totalPrice * (pct / 100));
       if (commission < minC) commission = minC;
       return commission;
     }
@@ -86,14 +86,15 @@ export function PublishSummaryModal({
     const pct = financialSettings.commission_percentage !== undefined ? financialSettings.commission_percentage : 10;
     const minC = financialSettings.min_commission !== undefined ? financialSettings.min_commission : 100;
     const maxC = financialSettings.max_commission;
-    let commission = Math.floor(driverPayout * (pct / 100));
+    let commission = Math.floor(totalPrice * (pct / 100));
     if (commission < minC) commission = minC;
     if (maxC && commission > maxC) commission = maxC;
     return commission;
   };
 
   const commission = calcCommission(priceNum);
-  const totalPassenger = priceNum + commission;
+  const totalPassenger = priceNum;
+  const driverPayout = priceNum - commission;
 
   return (
     <AppBottomSheet
@@ -196,7 +197,7 @@ export function PublishSummaryModal({
           <View style={styles.commissionCard}>
             <View style={styles.commissionRow}>
               <Text style={styles.commissionLabel}>Vous recevrez par place</Text>
-              <Text style={styles.commissionValue}>{priceNum.toLocaleString()} FCFA</Text>
+              <Text style={styles.commissionValue}>{driverPayout.toLocaleString()} FCFA</Text>
             </View>
             <View style={styles.commissionRow}>
               <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage ?? 10}%)</Text>
@@ -214,7 +215,7 @@ export function PublishSummaryModal({
               <Ionicons name="wallet-outline" size={18} color="#059669" />
               <Text style={styles.summaryTotalTitle}>GAIN TOTAL POTENTIEL ({seats} place{seats > 1 ? 's' : ''})</Text>
             </View>
-            <Text style={styles.summaryTotalAmount}>{(priceNum * seats).toLocaleString()} FCFA</Text>
+            <Text style={styles.summaryTotalAmount}>{(driverPayout * seats).toLocaleString()} FCFA</Text>
           </View>
         </View>
 

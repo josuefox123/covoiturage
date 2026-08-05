@@ -1,4 +1,4 @@
-﻿"""
+"""
 ========================================================
 pricing_service.py
 
@@ -72,11 +72,26 @@ class PricingService:
 
     @staticmethod
     def compute_for_booking(booking) -> 'PricingResult':
+        # Si pas de prix négocié, on utilise directement les valeurs enregistrées sur le trajet
+        if not booking.custom_price and not booking.driver_counter_price and not booking.passenger_proposed_price:
+            ride = booking.ride
+            seats = booking.seats_booked
+            return PricingResult(
+                driver_price=ride.driver_payout,
+                commission=ride.zemy_commission,
+                total_to_pay=ride.price_per_seat * seats,
+                driver_amount=ride.driver_payout * seats,
+                zemy_amount=ride.zemy_commission * seats,
+                seats=seats,
+                segment_distance_m=0,
+                segment_distance_km=0.0
+            )
+
+        # Si prix négocié, on considère que le prix proposé est le gain conducteur et on rajoute la commission
         driver_price = (
             booking.custom_price
             or booking.driver_counter_price
             or booking.passenger_proposed_price
-            or booking.ride.price_per_seat
         )
         return PricingService.compute(driver_price=int(driver_price), seats=booking.seats_booked)
 
@@ -97,9 +112,30 @@ class PricingService:
             if total_distance_m <= 0:
                 total_distance_m = sum(leg.distance_m for leg in ride.legs.all()) or 1
             ratio = segment_distance_m / total_distance_m
-            driver_price_raw = ride.price_per_seat * ratio
+            
+            # Prorata du prix passager (price_per_seat)
+            passenger_price_raw = ride.price_per_seat * ratio
+            passenger_price = max(100, int(round(passenger_price_raw / 50.0) * 50))
+            
+            # Prorata du gain conducteur (driver_payout)
+            driver_price_raw = ride.driver_payout * ratio
             driver_price = max(100, int(round(driver_price_raw / 50.0) * 50))
-            return PricingService.compute(driver_price=driver_price, seats=seats, segment_distance_m=int(segment_distance_m))
+            
+            if passenger_price < driver_price:
+                passenger_price = driver_price
+                
+            commission = passenger_price - driver_price
+            
+            return PricingResult(
+                driver_price=driver_price,
+                commission=commission,
+                total_to_pay=passenger_price * seats,
+                driver_amount=driver_price * seats,
+                zemy_amount=commission * seats,
+                seats=seats,
+                segment_distance_m=int(segment_distance_m),
+                segment_distance_km=round(segment_distance_m / 1000, 1)
+            )
         except Exception as e:
             logger.error(f"PricingService.compute_for_segment error for ride {ride.id}: {e}")
             return PricingService._fallback(ride, seats)
@@ -112,14 +148,31 @@ class PricingService:
                 return PricingService._fallback(ride, seats)
             dep_leg_idx = max(0, dep_leg_idx)
             arr_leg_idx = min(arr_leg_idx, len(legs) - 1)
-            total_leg_price = 0
-            total_distance_m = 0
-            for i in range(dep_leg_idx, arr_leg_idx + 1):
-                if i < len(legs):
-                    total_leg_price += legs[i].price
-                    total_distance_m += legs[i].distance_m
-            driver_price = max(100, total_leg_price)
-            return PricingService.compute(driver_price=driver_price, seats=seats, segment_distance_m=int(total_distance_m))
+            
+            passenger_price = sum(legs[i].price for i in range(dep_leg_idx, arr_leg_idx + 1))
+            
+            sub_distance = sum(legs[i].distance_m for i in range(dep_leg_idx, arr_leg_idx + 1))
+            total_distance = sum(lg.distance_m for lg in legs) or 1
+            ratio = sub_distance / total_distance
+            
+            driver_price_raw = ride.driver_payout * ratio
+            driver_price = max(100, int(round(driver_price_raw / 50.0) * 50))
+            
+            if passenger_price < driver_price:
+                passenger_price = driver_price
+                
+            commission = passenger_price - driver_price
+            
+            return PricingResult(
+                driver_price=driver_price,
+                commission=commission,
+                total_to_pay=passenger_price * seats,
+                driver_amount=driver_price * seats,
+                zemy_amount=commission * seats,
+                seats=seats,
+                segment_distance_m=int(sub_distance),
+                segment_distance_km=round(sub_distance / 1000, 1)
+            )
         except Exception as e:
             logger.error(f"PricingService.compute_for_legs error: {e}")
             return PricingService._fallback(ride, seats)
@@ -139,7 +192,16 @@ class PricingService:
 
     @staticmethod
     def _fallback(ride, seats: int) -> 'PricingResult':
-        return PricingService.compute(driver_price=ride.price_per_seat, seats=seats, segment_distance_m=0)
+        return PricingResult(
+            driver_price=ride.driver_payout,
+            commission=ride.zemy_commission,
+            total_to_pay=ride.price_per_seat * seats,
+            driver_amount=ride.driver_payout * seats,
+            zemy_amount=ride.zemy_commission * seats,
+            seats=seats,
+            segment_distance_m=0,
+            segment_distance_km=0.0
+        )
 
     # Retro-compatibilite
     @staticmethod
