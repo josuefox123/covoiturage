@@ -13,7 +13,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TextInput,
-  TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator
+  TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator,
+  Image, Linking
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '../../src/styles/theme';
@@ -22,6 +23,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../../src/context/AuthContext';
 import { WebSocketService, buildWsUrl, WSMessage } from '../../src/services/websocketService';
 import { API_URL } from '../../src/services/api';
+import { getMediaUrl } from '../../src/utils/media';
 
 /**
  * Composant ChatScreen.
@@ -60,11 +62,10 @@ export default function ChatScreen() {
 
       // Charger l'historique des messages via REST (une seule fois)
       const msgsData = await authFetch(`/messages/?conversation=${id}`);
-      const sorted = Array.isArray(msgsData)
-        ? [...msgsData].sort(
-            (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          )
-        : [];
+      const msgsList = Array.isArray(msgsData) ? msgsData : (msgsData?.results || []);
+      const sorted = [...msgsList].sort(
+        (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
       setMessages(sorted);
 
       // Marquer comme lus
@@ -145,22 +146,21 @@ export default function ChatScreen() {
     const interval = setInterval(async () => {
       try {
         const msgsData = await authFetch(`/messages/?conversation=${id}`);
-        if (Array.isArray(msgsData)) {
-          const sorted = [...msgsData].sort(
-            (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          
-          setMessages(prev => {
-            if (sorted.length !== prev.length || sorted.some((m, idx) => !prev[idx] || prev[idx].id !== m.id)) {
-              // Marquer comme lus car l'utilisateur est actif sur l'écran
-              authFetch(`/messages/${id}/mark-read/`, { method: 'POST' }).catch(() => {});
-              // Scroller vers le bas si un nouveau message arrive
-              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-              return sorted;
-            }
-            return prev;
-          });
-        }
+        const msgsList = Array.isArray(msgsData) ? msgsData : (msgsData?.results || []);
+        const sorted = [...msgsList].sort(
+          (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        
+        setMessages(prev => {
+          if (sorted.length !== prev.length || sorted.some((m, idx) => !prev[idx] || prev[idx].id !== m.id)) {
+            // Marquer comme lus car l'utilisateur est actif sur l'écran
+            authFetch(`/messages/${id}/mark-read/`, { method: 'POST' }).catch(() => {});
+            // Scroller vers le bas si un nouveau message arrive
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+            return sorted;
+          }
+          return prev;
+        });
       } catch (error) {
         console.error('[Chat] Erreur lors du polling de messages:', error);
       }
@@ -288,18 +288,34 @@ export default function ChatScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerUser}>
-          <View style={styles.avatarMini}>
-            <Text style={styles.avatarMiniText}>{partnerInitials}</Text>
-          </View>
+          {otherUser?.avatar ? (
+            <Image source={{ uri: getMediaUrl(otherUser.avatar) }} style={styles.avatarMiniImage} />
+          ) : (
+            <View style={styles.avatarMini}>
+              <Text style={styles.avatarMiniText}>{partnerInitials}</Text>
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={styles.headerName}>{partnerName}</Text>
-            {rideInfo && (
+            {(conversation?.booking_details || rideInfo) && (
               <Text style={styles.rideInfoText} numberOfLines={1}>
-                {rideInfo.departure_location} → {rideInfo.arrival_location}
+                {conversation?.booking_details
+                  ? `${conversation.booking_details.departure_location?.split(',')[0]} → ${conversation.booking_details.arrival_location?.split(',')[0]}`
+                  : `${rideInfo.departure_location?.split(',')[0]} → ${rideInfo.arrival_location?.split(',')[0]}`}
               </Text>
             )}
           </View>
         </View>
+
+        {otherUser?.phone && (
+          <TouchableOpacity 
+            style={styles.callButton} 
+            onPress={() => Linking.openURL(`tel:${otherUser.phone}`)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="call" size={18} color={theme.colors.primary} />
+          </TouchableOpacity>
+        )}
 
         {/* Indicateur de connexion WebSocket */}
         <View style={[styles.wsIndicator, wsConnected ? styles.wsConnected : styles.wsDisconnected]}>
@@ -439,6 +455,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center'
   },
   avatarMiniText: { color: theme.colors.secondaryDark, fontWeight: '700', fontSize: 12 },
+  avatarMiniImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  callButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
   bubble: {
     borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing.md,
