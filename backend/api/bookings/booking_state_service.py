@@ -131,7 +131,17 @@ class BookingStateService:
             if dep_order is not None and arr_order is not None:
                 pricing = PricingService.compute_for_segment(ride, dep_order, arr_order, seats=1)
             else:
-                pricing = PricingService.compute(driver_price=ride.price_per_seat, seats=1)
+                from ..services.pricing_service import PricingResult
+                pricing = PricingResult(
+                    driver_price=ride.driver_payout,
+                    commission=ride.zemy_commission,
+                    total_to_pay=ride.price_per_seat,
+                    driver_amount=ride.driver_payout,
+                    zemy_amount=ride.zemy_commission,
+                    seats=1,
+                    segment_distance_m=0,
+                    segment_distance_km=0.0
+                )
 
             is_started = ride.status == 'started'
             is_full = ride.seats_available <= 0
