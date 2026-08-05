@@ -166,7 +166,7 @@ class RideActionsMixin:
         if ride.status not in ['active', 'started']:
             return Response({"error": "Le trajet n'est pas en cours."}, status=status.HTTP_400_BAD_REQUEST)
 
-        legs = list(ride.legs.order_by('order'))
+        legs = list(getattr(ride, 'legs').all().order_by('order'))
         if not legs:
             return Response({"error": "Ce trajet ne possède pas de tronçons."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -254,7 +254,7 @@ class RideActionsMixin:
                 from api.tasks import notify_compatible_passengers_task
                 if hasattr(notify_compatible_passengers_task, 'apply_async'):
                     notify_compatible_passengers_task.apply_async(
-                        (str(ride.id), next_idx, freed_seats_total), countdown=5
+                        args=[str(ride.id), next_idx, freed_seats_total], countdown=5
                     )
                 else:
                     notify_compatible_passengers_task(str(ride.id), next_idx, freed_seats_total)

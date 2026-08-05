@@ -1,9 +1,16 @@
-﻿"""
+"""
 Zemy — Modeles Trajet : RideSeries, Ride, RideLeg, RideWaypoint, DirectionsCache, SearchAlert
 """
 from django.db import models
 import uuid
+from typing import TYPE_CHECKING
 from .utilisateur import User, Vehicle
+
+if TYPE_CHECKING:
+    from typing import Any
+    from .reservation import Booking
+    from .colis import Parcel
+    from api.models import RideLeg, RideWaypoint
 
 class RideSeries(models.Model):
     """
@@ -69,6 +76,12 @@ class Ride(models.Model):
         - bookings : RÃ©servations associÃ©es.
         - parcels : Colis associÃ©s.
     """
+    if TYPE_CHECKING:
+        bookings: models.Manager['Booking'] | Any
+        parcels: models.Manager['Parcel'] | Any
+        legs: models.Manager['RideLeg'] | Any
+        waypoints: models.Manager['RideWaypoint'] | Any
+
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('started', 'Started'),

@@ -23,7 +23,7 @@ def notify_compatible_passengers_task(ride_id, freed_from_leg_idx, freed_seats):
             try:
                 create_and_send_notification(
                     user=item['passenger'],
-                    title="Place disponible sur votre trajet 🎉",
+                    title="Place disponible sur votre trajet",
                     message=(
                         f"Une place vient de se libérer sur le trajet "
                         f"{ride.departure_location} → {ride.arrival_location} "
