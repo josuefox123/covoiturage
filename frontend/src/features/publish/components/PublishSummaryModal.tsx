@@ -73,12 +73,11 @@ export function PublishSummaryModal({
   onConfirm
 }: PublishSummaryModalProps) {
   const priceNum = parseInt(price, 10) || 0;
-  
-  const calcCommission = (totalPrice: number) => {
+  const calcCommission = (driverPayout: number) => {
     if (!financialSettings) {
       const pct = 10;
       const minC = 100;
-      let commission = Math.floor(totalPrice * (pct / 100));
+      let commission = Math.floor(driverPayout * (pct / 100));
       if (commission < minC) commission = minC;
       return commission;
     }
@@ -86,15 +85,15 @@ export function PublishSummaryModal({
     const pct = financialSettings.commission_percentage !== undefined ? financialSettings.commission_percentage : 10;
     const minC = financialSettings.min_commission !== undefined ? financialSettings.min_commission : 100;
     const maxC = financialSettings.max_commission;
-    let commission = Math.floor(totalPrice * (pct / 100));
+    let commission = Math.floor(driverPayout * (pct / 100));
     if (commission < minC) commission = minC;
     if (maxC && commission > maxC) commission = maxC;
     return commission;
   };
 
   const commission = calcCommission(priceNum);
-  const totalPassenger = priceNum;
-  const driverPayout = priceNum - commission;
+  const totalPassenger = priceNum + commission;
+  const driverPayout = priceNum;
 
   return (
     <AppBottomSheet
