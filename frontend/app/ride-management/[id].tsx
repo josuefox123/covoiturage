@@ -241,7 +241,7 @@ export default function RideManagementScreen() {
         {/* Timeline Trajet */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Mon trajet</Text>
-          <RideTimeline ride={ride} />
+          <RideTimeline ride={ride} bookings={bookings} />
 
           <View style={styles.divider} />
           
