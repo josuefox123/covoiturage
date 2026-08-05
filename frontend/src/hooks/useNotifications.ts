@@ -27,6 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { CustomAlert } from '../utils/CustomAlert';
 import { API_URL } from '../services/api';
 import { wsService } from '../services/websocket/WebSocketService';
+import { rideEventBus } from '../features/ride-session/manager/EventBus';
 import * as Speech from 'expo-speech';
 
 import Constants, { ExecutionEnvironment } from 'expo-constants';
