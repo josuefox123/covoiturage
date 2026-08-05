@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePayment } from '../../src/hooks/usePayment';
 import { useAuth } from '../../src/context/AuthContext';
+import { API_URL } from '../../src/services/api';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
 export default function PaymentSuccessScreen() {
@@ -19,6 +20,46 @@ export default function PaymentSuccessScreen() {
     const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
     const [message, setMessage] = useState('Vérification du paiement en cours auprès de FeexPay...');
     const [bookingDetails, setBookingDetails] = useState<any>(null);
+    const [downloading, setDownloading] = useState(false);
+
+    const handleDownloadReceipt = async () => {
+        if (!bookingId) return;
+        try {
+            setDownloading(true);
+            const FileSystem = require('expo-file-system');
+            const Sharing = require('expo-sharing');
+            const SecureStore = require('expo-secure-store');
+
+            const isSharingAvailable = await Sharing.isAvailableAsync();
+            if (!isSharingAvailable) {
+                alert("Le partage de fichiers n'est pas disponible sur cet appareil.");
+                return;
+            }
+
+            const storedToken = await SecureStore.getItemAsync('zemy_access_token');
+            const receiptUrl = `${API_URL}/bookings/${bookingId}/receipt/`;
+            const localUri = (((FileSystem as any).documentDirectory) ?? '') + `recu_paiement_${bookingId.substring(0, 8)}.pdf`;
+
+            const downloadResult = await FileSystem.downloadAsync(receiptUrl, localUri, {
+                headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+            });
+
+            if (downloadResult.status === 200) {
+                await Sharing.shareAsync(downloadResult.uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: 'Reçu de paiement Zemy',
+                    UTI: 'com.adobe.pdf',
+                });
+            } else {
+                alert('Impossible de télécharger le reçu. Veuillez réessayer.');
+            }
+        } catch (e: any) {
+            console.error('Erreur téléchargement reçu:', e);
+            alert('Impossible de générer le reçu. Veuillez réessayer.');
+        } finally {
+            setDownloading(false);
+        }
+    };
 
     useEffect(() => {
         if (txRef) {
@@ -195,6 +236,22 @@ export default function PaymentSuccessScreen() {
                 </View>
             </View>
 
+            <TouchableOpacity 
+                style={styles.receiptBtn} 
+                onPress={handleDownloadReceipt}
+                disabled={downloading}
+                activeOpacity={0.8}
+            >
+                {downloading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                    <>
+                        <Ionicons name="document-text" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <Text style={styles.receiptBtnText}>Télécharger mon reçu PDF</Text>
+                    </>
+                )}
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace('/(tabs)/trips')}>
                 <Text style={styles.doneBtnText}>Fermer et voir mes trajets</Text>
             </TouchableOpacity>
@@ -249,6 +306,8 @@ const styles = StyleSheet.create({
     retryBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     outlineBtn: { width: '100%', padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
     outlineBtnText: { color: '#4B5563', fontSize: 16, fontWeight: '600' },
+    receiptBtn: { backgroundColor: '#10B981', width: '100%', padding: 16, borderRadius: 16, alignItems: 'center', marginBottom: 12, flexDirection: 'row', justifyContent: 'center' },
+    receiptBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginLeft: 8 },
     doneBtn: { backgroundColor: '#111827', width: '100%', padding: 16, borderRadius: 16, alignItems: 'center' },
     doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' }
 });

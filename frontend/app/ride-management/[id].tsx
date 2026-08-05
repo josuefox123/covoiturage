@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { CustomAlert } from '../../src/utils/CustomAlert';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { API_URL } from '@/src/services/api';
 
 // Components & Hooks
 import { useRideManagement } from '@/src/features/ride-management/hooks/useRideManagement';
@@ -82,6 +83,46 @@ export default function RideManagementScreen() {
       await onRefresh();
     } catch (err: any) {
       CustomAlert.alert('Erreur', err.message || "Impossible de valider l'embarquement.");
+    }
+  };
+
+  const [downloadingManifestId, setDownloadingManifestId] = React.useState<string | null>(null);
+
+  const handleDownloadManifest = async (bookingId: string) => {
+    try {
+      setDownloadingManifestId(bookingId);
+      const FileSystem = require('expo-file-system');
+      const Sharing = require('expo-sharing');
+      const SecureStore = require('expo-secure-store');
+
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (!isSharingAvailable) {
+        CustomAlert.alert('Non disponible', "Le partage de fichiers n'est pas disponible sur cet appareil.");
+        return;
+      }
+
+      const storedToken = await SecureStore.getItemAsync('zemy_access_token');
+      const manifestUrl = `${API_URL}/bookings/${bookingId}/manifest/`;
+      const localUri = (((FileSystem as any).documentDirectory) ?? '') + `reconnaissance_reservation_${bookingId.substring(0, 8)}.pdf`;
+
+      const downloadResult = await FileSystem.downloadAsync(manifestUrl, localUri, {
+        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
+      });
+
+      if (downloadResult.status === 200) {
+        await Sharing.shareAsync(downloadResult.uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Reconnaissance de réservation Zemy',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        CustomAlert.alert('Erreur', 'Impossible de télécharger le document. Veuillez réessayer.');
+      }
+    } catch (e: any) {
+      console.error('Erreur téléchargement reconnaissance:', e);
+      CustomAlert.alert('Erreur', 'Impossible de générer la reconnaissance. Veuillez réessayer.');
+    } finally {
+      setDownloadingManifestId(null);
     }
   };
 
@@ -332,6 +373,7 @@ export default function RideManagementScreen() {
                 setSelectedBookingForManualCode(booking);
                 setShowCodeInputModal(true);
               }}
+              onDownloadManifest={handleDownloadManifest}
             />
           ))
         )}

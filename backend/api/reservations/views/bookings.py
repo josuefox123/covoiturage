@@ -473,6 +473,56 @@ class BookingViewSet(viewsets.ModelViewSet):
         _push_booking_update(booking)
         return Response({"status": "Proposition refusée. Réservation annulée.", "booking_status": booking.status})
 
+    @action(detail=True, methods=['get'], url_path='receipt')
+    def download_receipt(self, request, pk=None):
+        booking = self.get_object()
+        
+        # Le reçu de paiement n'est accessible qu'au passager (ou admin)
+        if booking.passenger != request.user and not getattr(request.user, 'is_staff', False):
+            return Response({"error": "Vous n'êtes pas le passager de cette réservation."}, status=status.HTTP_403_FORBIDDEN)
+            
+        # Le paiement doit avoir réussi ou le trajet doit être actif/confirmé/complété
+        from api.models import Payment
+        has_successful_payment = Payment.objects.filter(booking=booking, status='SUCCESS').exists()
+        is_valid_status = booking.status in ['confirmed', 'active', 'started', 'completed']
+        
+        if not (has_successful_payment or is_valid_status):
+            return Response({"error": "Aucun reçu disponible car aucun paiement réussi n'a été détecté pour cette réservation."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from django.http import HttpResponse
+        from api.services.pdf_service import generate_passenger_receipt
+        
+        try:
+            pdf_bytes = generate_passenger_receipt(booking)
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="recu_paiement_{booking.id.hex[:8]}.pdf"'
+            return response
+        except Exception as e:
+            return Response({"error": f"Erreur lors de la génération du PDF: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'], url_path='manifest')
+    def download_manifest(self, request, pk=None):
+        booking = self.get_object()
+        
+        # La confirmation de réservation n'est accessible qu'au conducteur du trajet (ou admin)
+        if booking.ride.driver != request.user and not getattr(request.user, 'is_staff', False):
+            return Response({"error": "Seul le conducteur de ce trajet peut télécharger ce document."}, status=status.HTTP_403_FORBIDDEN)
+            
+        # Il faut que la réservation soit confirmée, active ou complétée (pas annulée ou rejetée)
+        if booking.status in ['cancelled', 'rejected', 'expired']:
+            return Response({"error": "Cette réservation a été annulée ou rejetée."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from django.http import HttpResponse
+        from api.services.pdf_service import generate_driver_confirmation
+        
+        try:
+            pdf_bytes = generate_driver_confirmation(booking)
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="reconnaissance_reservation_{booking.id.hex[:8]}.pdf"'
+            return response
+        except Exception as e:
+            return Response({"error": f"Erreur lors de la génération du PDF: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 def _push_booking_update(booking):
     from api.websocket.handlers import push_booking_update
     push_booking_update(booking)

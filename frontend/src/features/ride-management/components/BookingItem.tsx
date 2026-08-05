@@ -13,6 +13,7 @@ interface BookingItemProps {
   onBoard?: () => void;
   onMessage: (passengerId: string) => void;
   onCall: (phone?: string) => void;
+  onDownloadManifest?: (bookingId: string) => void;
 }
 
 const getBookingStatusDisplay = (status: string) => {
@@ -54,7 +55,8 @@ export function BookingItem({
   onReject,
   onBoard,
   onMessage,
-  onCall
+  onCall,
+  onDownloadManifest
 }: BookingItemProps) {
   const badge = getBookingStatusDisplay(booking.status);
   const finalPrice = booking.portion_price || booking.amount_paid_online || (ridePrice * (booking.seats_booked || 1));
@@ -169,6 +171,16 @@ export function BookingItem({
               </TouchableOpacity>
             </View>
           ) : null}
+
+          {!['cancelled', 'rejected', 'payment_failed', 'expired', 'payment_refunded'].includes(booking.status) && onDownloadManifest && (
+            <TouchableOpacity 
+              style={[styles.actionBtn, { borderColor: '#10B981', flex: 0, width: '100%', height: 44 }]} 
+              onPress={() => onDownloadManifest(booking.id)}
+            >
+              <Ionicons name="document-text-outline" size={20} color="#10B981" />
+              <Text style={[styles.actionBtnText, { color: '#10B981' }]}>Télécharger la reconnaissance PDF</Text>
+            </TouchableOpacity>
+          )}
 
           {booking.status === 'confirmed' && onBoard && (
             <TouchableOpacity 
