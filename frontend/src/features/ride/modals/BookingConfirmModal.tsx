@@ -105,15 +105,41 @@ export function BookingConfirmModal({
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingBottom: 16 }}>
-              <View>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>TOTAL :</Text>
-                <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Frais Zemy inclus</Text>
-              </View>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: '#2F80ED' }}>
-                {((pricePerSeat ?? ride?.price_per_seat ?? 0) * seatsToBook).toLocaleString()} FCFA
-              </Text>
-            </View>
+            {(() => {
+              const extractCity = (locStr: string | undefined): string => {
+                if (!locStr) return '';
+                const parts = locStr.replace(/\//g, ',').split(',').map((p) => p.trim());
+                const ignore = new Set(['bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france']);
+                const cleanParts = parts.filter((p) => p && !ignore.has(p.toLowerCase()));
+                return cleanParts.length ? cleanParts[cleanParts.length - 1].toLowerCase() : (parts[0] || '').toLowerCase();
+              };
+
+              const isSegment = !!(ride?.price_per_seat && ride?.original_price_per_seat && ride.price_per_seat !== ride.original_price_per_seat);
+              const isIntermediate = !!(
+                (departure && (extractCity(departure) !== extractCity(ride?.departure_location))) ||
+                (destination && (extractCity(destination) !== extractCity(ride?.arrival_location))) ||
+                isSegment
+              );
+
+              return (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingBottom: 16 }}>
+                  <View>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>TOTAL :</Text>
+                    <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Frais Zemy inclus</Text>
+                  </View>
+                  {isIntermediate ? (
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 18, fontWeight: '800', color: '#D97706' }}>À confirmer</Text>
+                      <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2, fontWeight: '600' }}>avec le chauffeur</Text>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 22, fontWeight: '800', color: '#2F80ED' }}>
+                      {((pricePerSeat ?? ride?.price_per_seat ?? 0) * seatsToBook).toLocaleString()} FCFA
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
 
             <View style={{ marginBottom: 20 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#1F2937', marginBottom: 10 }}>
