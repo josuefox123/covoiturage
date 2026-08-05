@@ -55,4 +55,13 @@ export interface Ride {
   vehicle_details?: any;
   bookings?: any[];
   waypoints?: any[];
+
+  // Preferences
+  music?: boolean;
+  smoking?: boolean;
+  chatty?: boolean;
+  air_conditioner?: boolean;
+  pets_allowed?: boolean;
+  luggage_allowed?: boolean;
+  stops_allowed?: boolean;
 }
