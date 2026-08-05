@@ -59,7 +59,7 @@ export class WebSocketService {
 
     try {
       // Construire l'URL WebSocket sécurisée (wss:// pour https://, ws:// pour http://)
-      let wsUrl = this.baseUrl.replace(/^http/, 'ws').replace(/\/+$/, '');
+      let wsUrl = this.baseUrl.replace(/^http/, 'ws').replace(/\/+$/, '').replace(/\/api$/, '');
       const fullWsUrl = `${wsUrl}/ws/notifications/?token=${encodeURIComponent(this.token)}`;
 
       console.log('[WebSocket] Connexion en cours vers :', fullWsUrl);
