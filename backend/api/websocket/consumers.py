@@ -346,9 +346,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
+        await self.accept()
         self.group_name = f"user_{self.user.id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
         await self.send(text_data=json.dumps({'type': 'connected', 'message': 'connected'}))
         logger.info(f"NotificationWS connecté: user={self.user.id}")
 

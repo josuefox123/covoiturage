@@ -47,7 +47,8 @@ export class WebSocketService {
     this.baseUrl = apiBaseUrl;
     this.isExplicitlyClosed = false;
 
-    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+    if (this.socket && this.token === token && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+      console.log('[WebSocket] Connexion déjà active.');
       return;
     }
 
@@ -156,7 +157,11 @@ export class WebSocketService {
   }
 
   private handleClose(event: WebSocketCloseEvent) {
-    console.log(`[WebSocket] Déconnecté (code: ${event.code})`);
+    console.log('[WebSocket] Fermeture :', {
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean
+    });
     this.stopHeartbeat();
     DeviceEventEmitter.emit('wsStatusChange', { connected: false });
 
@@ -182,7 +187,7 @@ export class WebSocketService {
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         this.socket.send(JSON.stringify({ type: 'ping' }));
       }
-    }, 25000);
+    }, 15000);
   }
 
   private stopHeartbeat() {
