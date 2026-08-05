@@ -198,7 +198,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'sender_id': str(self.user.id),
                 'sender_details': {
                     'id': str(self.user.id),
-                    'full_name': self.user.full_name or '',
+                    'full_name': getattr(self.user, 'full_name', '') or '',
                     'avatar': None,
                 },
                 'created_at': message.created_at.isoformat(),
@@ -240,7 +240,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if recipient is None:
                 return  # Conversation support sans admin connecté
 
-            sender_name = self.user.full_name or self.user.phone or 'Utilisateur'
+            sender_name = getattr(self.user, 'full_name', None) or getattr(self.user, 'phone', None) or 'Utilisateur'
 
             send_fcm_to_user(
                 recipient,
@@ -380,7 +380,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             return None
 
         try:
-            access_token = AccessToken(token_str)
+            access_token = AccessToken(token_str)  # type: ignore
             user_id = access_token.get('user_id')
             return User.objects.get(id=user_id, is_active=True)
         except (TokenError, User.DoesNotExist, Exception) as e:
