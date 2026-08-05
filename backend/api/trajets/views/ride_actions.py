@@ -17,6 +17,9 @@ class RideActionsMixin:
     Mixin regroupant les actions du cycle de vie des trajets
     pour alléger le RideViewSet principal.
     """
+    def get_object(self) -> Ride:
+        """Méthode de ViewSet fournie au runtime."""
+        return super().get_object()  # type: ignore
 
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel_ride(self, request, pk=None):
