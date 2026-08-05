@@ -273,6 +273,27 @@ class BookingViewSet(viewsets.ModelViewSet):
             'custom_price': booking.custom_price,
         })
 
+    @action(detail=True, methods=['post'], url_path='board')
+    def board_booking(self, request, pk=None):
+        booking = self.get_object()
+        if booking.ride.driver != request.user and not request.user.is_staff:
+            return Response({"error": "Seul le conducteur de ce trajet peut valider l'embarquement."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if booking.status not in ['confirmed']:
+            return Response({"error": f"Statut invalide pour l'embarquement: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        booking.status = 'started'
+        booking.save()
+        
+        create_and_send_notification(
+            user=booking.passenger,
+            title="Vous avez embarqué ! 🚗",
+            message=f"Le conducteur a validé votre embarquement. Bon voyage !",
+            data={'type': 'passenger_boarded', 'booking_id': str(booking.id), 'screen': 'trips'}
+        )
+        _push_booking_update(booking)
+        return Response({"status": "Embarquement validé avec succès.", "booking_status": booking.status})
+
     @action(detail=True, methods=['post'], url_path='complete')
     def complete_booking(self, request, pk=None):
         booking = self.get_object()
