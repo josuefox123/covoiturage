@@ -23,11 +23,31 @@ export default function PaymentSuccessScreen() {
     useEffect(() => {
         if (txRef) {
             handleVerify();
+        } else if (bookingId) {
+            handleLoadTicket();
         } else {
             setStatus('failed');
             setMessage('Référence de transaction manquante.');
         }
-    }, [txRef, txId]);
+    }, [txRef, txId, bookingId]);
+
+    const handleLoadTicket = async () => {
+        try {
+            const details = await authFetch(`/bookings/${bookingId}/`);
+            const validStatuses = ['confirmed', 'active', 'started', 'completed'];
+            if (details && (validStatuses.includes(details.status) || details.payment_status === 'paid')) {
+                setBookingDetails(details);
+                setStatus('success');
+                setMessage('Votre ticket a été chargé.');
+            } else {
+                setStatus('failed');
+                setMessage("Ce billet n'est pas disponible (réservation en attente de paiement ou annulée).");
+            }
+        } catch (error: any) {
+            setStatus('failed');
+            setMessage(error.message || 'Erreur lors de la récupération de votre billet.');
+        }
+    };
 
     const handleVerify = async () => {
         try {

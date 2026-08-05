@@ -31,13 +31,26 @@ export class MissionActionsHandler {
         break;
 
       case 'view_details':
-      case 'view_ticket':
         if (data.rideId) {
           if (mission.role === 'driver') {
             router.push(`/ride-management/${data.rideId}`);
           } else {
             router.push(`/ride/${data.rideId}`);
           }
+        }
+        break;
+
+      case 'view_ticket':
+        if (data.bookingId) {
+          router.push({
+            pathname: '/payment/success',
+            params: {
+              booking_id: String(data.bookingId),
+              amount: String(data.amount || 0)
+            }
+          });
+        } else if (data.rideId) {
+          router.push(`/ride/${data.rideId}`);
         }
         break;
 
