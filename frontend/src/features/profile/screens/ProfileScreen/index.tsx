@@ -251,10 +251,12 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
 
-                <View style={styles.ratingBadge}>
-                  <Ionicons name="star" size={12} color="#F59E0B" />
-                  <Text style={styles.ratingText}>{user.rating?.toFixed(1) || '4.8'}</Text>
-                </View>
+                {user.rating ? (
+                  <View style={styles.ratingBadge}>
+                    <Ionicons name="star" size={12} color="#F59E0B" />
+                    <Text style={styles.ratingText}>{user.rating.toFixed(1)}</Text>
+                  </View>
+                ) : null}
 
                 {user.is_verified ? (
                   <View style={styles.verifiedBadgePremium}>

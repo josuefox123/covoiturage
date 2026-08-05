@@ -60,8 +60,10 @@ export function PassengerCard({ booking, onMessage, onCall }: PassengerCardProps
           <Text style={styles.passengerName}>{booking.passenger_details?.full_name}</Text>
           <Text style={styles.passengerPhone}>{booking.passenger_details?.phone || 'Numéro masqué'}</Text>
           <View style={styles.ratingRow}>
-            <Ionicons name="star" size={12} color="#F59E0B" />
-            <Text style={styles.ratingTextSmall}>4.8</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginRight: 4 }}>
+              <Ionicons name="checkmark-circle" size={13} color="#16A34A" />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A', marginLeft: 3 }}>Profil vérifié</Text>
+            </View>
             <Text style={styles.seatBadge}>{booking.seats_booked} place(s)</Text>
             <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
               <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
