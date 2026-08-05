@@ -264,7 +264,7 @@ def generate_driver_confirmation(booking) -> bytes:
     pdf.set_text_color(180, 83, 9) # Amber dark
     pdf.cell(0, 6, "INSTRUCTIONS DE VALIDATION DE L'EMBARQUEMENT", new_x="LMARGIN", new_y="NEXT")
     
-    pdf.set_font("helvetica", "", 9.5)
+    pdf.set_font("helvetica", "", 9)
     pdf.set_text_color(31, 41, 55)
     pdf.set_x(18)
     pdf.cell(0, 5, "Lors de la prise en charge du passager à son point de montée :", new_x="LMARGIN", new_y="NEXT")
@@ -282,7 +282,7 @@ def generate_driver_confirmation(booking) -> bytes:
     pdf.ln(12)
     
     # 5. FOOTER NOTICE
-    pdf.set_font("helvetica", "I", 8.5)
+    pdf.set_font("helvetica", "I", 8)
     pdf.set_text_color(107, 114, 128)
     pdf.cell(0, 4, "Ce billet de reconnaissance confirme que le passager s'est acquitté du montant du trajet sur Zemy.", align="C")
     
