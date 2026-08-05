@@ -25,7 +25,8 @@ import { Platform, Alert, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { CustomAlert } from '../utils/CustomAlert';
-import { rideEventBus } from '../features/ride-session/manager/EventBus';
+import { API_URL } from '../config/api';
+import { wsService } from '../services/websocket/WebSocketService';
 import * as Speech from 'expo-speech';
 
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -115,24 +116,33 @@ export function useNotifications() {
       });
     }
 
-    // Dans Expo Go (SDK 53+), Expo neutralise getExpoPushTokenAsync et lève une erreur rouge.
-    // En mode Standalone APK ou Dev Build, le token push est généré normalement.
     if (isExpoGo) {
       return null;
     }
 
-    // Récupérer le token Expo Push (uniquement sur Dev Build / Build APK)
+    // Récupérer le token Push (Expo Push Token ou FCM Device Token)
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId || "7befcd51-2b86-4b54-a963-80ffb264a743";
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: projectId,
-      });
-      const pushToken = tokenData.data;
-      setExpoPushToken(pushToken);
-      return pushToken;
+      let pushToken: string | null = null;
+      try {
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+        pushToken = tokenData?.data || null;
+      } catch (e1) {
+        try {
+          const nativeTokenData = await Notifications.getDevicePushTokenAsync();
+          pushToken = nativeTokenData?.data || null;
+        } catch (e2) {
+          console.warn('[Notifications] Impossible d\'obtenir le push token:', e1);
+        }
+      }
+      if (pushToken) {
+        setExpoPushToken(pushToken);
+        return pushToken;
+      }
     } catch (e) {
-      return null;
+      console.warn('[Notifications] Erreur récupération token push:', e);
     }
+    return null;
   }, []);
 
   const saveFcmTokenToBackend = useCallback(async (pushToken: string) => {
@@ -149,7 +159,15 @@ export function useNotifications() {
 
   // Initialiser les notifications quand l'utilisateur est authentifié
   useEffect(() => {
-    if (!token || !Notifications) return;
+    if (!token) {
+      wsService.disconnect();
+      return;
+    }
+
+    // Connecter le WebSocket direct pour les notifications 0ms en direct
+    wsService.connect(token, API_URL);
+
+    if (!Notifications) return;
 
     let mounted = true;
 

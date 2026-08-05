@@ -238,6 +238,26 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
     except Exception as e:
         logger.error(f"Erreur création Notification en BD: {e}")
         
+    # Diffuser en temps réel via WebSocket au groupe user_<user_id>
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{user.id}",
+                {
+                    "type": "send_realtime_notification",
+                    "notification": {
+                        "title": title,
+                        "message": message,
+                        "data": data or {'screen': 'notifications'}
+                    }
+                }
+            )
+    except Exception as e:
+        logger.debug(f"WS notification send error: {e}")
+
     def _send_push_async():
         try:
             send_fcm_to_user(

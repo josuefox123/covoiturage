@@ -330,6 +330,60 @@ class BookingConsumer(AsyncWebsocketConsumer):
         from ..models import Booking
         try:
             booking = Booking.objects.select_related('passenger', 'ride__driver').get(id=booking_id)
-            return booking.passenger == user or booking.ride.driver == user or user.is_staff
+            return booking.passenger == user or booking.ride.driver == user or bool(getattr(user, 'is_staff', False))
         except (Booking.DoesNotExist, Exception):
             return False
+
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    """
+    Consumer WebSocket pour la diffusion des notifications personnelles en temps réel.
+    Rejoint le groupe Channels : "user_<user_id>"
+    """
+    async def connect(self):
+        self.user = await self._authenticate()
+        if self.user is None:
+            await self.close(code=4001)
+            return
+
+        self.group_name = f"user_{self.user.id}"
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+        logger.info(f"NotificationWS connecté: user={self.user.id}")
+
+    async def disconnect(self, code):
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def send_realtime_notification(self, event):
+        """Envoie la notification en JSON au client mobile via WebSocket."""
+        await self.send(text_data=json.dumps({
+            'type': 'notification',
+            'title': event['notification']['title'],
+            'message': event['notification']['message'],
+            'data': event['notification']['data']
+        }))
+
+    @database_sync_to_async
+    def _authenticate(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+        from rest_framework_simplejwt.exceptions import TokenError
+
+        query_string = self.scope.get('query_string', b'').decode()
+        token_str = None
+        for part in query_string.split('&'):
+            if part.startswith('token='):
+                token_str = part[6:]
+                break
+
+        if not token_str:
+            return None
+
+        try:
+            access_token = AccessToken(token_str)
+            user_id = access_token.get('user_id')
+            return User.objects.get(id=user_id, is_active=True)
+        except (TokenError, User.DoesNotExist, Exception) as e:
+            logger.debug(f"Auth NotificationWS échouée: {e}")
+            return None
+
