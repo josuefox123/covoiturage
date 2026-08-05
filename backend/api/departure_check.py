@@ -87,12 +87,14 @@ def check_upcoming_departures():
                         except Exception as wse:
                             logger.error(f"[Cleanup] Erreur push WS pour expiration {pb.id}: {wse}")
 
+                        dep_loc = pb.departure_location or ride.departure_location or ''
+                        arr_loc = pb.arrival_location or ride.arrival_location or ''
                         # Notifier le passager
                         try:
                             create_and_send_notification(
                                 user=pb.passenger,
                                 title="Demande de réservation expirée ⏱️",
-                                message=f"Votre demande de réservation pour le trajet {ride.departure_location} -> {ride.arrival_location} a expiré car l'heure de départ est dépassée.",
+                                message=f"Votre demande de réservation pour le trajet {dep_loc} -> {arr_loc} a expiré car l'heure de départ est dépassée.",
                                 data={'type': 'booking_expired', 'booking_id': str(pb.id), 'screen': 'trips'}
                             )
                         except Exception as ne:
@@ -103,7 +105,7 @@ def check_upcoming_departures():
                             create_and_send_notification(
                                 user=ride.driver,
                                 title="Demande expirée ⏱️",
-                                message=f"La demande de réservation de {pb.passenger.full_name or pb.passenger.phone} a expiré car l'heure de départ du trajet est dépassée.",
+                                message=f"La demande de réservation de {pb.passenger.full_name or pb.passenger.phone} ({dep_loc} -> {arr_loc}) a expiré car l'heure de départ du trajet est dépassée.",
                                 data={'type': 'booking_expired_driver', 'booking_id': str(pb.id), 'screen': 'rides'}
                             )
                         except Exception as ne2:
@@ -145,17 +147,19 @@ def check_upcoming_departures():
                 # 2. Alerte Passagers confirmés
                 bookings = Booking.objects.filter(ride=ride, status='confirmed')
                 for booking in bookings:
+                    b_dep = booking.departure_location or ride.departure_location or ''
+                    b_arr = booking.arrival_location or ride.arrival_location or ''
                     has_passenger_notified = Notification.objects.filter(
                         user=booking.passenger,
                         title="Départ dans 30 min ⏰",
-                        message__contains=ride.departure_location
+                        message__contains=b_dep
                     ).exists()
                     
                     if not has_passenger_notified:
                         create_and_send_notification(
                             user=booking.passenger,
                             title="Départ dans 30 min ⏰",
-                            message=f"Rappel : Votre départ pour le trajet {ride.departure_location} -> {ride.arrival_location} est prévu dans environ 30 minutes !",
+                            message=f"Rappel : Votre départ pour le trajet {b_dep} -> {b_arr} est prévu dans environ 30 minutes !",
                             data={'type': 'departure_warning_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
                         )
                         
