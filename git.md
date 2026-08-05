@@ -29,3 +29,22 @@ Ce document récapitule l'organisation de vos dépôts Git pour ce projet. Le pr
 > [!TIP]
 > **Rappel pour les mises à jour :**
 > Si vous modifiez un élément dans l'un des sous-dossiers (`backend`, `frontend`, `dashboard`), vous devez vous placer dans le dossier correspondant pour faire un `git push` vers son dépôt dédié, puis également le faire dans le dossier principal `covoiturage1` si vous souhaitez que le dépôt global soit aussi à jour.
+
+---
+
+## Historique des Mises à Jour Récentes
+
+### 📅 Mise à jour du 5 Août 2026
+- **Messagerie et Résolution des Doublons :**
+  - Ajout d'une déduplication en mémoire dans la liste des discussions (`ConversationViewSet.get_queryset()`) pour n'afficher que la boîte de discussion la plus récente par trajet/participants.
+  - Résolution des créations de doublons de discussions lors des annulations et notifications en remplaçant les `get_or_create` ordonnés par des filtres croisés `Q()`.
+  - Intégration d'un indicateur de présence (`En ligne` 🟢 / `Hors ligne` ⚪) dynamique et textuel dans l'en-tête de la discussion mobile.
+- **Documents PDF Officiels (Reçus et Billets) :**
+  - Création du service de génération de PDF (`pdf_service.py` utilisant `fpdf2` sur le serveur) avec le logo Zemy, bandeau de marque et fiches descriptives.
+  - Ajout d'un bouton de téléchargement de reçu de paiement PDF sur l'écran mobile de succès de paiement (passager).
+  - Ajout d'un bouton de téléchargement de reconnaissance de réservation PDF sous la liste des passagers confirmés (conducteur).
+  - Résolution du crash de téléchargement sous Android/Expo en migrant l'API vers le module `expo-file-system/legacy` (Expo SDK 54).
+- **Suppression des Emojis :**
+  - Retrait intégral des émojis et stickers dans le code backend et frontend (notifications push, météo, administration Django, notes étoiles).
+- **Géolocalisation Globale :**
+  - Récupération automatique de la position utilisateur au démarrage de l'application et partage global dans `AuthContext` via `useAuth().userLocation`.
