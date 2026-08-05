@@ -32,7 +32,7 @@ export default function MessageEmptyState() {
       </View>
       <Text style={styles.title}>Aucune conversation</Text>
       <Text style={styles.subtitle}>
-        Réservez un trajet ou acceptez une réservation pour commencer à discuter avec les membres de la communauté.
+        Envoyez une demande de trajet ou proposez un itinéraire pour commencer à discuter avec les membres de la communauté.
       </Text>
       <TouchableOpacity 
         style={styles.button}
