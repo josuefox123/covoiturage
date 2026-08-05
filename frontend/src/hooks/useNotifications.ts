@@ -25,7 +25,7 @@ import { Platform, Alert, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { CustomAlert } from '../utils/CustomAlert';
-import { API_URL } from '../config/api';
+import { API_URL } from '../services/api';
 import { wsService } from '../services/websocket/WebSocketService';
 import * as Speech from 'expo-speech';
 
