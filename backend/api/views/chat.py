@@ -65,7 +65,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
         qs = Conversation.objects.select_related('participant_1', 'participant_2', 'ride', 'ride__driver', 'ride__vehicle').prefetch_related('messages')
         
         # Admin sees all support conversations
-        if user.is_staff and self.request.query_params.get('type') == 'support':
+        query_type = getattr(self.request, 'query_params', self.request.GET).get('type')
+        if getattr(user, 'is_staff', False) and query_type == 'support':
             return qs.filter(conversation_type='support').order_by('-updated_at')
         return (qs.filter(participant_1=user) | qs.filter(participant_2=user)).order_by('-updated_at')
 
@@ -292,11 +293,11 @@ class MessageViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = super().get_queryset().select_related('sender', 'conversation')
         
-        if not user.is_staff:
+        if not getattr(user, 'is_staff', False):
             from django.db.models import Q
             queryset = queryset.filter(Q(conversation__participant_1=user) | Q(conversation__participant_2=user))
             
-        conversation_id = self.request.query_params.get('conversation')
+        conversation_id = getattr(self.request, 'query_params', self.request.GET).get('conversation')
         if conversation_id:
             queryset = queryset.filter(conversation_id=conversation_id)
         return queryset
