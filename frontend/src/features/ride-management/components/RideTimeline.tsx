@@ -55,18 +55,32 @@ export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
       <View style={styles.passengersContainer}>
         {boarding.map((b: any, idx: number) => (
           <View key={`b-${idx}`} style={styles.passengerRow}>
-            <Ionicons name="enter" size={14} color="#16A34A" />
-            <Text style={styles.boardingText}>
-              Monte : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.)
-            </Text>
+            <Ionicons name="enter" size={16} color="#16A34A" style={{ marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.boardingText}>
+                Prendre : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.)
+              </Text>
+              {b.departure_location ? (
+                <Text style={styles.addressText} numberOfLines={2}>
+                  ➔ {b.departure_location}
+                </Text>
+              ) : null}
+            </View>
           </View>
         ))}
         {alighting.map((b: any, idx: number) => (
           <View key={`a-${idx}`} style={styles.passengerRow}>
-            <Ionicons name="exit" size={14} color="#DC2626" />
-            <Text style={styles.alightingText}>
-              Descend : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.)
-            </Text>
+            <Ionicons name="exit" size={16} color="#DC2626" style={{ marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.alightingText}>
+                Déposer : <Text style={styles.passengerName}>{b.passenger_details?.full_name || 'Passager'}</Text> ({b.seats_booked} pl.)
+              </Text>
+              {b.arrival_location ? (
+                <Text style={styles.addressText} numberOfLines={2}>
+                  ➔ {b.arrival_location}
+                </Text>
+              ) : null}
+            </View>
           </View>
         ))}
       </View>
@@ -131,13 +145,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderRadius: 8,
     padding: 8,
-    gap: 6,
+    gap: 10,
     borderWidth: 1,
     borderColor: '#F3F4F6'
   },
   passengerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8
   },
   passengerName: {
@@ -147,11 +161,18 @@ const styles = StyleSheet.create({
   boardingText: {
     fontSize: 13,
     color: '#16A34A',
-    fontWeight: '500'
+    fontWeight: '700'
   },
   alightingText: {
     fontSize: 13,
     color: '#DC2626',
+    fontWeight: '700'
+  },
+  addressText: {
+    fontSize: 12,
+    color: '#4B5563',
+    marginTop: 2,
+    lineHeight: 16,
     fontWeight: '500'
   }
 });

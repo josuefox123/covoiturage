@@ -76,10 +76,22 @@ export function BookingItem({
           <Text style={styles.passengerPhone}>{booking.passenger_details?.phone || 'Numéro masqué'}</Text>
           
           <View style={{ marginTop: 6, backgroundColor: '#F9FAFB', borderRadius: 8, padding: 8 }}>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: '#6B7280' }}>PORTION DEMANDÉE :</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: '#6B7280' }}>PORTION ET LIEUX DE PASSAGE :</Text>
             <Text style={{ fontSize: 13, color: '#1F2937', fontWeight: '700', marginTop: 2 }}>
               {booking.departure_location?.split(',')[0]} ➔ {booking.arrival_location?.split(',')[0]}
             </Text>
+            <View style={{ marginTop: 6, gap: 4 }}>
+              {booking.departure_location ? (
+                <Text style={{ fontSize: 11, color: '#4B5563', lineHeight: 15 }}>
+                  🟢 <Text style={{ fontWeight: '700' }}>Embarquement :</Text> {booking.departure_location}
+                </Text>
+              ) : null}
+              {booking.arrival_location ? (
+                <Text style={{ fontSize: 11, color: '#4B5563', lineHeight: 15 }}>
+                  🔴 <Text style={{ fontWeight: '700' }}>Débarquement :</Text> {booking.arrival_location}
+                </Text>
+              ) : null}
+            </View>
           </View>
 
           <View style={[styles.ratingRow, { marginTop: 8 }]}>
