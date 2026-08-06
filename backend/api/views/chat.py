@@ -76,8 +76,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
         ids_to_keep = []
         for conv in user_convs:
             if conv.conversation_type == 'ride' and conv.ride_id:
-                p1 = min(conv.participant_1_id, conv.participant_2_id)
-                p2 = max(conv.participant_1_id, conv.participant_2_id)
+                p1_str = str(conv.participant_1_id) if conv.participant_1_id else ""
+                p2_str = str(conv.participant_2_id) if conv.participant_2_id else ""
+                p1 = min(p1_str, p2_str)
+                p2 = max(p1_str, p2_str)
                 pair_key = (conv.ride_id, p1, p2)
                 if pair_key in seen_pairs:
                     continue
