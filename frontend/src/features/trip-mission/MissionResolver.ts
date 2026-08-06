@@ -166,7 +166,7 @@ export class MissionResolver {
         });
       }
 
-      if (action === 'pay_now' || bookingStatus === 'pending_payment') {
+      if (action === 'pay_now' || bookingStatus === 'pending_payment' || (bookingStatus === 'confirmed' && paymentStatus !== 'paid' && paymentStatus !== 'escrow')) {
         return this.createMission({
           state: 'PAYMENT',
           title: 'Paiement requis',
@@ -226,7 +226,7 @@ export class MissionResolver {
         });
       }
 
-      if (paymentStatus === 'paid' || bookingStatus === 'confirmed') {
+      if (paymentStatus === 'paid' || paymentStatus === 'escrow') {
         if (minutesToDeparture <= 30 && minutesToDeparture > 0) {
           return this.createMission({
             state: 'DRIVER_APPROACHING',

@@ -76,7 +76,7 @@ export default function PaymentSuccessScreen() {
         try {
             const details = await authFetch(`/bookings/${bookingId}/`);
             const validStatuses = ['confirmed', 'active', 'started', 'completed'];
-            if (details && (validStatuses.includes(details.status) || details.payment_status === 'paid')) {
+            if (details && (details.payment_status === 'paid' || details.payment_status === 'escrow')) {
                 setBookingDetails(details);
                 setStatus('success');
                 setMessage('Votre ticket a été chargé.');

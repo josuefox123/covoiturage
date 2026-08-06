@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -97,14 +98,86 @@
         .feexpay-btn:active {
             transform: translateY(1px);
         }
+        .form-group {
+            width: 100%;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            box-sizing: border-box;
+        }
+        .input-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4B5563;
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #D1D5DB;
+            font-size: 15px;
+            color: #1F2937;
+            background-color: #FAFAFA;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #2F80ED;
+            box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.15);
+            background-color: #FFFFFF;
+        }
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+        .zemy-logo {
+            height: 38px;
+            object-fit: contain;
+        }
+        .feexpay-logo {
+            height: 28px;
+            object-fit: contain;
+        }
+        .logo-separator {
+            font-size: 20px;
+            font-weight: bold;
+            color: #9CA3AF;
+        }
+        .payment-methods-logos {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin: 16px 0 8px 0;
+            width: 100%;
+        }
+        .payment-logo-img {
+            height: 32px;
+            object-fit: contain;
+            border-radius: 6px;
+            border: 1px solid #E5E7EB;
+            padding: 2px 8px;
+            background-color: #FFFFFF;
+        }
     </style>
 </head>
 <body>
     <div id="root">
         <div class="header">
-            <img class="logo" src="https://api.feexpay.me/api/static/feexpay_logo-h.png" alt="FeexPay Logo">
+            <div class="logo-container">
+                <img class="zemy-logo" src="{% static 'logozemy.png' %}" alt="Zemy Logo" onerror="this.style.display='none';">
+                <span class="logo-separator">+</span>
+                <img class="feexpay-logo" src="https://api.feexpay.me/api/static/feexpay_logo-h.png" alt="FeexPay Logo" onerror="this.src='https://feexpay.me/wp-content/uploads/2022/08/logo_feexpay.png';">
+            </div>
             <h1 class="title">Finaliser le paiement</h1>
-            <p class="subtitle">Sélectionnez votre moyen de paiement</p>
+            <p class="subtitle">Veuillez vérifier vos informations et payer</p>
         </div>
         <div class="loader" id="page-loader"></div>
         <div id="payment-container" style="width: 100%;"></div>
@@ -170,6 +243,10 @@
             console.log(`Paiement info: Amount=${amount}, MerchantId=${merchantId}, Mode=${mode}`);
 
             function App() {
+                const [fullnameState, setFullnameState] = React.useState(fullname);
+                const [emailState, setEmailState] = React.useState(email);
+                const [phoneState, setPhoneState] = React.useState(phone);
+
                 const handleCallback = (response) => {
                     console.log('FeexPay Callback received:', response);
                     
@@ -208,26 +285,75 @@
                     }
                 };
 
-                return React.createElement(FeexPay, {
-                    amount: amount,
-                    description: description,
-                    id: merchantId,
-                    token: apiToken,
-                    reference: customId,
-                    callback_url: urlParams.get('callback_url') || 'zemy://payments',
-                    callback_info: {
-                        description: description,
-                        fullname: fullname,
-                        email: email,
-                        phone: phone
-                    },
-                    mode: mode.toLowerCase(),
-                    currency: "XOF",
-                    buttonText: `Payer ${amount} FCFA`,
-                    buttonClass: "feexpay-btn",
-                    callback: handleCallback,
-                    error_callback_url: urlParams.get('error_callback_url') || ''
-                });
+                const cleanedFullname = fullnameState.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z\s-]/g, " ").trim();
+                const cleanedPhone = phoneState.replace(/\D/g, "");
+
+                return React.createElement('div', { style: { width: '100%' } },
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'input-label' }, 'Nom complet'),
+                        React.createElement('input', {
+                            type: 'text',
+                            className: 'form-input',
+                            value: fullnameState,
+                            onChange: (e) => setFullnameState(e.target.value)
+                        })
+                    ),
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'input-label' }, 'Adresse e-mail'),
+                        React.createElement('input', {
+                            type: 'email',
+                            className: 'form-input',
+                            value: emailState,
+                            onChange: (e) => setEmailState(e.target.value)
+                        })
+                    ),
+                    React.createElement('div', { className: 'form-group' },
+                        React.createElement('label', { className: 'input-label' }, 'Numéro de téléphone (Mobile Money)'),
+                        React.createElement('input', {
+                            type: 'tel',
+                            className: 'form-input',
+                            placeholder: 'ex: 229XXXXXXXX',
+                            value: phoneState,
+                            onChange: (e) => setPhoneState(e.target.value)
+                        })
+                    ),
+                    React.createElement('div', { className: 'payment-methods-logos' },
+                        React.createElement('img', { 
+                            src: 'https://feexpay.me/wp-content/uploads/2023/02/MTN-MoMo-Logo-PNG.png', 
+                            alt: 'MTN Mobile Money', 
+                            className: 'payment-logo-img',
+                            onError: (e) => { e.target.src = 'https://api.feexpay.me/api/static/mtn_momo.png'; }
+                        }),
+                        React.createElement('img', { 
+                            src: 'https://feexpay.me/wp-content/uploads/2023/02/Moov-Money-Logo.png', 
+                            alt: 'Moov Money', 
+                            className: 'payment-logo-img',
+                            onError: (e) => { e.target.src = 'https://api.feexpay.me/api/static/moov_money.png'; }
+                        })
+                    ),
+                    React.createElement('div', { style: { marginTop: '16px' } },
+                        React.createElement(FeexPay, {
+                            amount: amount,
+                            description: description,
+                            id: merchantId,
+                            token: apiToken,
+                            reference: customId,
+                            callback_url: urlParams.get('callback_url') || 'zemy://payments',
+                            callback_info: {
+                                description: description,
+                                fullname: cleanedFullname,
+                                email: emailState,
+                                phone: cleanedPhone
+                            },
+                            mode: mode.toLowerCase(),
+                            currency: "XOF",
+                            buttonText: `Payer ${amount} FCFA`,
+                            buttonClass: "feexpay-btn",
+                            callback: handleCallback,
+                            error_callback_url: urlParams.get('error_callback_url') || ''
+                        })
+                    )
+                );
             }
 
             console.log('Rendering FeexPayButton component...');
