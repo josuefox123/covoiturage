@@ -23,10 +23,10 @@ class MatchingEngine:
     @classmethod
     def find_rides(
         cls,
-        departure_lat: float,
-        departure_lon: float,
-        arrival_lat: float,
-        arrival_lon: float,
+        departure_lat: Optional[float],
+        departure_lon: Optional[float],
+        arrival_lat: Optional[float],
+        arrival_lon: Optional[float],
         target_date: Any,
         seats_requested: int = 1,
         departure_place_id: Optional[str] = None,
@@ -122,10 +122,10 @@ class MatchingEngine:
     def match_ride(
         cls,
         ride: Any,
-        departure_lat: float,
-        departure_lon: float,
-        arrival_lat: float,
-        arrival_lon: float,
+        departure_lat: Optional[float],
+        departure_lon: Optional[float],
+        arrival_lat: Optional[float],
+        arrival_lon: Optional[float],
         seats_requested: int
     ) -> Optional[Dict[str, Any]]:
         """

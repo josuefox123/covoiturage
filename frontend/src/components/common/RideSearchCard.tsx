@@ -169,21 +169,9 @@ export default function RideSearchCard({
               <View style={styles.driverMeta}>
                 <Text style={styles.driverName} numberOfLines={1}>{driverName}</Text>
                 <View style={styles.ratingContainer}>
-                  {ride.driver_details?.rating ? (
-                    <>
-                      <Ionicons name="star" size={12} color="#F59E0B" />
-                      <Text style={styles.ratingText}>
-                        {Number(ride.driver_details.rating).toFixed(1)}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={12} color="#16A34A" />
-                      <Text style={[styles.ratingText, { color: '#16A34A', fontWeight: '700' }]}>Vérifié</Text>
-                    </>
-                  )}
+                  <Ionicons name="car-sport" size={12} color="#6B7280" />
                   <Text style={styles.reviewCount} numberOfLines={1}>
-                    • {ride.driver_details?.rides_count ?? 0} trajet{(ride.driver_details?.rides_count ?? 0) > 1 ? 's' : ''}
+                    {ride.driver_details?.rides_count ?? 0} trajet{(ride.driver_details?.rides_count ?? 0) > 1 ? 's' : ''}
                   </Text>
                 </View>
               </View>

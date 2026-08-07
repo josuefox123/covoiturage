@@ -27,21 +27,8 @@ export function DriverCard({ ride, chatLoading, openChat }: DriverCardProps) {
         <View style={styles.driverHeaderInfo}>
           <Text style={styles.driverNameText}>{driverName}</Text>
           <View style={styles.ratingRow}>
-            {ride.driver_details?.rating ? (
-              <>
-                <Ionicons name="star" size={16} color="#F59E0B" />
-                <Text style={styles.ratingValueText}>
-                  {Number(ride.driver_details.rating).toFixed(1)}
-                </Text>
-              </>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginRight: 6 }}>
-                <Ionicons name="checkmark-circle" size={13} color="#16A34A" />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A', marginLeft: 3 }}>Conducteur vérifié</Text>
-              </View>
-            )}
             <Text style={styles.ridesCountText}>
-              • {ride.driver_details?.rides_count ?? 0} trajet(s) complété(s)
+              {ride.driver_details?.rides_count ?? 0} trajet(s) complété(s)
             </Text>
           </View>
           {ride.driver_details?.is_verified && (

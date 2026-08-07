@@ -31,6 +31,10 @@ export interface Booking {
   amount_paid_online?: number;
   departure_location?: string;
   arrival_location?: string;
+  departure_latitude?: number | string | null;
+  departure_longitude?: number | string | null;
+  arrival_latitude?: number | string | null;
+  arrival_longitude?: number | string | null;
   portion_price?: number;
   passenger_proposed_price?: number;
   driver_counter_price?: number;

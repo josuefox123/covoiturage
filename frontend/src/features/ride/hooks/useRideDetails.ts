@@ -56,12 +56,17 @@ export function useRideDetails(
   // Fetch portion metrics via Google Directions API
   useEffect(() => {
     const fetchMetrics = async () => {
-      if (passenger_dep_lat && passenger_dep_lon && passenger_arr_lat && passenger_arr_lon) {
+      const depLat = passenger_dep_lat || booking?.departure_latitude;
+      const depLon = passenger_dep_lon || booking?.departure_longitude;
+      const arrLat = passenger_arr_lat || booking?.arrival_latitude;
+      const arrLon = passenger_arr_lon || booking?.arrival_longitude;
+
+      if (depLat && depLon && arrLat && arrLon) {
         try {
-          const lat1 = parseFloat(passenger_dep_lat);
-          const lon1 = parseFloat(passenger_dep_lon);
-          const lat2 = parseFloat(passenger_arr_lat);
-          const lon2 = parseFloat(passenger_arr_lon);
+          const lat1 = parseFloat(String(depLat));
+          const lon1 = parseFloat(String(depLon));
+          const lat2 = parseFloat(String(arrLat));
+          const lon2 = parseFloat(String(arrLon));
           if (!isNaN(lat1) && !isNaN(lon1) && !isNaN(lat2) && !isNaN(lon2)) {
             const apiKey = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
             const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${lat1},${lon1}&destination=${lat2},${lon2}&key=${apiKey}`;
@@ -83,7 +88,7 @@ export function useRideDetails(
       }
     };
     fetchMetrics();
-  }, [passenger_dep_lat, passenger_dep_lon, passenger_arr_lat, passenger_arr_lon]);
+  }, [passenger_dep_lat, passenger_dep_lon, passenger_arr_lat, passenger_arr_lon, booking?.departure_latitude, booking?.departure_longitude, booking?.arrival_latitude, booking?.arrival_longitude]);
 
   const onRefresh = async () => {
     await refreshSession();

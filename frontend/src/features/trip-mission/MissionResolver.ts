@@ -23,18 +23,35 @@ export class MissionResolver {
     const paymentStatus = String(booking?.payment_status || '').toLowerCase();
     const action = String(booking?.action || '').toLowerCase();
 
+    const bookingDep = booking?.departure_location || '';
+    const bookingArr = booking?.arrival_location || '';
+    const rideDep = ride?.departure_location || '';
+    const rideArr = ride?.arrival_location || '';
+
+    const isIntermediate = bookingDep && bookingArr && (
+      bookingDep.split(',')[0].trim().toLowerCase() !== rideDep.split(',')[0].trim().toLowerCase() ||
+      bookingArr.split(',')[0].trim().toLowerCase() !== rideArr.split(',')[0].trim().toLowerCase()
+    );
+
+    let amountVal: number | string = booking?.price || ride.price_per_seat || 0;
+    if (isPassenger && booking && isIntermediate) {
+      if (['pending', 'pending_driver', 'waiting_driver'].includes(bookingStatus)) {
+        amountVal = 'À confirmer';
+      }
+    }
+
     const data: MissionData = {
       rideId: String(ride.id || item.id || ''),
       bookingId: booking?.id ? String(booking.id) : undefined,
       passengerId: booking?.passenger ? String(booking.passenger) : undefined,
       driverId: ride.driver ? String(ride.driver) : undefined,
-      amount: booking?.price || ride.price_per_seat || 0,
+      amount: amountVal,
       proposedPrice: booking?.passenger_proposed_price,
       counterPrice: booking?.driver_counter_price || booking?.custom_price,
       seatsBooked: booking?.seats_booked || 1,
-      otpCode: booking?.id ? `T-${booking.id.substring(0, 8).toUpperCase()}` : (booking?.otp_code || booking?.validation_code),
-      departureLocation: ride.departure_location || booking?.departure_location || 'Départ',
-      arrivalLocation: ride.arrival_location || booking?.arrival_location || 'Arrivée',
+      otpCode: (booking?.payment_status === 'paid' || booking?.payment_status === 'escrow') ? `T-${booking.id.substring(0, 8).toUpperCase()}` : undefined,
+      departureLocation: booking?.departure_location || ride.departure_location || 'Départ',
+      arrivalLocation: booking?.arrival_location || ride.arrival_location || 'Arrivée',
       departureTime: ride.departure_time || '00:00',
       departureDate: ride.departure_date || 'Aujourd\'hui',
       driverName: ride.driver_details?.full_name || 'Conducteur',
@@ -71,7 +88,7 @@ export class MissionResolver {
           actions: [{ type: 'view_details', label: 'Voir le trajet' }],
           data,
           progress: 0,
-          category: 'completed'
+          category: 'cancelled'
         });
       }
 
@@ -88,7 +105,7 @@ export class MissionResolver {
           actions: [{ type: 'view_details', label: 'Détails' }],
           data,
           progress: 0,
-          category: 'completed'
+          category: 'cancelled'
         });
       }
 
@@ -105,7 +122,7 @@ export class MissionResolver {
           actions: [{ type: 'view_details', label: 'Rechercher un autre' }],
           data,
           progress: 0,
-          category: 'completed'
+          category: 'cancelled'
         });
       }
 
@@ -122,7 +139,7 @@ export class MissionResolver {
           actions: [{ type: 'view_details', label: 'Autres trajets' }],
           data,
           progress: 0,
-          category: 'completed'
+          category: 'cancelled'
         });
       }
 
@@ -318,7 +335,7 @@ export class MissionResolver {
         actions: [{ type: 'view_details', label: 'Détails' }],
         data,
         progress: 0,
-        category: 'completed'
+        category: 'cancelled'
       });
     }
 
@@ -352,7 +369,7 @@ export class MissionResolver {
     actions: MissionAction[];
     data: MissionData;
     progress: number;
-    category: 'upcoming' | 'live' | 'completed';
+    category: 'upcoming' | 'live' | 'completed' | 'cancelled';
   }): Mission {
     return {
       state: params.state,

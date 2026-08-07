@@ -38,14 +38,6 @@ export default function UserCard({ name, avatarUrl, subtitle, rating, reviewsCou
         <Text style={styles.name}>{name}</Text>
         {subtitle ? (
           <Text style={styles.subtitle}>{subtitle}</Text>
-        ) : rating ? (
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color={theme.colors.warning} />
-            <Text style={styles.ratingText}>{rating}</Text>
-            {reviewsCount !== undefined && (
-              <Text style={styles.reviewsText}>({reviewsCount} avis)</Text>
-            )}
-          </View>
         ) : null}
       </View>
     </View>

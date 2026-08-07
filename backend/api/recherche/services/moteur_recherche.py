@@ -8,10 +8,10 @@ class SearchService:
 
     @staticmethod
     def find_rides(
-        departure_lat: float,
-        departure_lon: float,
-        arrival_lat: float,
-        arrival_lon: float,
+        departure_lat: Optional[float],
+        departure_lon: Optional[float],
+        arrival_lat: Optional[float],
+        arrival_lon: Optional[float],
         target_date: Any,
         seats_requested: int = 1,
         departure_place_id: Optional[str] = None,

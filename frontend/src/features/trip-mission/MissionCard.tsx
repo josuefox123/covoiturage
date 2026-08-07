@@ -95,7 +95,12 @@ export function MissionCard({
         {data.amount ? (
           <View style={styles.priceChip}>
             <Text style={styles.priceLabel}>Montant : </Text>
-            <Text style={styles.priceValue}>{data.amount.toLocaleString()} FCFA</Text>
+            <Text style={styles.priceValue}>
+              {typeof data.amount === 'number'
+                ? `${data.amount.toLocaleString()} FCFA`
+                : data.amount
+              }
+            </Text>
           </View>
         ) : null}
 

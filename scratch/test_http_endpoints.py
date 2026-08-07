@@ -24,16 +24,14 @@ client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 client.connect(HOSTNAME, port=PORT, username=USERNAME, password=PASSWORD, timeout=30)
 
-print("=== LISTING LOGS DIRECTORY ===")
-_, stdout, _ = client.exec_command("ls -la /home/ewnhmjym/zemy/logs")
+print("=== CURL PUBLIC RIDES ENDPOINT ===")
+_, stdout, stderr = client.exec_command("curl -i https://zemy.erika-app.com/api/rides/")
 print(stdout.read().decode('utf-8'))
+print(stderr.read().decode('utf-8'))
 
-print("=== READING RECENT LOG FILES ===")
-_, stdout, _ = client.exec_command("tail -n 50 /home/ewnhmjym/zemy/logs/* 2>/dev/null")
+print("=== CURL LOCAL DAPHNE FOR RIDES ===")
+_, stdout, stderr = client.exec_command("curl -i http://127.0.0.1:8014/api/rides/")
 print(stdout.read().decode('utf-8'))
-
-print("=== NETSTAT LOG FOR PROCESS 135389 (DAPHNE) ===")
-_, stdout, _ = client.exec_command("ls -l /proc/135389/fd/ 2>/dev/null")
-print(stdout.read().decode('utf-8'))
+print(stderr.read().decode('utf-8'))
 
 client.close()

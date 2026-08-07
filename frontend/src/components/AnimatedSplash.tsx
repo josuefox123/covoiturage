@@ -41,9 +41,13 @@ export default function AnimatedSplash({ onFinish }: Props) {
   useEffect(() => {
     let animType = 'fade_scale';
 
-    // 1. Fetch branding config
-    fetchApi('/branding/')
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+    // 1. Fetch branding config with a 1.5s timeout to prevent startup hangs
+    fetchApi('/branding/', { signal: controller.signal })
       .then((data) => {
+        clearTimeout(timeoutId);
         if (data && data.logo) {
           animType = data.animation_type || 'fade_scale';
           setBranding({
@@ -56,6 +60,7 @@ export default function AnimatedSplash({ onFinish }: Props) {
         }
       })
       .catch((err) => {
+        clearTimeout(timeoutId);
       })
       .finally(() => {
         // 2. Start animation based on the selected type

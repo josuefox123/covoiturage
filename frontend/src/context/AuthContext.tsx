@@ -127,21 +127,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const savedUser = await AsyncStorage.getItem(STORAGE_USER_KEY);
         if (savedToken && savedUser) {
           setToken(savedToken);
-          setUser(JSON.parse(savedUser));
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
           
-          // Fetch fresh user data in background
-          try {
-            const parsedUser = JSON.parse(savedUser);
-            if (parsedUser && parsedUser.id) {
-              const freshUser = await fetchApi(`/users/${parsedUser.id}/`, {
-                headers: { 'Authorization': `Bearer ${savedToken}` }
-              });
-              if (freshUser) {
-                setUser(freshUser);
-                await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(freshUser));
-              }
-            }
-          } catch (e) {
+          // Fetch fresh user data in background without blocking startup
+          if (parsedUser && parsedUser.id) {
+            fetchApi(`/users/${parsedUser.id}/`, {
+              headers: { 'Authorization': `Bearer ${savedToken}` }
+            })
+              .then(async (freshUser) => {
+                if (freshUser) {
+                  setUser(freshUser);
+                  await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(freshUser));
+                }
+              })
+              .catch(() => {});
           }
         }
       } catch (e) {

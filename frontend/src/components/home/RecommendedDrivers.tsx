@@ -50,12 +50,6 @@ function DriverCard({ item }: { item: ApiDriver }) {
       <Text style={styles.name} numberOfLines={1}>
         {item.full_name?.split(' ')[0] || 'Conducteur'}
       </Text>
-      {item.rating ? (
-        <View style={styles.ratingRow}>
-          <Ionicons name="star" size={11} color="#F59E0B" />
-          <Text style={styles.rating}>{item.rating.toFixed(1)}</Text>
-        </View>
-      ) : null}
       {item.rides_count != null ? (
         <Text style={styles.trips}>{item.rides_count} trajet{item.rides_count !== 1 ? 's' : ''}</Text>
       ) : null}
@@ -77,10 +71,10 @@ export default function RecommendedDrivers() {
     try {
       const data = await authFetch('/users/?is_staff=false&is_verified=true');
       const list: ApiDriver[] = Array.isArray(data) ? data : data?.results || [];
-      // Sort by rating desc, take top 6
+      // Sort by rides count desc, take top 6
       const sorted = list
         .filter((u) => u.is_verified)
-        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+        .sort((a, b) => (b.rides_count ?? 0) - (a.rides_count ?? 0))
         .slice(0, 6);
       setDrivers(sorted);
     } catch {

@@ -172,10 +172,15 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if not passenger_id:
             return Response({'error': 'La conversation de trajet doit inclure le passager et le conducteur.'}, status=status.HTTP_400_BAD_REQUEST)
             
-        # Vérifier que le passager a une réservation active ou en attente pour ce trajet
-        has_valid_booking = Booking.objects.filter(ride=ride, passenger_id=passenger_id).exclude(status__in=['cancelled', 'rejected', 'expired']).exists()
-        if not has_valid_booking:
-            return Response({'error': "Vous devez avoir une réservation en cours ou validée pour démarrer une discussion."}, status=status.HTTP_403_FORBIDDEN)
+        # Vérifier que le passager a payé sa réservation pour ce trajet
+        has_paid_booking = Booking.objects.filter(
+            ride=ride,
+            passenger_id=passenger_id,
+            payment_status__in=['paid', 'escrow'],
+            status__in=['confirmed', 'active', 'started', 'completed']
+        ).exists()
+        if not has_paid_booking:
+            return Response({'error': "Le passager doit régler sa réservation pour démarrer une discussion."}, status=status.HTTP_403_FORBIDDEN)
             
         # Vérifier si l'utilisateur qui fait la requête est soit le passager, soit le conducteur
         if request.user.id not in [int(participant_1_id or 0), int(participant_2_id or 0)]:
@@ -281,10 +286,15 @@ class ConversationViewSet(viewsets.ModelViewSet):
         # If current user is the driver, they can also open the chat
         if passenger == driver:
             return Response({'error': 'Vous ne pouvez pas discuter avec vous-même.'}, status=status.HTTP_400_BAD_REQUEST)
-        # Vérifier que le passager a une réservation active ou en attente pour ce trajet
-        has_valid_booking = Booking.objects.filter(ride=ride, passenger=passenger).exclude(status__in=['cancelled', 'rejected', 'expired']).exists()
-        if not has_valid_booking:
-            return Response({'error': "Vous devez avoir une réservation en cours ou validée pour ce trajet pour démarrer une discussion."}, status=status.HTTP_403_FORBIDDEN)
+        # Vérifier que le passager a payé sa réservation pour ce trajet
+        has_paid_booking = Booking.objects.filter(
+            ride=ride,
+            passenger=passenger,
+            payment_status__in=['paid', 'escrow'],
+            status__in=['confirmed', 'active', 'started', 'completed']
+        ).exists()
+        if not has_paid_booking:
+            return Response({'error': "Vous devez régler votre réservation pour ce trajet pour pouvoir démarrer une discussion."}, status=status.HTTP_403_FORBIDDEN)
 
         # Find or create the conversation
         conversation = Conversation.objects.filter(

@@ -143,7 +143,7 @@ export function BookingConfirmModal({
 
             <View style={{ marginBottom: 20 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#1F2937', marginBottom: 10 }}>
-                Souhaitez-vous proposer un autre prix ?
+                Souhaitez-vous proposer un prix ?
               </Text>
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
                 <TouchableOpacity

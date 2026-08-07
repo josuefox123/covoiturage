@@ -45,7 +45,7 @@ export interface MissionData {
   bookingId?: string;
   passengerId?: string;
   driverId?: string;
-  amount?: number;
+  amount?: number | string;
   proposedPrice?: number;
   counterPrice?: number;
   seatsBooked?: number;
@@ -73,6 +73,6 @@ export interface Mission {
   actions: MissionAction[];
   data: MissionData;
   progress: number; // Percentage 0 - 100%
-  category: 'upcoming' | 'live' | 'completed';
+  category: 'upcoming' | 'live' | 'completed' | 'cancelled';
   role?: 'passenger' | 'driver';
 }

@@ -310,6 +310,8 @@ class BookingViewSet(viewsets.ModelViewSet):
         passenger = booking.passenger
         driver = ride.driver
         
+        dep_loc = booking.departure_location or ride.departure_location or ''
+        arr_loc = booking.arrival_location or ride.arrival_location or ''
         create_and_send_notification(
             user=driver,
             title="Passager arrivé 🏁",
@@ -319,7 +321,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         create_and_send_notification(
             user=passenger,
             title="Trajet terminé 🏁",
-            message=f"Votre trajet {ride.departure_location} -> {ride.arrival_location} est terminé. Merci d'avoir voyagé avec nous !",
+            message=f"Votre trajet {dep_loc} -> {arr_loc} est terminé. Merci d'avoir voyagé avec nous !",
             data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
         )
         
@@ -343,7 +345,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         try:
             import urllib.parse
             amount_to_pay = max(100, int(booking.amount_paid_online))
-            description = f"Commission Zemy - Trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}"
+            dep_loc = booking.departure_location or booking.ride.departure_location or ''
+            arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
+            description = f"Commission Zemy - Trajet {dep_loc} -> {arr_loc}"
             
             import time
             path = (

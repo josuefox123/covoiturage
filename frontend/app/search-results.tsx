@@ -31,7 +31,7 @@ const PRIMARY = '#0066FF';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type SortOption = 'earliest' | 'price_asc' | 'price_desc' | 'rating';
+type SortOption = 'earliest' | 'price_asc' | 'price_desc';
 type TimeSlot   = 'morning' | 'afternoon' | 'evening';
 
 interface FilterState {
@@ -70,7 +70,6 @@ const SORT_OPTIONS: { id: SortOption; label: string; icon: keyof typeof Ionicons
   { id: 'earliest',   label: 'Départ le plus tôt', icon: 'time-outline' },
   { id: 'price_asc',  label: 'Prix le plus bas',    icon: 'trending-down-outline' },
   { id: 'price_desc', label: 'Prix le plus élevé',  icon: 'trending-up-outline' },
-  { id: 'rating',     label: 'Meilleure note',       icon: 'star-outline' },
 ];
 
 const TIME_SLOTS: { id: TimeSlot; range: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -462,7 +461,6 @@ export default function SearchResultsScreen() {
     switch (filters.sort) {
       case 'price_asc':  list.sort((a, b) => (a.price_per_seat ?? 0) - (b.price_per_seat ?? 0)); break;
       case 'price_desc': list.sort((a, b) => (b.price_per_seat ?? 0) - (a.price_per_seat ?? 0)); break;
-      case 'rating':     list.sort((a, b) => (b.driver_details?.rating ?? 0) - (a.driver_details?.rating ?? 0)); break;
       default:           list.sort((a, b) => (a.departure_time || '').localeCompare(b.departure_time || '')); break;
     }
     return list;

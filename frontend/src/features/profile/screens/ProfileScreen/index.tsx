@@ -251,13 +251,6 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
 
-                {user.rating ? (
-                  <View style={styles.ratingBadge}>
-                    <Ionicons name="star" size={12} color="#F59E0B" />
-                    <Text style={styles.ratingText}>{user.rating.toFixed(1)}</Text>
-                  </View>
-                ) : null}
-
                 {user.is_verified ? (
                   <View style={styles.verifiedBadgePremium}>
                     <Ionicons name="checkmark-circle" size={12} color="#10B981" />
@@ -286,11 +279,9 @@ export default function ProfileScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
               <Text style={styles.statNumber}>
-                {user?.rating != null && user.rating > 0
-                  ? user.rating.toFixed(1)
-                  : '–'}
+                {user?.is_verified ? 'Oui' : 'Non'}
               </Text>
-              <Text style={styles.statLabel}>Note / 5</Text>
+              <Text style={styles.statLabel}>Vérifié</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>

@@ -145,6 +145,7 @@ export default function PaymentSuccessScreen() {
 
     const ride = bookingDetails?.ride_details || bookingDetails?.ride || {};
     const driver = ride.driver_details || {};
+    const isPaid = bookingDetails?.payment_status === 'paid' || bookingDetails?.payment_status === 'escrow';
     const ticketNumber = `T-${bookingId?.substring(0, 8).toUpperCase() || 'ZEMY'}`;
     const formattedDate = ride.departure_date 
         ? new Date(ride.departure_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -166,11 +167,23 @@ export default function PaymentSuccessScreen() {
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
             <View style={styles.successHeader}>
-                <View style={styles.iconContainerSuccess}>
-                    <Feather name="check-circle" size={50} color="#10B981" />
-                </View>
-                <Text style={styles.successTitle}>Paiement Validé !</Text>
-                <Text style={styles.successSubtitle}>Votre place a été réservée avec succès.</Text>
+                {isPaid ? (
+                    <>
+                        <View style={styles.iconContainerSuccess}>
+                            <Feather name="check-circle" size={50} color="#10B981" />
+                        </View>
+                        <Text style={styles.successTitle}>Paiement Validé !</Text>
+                        <Text style={styles.successSubtitle}>Votre place a été réservée avec succès.</Text>
+                    </>
+                ) : (
+                    <>
+                        <View style={[styles.iconContainerSuccess, { backgroundColor: '#EFF6FF' }]}>
+                            <Feather name="info" size={50} color="#2D9CDB" />
+                        </View>
+                        <Text style={[styles.successTitle, { color: '#2F80ED' }]}>Billet Disponible</Text>
+                        <Text style={styles.successSubtitle}>Réservation acceptée. En attente de règlement.</Text>
+                    </>
+                )}
             </View>
 
             {/* Ticket Card */}
@@ -218,7 +231,7 @@ export default function PaymentSuccessScreen() {
                         <Text style={styles.detailsValSub}>{driver.phone || ''}</Text>
                     </View>
                     <View style={styles.detailsCol}>
-                        <Text style={styles.detailsLabel}>Montant total payé</Text>
+                        <Text style={styles.detailsLabel}>{isPaid ? 'Montant total payé' : 'Montant à payer'}</Text>
                         <Text style={styles.detailsValAmount}>{amount} FCFA</Text>
                     </View>
                 </View>
@@ -236,21 +249,23 @@ export default function PaymentSuccessScreen() {
                 </View>
             </View>
 
-            <TouchableOpacity 
-                style={styles.receiptBtn} 
-                onPress={handleDownloadReceipt}
-                disabled={downloading}
-                activeOpacity={0.8}
-            >
-                {downloading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                    <>
-                        <Ionicons name="document-text" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <Text style={styles.receiptBtnText}>Télécharger mon reçu PDF</Text>
-                    </>
-                )}
-            </TouchableOpacity>
+            {isPaid && (
+                <TouchableOpacity 
+                    style={styles.receiptBtn} 
+                    onPress={handleDownloadReceipt}
+                    disabled={downloading}
+                    activeOpacity={0.8}
+                >
+                    {downloading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <>
+                            <Ionicons name="document-text" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                            <Text style={styles.receiptBtnText}>Télécharger mon reçu PDF</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace('/(tabs)/trips')}>
                 <Text style={styles.doneBtnText}>Fermer et voir mes trajets</Text>

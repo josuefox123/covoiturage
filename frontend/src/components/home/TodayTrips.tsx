@@ -39,12 +39,6 @@ function TripCard({ item, onPress }: { item: Ride; onPress: () => void }) {
         )}
         <View style={styles.driverInfo}>
           <Text style={styles.driverName}>{driver?.full_name || 'Conducteur'}</Text>
-          {driver?.rating ? (
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={11} color="#F59E0B" />
-              <Text style={styles.rating}>{driver.rating}</Text>
-            </View>
-          ) : null}
         </View>
         <View style={styles.priceBadge}>
           <Text style={styles.price}>{(item.price_per_seat ?? 0).toLocaleString()}</Text>

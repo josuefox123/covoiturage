@@ -18,7 +18,7 @@ export default function TripsScreen() {
   const { fetchPassengerBookings, fetchDriverRides } = useTrips();
   
   const [roleTab, setRoleTab] = useState<'passenger' | 'driver'>('passenger');
-  const [missionFilter, setMissionFilter] = useState<'upcoming' | 'live' | 'completed'>('upcoming');
+  const [missionFilter, setMissionFilter] = useState<'upcoming' | 'live' | 'completed' | 'cancelled'>('upcoming');
   
   const [passengerTrips, setPassengerTrips] = useState<any[]>([]);
   const [driverTrips, setDriverTrips] = useState<any[]>([]);
@@ -121,7 +121,7 @@ export default function TripsScreen() {
 
   const filteredItems = getFilteredItems();
 
-  const getCountByFilter = (filter: 'upcoming' | 'live' | 'completed') => {
+  const getCountByFilter = (filter: 'upcoming' | 'live' | 'completed' | 'cancelled') => {
     const rawList = roleTab === 'passenger' ? passengerTrips : driverTrips;
     return rawList.filter((item) => {
       const mission = MissionResolver.resolveMission(item, roleTab);
@@ -250,7 +250,7 @@ export default function TripsScreen() {
               color={missionFilter === 'completed' ? '#7C3AED' : '#94A3B8'}
             />
           </View>
-          <Text style={[styles.filterCardTitle, missionFilter === 'completed' && { color: '#7C3AED', fontWeight: '800' }]}>
+          <Text style={[styles.filterCardTitle, missionFilter === 'completed' && { color: '#7C3AED', fontWeight: '800' }]} numberOfLines={1} adjustsFontSizeToFit>
             Terminés
           </Text>
           <View style={[styles.filterCardBadge, missionFilter === 'completed' && { backgroundColor: '#DDD6FE' }]}>
@@ -259,21 +259,45 @@ export default function TripsScreen() {
             </Text>
           </View>
         </TouchableOpacity>
+
+        {/* Annulés */}
+        <TouchableOpacity
+          style={[styles.filterCard, missionFilter === 'cancelled' && styles.filterCardCancelledActive]}
+          onPress={() => setMissionFilter('cancelled')}
+        >
+          <View style={[styles.filterCardIcon, missionFilter === 'cancelled' && { backgroundColor: '#FEE2E2' }]}>
+            <Ionicons
+              name="close-circle"
+              size={18}
+              color={missionFilter === 'cancelled' ? '#EF4444' : '#94A3B8'}
+            />
+          </View>
+          <Text style={[styles.filterCardTitle, missionFilter === 'cancelled' && { color: '#EF4444', fontWeight: '800' }]} numberOfLines={1} adjustsFontSizeToFit>
+            Annulés
+          </Text>
+          <View style={[styles.filterCardBadge, missionFilter === 'cancelled' && { backgroundColor: '#FCA5A5' }]}>
+            <Text style={[styles.filterCardBadgeText, missionFilter === 'cancelled' && { color: '#7F1D1D' }]}>
+              {getCountByFilter('cancelled')}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Section Title */}
       <View style={styles.sectionHeader}>
         <View style={[styles.sectionDot, {
-          backgroundColor: missionFilter === 'upcoming' ? '#D97706' : missionFilter === 'live' ? '#059669' : '#7C3AED'
+          backgroundColor: missionFilter === 'upcoming' ? '#D97706' : missionFilter === 'live' ? '#059669' : missionFilter === 'completed' ? '#7C3AED' : '#EF4444'
         }]} />
         <Text style={styles.sectionTitle}>
           {roleTab === 'passenger'
             ? missionFilter === 'upcoming' ? 'Réservations à venir'
               : missionFilter === 'live' ? 'Réservations en cours'
-              : 'Historique des réservations'
+              : missionFilter === 'completed' ? 'Historique des réservations'
+              : 'Réservations annulées'
             : missionFilter === 'upcoming' ? 'Trajets publiés à venir'
               : missionFilter === 'live' ? 'Trajets en cours de conduite'
-              : 'Trajets terminés'}
+              : missionFilter === 'completed' ? 'Trajets terminés'
+              : 'Trajets annulés'}
         </Text>
         <Text style={styles.sectionCount}>
           {filteredItems.length} résultat{filteredItems.length > 1 ? 's' : ''}
@@ -309,7 +333,7 @@ export default function TripsScreen() {
                 />
               </View>
               <Text style={styles.emptyTitle}>
-                {missionFilter === 'upcoming' ? 'Aucune mission à venir' : missionFilter === 'live' ? 'Aucun trajet en cours' : 'Aucun historique'}
+                {missionFilter === 'upcoming' ? 'Aucune mission à venir' : missionFilter === 'live' ? 'Aucun trajet en cours' : missionFilter === 'completed' ? 'Aucun historique' : 'Aucun trajet annulé'}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {roleTab === 'passenger'
@@ -317,12 +341,16 @@ export default function TripsScreen() {
                     ? 'Vos réservations confirmées et en attente apparaîtront ici.'
                     : missionFilter === 'live'
                     ? 'Aucune réservation active en ce moment.'
-                    : 'Votre historique de voyages s\'affichera ici.'
+                    : missionFilter === 'completed'
+                    ? 'Votre historique de voyages s\'affichera ici.'
+                    : 'Vos réservations annulées ou expirées s\'afficheront ici.'
                   : missionFilter === 'upcoming'
                   ? 'Vos trajets publiés et à venir sont listés ici.'
                   : missionFilter === 'live'
                   ? 'Aucun trajet que vous conduisez actuellement.'
-                  : 'Vos trajets effectués apparaissent ici.'}
+                  : missionFilter === 'completed'
+                  ? 'Vos trajets effectués apparaissent ici.'
+                  : 'Vos trajets annulés s\'afficheront ici.'}
               </Text>
             </View>
           ) : (
@@ -505,6 +533,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
     borderColor: '#C4B5FD',
     shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2
+  },
+  filterCardCancelledActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    shadowColor: '#EF4444',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 6,
