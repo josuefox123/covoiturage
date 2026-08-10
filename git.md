@@ -66,29 +66,15 @@ Ce document récapitule l'organisation de vos dépôts Git pour ce projet. Le pr
 
 ---
 
-### 📅 Etat au 7 Août 2026 (Modifications en cours — non commitées)
-> Ces modifications sont présentes dans le répertoire de travail mais n'ont pas encore été committées.
-
-- **Backend :**
-  - `directions.py` (cartographie Google) — ajustements mineurs.
-  - `connections.py` et `moteur.py` (matching) — refactoring/optimisations du moteur de correspondances.
-  - `moteur_recherche.py` (recherche) — mises à jour du service de recherche.
-  - `bookings.py` (réservations) — ajustements dans les vues de réservation.
-  - `chat.py` (messagerie) — modifications dans la vue de chat.
-- **Frontend (Application Mobile) :**
-  - `trips.tsx` — mise à jour de l'onglet Trajets.
-  - `payment/success.tsx` — modifications de l'écran de succès de paiement.
-  - `ride-management/[id].tsx` — refactoring majeur de l'écran de gestion de trajet conducteur (1598 insertions / suppressions).
-  - `ride/[id].tsx` — refactoring majeur de l'écran de détail trajet passager (1436 insertions / suppressions).
-  - `search-results.tsx` — corrections mineures de l'écran de résultats de recherche.
-  - `LiveRideModal.tsx` — refactoring du modal de trajet en direct (1384 insertions / suppressions).
-  - `RideMap.tsx` — refactoring de la carte de trajet (479 insertions / suppressions).
-  - `MissionResolver.ts` et `MissionCard.tsx` / `MissionTypes.ts` — mises à jour de la logique de résolution et d'affichage des missions.
-  - `useRideDetails.ts` — mise à jour du hook de chargement des détails de trajet.
-  - `AuthContext.tsx` — évolution du contexte d'authentification.
-  - `AnimatedSplash.tsx` — ajustements de l'écran de démarrage animé.
-  - `RideSearchCard.tsx`, `UserCard.tsx`, `DriverCard.tsx`, `RecommendedDrivers.tsx`, `TodayTrips.tsx` — retouches sur les composants de liste et de carte.
-  - `ProfileScreen/index.tsx` — mises à jour de l'écran de profil.
-  - `BookingConfirmModal.tsx` — ajustements du modal de confirmation de réservation.
-  - `booking.ts` — ajout de nouveaux champs dans le type TypeScript Booking.
-  - `package.json` / `package-lock.json` — ajout d'une nouvelle dépendance npm.
+### 📅 Mise à jour du 10 Août 2026
+- **Réorganisation et Modularisation (Zéro fichier de +300 lignes) :**
+  - **Onglet Mes Trajets :** Décomposition de [trips.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/(tabs)/trips.tsx) (de 663 à ~180 lignes) en composants modulaires sous `src/features/mes-trajets/` (EnteteTrajet, SwitcherRole, FiltresStatut, EtatVide, CarteTrajet).
+  - **Détails du Trajet Passager :** Réduction de [ride/[id].tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/ride/[id].tsx) (de 981 à ~370 lignes) avec extraction des cartes et boutons sous `src/features/ride/composants/` (CarteConducteur, CarteItineraire, CarteBillet, CarteSecurite, BoutonReservation, PiedDePageTrajet).
+  - **Gestion du Trajet Conducteur :** Réduction de [ride-management/[id].tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/ride-management/[id].tsx) (de 1047 à ~470 lignes) en composants modulaires sous `src/features/ride-management/composants/` (HeroCard, StatsGrid, Timeline, PendingBookingCard, PassengerCard, VehicleCard, PremiumScanner).
+  - **Résultats de recherche :** Réduction de [search-results.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/search-results.tsx) (de 1226 à ~450 lignes) sous `src/features/search/composants/` (FiltreModalRecherche, CarteTrajetCorrespondance).
+- **Sécurisation de la communication Conducteur / Passagers :**
+  - Masquage et blocage systématique des boutons rapides d'appel téléphonique et de chat par message pour les réservations annulées ou n'ayant pas fait l'objet d'un paiement effectif (`payment_status` différent de `'paid'` ou `'escrow'`).
+  - Restriction du bouton de contact collectif pour le conducteur aux seuls passagers actifs ayant payé.
+- **Rétrocompatibilité :**
+  - Maintien des re-exports pour les anciens modules de `trip-mission` pour éviter toute régression.
+  - Validation complète de la compilation TypeScript (0 erreur) et du fonctionnement sous Expo.

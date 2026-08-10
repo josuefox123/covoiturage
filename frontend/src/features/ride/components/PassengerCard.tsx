@@ -40,9 +40,11 @@ const getBookingStatusDisplay = (status: string) => {
       return { text: status.toUpperCase(), color: '#6B7280', bg: '#F3F4F6' };
   }
 };
-
 export function PassengerCard({ booking, onMessage, onCall }: PassengerCardProps) {
   const badge = getBookingStatusDisplay(booking.status);
+  const estPaye = booking.payment_status === 'paid' || booking.payment_status === 'escrow';
+  const estAnnulle = ['cancelled', 'rejected', 'expired', 'payment_failed'].includes(booking.status);
+  const peutContacter = estPaye && !estAnnulle;
 
   return (
     <View style={styles.passengerCard}>
@@ -58,7 +60,11 @@ export function PassengerCard({ booking, onMessage, onCall }: PassengerCardProps
         )}
         <View style={styles.passengerDetails}>
           <Text style={styles.passengerName}>{booking.passenger_details?.full_name}</Text>
-          <Text style={styles.passengerPhone}>{booking.passenger_details?.phone || 'Numéro masqué'}</Text>
+          {peutContacter && booking.passenger_details?.phone ? (
+            <Text style={styles.passengerPhone}>{booking.passenger_details.phone}</Text>
+          ) : (
+            <Text style={styles.passengerPhone}>Numéro masqué</Text>
+          )}
           <View style={styles.ratingRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginRight: 4 }}>
               <Ionicons name="checkmark-circle" size={13} color="#16A34A" />
@@ -72,19 +78,21 @@ export function PassengerCard({ booking, onMessage, onCall }: PassengerCardProps
         </View>
       </View>
 
-      <View style={styles.passengerActions}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => {
-          const pId = booking.passenger_details?.id;
-          if (pId) onMessage(pId);
-        }}>
-          <Ionicons name="chatbubble-outline" size={20} color="#2F80ED" />
-          <Text style={[styles.actionBtnText, { color: '#2F80ED' }]}>Message</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => onCall(booking.passenger_details?.phone)}>
-          <Ionicons name="call-outline" size={20} color="#16A34A" />
-          <Text style={[styles.actionBtnText, { color: '#16A34A' }]}>Appeler</Text>
-        </TouchableOpacity>
-      </View>
+      {peutContacter && (
+        <View style={styles.passengerActions}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => {
+            const pId = booking.passenger_details?.id;
+            if (pId) onMessage(pId);
+          }}>
+            <Ionicons name="chatbubble-outline" size={20} color="#2F80ED" />
+            <Text style={[styles.actionBtnText, { color: '#2F80ED' }]}>Message</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => onCall(booking.passenger_details?.phone)}>
+            <Ionicons name="call-outline" size={20} color="#16A34A" />
+            <Text style={[styles.actionBtnText, { color: '#16A34A' }]}>Appeler</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }

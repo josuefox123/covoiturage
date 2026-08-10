@@ -4,7 +4,7 @@
  * Page de résultats + panneau de filtres — optimisé mobile.
  * ==============================================================
  */
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,43 +15,27 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
-  Animated,
-  Platform,
-  Dimensions,
   StatusBar,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
 import { Ride } from '../src/types/ride';
 import RideSearchCard from '../src/components/common/RideSearchCard';
 
-const PRIMARY = '#0066FF';
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+// ─── Composants Extraits ─────────────────────────────────────────────────────
+import { PRIMARY } from '../src/features/search/composants/theme-recherche';
+import {
+  FilterState,
+  DEFAULT_FILTERS,
+  FiltreModalRecherche
+} from '../src/features/search/composants/FiltreModalRecherche';
+import { CarteTrajetCorrespondance } from '../src/features/search/composants/CarteTrajetCorrespondance';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type SortOption = 'earliest' | 'price_asc' | 'price_desc';
-type TimeSlot   = 'morning' | 'afternoon' | 'evening';
-
-interface FilterState {
-  sort: SortOption;
-  timeSlots: TimeSlot[];
-  verifiedOnly: boolean;
-  minSeats: number;
-}
-
-const DEFAULT_FILTERS: FilterState = {
-  sort: 'earliest',
-  timeSlots: [],
-  verifiedOnly: false,
-  minSeats: 1,
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const getHour = (t?: string) => (t ? parseInt(t.split(':')[0], 10) : 0);
 
-const matchesSlot = (r: Ride, slots: TimeSlot[]) => {
+const matchesSlot = (r: Ride, slots: ('morning' | 'afternoon' | 'evening')[]) => {
   if (!slots.length) return true;
   const h = getHour(r.departure_time);
   return slots.some((s) =>
@@ -63,279 +47,6 @@ const matchesSlot = (r: Ride, slots: TimeSlot[]) => {
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-
-// ─── Filter Modal ─────────────────────────────────────────────────────────────
-
-const SORT_OPTIONS: { id: SortOption; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'earliest',   label: 'Départ le plus tôt', icon: 'time-outline' },
-  { id: 'price_asc',  label: 'Prix le plus bas',    icon: 'trending-down-outline' },
-  { id: 'price_desc', label: 'Prix le plus élevé',  icon: 'trending-up-outline' },
-];
-
-const TIME_SLOTS: { id: TimeSlot; range: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'morning',   range: '06:00 – 12:00', label: 'Matin',      icon: 'sunny-outline' },
-  { id: 'afternoon', range: '12:01 – 18:00', label: 'Après-midi', icon: 'partly-sunny-outline' },
-  { id: 'evening',   range: 'Après 18:00',   label: 'Soirée',     icon: 'moon-outline' },
-];
-
-interface FilterModalProps {
-  visible: boolean;
-  filters: FilterState;
-  rides: Ride[];
-  onClose: () => void;
-  onApply: (f: FilterState) => void;
-}
-
-function FilterModal({ visible, filters, rides, onClose, onApply }: FilterModalProps) {
-  const insets = useSafeAreaInsets();
-  const [local, setLocal] = useState<FilterState>(filters);
-  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-
-  useEffect(() => {
-    if (visible) {
-      setLocal(filters);
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: SCREEN_HEIGHT,
-        duration: 260,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [visible]);
-
-  const toggleSlot = (s: TimeSlot) =>
-    setLocal((p) => ({
-      ...p,
-      timeSlots: p.timeSlots.includes(s)
-        ? p.timeSlots.filter((x) => x !== s)
-        : [...p.timeSlots, s],
-    }));
-
-  const countSlot = (s: TimeSlot) => rides.filter((r) => matchesSlot(r, [s])).length;
-
-  /* ── render ── */
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      statusBarTranslucent
-      animationType="none"
-      onRequestClose={onClose}
-    >
-      {/* Dim backdrop */}
-      <TouchableOpacity
-        style={StyleSheet.absoluteFillObject}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={fm.backdrop} />
-      </TouchableOpacity>
-
-      {/* Sheet */}
-      <Animated.View
-        style={[
-          fm.sheet,
-          {
-            paddingBottom: insets.bottom + 12,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        {/* Drag handle */}
-        <View style={fm.handle} />
-
-        {/* Title bar */}
-        <View style={fm.titleBar}>
-          <TouchableOpacity onPress={onClose} style={fm.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={20} color="#374151" />
-          </TouchableOpacity>
-          <Text style={fm.titleTxt}>Filtrer</Text>
-          <TouchableOpacity onPress={() => setLocal(DEFAULT_FILTERS)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={fm.clearTxt}>Tout effacer</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Scrollable content */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-          contentContainerStyle={fm.scrollContent}
-        >
-
-          {/* ── Trier par ── */}
-          <Text style={fm.sectionHead}>Trier par</Text>
-          {SORT_OPTIONS.map((o) => (
-            <TouchableOpacity
-              key={o.id}
-              style={fm.row}
-              onPress={() => setLocal((p) => ({ ...p, sort: o.id }))}
-              activeOpacity={0.75}
-            >
-              <View style={fm.rowLeft}>
-                <View style={[fm.radio, local.sort === o.id && fm.radioOn]}>
-                  {local.sort === o.id && <View style={fm.radioDot} />}
-                </View>
-                <Text style={fm.rowLabel}>{o.label}</Text>
-              </View>
-              <View style={[fm.iconBox, local.sort === o.id && fm.iconBoxOn]}>
-                <Ionicons name={o.icon} size={16} color={local.sort === o.id ? PRIMARY : '#9CA3AF'} />
-              </View>
-            </TouchableOpacity>
-          ))}
-
-          <View style={fm.sep} />
-
-          {/* ── Heure de départ ── */}
-          <Text style={fm.sectionHead}>Heure de départ</Text>
-          {TIME_SLOTS.map((s) => {
-            const on = local.timeSlots.includes(s.id);
-            return (
-              <TouchableOpacity
-                key={s.id}
-                style={fm.row}
-                onPress={() => toggleSlot(s.id)}
-                activeOpacity={0.75}
-              >
-                <View style={fm.rowLeft}>
-                  <View style={[fm.checkbox, on && fm.checkboxOn]}>
-                    {on && <Ionicons name="checkmark" size={13} color="#fff" />}
-                  </View>
-                  <View>
-                    <Text style={fm.rowLabel}>{s.range}</Text>
-                    <Text style={fm.rowSub}>{s.label}</Text>
-                  </View>
-                </View>
-                <View style={fm.slotRight}>
-                  <View style={[fm.iconBox, on && fm.iconBoxOn]}>
-                    <Ionicons name={s.icon} size={16} color={on ? PRIMARY : '#9CA3AF'} />
-                  </View>
-                  <Text style={fm.countTxt}>{countSlot(s.id)}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-
-          <View style={fm.sep} />
-
-          {/* ── Confiance & sécurité ── */}
-          <Text style={fm.sectionHead}>Confiance et sécurité</Text>
-          <TouchableOpacity
-            style={fm.row}
-            onPress={() => setLocal((p) => ({ ...p, verifiedOnly: !p.verifiedOnly }))}
-            activeOpacity={0.75}
-          >
-            <View style={fm.rowLeft}>
-              <View style={[fm.checkbox, local.verifiedOnly && fm.checkboxOn]}>
-                {local.verifiedOnly && <Ionicons name="checkmark" size={13} color="#fff" />}
-              </View>
-              <Text style={fm.rowLabel}>Profil Vérifié</Text>
-            </View>
-            <Ionicons name="shield-checkmark" size={20} color={PRIMARY} />
-          </TouchableOpacity>
-
-          <View style={fm.sep} />
-
-          {/* ── Places minimum ── */}
-          <Text style={fm.sectionHead}>Places disponibles minimum</Text>
-          <View style={fm.chipsRow}>
-            {[1, 2, 3, 4, 5].map((n) => {
-              const on = local.minSeats === n;
-              return (
-                <TouchableOpacity
-                  key={n}
-                  style={[fm.chip, on && fm.chipOn]}
-                  onPress={() => setLocal((p) => ({ ...p, minSeats: n }))}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[fm.chipTxt, on && fm.chipTxtOn]}>{n}+</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Bottom padding so last item isn't behind footer */}
-          <View style={{ height: 24 }} />
-        </ScrollView>
-
-        {/* Sticky footer */}
-        <View style={fm.footer}>
-          <TouchableOpacity
-            style={fm.applyBtn}
-            onPress={() => onApply(local)}
-            activeOpacity={0.9}
-          >
-            <Text style={fm.applyTxt}>Voir les trajets</Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    </Modal>
-  );
-}
-
-interface ConnectionRideCardProps {
-  item: any;
-  onPress: () => void;
-}
-
-function ConnectionRideCard({ item, onPress }: ConnectionRideCardProps) {
-  const driver1 = item.ride_1.driver_details?.full_name || 'Conducteur 1';
-  const driver2 = item.ride_2.driver_details?.full_name || 'Conducteur 2';
-  
-  const depTime1 = item.departure_time_1?.substring(0, 5) || '--:--';
-  const arrTime1 = item.arrival_time_1?.substring(0, 5) || '--:--';
-  const depTime2 = item.departure_time_2?.substring(0, 5) || '--:--';
-  const arrTime2 = item.arrival_time_2?.substring(0, 5) || '--:--';
-
-  return (
-    <TouchableOpacity style={styles.connCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.connHeader}>
-        <View style={styles.connBadge}>
-          <Ionicons name="git-branch" size={14} color="#0284C7" />
-          <Text style={styles.connBadgeTxt}>1 CORRESPONDANCE</Text>
-        </View>
-        <Text style={styles.connPrice}>{item.price?.toLocaleString()} FCFA</Text>
-      </View>
-
-      <Text style={styles.connEscale}>
-        Escale à <Text style={{ fontWeight: '700' }}>{item.connection_point_name}</Text> ({item.waiting_time_min} min d'attente)
-      </Text>
-
-      <View style={styles.connTimeline}>
-        {/* Tronçon 1 */}
-        <View style={styles.connStep}>
-          <Ionicons name="time-outline" size={16} color="#6B7280" />
-          <Text style={styles.connStepTime}>{depTime1} ➔ {arrTime1}</Text>
-          <Text style={styles.connStepDriver} numberOfLines={1}>Conducteur : {driver1}</Text>
-        </View>
-
-        {/* Connecteur pointillé */}
-        <View style={styles.connDivider}>
-          <View style={styles.connDotLine} />
-        </View>
-
-        {/* Tronçon 2 */}
-        <View style={styles.connStep}>
-          <Ionicons name="time-outline" size={16} color="#6B7280" />
-          <Text style={styles.connStepTime}>{depTime2} ➔ {arrTime2}</Text>
-          <Text style={styles.connStepDriver} numberOfLines={1}>Conducteur : {driver2}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.connFooter}>
-        <Text style={styles.connMoreTxt}>Voir les détails de la correspondance</Text>
-        <Ionicons name="chevron-forward" size={16} color="#0284C7" />
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function SearchResultsScreen() {
   const router = useRouter();
@@ -535,7 +246,7 @@ export default function SearchResultsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Barre de filtrage rapide par Véhicule (Voiture, Moto, Tricycle) ── */}
+      {/* ── Barre de filtrage rapide par Véhicule ── */}
       <View style={styles.vehicleFilterBar}>
         <ScrollView
           horizontal
@@ -626,7 +337,7 @@ export default function SearchResultsScreen() {
           renderItem={({ item, index }) => {
             if (item.cardType === 'connection') {
               return (
-                <ConnectionRideCard
+                <CarteTrajetCorrespondance
                   item={item}
                   onPress={() => setSelectedConnection(item)}
                 />
@@ -674,8 +385,8 @@ export default function SearchResultsScreen() {
         />
       )}
 
-      {/* ── Filter Modal ── */}
-      <FilterModal
+      {/* ── Modal de filtre ── */}
+      <FiltreModalRecherche
         visible={showFilter}
         filters={filters}
         rides={rides}
@@ -683,7 +394,7 @@ export default function SearchResultsScreen() {
         onApply={(f) => { setFilters(f); setShowFilter(false); }}
       />
 
-      {/* ── Connection Details Modal ── */}
+      {/* ── Modal Détails Correspondance ── */}
       <Modal
         visible={selectedConnection !== null}
         transparent={true}
@@ -730,7 +441,7 @@ export default function SearchResultsScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Escale Pivot info */}
+              {/* Escale pivot */}
               <View style={styles.modalEscaleInfo}>
                 <Ionicons name="walk" size={20} color="#0284C7" />
                 <Text style={styles.modalEscaleText}>
@@ -771,455 +482,67 @@ export default function SearchResultsScreen() {
   );
 }
 
-// ─── Styles: main screen ──────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FAFF' },
-
-  /* header */
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', gap: 8,
   },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center', alignItems: 'center',
-  },
+  backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
   headerMid: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
   headerSub:   { fontSize: 11, color: '#6B7280', marginTop: 1, fontWeight: '500' },
   filterBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 11, paddingVertical: 8,
-    borderRadius: 18, borderWidth: 1.5, borderColor: PRIMARY,
+    flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 8,
+    borderRadius: 18, borderWidth: 1.5, borderColor: PRIMARY
   },
   filterBtnOn:    { backgroundColor: PRIMARY, borderColor: PRIMARY },
   filterBtnTxt:   { fontSize: 12, fontWeight: '700', color: PRIMARY },
   filterBtnTxtOn: { color: '#FFFFFF' },
-
-  /* vehicle filter bar */
-  vehicleFilterBar: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  vehicleFilterScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
+  vehicleFilterBar: { backgroundColor: '#FFFFFF', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  vehicleFilterScroll: { paddingHorizontal: 16, gap: 8 },
   vehicleChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB'
   },
   vehicleChipActive: {
-    backgroundColor: PRIMARY,
-    borderColor: PRIMARY,
-    shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: PRIMARY, borderColor: PRIMARY, shadowColor: PRIMARY,
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3
   },
-  vehicleChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  vehicleChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  vehicleCountBadge: {
-    marginLeft: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: '#E5E7EB',
-  },
-  vehicleCountBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  vehicleCountText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#4B5563',
-  },
-  vehicleCountTextActive: {
-    color: '#FFFFFF',
-  },
-
-  /* list */
+  vehicleChipText: { fontSize: 13, fontWeight: '600', color: '#4B5563' },
+  vehicleChipTextActive: { color: '#FFFFFF', fontWeight: '700' },
+  vehicleCountBadge: { marginLeft: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, backgroundColor: '#E5E7EB' },
+  vehicleCountBadgeActive: { backgroundColor: 'rgba(255, 255, 255, 0.3)' },
+  vehicleCountText: { fontSize: 11, fontWeight: '700', color: '#4B5563' },
+  vehicleCountTextActive: { color: '#FFFFFF' },
   listContent: { padding: 14, paddingBottom: 60 },
   listEmpty:   { flex: 1 },
-  listHeader:  {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 10,
-  },
+  listHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   countTxt:  { fontSize: 13, fontWeight: '600', color: '#6B7280' },
   resetTxt:  { fontSize: 13, fontWeight: '600', color: PRIMARY },
-
-  /* states */
-  center: {
-    flex: 1, justifyContent: 'center', alignItems: 'center',
-    paddingVertical: 80, paddingHorizontal: 32,
-  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 80, paddingHorizontal: 32 },
   loadTxt:  { marginTop: 14, fontSize: 14, color: '#6B7280', fontWeight: '500' },
   emptyH:   { fontSize: 17, fontWeight: '700', color: '#1F2937', marginTop: 14, marginBottom: 6, textAlign: 'center' },
   emptyP:   { fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 19 },
   retryBtn: { marginTop: 18, backgroundColor: PRIMARY, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14 },
   retryTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
-
-  /* connection card */
-  connCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: '#BAE6FD',
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  connHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  connBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E0F2FE',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  connBadgeTxt: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#0369A1',
-  },
-  connPrice: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  connEscale: {
-    fontSize: 13,
-    color: '#374151',
-    marginBottom: 12,
-  },
-  connTimeline: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  connStep: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  connStepTime: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  connStepDriver: {
-    fontSize: 12,
-    color: '#6B7280',
-    flex: 1,
-  },
-  connDivider: {
-    marginLeft: 7,
-    height: 10,
-    borderLeftWidth: 1.5,
-    borderLeftColor: '#D1D5DB',
-    borderStyle: 'dashed',
-  },
-  connDotLine: {
-    height: '100%',
-  },
-  connFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  connMoreTxt: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0284C7',
-  },
-
-  /* modal styles */
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '90%',
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  modalClose: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalScroll: {
-    padding: 20,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  modalSection: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  modalSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  stepIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: PRIMARY,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepIndicatorTxt: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  modalSectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  modalLocation: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  modalTime: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
-    marginBottom: 4,
-  },
-  modalDriver: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 12,
-  },
-  modalBookBtn: {
-    backgroundColor: PRIMARY,
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  modalBookBtnTxt: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  modalEscaleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginVertical: 14,
-    paddingHorizontal: 16,
-  },
-  modalEscaleText: {
-    fontSize: 13,
-    color: '#0284C7',
-  },
-});
-
-// ─── Styles: filter modal ─────────────────────────────────────────────────────
-const fm = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.50)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    // Max height = 88% of screen so it never overflows
-    maxHeight: SCREEN_HEIGHT * 0.88,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 24,
-  },
-
-  /* drag handle */
-  handle: {
-    alignSelf: 'center',
-    width: 40, height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D1D5DB',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-
-  /* title bar */
-  titleBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  closeBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  titleTxt:  { fontSize: 17, fontWeight: '800', color: '#111827' },
-  clearTxt:  { fontSize: 13, fontWeight: '600', color: PRIMARY },
-
-  /* scroll */
-  scrollContent: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 100 },
-
-  /* section */
-  sectionHead: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#111827',
-    marginTop: 18,
-    marginBottom: 4,
-  },
-
-  /* row */
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F9FAFB',
-  },
-  rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
-  rowLabel: { fontSize: 15, fontWeight: '500', color: '#1F2937' },
-  rowSub:   { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
-  rowIcon: { fontSize: 18 },
-  iconBox: {
-    width: 30, height: 30, borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  iconBoxOn: { backgroundColor: '#EEF3FF' },
-  slotRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  countTxt: { fontSize: 13, fontWeight: '700', color: '#9CA3AF', minWidth: 20, textAlign: 'right' },
-
-  /* radio */
-  radio: {
-    width: 22, height: 22, borderRadius: 11,
-    borderWidth: 2, borderColor: '#D1D5DB',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  radioOn:  { borderColor: PRIMARY },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: PRIMARY },
-
-  /* checkbox */
-  checkbox: {
-    width: 22, height: 22, borderRadius: 6,
-    borderWidth: 2, borderColor: '#D1D5DB',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  checkboxOn: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-
-  /* separator */
-  sep: { height: 1, backgroundColor: '#F3F4F6', marginTop: 16 },
-
-  /* seat chips */
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: 12 },
-  chip: {
-    paddingHorizontal: 20, paddingVertical: 10,
-    borderRadius: 50, borderWidth: 1.5, borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-  },
-  chipOn:    { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  chipTxt:   { fontSize: 14, fontWeight: '700', color: '#6B7280' },
-  chipTxtOn: { color: '#FFFFFF' },
-
-  /* sticky footer */
-  footer: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  applyBtn: {
-    backgroundColor: PRIMARY,
-    borderRadius: 18,
-    paddingVertical: 15,
-    alignItems: 'center',
-    shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  applyTxt: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '90%', paddingBottom: 40 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  modalClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  modalScroll: { padding: 20 },
+  modalSubtitle: { fontSize: 14, color: '#6B7280', marginBottom: 20, lineHeight: 20 },
+  modalSection: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' },
+  modalSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  stepIndicator: { width: 24, height: 24, borderRadius: 12, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
+  stepIndicatorTxt: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  modalSectionTitle: { fontSize: 14, fontWeight: '800', color: '#111827' },
+  modalLocation: { fontSize: 16, fontWeight: '700', color: '#1F2937', marginBottom: 4 },
+  modalTime: { fontSize: 13, fontWeight: '600', color: '#4B5563', marginBottom: 4 },
+  modalDriver: { fontSize: 12, color: '#6B7280', marginBottom: 12 },
+  modalBookBtn: { backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  modalBookBtnTxt: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  modalEscaleInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 14, paddingHorizontal: 16 },
+  modalEscaleText: { fontSize: 13, color: '#0284C7' }
 });
