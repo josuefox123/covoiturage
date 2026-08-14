@@ -191,6 +191,11 @@ class RideSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         ret['original_price_per_seat'] = instance.price_per_seat
+        
+        # Filtrer pour exclure les escales générées automatiquement (is_driver = False)
+        if 'stopovers' in ret and isinstance(ret['stopovers'], list):
+            ret['stopovers'] = [s for s in ret['stopovers'] if isinstance(s, dict) and s.get('is_driver', True)]
+
         request = self.context.get('request')
         if request:
             query_params = request.query_params if hasattr(request, 'query_params') else getattr(request, 'GET', {})
