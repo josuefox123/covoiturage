@@ -373,6 +373,24 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Paramètres du compte</Text>
           <View style={styles.menuCard}>
             <MenuItem
+              icon="shield-checkmark-outline"
+              title="Vérification d'identité"
+              subtitle={user.is_verified ? "Identité vérifiée" : "Non vérifié — À compléter"}
+              iconColor={user.is_verified ? '#10B981' : theme.colors.primary}
+              onPress={() => {
+                if (user.is_verified) {
+                  CustomAlert.alert(
+                    'Compte vérifié',
+                    'Votre identité a été vérifiée avec succès. Vous pouvez utiliser toutes les fonctionnalités de l\'application, notamment publier des trajets.',
+                    [{ text: 'Super !' }]
+                  );
+                } else {
+                  router.push('/verify-identity');
+                }
+              }}
+            />
+            <View style={styles.menuDivider} />
+            <MenuItem
               icon="person-outline"
               title="Informations personnelles"
               subtitle={user.full_name || 'À remplir'}
@@ -424,24 +442,6 @@ export default function ProfileScreen() {
               title="Vérifier l'email"
               subtitle={user.email ? "Email vérifié" : "Non vérifié"}
               onPress={() => CustomAlert.alert('Sécurité', 'Fonctionnalité disponible prochainement.')}
-            />
-            <View style={styles.menuDivider} />
-            <MenuItem
-              icon="shield-checkmark-outline"
-              title="Vérification d'identité"
-              subtitle={user.is_verified ? "Identité vérifiée" : "Non vérifié — À compléter"}
-              iconColor={user.is_verified ? '#10B981' : theme.colors.primary}
-              onPress={() => {
-                if (user.is_verified) {
-                  CustomAlert.alert(
-                    'Compte vérifié',
-                    'Votre identité a été vérifiée avec succès. Vous pouvez utiliser toutes les fonctionnalités de l\'application, notamment publier des trajets.',
-                    [{ text: 'Super !' }]
-                  );
-                } else {
-                  router.push('/verify-identity');
-                }
-              }}
             />
           </View>
         </View>
