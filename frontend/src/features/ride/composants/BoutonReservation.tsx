@@ -75,24 +75,26 @@ export function BoutonReservation({
         onBooking, {}, bookingLoading || isStarted
       );
 
-    case 'waiting_driver':
-      return wrap(
-        <View style={styles.rowC}>
-          <Ionicons name="time-outline" size={17} color={C.white} />
-          <Text style={styles.bookBtnTxt} adjustsFontSizeToFit numberOfLines={1}>En attente</Text>
-        </View>,
-        () => CustomAlert.alert('En attente', 'Le conducteur doit approuver votre demande.'),
-        { backgroundColor: C.warning }
-      );
-
-    case 'offer_received':
-      return wrap(
-        <View style={styles.rowC}>
-          <Ionicons name="alert-circle" size={17} color={C.white} />
-          <Text style={styles.bookBtnTxt} adjustsFontSizeToFit numberOfLines={1}>Proposition reçue</Text>
-        </View>,
-        onShowNegModal, { backgroundColor: C.warning }
-      );
+    // ── NÉGOCIATION DÉSACTIVÉE — cases waiting_driver et offer_received commentés ────────────────────
+    // case 'waiting_driver':
+    //   return wrap(
+    //     <View style={styles.rowC}>
+    //       <Ionicons name="time-outline" size={17} color={C.white} />
+    //       <Text style={styles.bookBtnTxt} adjustsFontSizeToFit numberOfLines={1}>En attente</Text>
+    //     </View>,
+    //     () => CustomAlert.alert('En attente', 'Le conducteur doit approuver votre demande.'),
+    //     { backgroundColor: C.warning }
+    //   );
+    //
+    // case 'offer_received':
+    //   return wrap(
+    //     <View style={styles.rowC}>
+    //       <Ionicons name="alert-circle" size={17} color={C.white} />
+    //       <Text style={styles.bookBtnTxt} adjustsFontSizeToFit numberOfLines={1}>Proposition reçue</Text>
+    //     </View>,
+    //     onShowNegModal, { backgroundColor: C.warning }
+    //   );
+    // ─────────────────────────────────────────────────────────────────────────────────────────────────
 
     case 'pay':
       return wrap(

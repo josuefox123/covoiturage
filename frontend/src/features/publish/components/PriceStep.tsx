@@ -154,6 +154,15 @@ export function PriceStep({
             </Text>
           </View>
 
+          {/* Bandeau obligatoire : prix par tronçon */}
+          <View style={{ backgroundColor: '#FFF7ED', borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderColor: '#FED7AA' }}>
+            <Ionicons name="alert-circle" size={18} color="#F97316" style={{ marginTop: 2 }} />
+            <Text style={{ flex: 1, fontSize: 13, color: '#92400E', fontWeight: '600', lineHeight: 18 }}>
+              {'Vous avez ajouté des points d\'arrêt. Le prix de chaque tronçon est obligatoire et sera affiché au passager pour paiement.'}
+            </Text>
+          </View>
+
+
           <View style={styles.segmentPricesList}>
             {legs.map((leg, idx) => {
               const startCity = idx === 0 ? departure.split(',')[0].trim() : stopovers[idx - 1]?.name.split(',')[0].trim();

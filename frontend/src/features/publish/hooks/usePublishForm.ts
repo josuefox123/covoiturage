@@ -570,8 +570,24 @@ export function usePublishForm(authCtx: any) {
       CustomAlert.alert('Prix manquant', 'Veuillez entrer un prix valide.');
       return false;
     }
+    // PRIX OBLIGATOIRES PAR TRONÇON : si le conducteur a des points d'arrêt,
+    // chaque tronçon doit avoir un prix > 0 pour que les passagers puissent payer.
+    if (stopovers && stopovers.length > 0) {
+      const numLegs = stopovers.length + 1;
+      for (let i = 0; i < numLegs; i++) {
+        const legPrice = legPrices && legPrices.length > i ? legPrices[i] : 0;
+        if (!legPrice || legPrice <= 0) {
+          CustomAlert.alert(
+            'Prix des tronçons obligatoires',
+            `Vous avez ajouté des points d'arrêt. Veuillez définir un prix > 0 pour chaque tronçon (tronçon ${i + 1} est à 0).`
+          );
+          return false;
+        }
+      }
+    }
     return true;
   };
+
 
   const handleNext = () => {
     Keyboard.dismiss();

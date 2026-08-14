@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+﻿import React, { useState } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Ride } from '../../../../src/types';
 
@@ -25,24 +25,31 @@ export function BookingConfirmModal({
   onConfirm
 }: BookingConfirmModalProps) {
   const [seatsToBook, setSeatsToBook] = useState(1);
-  const [proposeCustomPrice, setProposeCustomPrice] = useState(false);
-  const [proposedPriceText, setProposedPriceText] = useState('');
-  const [passengerMessageText, setPassengerMessageText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset submitting state when modal visibility changes
+  // â”€â”€ NÃ‰GOCIATION DÃ‰SACTIVÃ‰E â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // const [proposeCustomPrice, setProposeCustomPrice] = useState(false);
+  // const [proposedPriceText, setProposedPriceText] = useState('');
+  // const [passengerMessageText, setPassengerMessageText] = useState('');
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  // Reset state when modal visibility changes
   React.useEffect(() => {
     if (!visible) {
       setSubmitting(false);
+      setSeatsToBook(1);
     }
   }, [visible]);
+
+  const displayPrice = pricePerSeat ?? ride?.price_per_seat ?? 0;
+  const totalToPay = displayPrice * seatsToBook;
 
   const handleConfirm = async () => {
     if (submitting || bookingLoading) return;
     setSubmitting(true);
     try {
-      const customPrice = proposeCustomPrice && proposedPriceText ? parseInt(proposedPriceText) : undefined;
-      await onConfirm(seatsToBook, customPrice, passengerMessageText);
+      // Plus de nÃ©gociation : on confirme directement avec le prix affichÃ©
+      await onConfirm(seatsToBook, undefined, undefined);
     } catch (e) {
       setSubmitting(false);
     }
@@ -58,23 +65,21 @@ export function BookingConfirmModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Réserver ce trajet</Text>
+            <Text style={styles.modalTitle}>RÃ©server ce trajet</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color="#1F2937" />
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
-            <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 16 }}>
-              Veuillez configurer vos options de réservation ci-dessous.
-            </Text>
 
+            {/* RÃ©capitulatif portion */}
             <View style={{ backgroundColor: '#F3F4F6', borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 4 }}>
-                PORTION SÉLECTIONNÉE
+                PORTION SÃ‰LECTIONNÃ‰E
               </Text>
               <Text style={{ fontSize: 14, fontWeight: '600', color: '#1F2937', marginBottom: 12 }} numberOfLines={2}>
-                {departure || ride?.departure_location} → {destination || ride?.arrival_location}
+                {departure || ride?.departure_location} â†’ {destination || ride?.arrival_location}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="people-outline" size={18} color="#2F80ED" />
@@ -84,6 +89,7 @@ export function BookingConfirmModal({
               </View>
             </View>
 
+            {/* SÃ©lecteur de places */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
               <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>Nombre de places</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -105,125 +111,56 @@ export function BookingConfirmModal({
               </View>
             </View>
 
-            {(() => {
-              const extractCity = (locStr: string | undefined): string => {
-                if (!locStr) return '';
-                const parts = locStr.replace(/\//g, ',').split(',').map((p) => p.trim());
-                const ignore = new Set(['bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france']);
-                const cleanParts = parts.filter((p) => p && !ignore.has(p.toLowerCase()));
-                return cleanParts.length ? cleanParts[cleanParts.length - 1].toLowerCase() : (parts[0] || '').toLowerCase();
-              };
-
-              const isSegment = !!(ride?.price_per_seat && ride?.original_price_per_seat && ride.price_per_seat !== ride.original_price_per_seat);
-              const isIntermediate = !!(
-                (departure && (extractCity(departure) !== extractCity(ride?.departure_location))) ||
-                (destination && (extractCity(destination) !== extractCity(ride?.arrival_location))) ||
-                isSegment
-              );
-
-              return (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingBottom: 16 }}>
-                  <View>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>TOTAL :</Text>
-                    <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>Frais Zemy inclus</Text>
-                  </View>
-                  {isIntermediate ? (
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 18, fontWeight: '800', color: '#D97706' }}>À confirmer</Text>
-                      <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2, fontWeight: '600' }}>avec le chauffeur</Text>
-                    </View>
-                  ) : (
-                    <Text style={{ fontSize: 22, fontWeight: '800', color: '#2F80ED' }}>
-                      {((pricePerSeat ?? ride?.price_per_seat ?? 0) * seatsToBook).toLocaleString()} FCFA
-                    </Text>
-                  )}
+            {/* RÃ©capitulatif du prix */}
+            <View style={{ backgroundColor: '#EFF6FF', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1.5, borderColor: '#BFDBFE' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, color: '#4B5563' }}>Prix par place</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>
+                  {displayPrice.toLocaleString()} FCFA
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, color: '#4B5563' }}>Nombre de places</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>
+                  Ã— {seatsToBook}
+                </Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: '#BFDBFE', marginBottom: 12 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E40AF' }}>TOTAL Ã€ PAYER</Text>
+                  <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Frais Zemy inclus</Text>
                 </View>
-              );
-            })()}
+                <Text style={{ fontSize: 24, fontWeight: '900', color: '#2F80ED' }}>
+                  {totalToPay.toLocaleString()} FCFA
+                </Text>
+              </View>
+            </View>
 
+            {/* â”€â”€ NÃ‰GOCIATION DÃ‰SACTIVÃ‰E â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             <View style={{ marginBottom: 20 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#1F2937', marginBottom: 10 }}>
                 Souhaitez-vous proposer un prix ?
               </Text>
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-                <TouchableOpacity
-                  onPress={() => setProposeCustomPrice(false)}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                    borderWidth: 1.5,
-                    borderColor: !proposeCustomPrice ? '#2F80ED' : '#CBD5E1',
-                    backgroundColor: !proposeCustomPrice ? '#EFF6FF' : '#FFFFFF',
-                    alignItems: 'center'
-                  }}
-                >
-                  <Text style={{ fontWeight: '700', color: !proposeCustomPrice ? '#2F80ED' : '#6B7280' }}>NON</Text>
+                <TouchableOpacity onPress={() => setProposeCustomPrice(false)} ...>
+                  <Text>NON</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setProposeCustomPrice(true)}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                    borderWidth: 1.5,
-                    borderColor: proposeCustomPrice ? '#2F80ED' : '#CBD5E1',
-                    backgroundColor: proposeCustomPrice ? '#EFF6FF' : '#FFFFFF',
-                    alignItems: 'center'
-                  }}
-                >
-                  <Text style={{ fontWeight: '700', color: proposeCustomPrice ? '#2F80ED' : '#6B7280' }}>OUI</Text>
+                <TouchableOpacity onPress={() => setProposeCustomPrice(true)} ...>
+                  <Text>OUI</Text>
                 </TouchableOpacity>
               </View>
-
               {proposeCustomPrice && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>
-                    Votre proposition (par place)
-                  </Text>
-                  <TextInput
-                    style={{
-                      borderWidth: 1,
-                      borderColor: '#CBD5E1',
-                      borderRadius: 8,
-                      padding: 12,
-                      fontSize: 15,
-                      color: '#1F2937',
-                      backgroundColor: '#F8FAFC'
-                    }}
-                    keyboardType="numeric"
-                    placeholder="Ex: 700 FCFA"
-                    value={proposedPriceText}
-                    onChangeText={setProposedPriceText}
-                  />
-                </View>
+                <TextInput keyboardType="numeric" placeholder="Ex: 700 FCFA" ... />
               )}
             </View>
-
             <View style={{ marginBottom: 24 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1F2937', marginBottom: 8 }}>
-                Message (facultatif)
-              </Text>
-              <TextInput
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#CBD5E1',
-                  borderRadius: 8,
-                  padding: 12,
-                  fontSize: 14,
-                  color: '#1F2937',
-                  backgroundColor: '#F8FAFC',
-                  minHeight: 80,
-                  textAlignVertical: 'top'
-                }}
-                placeholder="Écrivez un message pour le chauffeur..."
-                multiline={true}
-                numberOfLines={3}
-                value={passengerMessageText}
-                onChangeText={setPassengerMessageText}
-              />
+              <Text ...>Message (facultatif)</Text>
+              <TextInput multiline placeholder="Ã‰crivez un message pour le chauffeur..." ... />
             </View>
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
+            {/* Bouton PAYER */}
             <TouchableOpacity
               style={[
                 styles.bookBtn,
@@ -237,10 +174,13 @@ export function BookingConfirmModal({
               {submitting || bookingLoading ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                   <ActivityIndicator color="#FFFFFF" size="small" />
-                  <Text style={styles.bookBtnText}>ENVOI EN COURS...</Text>
+                  <Text style={styles.bookBtnText}>TRAITEMENT...</Text>
                 </View>
               ) : (
-                <Text style={styles.bookBtnText}>CONTINUER</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <Ionicons name="card" size={18} color="#FFFFFF" />
+                  <Text style={styles.bookBtnText}>PAYER {totalToPay.toLocaleString()} FCFA</Text>
+                </View>
               )}
             </TouchableOpacity>
 

@@ -20,7 +20,7 @@ import { RideMap } from '@/src/features/ride/components/RideMap';
 import { PassengerCard } from '@/src/features/ride/components/PassengerCard';
 import { BookingConfirmModal } from '@/src/features/ride/modals/BookingConfirmModal';
 import { BookingSuccessModal } from '@/src/features/ride/modals/BookingSuccessModal';
-import { PassengerNegotiationModal } from '@/src/features/ride/modals/PassengerNegotiationModal';
+// import { PassengerNegotiationModal } from '@/src/features/ride/modals/PassengerNegotiationModal'; // NÉGOCIATION DÉSACTIVÉE
 
 // ─── Nouveaux composants extraits ────────────────────────────────────────────
 import { EcranChargement, FadeInCard, TitreSection } from '@/src/features/ride/composants/AnimationsFade';
@@ -68,7 +68,7 @@ export default function RideDetailScreen() {
 
   const [showBookModal, setShowBookModal] = useState(false);
   const [showSuccModal, setShowSuccModal] = useState(false);
-  const [showNegModal, setShowNegModal] = useState(false);
+  // const [showNegModal, setShowNegModal] = useState(false); // NÉGOCIATION DÉSACTIVÉE
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   if (loading || !ride) return <EcranChargement />;
@@ -255,7 +255,7 @@ export default function RideDetailScreen() {
                 { icon: 'calendar', bg: '#EBF4FF', val: new Date(ride.departure_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), color: C.primary },
                 { icon: 'time', bg: '#FFF7ED', val: fmtDur(ride.duration_min ?? 0), color: C.warning },
                 { icon: 'people', bg: '#F0FDF4', val: `${ride.seats_available} place${ride.seats_available !== 1 ? 's' : ''}`, color: C.success },
-                { icon: 'wallet', bg: '#EBF4FF', val: isMid ? 'Sur devis' : `${ride.price_per_seat?.toLocaleString() ?? '0'} F`, color: C.primary },
+                { icon: 'wallet', bg: '#EBF4FF', val: `${ride.price_per_seat?.toLocaleString() ?? '0'} F`, color: C.primary },
               ].map((s, i, arr) => (
                 <React.Fragment key={i}>
                   <View style={ss.gcStat}>
@@ -284,10 +284,7 @@ export default function RideDetailScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={ss.pLabel}>{isMid ? 'Prix estimé' : 'Prix par place'}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
-                  {isMid
-                    ? <Text style={[ss.pAmt, { fontSize: 28, color: C.warning }]}>À confirmer</Text>
-                    : <><Text style={ss.pAmt}>{ride.price_per_seat?.toLocaleString() ?? '0'}</Text><Text style={ss.pCur}> FCFA</Text></>
-                  }
+                  <><Text style={ss.pAmt}>{ride.price_per_seat?.toLocaleString() ?? '0'}</Text><Text style={ss.pCur}> FCFA</Text></>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
                   <Ionicons name="people" size={14} color={C.success} />
@@ -351,7 +348,7 @@ export default function RideDetailScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border }}>
                     <Text style={{ fontSize: 13, color: C.textSec, fontWeight: '600' }}>Tarif estimé</Text>
                     <Text style={{ fontSize: 16, fontWeight: '800', color: C.primary }}>
-                      {isMid ? 'À confirmer par le conducteur' : `${ride.price_per_seat?.toLocaleString()} FCFA`}
+                      {ride.price_per_seat?.toLocaleString()} FCFA
                     </Text>
                   </View>
                   {approachDist && (
@@ -362,12 +359,7 @@ export default function RideDetailScreen() {
                       </Text>
                     </View>
                   )}
-                  {isMid && (
-                    <View style={ss.warnBox}>
-                      <Ionicons name="alert-circle-outline" size={16} color={C.warning} />
-                      <Text style={ss.warnTxt}>Le conducteur proposera le tarif après votre demande. Vous ne payez qu'après son acceptation.</Text>
-                    </View>
-                  )}
+                  {/* Avertissement négociation supprimé — le prix est fixé par le conducteur et affiché directement */}
                 </View>
               </View>
             </FadeInCard>
@@ -469,7 +461,7 @@ export default function RideDetailScreen() {
           onBooking={handleBooking}
           onRetryPayment={handleRetryPayment}
           onCancel={handleCancel}
-          onShowNegModal={() => setShowNegModal(true)}
+          onShowNegModal={() => {}} // NÉGOCIATION DÉSACTIVÉE
         />
       </PiedDePageTrajet>
 
@@ -492,6 +484,7 @@ export default function RideDetailScreen() {
         driverName={ride.driver_details?.full_name || 'Inconnu'}
         onClose={() => { setShowSuccModal(false); fetchRide(); }}
       />
+      {/* NÉGOCIATION DÉSACTIVÉE — PassengerNegotiationModal commenté
       <PassengerNegotiationModal
         visible={showNegModal}
         myBooking={myBooking}
@@ -507,6 +500,7 @@ export default function RideDetailScreen() {
           if (myBooking) { const s = await handlePassengerReject(myBooking.id); if (s) setShowNegModal(false); }
         }}
       />
+      */}
     </SafeAreaView>
   );
 }

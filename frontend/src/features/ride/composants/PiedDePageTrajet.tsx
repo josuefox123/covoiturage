@@ -47,18 +47,12 @@ export function PiedDePageTrajet({
     <View style={[styles.footer, { paddingBottom: Math.max(16, paddingBottom + 8) }]}>
       {/* Prix */}
       <View style={{ minWidth: 90, paddingRight: 4 }}>
-        {isMid ? (
-          <Text style={{ fontSize: 16, fontWeight: '900', color: C.text }} numberOfLines={1} adjustsFontSizeToFit>
-            À confirmer
+        <Text numberOfLines={1} adjustsFontSizeToFit>
+          <Text style={{ fontSize: 20, fontWeight: '900', color: C.text }}>
+            {prixParPlace?.toLocaleString() ?? '0'}
           </Text>
-        ) : (
-          <Text numberOfLines={1} adjustsFontSizeToFit>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: C.text }}>
-              {prixParPlace?.toLocaleString() ?? '0'}
-            </Text>
-            <Text style={{ fontSize: 13, color: C.textSec, fontWeight: '700' }}> FCFA</Text>
-          </Text>
-        )}
+          <Text style={{ fontSize: 13, color: C.textSec, fontWeight: '700' }}> FCFA</Text>
+        </Text>
         <Text style={{ fontSize: 11, color: C.textSec, marginTop: 1 }} numberOfLines={1} adjustsFontSizeToFit>
           par place
         </Text>
