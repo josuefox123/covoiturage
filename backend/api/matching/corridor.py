@@ -108,7 +108,7 @@ class CorridorMatcher:
         dep_ok = (dep_lat is None or min_dep_dist <= max_radius_km)
         arr_ok = (arr_lat is None or min_arr_dist <= max_radius_km)
 
-        if not (dep_ok and arr_ok and idx_dep <= idx_arr):
+        if not (dep_ok and arr_ok and idx_dep < idx_arr):
             return None
 
         ride_legs = list(ride.legs.order_by('order'))

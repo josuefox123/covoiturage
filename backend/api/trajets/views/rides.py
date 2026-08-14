@@ -209,6 +209,8 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
                         dest_idx = len(places) - 1
 
                 if (not dep_kws or dep_idx != -1) and (not dest_kws or dest_idx != -1):
+                    if dep_idx != -1 and dest_idx != -1 and dep_idx >= dest_idx:
+                        continue
                     matching_ids.append(ride.id)
 
             queryset = queryset.filter(id__in=matching_ids)
