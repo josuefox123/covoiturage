@@ -87,10 +87,21 @@ export default function HomeScreen() {
 
   // ── Navigate to search results ───────────────────────────────────────────
   const handleSearch = () => {
-    if (!searchParams.departure.trim() && !searchParams.destination.trim()) {
+    const dep = searchParams.departure.trim();
+    const dest = searchParams.destination.trim();
+
+    if (!dep && !dest) {
       CustomAlert.alert(
         'Lieu requis',
         'Veuillez renseigner au moins un lieu de départ ou une destination pour lancer la recherche.'
+      );
+      return;
+    }
+
+    if (dep && dest && dep.toLowerCase() === dest.toLowerCase()) {
+      CustomAlert.alert(
+        'Trajet invalide',
+        'Le lieu de départ et la destination ne peuvent pas être identiques.'
       );
       return;
     }
