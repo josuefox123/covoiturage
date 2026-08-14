@@ -94,7 +94,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (loc && loc.coords) {
             const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
             setUserLocation(coords);
-            console.log('[Location] Position utilisateur récupérée :', coords);
           }
         }
       } catch (err) {
