@@ -145,6 +145,11 @@ export default function RideSearchCard({
     isSegment
   );
 
+  const getArrivalTime = () => getArrivalTimeHelper(ride.departure_time, ride.duration_min);
+  const getDurationText = () => getDurationTextHelper(ride.duration_min);
+  const arrivalTime = getArrivalTime();
+  const durationText = getDurationText();
+
   return (
     <Animated.View
       style={[
@@ -155,92 +160,71 @@ export default function RideSearchCard({
         },
       ]}
     >
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-        <LinearGradient
-          colors={['#FFFFFF', '#F9FAFB']}
-          style={styles.rideCard}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {/* En-tête avec conducteur et prix */}
-          <View style={styles.rideHeader}>
-            <View style={styles.driverSection}>
-              <ProfileAvatar name={driverName} url={ride.driver_details?.avatar} size={36} showBorder={false} />
-              <View style={styles.driverMeta}>
-                <Text style={styles.driverName} numberOfLines={1}>{driverName}</Text>
-                <View style={styles.ratingContainer}>
-                  <Ionicons name="car-sport" size={12} color="#6B7280" />
-                  <Text style={styles.reviewCount} numberOfLines={1}>
-                    {ride.driver_details?.rides_count ?? 0} trajet{(ride.driver_details?.rides_count ?? 0) > 1 ? 's' : ''}
-                  </Text>
-                </View>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
+        <View style={styles.rideCard}>
+          {/* Main Row : Timeline à gauche, Prix à droite */}
+          <View style={styles.mainRow}>
+            <View style={styles.routeContainer}>
+              {/* Colonne des heures et durées */}
+              <View style={styles.timeColumn}>
+                <Text style={styles.timeText}>{departureTime}</Text>
+                {durationText ? <Text style={styles.durationText}>{durationText}</Text> : <View style={{ height: 20 }} />}
+                <Text style={styles.timeText}>{arrivalTime}</Text>
+              </View>
+
+              {/* Colonne de la ligne de timeline */}
+              <View style={styles.timelineColumn}>
+                <View style={[styles.timelineDot, { borderColor: PRIMARY_COLOR }]} />
+                <View style={[styles.timelineLine, { backgroundColor: PRIMARY_COLOR }]} />
+                <View style={[styles.timelineDot, { borderColor: '#10B981' }]} />
+              </View>
+
+              {/* Colonne des villes */}
+              <View style={styles.cityColumn}>
+                <Text style={styles.cityText} numberOfLines={1}>
+                  {displayDeparture}
+                </Text>
+                <View style={{ height: 18 }} />
+                <Text style={styles.cityText} numberOfLines={1}>
+                  {displayArrival}
+                </Text>
               </View>
             </View>
-            <View style={styles.priceSection}>
+
+            {/* Zone de prix */}
+            <View style={styles.priceContainer}>
               {isIntermediate ? (
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.priceValue, { fontSize: 13, color: '#D97706', fontWeight: '800' }]}>À confirmer</Text>
-                  <Text style={{ fontSize: 9, color: '#9CA3AF', fontWeight: '600', marginTop: 1 }}>
+                  <Text style={[styles.priceText, { fontSize: 13, color: '#D97706', fontWeight: '800' }]}>À confirmer</Text>
+                  <Text style={{ fontSize: 9, color: '#9CA3AF', fontWeight: '600', marginTop: 2 }}>
                     avec le chauffeur
                   </Text>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.priceValue}>{price} FCFA</Text>
-                  <Text style={styles.priceUnit}>{priceUnit}</Text>
+                  <Text style={styles.priceText}>{price} FCFA</Text>
+                  <Text style={styles.priceSub}>{priceUnit}</Text>
                 </>
               )}
             </View>
           </View>
 
-          {/* Date de départ (Simple ligne de texte discrète) */}
+          {/* Date de départ sous forme de badge discret */}
           <View style={styles.dateBarSimple}>
-            <Ionicons name="calendar-outline" size={13} color="#6B7280" />
+            <Ionicons name="calendar-outline" size={12} color="#64748B" />
             <Text style={styles.dateTextSimple}>
               {formatFullDate(ride.departure_date)}
             </Text>
           </View>
 
-          {/* Trajet épuré style BlaBlaCar */}
-          <View style={styles.routeSection}>
-            <View style={styles.timeline}>
-              <View style={[styles.timelineDot, { backgroundColor: PRIMARY_COLOR }]} />
-              <View style={styles.timelineLine} />
-              <View style={[styles.timelineDot, { backgroundColor: '#10B981' }]} />
-            </View>
-            <View style={styles.routeDetails}>
-              {/* Point de départ */}
-              <View style={styles.routePoint}>
-                <Text style={styles.locationName} numberOfLines={1}>
-                  {displayDeparture}
-                </Text>
-                <Text style={styles.routeTime}>{departureTime}</Text>
-              </View>
-              
-              <View style={{ height: 8 }} />
-              
-              {/* Point d'arrivée */}
-              <View style={styles.routePoint}>
-                <Text style={styles.locationName} numberOfLines={1}>
-                  {displayArrival}
-                </Text>
-                {ride.duration_min ? (
-                  <Text style={styles.durationText}>
-                    {Math.floor(ride.duration_min / 60) > 0 ? `${Math.floor(ride.duration_min / 60)}h` : ''}${ride.duration_min % 60}m
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          </View>
-
-          {/* Stopovers List */}
+          {/* Stopovers List (Via:) */}
           {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 8, paddingLeft: 18 }}>
+            <View style={styles.stopoversContainer}>
               <Ionicons name="location-outline" size={11} color="#D97706" />
-              <Text style={{ fontSize: 10, fontWeight: '600', color: '#6B7280' }}>Via :</Text>
+              <Text style={styles.stopoversLabel}>Via :</Text>
               {ride.stopovers.map((stop: any, idx: number) => (
-                <View key={idx} style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
-                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#D97706' }}>{stop.name}</Text>
+                <View key={idx} style={styles.stopoverChip}>
+                  <Text style={styles.stopoverText}>{stop.name}</Text>
                 </View>
               ))}
             </View>
@@ -263,18 +247,48 @@ export default function RideSearchCard({
             </View>
           )}
 
-          {/* Footer avec places dispo et type de véhicule */}
-          <View style={styles.rideFooter}>
-            <View style={styles.badgesContainer}>
+          {/* Séparateur horizontal */}
+          <View style={styles.divider} />
+
+          {/* Bottom Row : Conducteur, Étoiles et Icônes de confort */}
+          <View style={styles.driverRow}>
+            <View style={styles.driverLeft}>
+              {/* Type de véhicule à gauche */}
+              {(() => {
+                const vType = (ride.driver_details?.vehicles?.[0]?.vehicle_type || (ride as any).vehicle_type || 'voiture').toLowerCase();
+                const icon = vType === 'moto' ? 'bicycle-outline' : vType === 'tricycle' ? 'car-sport-outline' : 'car-outline';
+                return <Ionicons name={icon} size={18} color="#64748B" style={{ marginRight: 2 }} />;
+              })()}
+
+              <ProfileAvatar name={driverName} url={ride.driver_details?.avatar} size={32} showBorder={false} />
+              
+              <View style={styles.driverInfoStack}>
+                <Text style={styles.driverNameText}>{driverName}</Text>
+                <View style={styles.ratingRow}>
+                  <Ionicons name="star" size={11} color="#EAB308" />
+                  <Text style={styles.ratingText}>
+                    {ride.driver_details?.rating ? Number(ride.driver_details.rating).toFixed(1) : '5.0'}
+                  </Text>
+                  {ride.driver_details?.rides_count && ride.driver_details.rides_count > 10 && (
+                    <View style={styles.superDriverBadge}>
+                      <Text style={styles.superDriverText}>Super Chauffeur</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* Badges de confort (Places dispo, etc.) */}
+            <View style={styles.driverRight}>
               {searchedSeats && seatsLeft < searchedSeats ? (
                 <View style={styles.warningSeatsBadge}>
                   <Ionicons name="warning-outline" size={12} color="#DC2626" />
                   <Text style={styles.warningSeatsText}>
-                    {seatsLeft} place{seatsLeft > 1 ? 's' : ''} dispo.
+                    {seatsLeft} pl.
                   </Text>
                 </View>
               ) : (
-                <View style={styles.seatsContainer}>
+                <View style={styles.seatsBadge}>
                   <Ionicons 
                     name={ride.status === 'started' || ride.status === 'completed' ? "car-sport-outline" : "people-outline"} 
                     size={13} 
@@ -286,251 +300,173 @@ export default function RideSearchCard({
                       : ride.status === 'completed' 
                         ? 'Terminé' 
                         : seatsLeft > 0 
-                          ? `${seatsLeft} place${seatsLeft > 1 ? 's' : ''}` 
+                          ? `${seatsLeft} pl.` 
                           : 'Complet'}
                   </Text>
                 </View>
               )}
 
-              {/* Badge type de véhicule (Voiture, Moto, Tricycle) */}
-              {(() => {
-                const vType = (ride.driver_details?.vehicles?.[0]?.vehicle_type || (ride as any).vehicle_type || 'voiture').toLowerCase();
-                const label = vType === 'moto' ? 'Moto' : vType === 'tricycle' ? 'Tricycle' : 'Voiture';
-                const icon = vType === 'moto' ? 'bicycle-outline' : vType === 'tricycle' ? 'car-sport-outline' : 'car-outline';
-                return (
-                  <View style={styles.vehicleBadgeContainer}>
-                    <Ionicons name={icon} size={12} color="#4B5563" />
-                    <Text style={styles.vehicleBadgeText}>{label}</Text>
-                  </View>
-                );
-              })()}
-
-              {/* Badge Kilométrage et Durée */}
-              {ride.distance_km ? (
-                <View style={styles.vehicleBadgeContainer}>
-                  <Ionicons name="map-outline" size={12} color="#4B5563" />
-                  <Text style={styles.vehicleBadgeText}>
-                    {ride.distance_km} km
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <View style={styles.viewButton}>
-              <Ionicons name="chevron-forward" size={18} color={PRIMARY_COLOR} />
+              {/* Éclat ou réservation instantanée */}
+              <Ionicons name="flash" size={16} color="#EAB308" />
             </View>
           </View>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
+// Fonction de calcul de l'heure d'arrivée
+function getArrivalTimeHelper(depTime: string | undefined, durationMin: number | undefined) {
+  if (!depTime) return '--:--';
+  try {
+    const [h, m] = depTime.split(':').map(Number);
+    const duration = durationMin || 0;
+    const totalMinutes = h * 60 + m + duration;
+    const arrH = Math.floor(totalMinutes / 60) % 24;
+    const arrM = totalMinutes % 60;
+    return `${String(arrH).padStart(2, '0')}:${String(arrM).padStart(2, '0')}`;
+  } catch (e) {
+    return '--:--';
+  }
+}
+
+// Fonction de formatage de la durée
+function getDurationTextHelper(durationMin: number | undefined) {
+  if (!durationMin) return '';
+  const h = Math.floor(durationMin / 60);
+  const m = durationMin % 60;
+  return h > 0 ? `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : `${m}min`;
+}
+
 const styles = StyleSheet.create({
   rideCardWrapper: {
-    marginBottom: 16,
+    marginBottom: 12,
     marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
   },
   rideCard: {
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#E2E8F0',
+    padding: 16,
   },
-  rideHeader: {
+  mainRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  driverSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  driverMeta: {
-    flex: 1,
-    marginLeft: 10,
-    marginRight: 4,
-  },
-  driverName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 1,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#374151',
-    marginLeft: 3,
-  },
-  reviewCount: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    marginLeft: 3,
-    flexShrink: 1,
-  },
-  priceSection: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: 4,
-  },
-  priceValue: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: PRIMARY_COLOR,
-  },
-  priceUnit: {
-    fontSize: 10,
-    color: '#6B7280',
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  dateBarSimple: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 10,
-    gap: 6,
-    paddingLeft: 2,
   },
-  dateTextSimple: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  routeSection: {
+  routeContainer: {
+    flex: 1,
     flexDirection: 'row',
-    marginBottom: 12,
-    paddingLeft: 2,
   },
-  timeline: {
-    width: 20,
+  timeColumn: {
+    width: 48,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  timeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  durationText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+    marginVertical: 4,
+  },
+  timelineColumn: {
+    width: 16,
     alignItems: 'center',
-    marginRight: 8,
-    paddingTop: 3,
+    justifyContent: 'space-between',
+    paddingVertical: 6,
   },
   timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    backgroundColor: '#FFFFFF',
   },
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#E5E7EB',
     marginVertical: 2,
     borderRadius: 1,
   },
-  routeDetails: {
+  cityColumn: {
     flex: 1,
-  },
-  routePoint: {
-    flexDirection: 'row',
+    paddingLeft: 10,
     justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingVertical: 1,
   },
-  locationName: {
-    fontSize: 14,
+  cityText: {
+    fontSize: 15,
     fontWeight: '600',
-    color: '#111827',
-    flex: 1,
-    marginRight: 12,
+    color: '#0F172A',
+    lineHeight: 18,
   },
-  routeTime: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
+  priceContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    marginLeft: 10,
   },
-  durationText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
+  priceText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  rideFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+  priceSub: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  badgesContainer: {
+  dateBarSimple: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
     gap: 6,
-    marginRight: 8,
+    marginBottom: 10,
+    paddingLeft: 2,
   },
-  seatsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  seatsText: {
+  dateTextSimple: {
     fontSize: 11,
     fontWeight: '600',
-    color: PRIMARY_COLOR,
-    marginLeft: 4,
+    color: '#64748B',
   },
-  parcelBadge: {
+  stopoversContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    gap: 6,
+    marginBottom: 10,
+    paddingLeft: 2,
   },
-  parcelBadgeText: {
-    fontSize: 11,
-    color: '#10B981',
-    marginLeft: 4,
-    fontWeight: '700',
-  },
-  vehicleBadgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    gap: 4,
-  },
-  vehicleBadgeText: {
+  stopoversLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#374151',
+    color: '#64748B',
   },
-  viewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
+  stopoverChip: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
-  viewButtonText: {
-    fontSize: 14,
+  stopoverText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: PRIMARY_COLOR,
-    marginRight: 4,
+    color: '#D97706',
   },
   intermediateBanner: {
     flexDirection: 'row',
@@ -539,7 +475,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#FCD34D',
     gap: 10,
@@ -557,24 +493,90 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   intermediateBannerText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#78350F',
     flex: 1,
-    lineHeight: 17,
+    lineHeight: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+  driverRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  driverLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  driverInfoStack: {
+    flexDirection: 'column',
+  },
+  driverNameText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 1,
+  },
+  ratingText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  superDriverBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  superDriverText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  driverRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   warningSeatsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEE2E2',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 10,
     gap: 4,
   },
   warningSeatsText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#DC2626',
+  },
+  seatsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  seatsText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: PRIMARY_COLOR,
+    marginLeft: 4,
   },
 });
