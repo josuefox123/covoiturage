@@ -217,35 +217,7 @@ export default function RideSearchCard({
             </Text>
           </View>
 
-          {/* Stopovers List (Via:) */}
-          {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 && (
-            <View style={styles.stopoversContainer}>
-              <Ionicons name="location-outline" size={11} color="#D97706" />
-              <Text style={styles.stopoversLabel}>Via :</Text>
-              {ride.stopovers.map((stop: any, idx: number) => (
-                <View key={idx} style={styles.stopoverChip}>
-                  <Text style={styles.stopoverText}>{stop.name}</Text>
-                </View>
-              ))}
-            </View>
-          )}
 
-          {/* Bannière d'arrêt intermédiaire */}
-          {(isIntermediatePickup || isIntermediateDropoff) && (
-            <View style={styles.intermediateBanner}>
-              <View style={styles.intermediateBannerLeft}>
-                <Ionicons name="information-circle" size={14} color="#D97706" />
-                <Text style={styles.intermediateBannerNB}>NB</Text>
-              </View>
-              <Text style={styles.intermediateBannerText}>
-                {isIntermediatePickup && isIntermediateDropoff
-                  ? `Arrêts intermédiaires sur le trajet ${ride.departure_location} ➔ ${ride.arrival_location}`
-                  : isIntermediatePickup
-                    ? `Votre départ n'est pas l'origine du trajet (Départ initial : ${ride.departure_location})`
-                    : `Votre arrivée n'est pas la destination finale (Destination : ${ride.arrival_location})`}
-              </Text>
-            </View>
-          )}
 
           {/* Séparateur horizontal */}
           <View style={styles.divider} />

@@ -79,12 +79,29 @@ export default function RideDetailScreen() {
   const isCompleted = ride.status === 'completed';
   const isStarted = ride.status === 'started';
   const rideAction = getRideAction(bookingState);
-  const isMid = (() => {
-    if (!ride) return false;
-    if (depLocation && depLocation.split(',')[0].trim().toLowerCase() !== ride.departure_location.split(',')[0].trim().toLowerCase()) return true;
-    if (destLocation && destLocation.split(',')[0].trim().toLowerCase() !== ride.arrival_location.split(',')[0].trim().toLowerCase()) return true;
-    return false;
+  const extractCity = (locStr: string | undefined): string => {
+    if (!locStr) return '';
+    const parts = locStr.replace(/\//g, ',').split(',').map((p) => p.trim());
+    const ignore = new Set(['bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france']);
+    const cleanParts = parts.filter((p) => p && !ignore.has(p.toLowerCase()));
+    return cleanParts.length ? cleanParts[cleanParts.length - 1].toLowerCase() : (parts[0] || '').toLowerCase();
+  };
+
+  const isIntermediatePickup = (() => {
+    if (!depLocation || !ride) return false;
+    const searchDepCity = extractCity(depLocation);
+    const rideDepCity = extractCity(ride.departure_location);
+    return !!(searchDepCity && rideDepCity && searchDepCity !== rideDepCity);
   })();
+
+  const isIntermediateDropoff = (() => {
+    if (!destLocation || !ride) return false;
+    const searchDestCity = extractCity(destLocation);
+    const rideDestCity = extractCity(ride.arrival_location);
+    return !!(searchDestCity && rideDestCity && searchDestCity !== rideDestCity);
+  })();
+
+  const isMid = isIntermediatePickup || isIntermediateDropoff;
 
   const getArrival = (): string => {
     if (!ride) return '--:--';
@@ -365,6 +382,27 @@ export default function RideDetailScreen() {
           <FadeInCard delay={240}>
             <CarteItineraire ride={ride} departure={departure} destination={destination} heureArrivee={getArrival()} />
           </FadeInCard>
+
+          {/* Note de trajet intermédiaire (NB) */}
+          {(isIntermediatePickup || isIntermediateDropoff) && (
+            <FadeInCard delay={260}>
+              <View style={ss.warnBox}>
+                <Ionicons name="information-circle-outline" size={18} color="#D97706" style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[ss.warnTxt, { fontWeight: '700', marginBottom: 2, color: '#92400E' }]}>
+                    Note Importante (Trajet Intermédiaire)
+                  </Text>
+                  <Text style={ss.warnTxt}>
+                    {isIntermediatePickup && isIntermediateDropoff
+                      ? `Votre trajet correspond à des arrêts intermédiaires sur l'itinéraire global du conducteur (${(ride.departure_location || '').split(',')[0]} ➔ ${(ride.arrival_location || '').split(',')[0]}).`
+                      : isIntermediatePickup
+                        ? `Le lieu de départ recherché (${(depLocation || '').split(',')[0]}) n'est pas le départ initial du chauffeur (Départ initial : ${(ride.departure_location || '').split(',')[0]}).`
+                        : `Le lieu d'arrivée recherché (${(destLocation || '').split(',')[0]}) n'est pas le terminus final du chauffeur (Terminus : ${(ride.arrival_location || '').split(',')[0]}).`}
+                  </Text>
+                </View>
+              </View>
+            </FadeInCard>
+          )}
 
           {/* Note du conducteur */}
           {ride.description && (
