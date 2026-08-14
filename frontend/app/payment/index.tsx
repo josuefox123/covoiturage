@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+// Force reload cache Metro
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -170,6 +171,7 @@ export default function PaymentScreen() {
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#2F80ED" />
                 <Text style={styles.loadingText}>Initialisation du paiement sécurisé...</Text>
+                <Text style={styles.loadingSubtext}>Connexion sécurisée en cours</Text>
                 {error && (
                     <View style={styles.errorBox}>
                         <Text style={styles.errorText}>{error}</Text>
@@ -193,7 +195,7 @@ export default function PaymentScreen() {
                         router.replace('/(tabs)/trips');
                     }
                 }}>
-                    <Ionicons name="close" size={24} color="#1F2937" />
+                    <Ionicons name="close" size={24} color="#0F172A" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Paiement Zemy</Text>
                 <View style={{ width: 40 }} />
@@ -218,7 +220,7 @@ export default function PaymentScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    container: { flex: 1, backgroundColor: '#F8FAFC' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -227,16 +229,22 @@ const styles = StyleSheet.create({
         paddingTop: 48,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-        backgroundColor: '#FFFFFF'
+        borderBottomColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 3
     },
     backBtn: { padding: 8 },
-    headerTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937' },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 24 },
-    loadingText: { marginTop: 16, fontSize: 16, color: '#4B5563', fontWeight: '500' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', letterSpacing: -0.3 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 24 },
+    loadingText: { marginTop: 20, fontSize: 16, color: '#0F172A', fontWeight: '600', textAlign: 'center' },
+    loadingSubtext: { marginTop: 6, fontSize: 13, color: '#64748B', fontWeight: '400', textAlign: 'center' },
     webViewLoading: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
     errorBox: { marginTop: 24, alignItems: 'center', width: '100%' },
-    errorText: { color: '#EF4444', textAlign: 'center', marginBottom: 16, fontSize: 14 },
-    retryBtn: { backgroundColor: '#2F80ED', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
-    retryText: { color: '#FFFFFF', fontWeight: '600' }
+    errorText: { color: '#EF4444', textAlign: 'center', marginBottom: 16, fontSize: 14, fontWeight: '500' },
+    retryBtn: { backgroundColor: '#2F80ED', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, shadowColor: '#2F80ED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    retryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 }
 });

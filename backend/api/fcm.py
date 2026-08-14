@@ -222,10 +222,23 @@ def send_fcm_to_all_users(title: str, body: str, data: dict | None = None, exclu
                 logger.error(f"Erreur FCM broadcast lot {i}: {e}")
 
 
+def strip_emojis(text: str) -> str:
+    """
+    Supprime tous les emojis, stickers et caractères graphiques spéciaux (catégories Unicode 'So', 'Cn', 'Cs')
+    pour garantir des emails propres sans caractères non supportés ou visuels inadaptés.
+    """
+    if not text:
+        return ""
+    import unicodedata
+    import re
+    cleaned = "".join(c for c in text if unicodedata.category(c) not in ('So', 'Cn', 'Cs'))
+    return re.sub(r'\s+', ' ', cleaned).strip()
+
+
 def create_and_send_notification(user, title: str, message: str, data: dict | None = None):
     """
-    Enregistre une notification en base de données et l'envoie sur le mobile de l'utilisateur via FCM.
-    L'envoi sur les serveurs de push (Expo / Firebase) est exécuté en arrière-plan (non-bloquant).
+    Enregistre une notification en base de données, l'envoie sur le mobile de l'utilisateur via FCM
+    et lui envoie un email personnalisé sans emojis/stickers en arrière-plan.
     """
     try:
         from .models import Notification
@@ -258,6 +271,7 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
     except Exception as e:
         logger.debug(f"WS notification send error: {e}")
 
+    # 1. Envoi du Push Notification FCM (Async)
     def _send_push_async():
         try:
             send_fcm_to_user(
@@ -270,4 +284,37 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
             logger.error(f"Erreur envoi notification FCM async: {e}")
 
     threading.Thread(target=_send_push_async, daemon=True).start()
+
+    # 2. Envoi de l'Email personnalisé sans emojis/stickers (Async)
+    if getattr(user, 'email', None):
+        def _send_email_async():
+            try:
+                from django.core.mail import send_mail
+                from django.conf import settings
+                
+                clean_title = strip_emojis(title)
+                clean_message = strip_emojis(message)
+                
+                if not clean_title:
+                    clean_title = "Notification Zemy"
+                    
+                email_body = (
+                    f"Bonjour {user.full_name or 'Utilisateur'},\n\n"
+                    f"{clean_message}\n\n"
+                    f"Cordialement,\n"
+                    f"L'équipe Zemy"
+                )
+                
+                send_mail(
+                    subject=clean_title,
+                    message=email_body,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False
+                )
+                logger.info(f"Email envoyé avec succès à {user.email}")
+            except Exception as e:
+                logger.error(f"Erreur envoi email à {user.email}: {e}")
+                
+        threading.Thread(target=_send_email_async, daemon=True).start()
 

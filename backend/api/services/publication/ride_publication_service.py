@@ -203,51 +203,67 @@ class RidePublicationService:
             'duration': d_dur
         })
 
-        for leg_info in legs_data:
-            for step in leg_info.get('steps', []):
-                end_loc = step.get('end_location', {})
-                slat, slng = end_loc.get('lat'), end_loc.get('lng')
-                if slat is not None and slng is not None:
-                    step_name = extract_locality_from_step(step)
-                    st_dist, st_dur = get_polyline_match(slat, slng)
-                    candidates.append({
-                        'name': step_name,
-                        'latitude': slat,
-                        'longitude': slng,
-                        'waypoint_type': 'city' if step_name else 'gps',
-                        'is_stopover': False,
-                        'distance': st_dist,
-                        'duration': st_dur
-                    })
+        # Ajouter explicitement les escales (stopovers) définies par le conducteur
+        for fs in final_stopovers:
+            fs_dist, fs_dur = get_polyline_match(fs['latitude'], fs['longitude'])
+            candidates.append({
+                'name': fs['name'],
+                'latitude': fs['latitude'],
+                'longitude': fs['longitude'],
+                'waypoint_type': 'stopover',
+                'is_stopover': True,
+                'distance': fs_dist,
+                'duration': fs_dur
+            })
 
-        if polyline:
-            detected_cities = find_cities_along_route(polyline)
-            for city in detected_cities:
-                c_dist, c_dur = get_polyline_match(city['latitude'], city['longitude'])
-                candidates.append({
-                    'name': city['name'],
-                    'latitude': city['latitude'],
-                    'longitude': city['longitude'],
-                    'waypoint_type': 'city',
-                    'is_stopover': False,
-                    'distance': c_dist,
-                    'duration': c_dur
-                })
+        # Commenté : désactivation de la génération automatique d'étapes (steps) intermédiaires
+        # for leg_info in legs_data:
+        #     for step in leg_info.get('steps', []):
+        #         end_loc = step.get('end_location', {})
+        #         slat, slng = end_loc.get('lat'), end_loc.get('lng')
+        #         if slat is not None and slng is not None:
+        #             step_name = extract_locality_from_step(step)
+        #             st_dist, st_dur = get_polyline_match(slat, slng)
+        #             candidates.append({
+        #                 'name': step_name,
+        #                 'latitude': slat,
+        #                 'longitude': slng,
+        #                 'waypoint_type': 'city' if step_name else 'gps',
+        #                 'is_stopover': False,
+        #                 'distance': st_dist,
+        #                 'duration': st_dur
+        #             })
 
-        if polyline_stats:
-            last_sampled_dist = 0
-            for ps in polyline_stats:
-                if ps['dist_m'] - last_sampled_dist >= 500:
-                    candidates.append({
-                        'name': '',
-                        'latitude': ps['lat'],
-                        'longitude': ps['lng'],
-                        'waypoint_type': 'gps',
-                        'is_stopover': False,
-                        'distance': ps['dist_m'],
-                        'duration': int(total_actual_duration_sec * ps['pct'])
-                    })
-                    last_sampled_dist = ps['dist_m']
+        # Commenté : désactivation de la génération automatique de villes traversées
+        # if polyline:
+        #     detected_cities = find_cities_along_route(polyline)
+        #     for city in detected_cities:
+        #         c_dist, c_dur = get_polyline_match(city['latitude'], city['longitude'])
+        #         candidates.append({
+        #             'name': city['name'],
+        #             'latitude': city['latitude'],
+        #             'longitude': city['longitude'],
+        #             'waypoint_type': 'city',
+        #             'is_stopover': False,
+        #             'distance': c_dist,
+        #             'duration': c_dur
+        #         })
+
+        # Commenté : désactivation de la génération de points GPS tous les 500m
+        # if polyline_stats:
+        #     last_sampled_dist = 0
+        #     for ps in polyline_stats:
+        #         if ps['dist_m'] - last_sampled_dist >= 500:
+        #             candidates.append({
+        #                 'name': '',
+        #                 'latitude': ps['lat'],
+        #                 'longitude': ps['lng'],
+        #                 'waypoint_type': 'gps',
+        #                 'is_stopover': False,
+        #                 'distance': ps['dist_m'],
+        #                 'duration': int(total_actual_duration_sec * ps['pct'])
+        #             })
+        #             last_sampled_dist = ps['dist_m']
 
         a_dist, a_dur = get_polyline_match(arr_lat, arr_lon)
         candidates.append({

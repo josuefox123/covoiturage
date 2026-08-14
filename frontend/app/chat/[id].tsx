@@ -14,7 +14,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TextInput,
   TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Image, Linking
+  Image, Linking, Modal
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '../../src/styles/theme';
@@ -32,7 +32,7 @@ import { getMediaUrl } from '../../src/utils/media';
  * - Affichage et gestion de l'état lié à ChatScreen.
  */
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, show_proposal } = useLocalSearchParams<{ id: string; show_proposal?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, token, authFetch } = useAuth();
@@ -49,6 +49,19 @@ export default function ChatScreen() {
   const [wsConnected, setWsConnected] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // Modale de proposition (Prise domicile / Dépose personnalisée)
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [proposalType, setProposalType] = useState<'none' | 'pickup' | 'dropoff'>('none');
+  const [proposalPrice, setProposalPrice] = useState('');
+  const [customAddress, setCustomAddress] = useState('');
+
+  // Ouverture automatique de la modale après paiement
+  useEffect(() => {
+    if (show_proposal === 'true') {
+      setShowProposalModal(true);
+    }
+  }, [show_proposal]);
 
   // Numéro de téléphone regex Bénin
   const PHONE_REGEX = /(\+229|00229)?\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{2}/g;
@@ -226,6 +239,52 @@ export default function ChatScreen() {
     }
   };
 
+  // Envoi d'une proposition spéciale (prise à domicile / dépose personnalisée)
+  const sendSystemProposal = async (type: 'pickup' | 'dropoff', address: string, price: string) => {
+    if (!address.trim()) {
+      alert("Veuillez renseigner l'adresse.");
+      return;
+    }
+    const additionalPrice = parseInt(price.replace(/\D/g, '')) || 0;
+    if (additionalPrice <= 0) {
+      alert("Veuillez proposer un montant valide.");
+      return;
+    }
+
+    const typeLabel = type === 'pickup' 
+      ? '🤝 [PROPOSITION DE PRISE À DOMICILE]' 
+      : '🤝 [PROPOSITION DE DÉPOSE PERSONNALISÉE]';
+    
+    const formattedContent = `${typeLabel}\n📍 Adresse : ${address.trim()}\n💵 Supplément proposé : +${additionalPrice.toLocaleString()} FCFA`;
+
+    if (wsRef.current?.isConnected) {
+      // Envoi direct via WebSocket
+      wsRef.current.sendMessage(formattedContent);
+    } else {
+      // Envoi via API REST si déconnecté
+      setSending(true);
+      try {
+        const newMsg = await authFetch('/messages/', {
+          method: 'POST',
+          body: JSON.stringify({ conversation: id, content: formattedContent }),
+        });
+        setMessages(prev => [...prev, newMsg]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300);
+      } catch (error) {
+        console.error('[Chat] Erreur envoi proposition:', error);
+        alert("Impossible d'envoyer la proposition. Veuillez réessayer.");
+      } finally {
+        setSending(false);
+      }
+    }
+    
+    // Fermer et réinitialiser
+    setShowProposalModal(false);
+    setProposalType('none');
+    setProposalPrice('');
+    setCustomAddress('');
+  };
+
   // ── Rendu des messages ────────────────────────────────────────────────
   const isSystemMessage = (item: any) => item.content?.startsWith('Bienvenue dans votre espace') || item.content?.startsWith('🤝');
 
@@ -235,6 +294,7 @@ export default function ChatScreen() {
   const partnerName = otherUser?.full_name || 'Utilisateur';
   const partnerInitials = partnerName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
   const rideInfo = conversation?.ride_details || null;
+  const isPassenger = conversation?.ride_details?.driver !== user?.id && conversation?.ride_details?.driver_details?.id !== user?.id;
 
   const renderMessage = useCallback(({ item }: { item: any }) => {
     if (isSystemMessage(item)) {
@@ -316,11 +376,27 @@ export default function ChatScreen() {
 
         {otherUser?.phone && (
           <TouchableOpacity 
-            style={styles.callButton} 
-            onPress={() => Linking.openURL(`tel:${otherUser.phone}`)}
+            style={[
+              styles.callButton,
+              ['cancelled', 'rejected', 'expired', 'payment_failed'].includes(conversation?.booking_details?.status) && styles.disabledCallButton
+            ]} 
+            onPress={() => {
+              if (!['cancelled', 'rejected', 'expired', 'payment_failed'].includes(conversation?.booking_details?.status)) {
+                Linking.openURL(`tel:${otherUser.phone}`);
+              }
+            }}
+            disabled={['cancelled', 'rejected', 'expired', 'payment_failed'].includes(conversation?.booking_details?.status)}
             activeOpacity={0.7}
           >
-            <Ionicons name="call" size={18} color={theme.colors.primary} />
+            <Ionicons 
+              name="call" 
+              size={18} 
+              color={
+                ['cancelled', 'rejected', 'expired', 'payment_failed'].includes(conversation?.booking_details?.status)
+                  ? '#94A3B8'
+                  : theme.colors.primary
+              } 
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -373,30 +449,216 @@ export default function ChatScreen() {
           }
         />
 
-        {/* Input Bar */}
-        <View style={[styles.inputContainer, { paddingBottom: Math.max(theme.spacing.md, insets.bottom) }]}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Écrivez votre message..."
-            placeholderTextColor={theme.colors.textMuted}
-            value={inputText}
-            onChangeText={handleInputChange}
-            multiline
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (!inputText.trim() || sending) && styles.disabledSend]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending}
-            activeOpacity={0.8}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={theme.colors.white} />
-            ) : (
-              <Ionicons name="send" size={18} color={theme.colors.white} />
+        {/* Blocage du chat et infos de remboursement si la réservation est annulée */}
+        {['cancelled', 'rejected', 'expired', 'payment_failed'].includes(conversation?.booking_details?.status) ? (
+          <View style={[styles.blockedContainer, { paddingBottom: Math.max(theme.spacing.md, insets.bottom) }]}>
+            <View style={styles.blockedHeader}>
+              <Ionicons name="lock-closed" size={18} color="#EF4444" />
+              <Text style={styles.blockedTitle}>Discussion fermée</Text>
+            </View>
+            <Text style={styles.blockedText}>
+              Cette discussion est bloquée car la réservation associée a été annulée ou a expiré.
+            </Text>
+            
+            {isPassenger && (
+              <View style={styles.refundContainer}>
+                <Text style={styles.refundTitle}>ℹ️ Conditions & Demande de remboursement</Text>
+                <Text style={styles.refundText}>
+                  Si vous avez déjà payé en ligne pour ce trajet, vous pouvez demander son remboursement intégral. 
+                  Rendez-vous dans votre historique de paiement pour soumettre votre demande qui sera confirmée par l'administrateur.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.refundBtn} 
+                  onPress={() => router.push('/payment-history')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="card-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.refundBtnText}>Demander un remboursement</Text>
+                </TouchableOpacity>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
+          </View>
+        ) : (
+          /* Input Bar standard */
+          <View style={[styles.inputContainer, { paddingBottom: Math.max(theme.spacing.md, insets.bottom) }]}>
+            {isPassenger && (
+              <TouchableOpacity
+                style={styles.attachButton}
+                onPress={() => setShowProposalModal(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle" size={26} color={theme.colors.primary} />
+              </TouchableOpacity>
+            )}
+            <TextInput
+              style={styles.textInput}
+              placeholder="Écrivez votre message..."
+              placeholderTextColor={theme.colors.textMuted}
+              value={inputText}
+              onChangeText={handleInputChange}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, (!inputText.trim() || sending) && styles.disabledSend]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || sending}
+              activeOpacity={0.8}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={theme.colors.white} />
+              ) : (
+                <Ionicons name="send" size={18} color={theme.colors.white} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
+
+      {/* Modal de proposition de trajet personnalisé (Prise domicile / Dépose personnalisée) */}
+      <Modal
+        visible={showProposalModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowProposalModal(false);
+          setProposalType('none');
+          setProposalPrice('');
+          setCustomAddress('');
+        }}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {proposalType === 'none' 
+                  ? 'Personnaliser mon trajet' 
+                  : proposalType === 'pickup' 
+                    ? 'Prise à domicile' 
+                    : 'Dépose personnalisée'}
+              </Text>
+              <TouchableOpacity onPress={() => {
+                setShowProposalModal(false);
+                setProposalType('none');
+                setProposalPrice('');
+                setCustomAddress('');
+              }}>
+                <Ionicons name="close" size={24} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+
+            {proposalType === 'none' ? (
+              <View style={{ gap: 16, paddingVertical: 10 }}>
+                <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 8, lineHeight: 20 }}>
+                  Souhaitez-vous que le conducteur passe vous chercher chez vous ou vous déposer à une adresse précise ?
+                </Text>
+
+                <TouchableOpacity 
+                  style={styles.proposalCard}
+                  onPress={() => setProposalType('pickup')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.proposalCardIconBg}>
+                    <Ionicons name="home" size={24} color={theme.colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.proposalCardTitle}>Prise à domicile</Text>
+                    <Text style={styles.proposalCardDesc}>Proposer au conducteur de passer vous prendre chez vous</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.proposalCard}
+                  onPress={() => setProposalType('dropoff')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.proposalCardIconBg, { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons name="location" size={24} color="#EF4444" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.proposalCardTitle}>Dépose personnalisée</Text>
+                    <Text style={styles.proposalCardDesc}>Proposer au conducteur de vous déposer à une autre adresse</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.modalCancelBtn, { marginTop: 12 }]}
+                  onPress={() => setShowProposalModal(false)}
+                >
+                  <Text style={styles.modalCancelBtnText}>Annuler</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ gap: 16, paddingVertical: 10 }}>
+                {/* Back button */}
+                <TouchableOpacity 
+                  onPress={() => {
+                    setProposalType('none');
+                    setProposalPrice('');
+                    setCustomAddress('');
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}
+                >
+                  <Ionicons name="arrow-back" size={16} color={theme.colors.primary} />
+                  <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '600' }}>Retour aux choix</Text>
+                </TouchableOpacity>
+
+                <Text style={{ fontSize: 13, color: '#6B7280', lineHeight: 18 }}>
+                  {proposalType === 'pickup'
+                    ? "Saisissez l'adresse de votre domicile ou lieu de départ souhaité et proposez un dédommagement financier."
+                    : "Saisissez l'adresse finale où vous souhaitez être déposé et proposez un dédommagement financier."}
+                </Text>
+
+                {/* Champ Adresse */}
+                <View>
+                  <Text style={styles.inputLabel}>Adresse exacte souhaitée</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder={proposalType === 'pickup' ? "Ex: Villa 14, quartier Houenoussou..." : "Ex: Devant le Supermarché Erevan..."}
+                    placeholderTextColor="#9CA3AF"
+                    value={customAddress}
+                    onChangeText={setCustomAddress}
+                  />
+                </View>
+
+                {/* Champ Prix */}
+                <View>
+                  <Text style={styles.inputLabel}>Supplément financier proposé (FCFA)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Ex: 1500 FCFA"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={proposalPrice}
+                    onChangeText={(val) => setProposalPrice(val.replace(/\D/g, ''))}
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                  <TouchableOpacity 
+                    style={[styles.modalCancelBtn, { flex: 1 }]}
+                    onPress={() => {
+                      setProposalType('none');
+                      setProposalPrice('');
+                      setCustomAddress('');
+                    }}
+                  >
+                    <Text style={styles.modalCancelBtnText}>Précédent</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.modalSubmitBtn, { flex: 2 }]}
+                    onPress={() => sendSystemProposal(proposalType, customAddress, proposalPrice)}
+                  >
+                    <Text style={styles.modalSubmitBtnText}>Envoyer</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -479,6 +741,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 4,
   },
+  disabledCallButton: {
+    backgroundColor: '#F1F5F9',
+  },
   bubble: {
     borderRadius: theme.borderRadius.lg,
     paddingHorizontal: theme.spacing.md,
@@ -527,4 +792,165 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', ...theme.shadows.sm
   },
   disabledSend: { backgroundColor: theme.colors.border, shadowOpacity: 0, elevation: 0 },
+  // Styles pour la modale de proposition personnalisée
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    minHeight: 380,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  proposalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 16,
+  },
+  proposalCardIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  proposalCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  proposalCardDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  modalCancelBtn: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  modalSubmitBtn: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#2F80ED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSubmitBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  attachButton: {
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Styles pour l'affichage de chat bloqué et remboursement
+  blockedContainer: {
+    backgroundColor: '#FFF1F2',
+    borderTopWidth: 1,
+    borderTopColor: '#FEE2E2',
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  blockedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  blockedTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#EF4444',
+  },
+  blockedText: {
+    fontSize: 13,
+    color: '#991B1B',
+    lineHeight: 18,
+  },
+  refundContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FFE4E6',
+    marginTop: 8,
+    gap: 8,
+    ...theme.shadows.sm,
+  },
+  refundTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  refundText: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 17,
+  },
+  refundBtn: {
+    backgroundColor: theme.colors.primary,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  refundBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

@@ -45,7 +45,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(ride__driver_id=ride_driver_id)
         if ride_id:
             queryset = queryset.filter(ride_id=ride_id)
-        return queryset
+        return queryset.order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
         from rest_framework.exceptions import ValidationError
@@ -111,37 +111,43 @@ class BookingViewSet(viewsets.ModelViewSet):
         dep_loc = booking.departure_location or booking.ride.departure_location or ''
         arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
 
-        create_and_send_notification(
-            user=booking.ride.driver,
-            title="Nouvelle demande de réservation",
-            message=f"{booking.passenger.full_name or booking.passenger.phone} souhaite réserver {booking.seats_booked} place(s) sur votre trajet {dep_loc} -> {arr_loc}.",
-            data={
-                'type': 'new_booking_request',
-                'booking_id': str(booking.id),
-                'screen': 'rides',
-                'passenger_name': booking.passenger.full_name or 'Passager',
-                'passenger_phone': booking.passenger.phone or '',
-                'departure_location': dep_loc,
-                'arrival_location': arr_loc,
-                'seats_booked': str(booking.seats_booked),
-                'total_amount': str(booking.total_amount),
-                'negotiation_message': booking.negotiation_message or '',
-                'created_at': booking.created_at.isoformat()
-            }
-        )
-
-        if booking.status == 'pending':
-            try:
-                create_and_send_notification(
-                    user=booking.passenger,
-                    title="Demande de réservation envoyée",
-                    message="Votre demande a été envoyée. Vous recevrez une réponse dans quelques instants.",
-                    data={'type': 'booking_request_sent_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
-                )
-            except Exception:
-                pass
+        # ── PAIEMENT DIRECT : notifications de "demande" désactivées ────────────────
+        # Le conducteur sera notifié APRÈS confirmation du paiement FeexPay uniquement.
+        # Le passager est redirigé directement vers la page de paiement par le frontend.
+        #
+        # create_and_send_notification(
+        #     user=booking.ride.driver,
+        #     title="Nouvelle demande de réservation",
+        #     message=f"{booking.passenger.full_name or booking.passenger.phone} souhaite réserver {booking.seats_booked} place(s) sur votre trajet {dep_loc} -> {arr_loc}.",
+        #     data={
+        #         'type': 'new_booking_request',
+        #         'booking_id': str(booking.id),
+        #         'screen': 'rides',
+        #         'passenger_name': booking.passenger.full_name or 'Passager',
+        #         'passenger_phone': booking.passenger.phone or '',
+        #         'departure_location': dep_loc,
+        #         'arrival_location': arr_loc,
+        #         'seats_booked': str(booking.seats_booked),
+        #         'total_amount': str(booking.total_amount),
+        #         'negotiation_message': booking.negotiation_message or '',
+        #         'created_at': booking.created_at.isoformat()
+        #     }
+        # )
+        #
+        # if booking.status == 'pending':
+        #     try:
+        #         create_and_send_notification(
+        #             user=booking.passenger,
+        #             title="Demande de réservation envoyée",
+        #             message="Votre demande a été envoyée. Vous recevrez une réponse dans quelques instants.",
+        #             data={'type': 'booking_request_sent_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+        #         )
+        #     except Exception:
+        #         pass
+        # ──────────────────────────────────────────────────────────────────────────────
             
         return Response(response_data, status=status.HTTP_201_CREATED)
+
 
     def perform_update(self, serializer):
         old_instance = self.get_object()
@@ -401,12 +407,13 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         booking.save()
         
-        create_and_send_notification(
-            user=booking.passenger,
-            title=title,
-            message=message,
-            data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'amount': str(booking.total_amount), 'ride_id': str(booking.ride.id)}
-        )
+        # Commenté pour ne plus envoyer de notification lors de l'acceptation par le conducteur
+        # create_and_send_notification(
+        #     user=booking.passenger,
+        #     title=title,
+        #     message=message,
+        #     data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'amount': str(booking.total_amount), 'ride_id': str(booking.ride.id)}
+        # )
         _push_booking_update(booking)
         return Response({"status": "Réservation acceptée.", "booking_status": booking.status})
 
@@ -424,12 +431,13 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         dep_loc = booking.departure_location or booking.ride.departure_location or ''
         arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
-        create_and_send_notification(
-            user=booking.passenger,
-            title="Demande de réservation déclinée",
-            message=f"Le conducteur a refusé votre demande de réservation pour le trajet {dep_loc} -> {arr_loc}.",
-            data={'type': 'booking_rejected_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
-        )
+        # Commenté pour ne plus envoyer de notification lors du refus par le conducteur
+        # create_and_send_notification(
+        #     user=booking.passenger,
+        #     title="Demande de réservation déclinée",
+        #     message=f"Le conducteur a refusé votre demande de réservation pour le trajet {dep_loc} -> {arr_loc}.",
+        #     data={'type': 'booking_rejected_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
+        # )
         _push_booking_update(booking)
         return Response({"status": "Réservation déclinée avec succès."})
 
@@ -447,12 +455,13 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.status = 'pending_payment'
         booking.save()
         
-        create_and_send_notification(
-            user=booking.ride.driver,
-            title="Offre validée par le passager",
-            message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} a accepté votre tarif de {booking.total_amount} FCFA et procède au paiement.",
-            data={'type': 'passenger_accepted_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
-        )
+        # Commenté pour ne plus envoyer de notification lors de la validation d'offre par le passager
+        # create_and_send_notification(
+        #     user=booking.ride.driver,
+        #     title="Offre validée par le passager",
+        #     message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} a accepté votre tarif de {booking.total_amount} FCFA et procède au paiement.",
+        #     data={'type': 'passenger_accepted_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
+        # )
         _push_booking_update(booking)
         return Response({"status": "Proposition acceptée. En attente de paiement.", "booking_status": booking.status})
 
@@ -468,12 +477,13 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.status = 'cancelled'
         booking.save()
         
-        create_and_send_notification(
-            user=booking.ride.driver,
-            title="Proposition refusée",
-            message=f"{booking.passenger.full_name or booking.passenger.phone} a refusé votre proposition.",
-            data={'type': 'passenger_refused_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
-        )
+        # Commenté pour ne plus envoyer de notification lors du refus d'offre par le passager
+        # create_and_send_notification(
+        #     user=booking.ride.driver,
+        #     title="Proposition refusée",
+        #     message=f"{booking.passenger.full_name or booking.passenger.phone} a refusé votre proposition.",
+        #     data={'type': 'passenger_refused_offer', 'booking_id': str(booking.id), 'screen': 'rides'}
+        # )
         _push_booking_update(booking)
         return Response({"status": "Proposition refusée. Réservation annulée.", "booking_status": booking.status})
 
@@ -482,7 +492,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking = self.get_object()
         
         # Le reçu de paiement n'est accessible qu'au passager (ou admin)
-        if booking.passenger != request.user and not getattr(request.user, 'is_staff', False):
+        if booking.passenger_id != request.user.id and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Vous n'êtes pas le passager de cette réservation."}, status=status.HTTP_403_FORBIDDEN)
             
         # Le paiement doit avoir réussi ou le trajet doit être actif/confirmé/complété
@@ -509,7 +519,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking = self.get_object()
         
         # La confirmation de réservation n'est accessible qu'au conducteur du trajet (ou admin)
-        if booking.ride.driver != request.user and not getattr(request.user, 'is_staff', False):
+        if booking.ride.driver_id != request.user.id and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Seul le conducteur de ce trajet peut télécharger ce document."}, status=status.HTTP_403_FORBIDDEN)
             
         # Il faut que la réservation soit confirmée, active ou complétée (pas annulée ou rejetée)

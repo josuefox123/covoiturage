@@ -132,8 +132,8 @@ export class RideSessionManager {
     message?: string,
     searchedDeparture?: string,
     searchedDestination?: string
-  ): Promise<boolean> {
-    if (!this.currentSession || !authFetch) return false;
+  ): Promise<string | null> {
+    if (!this.currentSession || !authFetch) return null;
 
     try {
       this.currentSession.loading = true;
@@ -178,8 +178,9 @@ export class RideSessionManager {
           bookingId: res.id,
           timestamp: Date.now()
         });
-        await this.loadSession(authFetch, seg, user, { forceRefresh: true });
-        return true;
+        // Charger la session en arrière-plan sans bloquer la redirection immédiate vers le paiement
+        this.loadSession(authFetch, seg, user, { forceRefresh: true });
+        return String(res.id); // Retourne l'ID pour redirection paiement direct
       }
     } catch (err: any) {
       const parsedErr = ErrorManager.parseError(err);
@@ -191,7 +192,7 @@ export class RideSessionManager {
         this.notify();
       }
     }
-    return false;
+    return null;
   }
 
   public async acceptOffer(authFetch: any, user: any, bookingId: string): Promise<boolean> {

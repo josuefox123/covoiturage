@@ -63,8 +63,8 @@ export function PassengerCard({
               <Text style={[styles.statusChipTxt, { color: statusChip.color }]}>{statusChip.label}</Text>
             </View>
           </View>
-          {pax?.phone_number && peutContacter && (
-            <Text style={{ fontSize: 12, color: C.textSec }}>{pax.phone_number}</Text>
+          {pax?.phone && peutContacter && (
+            <Text style={{ fontSize: 12, color: C.textSec }}>{pax.phone}</Text>
           )}
           {(booking.departure_location || booking.arrival_location) && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -79,10 +79,10 @@ export function PassengerCard({
           </Text>
         </View>
       </View>
-
+ 
       {peutContacter && (
         <View style={styles.paxActions}>
-          <TouchableOpacity style={styles.paxActBtn} onPress={() => onCall(pax?.phone_number)} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.paxActBtn} onPress={() => onCall(pax?.phone)} activeOpacity={0.8}>
             <Ionicons name="call" size={16} color={C.success} />
             <Text style={[styles.paxActTxt, { color: C.success }]}>Appeler</Text>
           </TouchableOpacity>

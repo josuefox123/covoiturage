@@ -28,7 +28,7 @@ export function useRideSession(segment: SegmentIdentifier) {
   }, [authFetch, segment, user]);
 
   const performBooking = useCallback(
-    async (seatsToBook: number, customPrice?: number, message?: string, searchedDeparture?: string, searchedDestination?: string) => {
+    async (seatsToBook: number, customPrice?: number, message?: string, searchedDeparture?: string, searchedDestination?: string): Promise<string | null> => {
       return rideSessionManager.performBooking(authFetch, user, seatsToBook, customPrice, message, searchedDeparture, searchedDestination);
     },
     [authFetch, user]

@@ -47,11 +47,15 @@ interface PaymentItem {
   arrival_location: string | null;
   departure_date: string | null;
   created_at: string;
+  booking_id?: string | null;
+  booking_status?: string | null;
+  driver_id?: string | null;
+  has_refund_request?: boolean;
 }
 
 export default function PaymentHistoryScreen() {
   const router = useRouter();
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -111,6 +115,42 @@ export default function PaymentHistoryScreen() {
     } finally {
       setDownloadingId(null);
     }
+  };
+
+  const handleRequestRefund = async (payment: PaymentItem) => {
+    if (!payment.booking_id) return;
+    
+    Alert.alert(
+      "Confirmer la demande",
+      "Souhaitez-vous vraiment soumettre une demande de remboursement pour ce trajet annulé ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        { 
+          text: "Confirmer", 
+          onPress: async () => {
+            try {
+              // Créer une demande de remboursement
+              await authFetch('/refund-requests/', {
+                method: 'POST',
+                body: JSON.stringify({
+                  booking: payment.booking_id,
+                  passenger: user?.id,
+                  driver: payment.driver_id,
+                  amount: payment.amount,
+                  reason: "Trajet annulé par le passager ou le conducteur. Demande automatique."
+                })
+              });
+              
+              Alert.alert("Demande soumise", "Votre demande de remboursement a été enregistrée avec succès. Un administrateur va l'examiner.");
+              fetchHistory();
+            } catch (err: any) {
+              console.error('Erreur demande remboursement:', err);
+              Alert.alert("Erreur", err.message || "Impossible de soumettre la demande de remboursement.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   const formatDate = (dateStr: string) => {
@@ -178,7 +218,7 @@ export default function PaymentHistoryScreen() {
       {/* Separator */}
       <View style={styles.cardDivider} />
 
-      {/* Footer row — Ref + Download */}
+      {/* Footer row — Ref + Download / Refund */}
       <View style={styles.cardFooter}>
         <View style={styles.refBlock}>
           <Ionicons name="receipt-outline" size={13} color={theme.colors.textMuted} />
@@ -189,21 +229,41 @@ export default function PaymentHistoryScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.downloadBtn}
-          onPress={() => downloadReceipt(item)}
-          disabled={downloadingId === item.id}
-          activeOpacity={0.75}
-        >
-          {downloadingId === item.id ? (
-            <ActivityIndicator size="small" color="#16A34A" />
-          ) : (
-            <>
-              <Ionicons name="download-outline" size={15} color="#16A34A" />
-              <Text style={styles.downloadText}>Reçu PDF</Text>
-            </>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {item.service_type === 'ride' && ['cancelled', 'rejected', 'expired', 'payment_failed'].includes(item.booking_status || '') && (
+            item.has_refund_request ? (
+              <View style={styles.refundPendingBadge}>
+                <Ionicons name="time-outline" size={13} color="#D97706" />
+                <Text style={styles.refundPendingText}>En cours</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.refundActionBtn}
+                onPress={() => handleRequestRefund(item)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="arrow-undo-outline" size={13} color="#FFFFFF" />
+                <Text style={styles.refundActionText}>Rembourser</Text>
+              </TouchableOpacity>
+            )
           )}
-        </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.downloadBtn}
+            onPress={() => downloadReceipt(item)}
+            disabled={downloadingId === item.id}
+            activeOpacity={0.75}
+          >
+            {downloadingId === item.id ? (
+              <ActivityIndicator size="small" color="#16A34A" />
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={15} color="#16A34A" />
+                <Text style={styles.downloadText}>Reçu PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </Animated.View>
   );
@@ -497,5 +557,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#16A34A',
+  },
+  refundPendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  refundPendingText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  refundActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  refundActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

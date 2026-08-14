@@ -175,23 +175,46 @@ export class ResolveurPassager {
       });
     }
 
-    // ─── En attente de réponse du conducteur ──────────────────────────
+    // ── PAIEMENT DIRECT : le cas 'En attente de réponse du conducteur' est désactivé ──
+    // Un booking 'pending' signifie maintenant 'en attente de paiement', pas de validation.
+    // Le passager est directement redirigé vers /payment. Ce cas ne devrait pas être atteint.
+    // if (bookingStatus === 'pending' || bookingStatus === 'pending_driver' || action === 'waiting_driver') {
+    //   return this.creerMission({
+    //     state: 'REQUEST_SENT',
+    //     title: 'En attente de réponse',
+    //     description: 'Votre demande a été envoyée au conducteur. Vous serez notifié dès sa réponse.',
+    //     iconName: 'hourglass-outline',
+    //     iconColor: theme.colors.warningDark,
+    //     badgeText: 'En attente',
+    //     badgeBgColor: theme.colors.warningLight,
+    //     badgeTextColor: theme.colors.warningDark,
+    //     actions: [
+    //       { type: 'cancel_request', label: 'Annuler la demande' },
+    //       { type: 'view_details', label: 'Détails' }
+    //     ],
+    //     data,
+    //     progress: 15,
+    //     category: 'upcoming'
+    //   });
+    // }
+
+    // Pour les bookings pending non payés, afficher 'Paiement en attente'
     if (bookingStatus === 'pending' || bookingStatus === 'pending_driver' || action === 'waiting_driver') {
       return this.creerMission({
-        state: 'REQUEST_SENT',
-        title: 'En attente de réponse',
-        description: 'Votre demande a été envoyée au conducteur. Vous serez notifié dès sa réponse.',
-        iconName: 'hourglass-outline',
-        iconColor: theme.colors.warningDark,
-        badgeText: 'En attente',
-        badgeBgColor: theme.colors.warningLight,
-        badgeTextColor: theme.colors.warningDark,
+        state: 'PAYMENT_PENDING',
+        title: 'Paiement en attente',
+        description: 'Votre réservation est créée. Veuillez procéder au paiement pour la confirmer.',
+        iconName: 'card-outline',
+        iconColor: theme.colors.primary,
+        badgeText: 'Paiement requis',
+        badgeBgColor: '#EFF6FF',
+        badgeTextColor: theme.colors.primary,
         actions: [
-          { type: 'cancel_request', label: 'Annuler la demande' },
-          { type: 'view_details', label: 'Détails' }
+          { type: 'pay', label: 'Payer maintenant', isPrimary: true, color: theme.colors.primary },
+          { type: 'cancel_request', label: 'Annuler' }
         ],
         data,
-        progress: 15,
+        progress: 30,
         category: 'upcoming'
       });
     }

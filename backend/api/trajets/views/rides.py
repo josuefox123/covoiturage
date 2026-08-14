@@ -222,7 +222,7 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
             except ValueError:
                 pass
 
-        return queryset
+        return queryset.order_by('-created_at')
 
     @action(detail=False, methods=['get'], url_path='suggest-price', permission_classes=[permissions.IsAuthenticated])
     def suggest_price(self, request):

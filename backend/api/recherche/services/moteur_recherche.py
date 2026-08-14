@@ -4,7 +4,7 @@ from ...matching.moteur import MatchingEngine
 class SearchService:
     """Service d'orchestration déléguant les requêtes de recherche de trajets au nouveau moteur de matching."""
 
-    MAX_RADIUS_KM = 2.0
+    MAX_RADIUS_KM = 20.0
 
     @staticmethod
     def find_rides(

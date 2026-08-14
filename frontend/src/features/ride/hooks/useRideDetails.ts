@@ -143,12 +143,26 @@ export function useRideDetails(
   };
 
   const performBooking = async (seatsToBook: number, customPrice?: number, message?: string) => {
-    const success = await executeBooking(seatsToBook, customPrice, message, departure, destination);
-    if (!success && error) {
+    const bookingId = await executeBooking(seatsToBook, customPrice, message, ride?.departure_location, ride?.arrival_location);
+    if (bookingId) {
+      // PAIEMENT DIRECT — rediriger immédiatement vers l'écran de paiement
+      // sans attendre la validation du conducteur (négociation désactivée)
+      const pricePerSeat = ride?.price_per_seat ?? 0;
+      const amount = pricePerSeat * seatsToBook;
+      router.push({
+        pathname: '/payment',
+        params: {
+          booking_id: String(bookingId),
+          amount: String(amount),
+        }
+      });
+      return true;
+    } else {
       CustomAlert.alert('Erreur', error || "Impossible de créer la réservation. Veuillez réessayer.");
+      return false;
     }
-    return success;
   };
+
 
   const handlePassengerAccept = async (bId: string) => {
     const success = await executeAcceptOffer(bId);

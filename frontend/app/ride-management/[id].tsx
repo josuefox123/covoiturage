@@ -16,6 +16,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { CustomAlert } from '../../src/utils/CustomAlert';
 import { useCameraPermissions } from 'expo-camera';
 import { API_URL } from '@/src/services/api';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useRideManagement } from '@/src/features/ride-management/hooks/useRideManagement';
 
 // ─── Composants Extraits ─────────────────────────────────────────────────────
@@ -85,7 +86,6 @@ export default function RideManagementScreen() {
   const handleDownloadManifest = async (bookingId: string) => {
     try {
       setDownloadingManifestId(bookingId);
-      const FileSystem = require('expo-file-system/legacy');
       const Sharing = require('expo-sharing');
       const SecureStore = require('expo-secure-store');
 
@@ -96,7 +96,7 @@ export default function RideManagementScreen() {
       }
       const storedToken = await SecureStore.getItemAsync('zemy_access_token');
       const manifestUrl = `${API_URL}/bookings/${bookingId}/manifest/`;
-      const localUri = (FileSystem.documentDirectory ?? '') + `reservation_${bookingId.substring(0, 8)}.pdf`;
+      const localUri = (((FileSystem as any).documentDirectory) ?? '') + `reservation_${bookingId.substring(0, 8)}.pdf`;
 
       const result = await FileSystem.downloadAsync(manifestUrl, localUri, {
         headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {}
@@ -111,8 +111,9 @@ export default function RideManagementScreen() {
       } else {
         CustomAlert.alert('Erreur', 'Impossible de télécharger le document.');
       }
-    } catch {
-      CustomAlert.alert('Erreur', 'Impossible de générer la reconnaissance.');
+    } catch (e: any) {
+      console.error('Erreur téléchargement fiche:', e);
+      CustomAlert.alert('Erreur', e.message || 'Impossible de générer la reconnaissance.');
     } finally {
       setDownloadingManifestId(null);
     }
@@ -336,15 +337,7 @@ export default function RideManagementScreen() {
         <VehicleCard ride={ride} />
       </Animated.ScrollView>
 
-      {/* Bouton de messagerie collective (FAB) */}
-      {activeBookings.length > 0 && (
-        <Animated.View style={[styles.fabWrap, { bottom: Math.max(24, insets.bottom + 12), transform: [{ translateY: fabTranslate }] }]}>
-          <TouchableOpacity style={styles.fab} onPress={handleContactPassengers} activeOpacity={0.9}>
-            <Ionicons name="chatbubbles" size={20} color={C.white} />
-            <Text style={styles.fabTxt}>Contacter les passagers</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+
 
       {/* Modal Ajuster Tarif */}
       <Modal visible={editingBooking !== null} transparent animationType="slide" onRequestClose={() => setEditingBooking(null)}>

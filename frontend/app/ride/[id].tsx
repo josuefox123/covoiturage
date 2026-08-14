@@ -63,8 +63,8 @@ export default function RideDetailScreen() {
     authFetch, user, createBooking
   );
 
-  const depLocation = departure || myBooking?.departure_location;
-  const destLocation = destination || myBooking?.arrival_location;
+  const depLocation = ride?.departure_location || departure || myBooking?.departure_location;
+  const destLocation = ride?.arrival_location || destination || myBooking?.arrival_location;
 
   const [showBookModal, setShowBookModal] = useState(false);
   const [showSuccModal, setShowSuccModal] = useState(false);
@@ -87,21 +87,9 @@ export default function RideDetailScreen() {
     return cleanParts.length ? cleanParts[cleanParts.length - 1].toLowerCase() : (parts[0] || '').toLowerCase();
   };
 
-  const isIntermediatePickup = (() => {
-    if (!depLocation || !ride) return false;
-    const searchDepCity = extractCity(depLocation);
-    const rideDepCity = extractCity(ride.departure_location);
-    return !!(searchDepCity && rideDepCity && searchDepCity !== rideDepCity);
-  })();
-
-  const isIntermediateDropoff = (() => {
-    if (!destLocation || !ride) return false;
-    const searchDestCity = extractCity(destLocation);
-    const rideDestCity = extractCity(ride.arrival_location);
-    return !!(searchDestCity && rideDestCity && searchDestCity !== rideDestCity);
-  })();
-
-  const isMid = isIntermediatePickup || isIntermediateDropoff;
+  const isIntermediatePickup = false;
+  const isIntermediateDropoff = false;
+  const isMid = false;
 
   const getArrival = (): string => {
     if (!ride) return '--:--';
@@ -140,8 +128,8 @@ export default function RideDetailScreen() {
     b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)
   );
 
-  const depShort = (departure || ride.departure_location).split(',')[0];
-  const arrShort = (destination || ride.arrival_location).split(',')[0];
+  const depShort = ride.departure_location.split(',')[0];
+  const arrShort = ride.arrival_location.split(',')[0];
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   const handleBooking = () => {
@@ -209,12 +197,12 @@ export default function RideDetailScreen() {
         <View style={ss.hero}>
           <RideMap
             ride={ride}
-            passenger_dep_lat={passenger_dep_lat}
-            passenger_dep_lon={passenger_dep_lon}
-            passenger_arr_lat={passenger_arr_lat}
-            passenger_arr_lon={passenger_arr_lon}
-            departure={departure}
-            destination={destination}
+            passenger_dep_lat={undefined}
+            passenger_dep_lon={undefined}
+            passenger_arr_lat={undefined}
+            passenger_arr_lon={undefined}
+            departure={undefined}
+            destination={undefined}
           />
 
           {/* Badge statut */}
@@ -278,8 +266,19 @@ export default function RideDetailScreen() {
 
         <View style={ss.cards}>
 
+          {/* Note du conducteur */}
+          {ride.description && (
+            <FadeInCard delay={80}>
+              <View style={ss.card}>
+                <TitreSection titre="Note du conducteur" icone="chatbox-ellipses-outline" />
+                <Text style={{ fontSize: 48, color: C.primary + '28', lineHeight: 40, fontWeight: '900', marginBottom: -8 }}>"</Text>
+                <Text style={{ fontSize: 15, color: C.textSec, lineHeight: 24, fontStyle: 'italic' }}>{ride.description}</Text>
+              </View>
+            </FadeInCard>
+          )}
+
           {/* Carte Prix */}
-          <FadeInCard delay={80}>
+          <FadeInCard delay={120}>
             <View style={[ss.card, { flexDirection: 'row', alignItems: 'center' }]}>
               <View style={{ flex: 1 }}>
                 <Text style={ss.pLabel}>{isMid ? 'Prix estimé' : 'Prix par place'}</Text>
@@ -396,16 +395,7 @@ export default function RideDetailScreen() {
             </FadeInCard>
           )}
 
-          {/* Note du conducteur */}
-          {ride.description && (
-            <FadeInCard delay={300}>
-              <View style={ss.card}>
-                <TitreSection titre="Note du conducteur" icone="chatbox-ellipses-outline" />
-                <Text style={{ fontSize: 48, color: C.primary + '28', lineHeight: 40, fontWeight: '900', marginBottom: -8 }}>"</Text>
-                <Text style={{ fontSize: 15, color: C.textSec, lineHeight: 24, fontStyle: 'italic' }}>{ride.description}</Text>
-              </View>
-            </FadeInCard>
-          )}
+
 
           {/* Sécurité */}
           <FadeInCard delay={420}>
@@ -469,15 +459,16 @@ export default function RideDetailScreen() {
       <BookingConfirmModal
         visible={showBookModal}
         ride={ride}
-        departure={departure}
-        destination={destination}
+        departure={ride?.departure_location}
+        destination={ride?.arrival_location}
         bookingLoading={bookingLoading}
         pricePerSeat={bookingState?.price ?? ride?.price_per_seat}
         onClose={() => setShowBookModal(false)}
         onConfirm={async (seats, customPrice, msg) => {
           const ok = await performBooking(seats, customPrice, msg);
-          if (ok) { setShowBookModal(false); setShowSuccModal(true); }
+          if (ok) { setShowBookModal(false); } // La redirection vers /payment est gérée dans performBooking
         }}
+
       />
       <BookingSuccessModal
         visible={showSuccModal}

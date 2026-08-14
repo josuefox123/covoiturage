@@ -81,17 +81,20 @@ class BookingService:
             # NE PAS décrémenter les places lors de la création de la réservation.
             # Elles seront décrémentées lors de la validation du paiement (confirm_payment).
             
-            # Créer la réservation
+            # PAIEMENT DIRECT : La réservation est créée en attente de paiement.
+            # On n'envoie PAS de notification au conducteur ici — il sera notifié
+            # uniquement après confirmation du paiement par FeexPay.
             booking = Booking.objects.create(
                 ride=ride,
                 passenger=passenger,
                 seats_booked=seats_booked,
-                payment_status=payment_status,
-                status='pending',
+                payment_status='pending',
+                status='pending_payment',  # En attente de paiement (pas de validation conducteur)
                 departure_location=departure_location,
                 arrival_location=arrival_location,
-                passenger_proposed_price=passenger_proposed_price,
-                negotiation_message=negotiation_message
+                # NÉGOCIATION DÉSACTIVÉE : passenger_proposed_price et negotiation_message ignorés
+                # passenger_proposed_price=passenger_proposed_price,
+                # negotiation_message=negotiation_message
             )
             
             # Planifier la tâche d'expiration automatique avec délai intelligent

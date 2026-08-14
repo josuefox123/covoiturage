@@ -178,7 +178,7 @@ class BookingService:
                 ride=ride,
                 passenger=passenger,
                 seats_booked=seats_booked,
-                status='pending',
+                status='pending_payment',
                 payment_status='pending',
                 departure_location=resolved_departure_location,
                 arrival_location=resolved_arrival_location,

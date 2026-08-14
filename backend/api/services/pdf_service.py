@@ -9,8 +9,8 @@ class ZemyPDF(FPDF):
         self.title_text = title_text
 
     def header(self):
-        # Top banner in Zemy Green (#10B981)
-        self.set_fill_color(16, 185, 129)
+        # Top banner in Zemy Blue (#2F80ED)
+        self.set_fill_color(47, 128, 237)
         self.rect(0, 0, 210, 15, "F")
         
         # Banner Text
@@ -47,7 +47,7 @@ def generate_passenger_receipt(booking) -> bytes:
     
     pdf.set_y(25)
     pdf.set_font("helvetica", "B", 20)
-    pdf.set_text_color(16, 185, 129) # Zemy Green
+    pdf.set_text_color(47, 128, 237) # Zemy Blue
     pdf.cell(0, 10, "REÇU DE PAIEMENT", align="R", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("helvetica", "B", 10)
@@ -61,12 +61,12 @@ def generate_passenger_receipt(booking) -> bytes:
     pdf.ln(15)
     
     # 2. STATUS BADGE
-    pdf.set_fill_color(240, 253, 244) # Light green
-    pdf.set_draw_color(74, 222, 128) # Green border
+    pdf.set_fill_color(239, 246, 255) # Light blue
+    pdf.set_draw_color(191, 219, 254) # Blue border
     pdf.rect(15, pdf.get_y(), 180, 12, "DF")
     pdf.set_y(pdf.get_y() + 3)
     pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(22, 163, 74) # Dark green
+    pdf.set_text_color(30, 64, 175) # Dark blue
     pdf.cell(0, 6, "   STATUT DU PAIEMENT : RÉUSSI / ENREGISTRÉ", align="L", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(10)
     
@@ -80,7 +80,7 @@ def generate_passenger_receipt(booking) -> bytes:
     pdf.set_y(start_y + 4)
     pdf.set_x(18)
     pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(16, 185, 129)
+    pdf.set_text_color(47, 128, 237)
     pdf.cell(0, 6, "INFORMATIONS DU PASSAGER", new_x="LMARGIN", new_y="NEXT")
     pdf.set_x(18)
     pdf.set_font("helvetica", "B", 10)
@@ -97,7 +97,7 @@ def generate_passenger_receipt(booking) -> bytes:
     pdf.set_y(start_y + 4)
     pdf.set_x(111)
     pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(16, 185, 129)
+    pdf.set_text_color(47, 128, 237)
     pdf.cell(0, 6, "INFORMATIONS DU CONDUCTEUR", new_x="LMARGIN", new_y="NEXT")
     pdf.set_x(111)
     pdf.set_font("helvetica", "B", 10)
@@ -121,7 +121,7 @@ def generate_passenger_receipt(booking) -> bytes:
     pdf.set_y(start_y2 + 3)
     pdf.set_x(18)
     pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(16, 185, 129)
+    pdf.set_text_color(47, 128, 237)
     pdf.cell(0, 6, "DÉTAILS DU TRAJET PUBLIÉ", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("helvetica", "", 10)
@@ -140,7 +140,7 @@ def generate_passenger_receipt(booking) -> bytes:
     
     # 5. TRANSACTION DETAIL TABLE
     pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(16, 185, 129)
+    pdf.set_text_color(47, 128, 237)
     pdf.cell(0, 6, "DÉTAILS DE LA FACTURATION", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
     
@@ -195,7 +195,7 @@ def generate_driver_confirmation(booking) -> bytes:
     
     pdf.set_y(25)
     pdf.set_font("helvetica", "B", 18)
-    pdf.set_text_color(16, 185, 129) # Zemy Green
+    pdf.set_text_color(47, 128, 237) # Zemy Blue
     pdf.cell(0, 10, "RECONNAISSANCE DE RÉSERVATION", align="R", new_x="LMARGIN", new_y="NEXT")
     
     # Unique Validation ticket code
@@ -211,12 +211,12 @@ def generate_driver_confirmation(booking) -> bytes:
     pdf.ln(15)
     
     # 2. STATUS BADGE
-    pdf.set_fill_color(240, 253, 244)
-    pdf.set_draw_color(74, 222, 128)
+    pdf.set_fill_color(239, 246, 255) # Light blue
+    pdf.set_draw_color(191, 219, 254) # Blue border
     pdf.rect(15, pdf.get_y(), 180, 12, "DF")
     pdf.set_y(pdf.get_y() + 3)
     pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(22, 163, 74)
+    pdf.set_text_color(30, 64, 175) # Dark blue
     pdf.cell(0, 6, "   RÉSERVATION CONFIRMÉE & SÉCURISÉE", align="L", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(10)
     
@@ -229,7 +229,7 @@ def generate_driver_confirmation(booking) -> bytes:
     pdf.set_y(start_y + 4)
     pdf.set_x(18)
     pdf.set_font("helvetica", "B", 11)
-    pdf.set_text_color(16, 185, 129)
+    pdf.set_text_color(47, 128, 237)
     pdf.cell(0, 6, "RÉCAPITULATIF DE LA RÉSERVATION PASSAGER", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("helvetica", "", 10)
@@ -240,7 +240,7 @@ def generate_driver_confirmation(booking) -> bytes:
     pdf.set_x(18)
     pdf.cell(0, 5, f"Téléphone du passager : {booking.passenger.phone}", new_x="LMARGIN", new_y="NEXT")
     pdf.set_x(18)
-    pdf.cell(0, 5, f"Itinéraire Passager : {booking.departure_location} ➔ {booking.arrival_location}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, f"Itinéraire Passager : {booking.departure_location} -> {booking.arrival_location}", new_x="LMARGIN", new_y="NEXT")
     pdf.set_x(18)
     pdf.cell(0, 5, f"Nombre de places réservées : {booking.seats_booked} place(s)", new_x="LMARGIN", new_y="NEXT")
     

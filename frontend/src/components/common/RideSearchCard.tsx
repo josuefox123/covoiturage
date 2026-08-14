@@ -117,6 +117,7 @@ export default function RideSearchCard({
   // Déterminer si le départ recherché est un arrêt intermédiaire dans une autre ville
   let displayDeparture = ride.departure_location || 'Départ';
   let isIntermediatePickup = false;
+  /* Commenté pour afficher le trajet initial du conducteur au lieu de la recherche
   if (searchedDeparture) {
     const searchDepCity = extractCity(searchedDeparture);
     const rideDepCity = extractCity(ride.departure_location);
@@ -125,10 +126,12 @@ export default function RideSearchCard({
       isIntermediatePickup = true;
     }
   }
+  */
 
   // Déterminer si l'arrivée recherchée est un arrêt intermédiaire dans une autre ville
   let displayArrival = ride.arrival_location || 'Arrivée';
   let isIntermediateDropoff = false;
+  /* Commenté pour afficher le trajet initial du conducteur au lieu de la recherche
   if (searchedDestination) {
     const searchDestCity = extractCity(searchedDestination);
     const rideDestCity = extractCity(ride.arrival_location);
@@ -137,6 +140,7 @@ export default function RideSearchCard({
       isIntermediateDropoff = true;
     }
   }
+  */
 
   const isSegment = !!(ride.price_per_seat && ride.original_price_per_seat && ride.price_per_seat !== ride.original_price_per_seat);
   // TRAJETS INTERMÉDIAIRES DÉSACTIVÉS pour cette version :
@@ -245,7 +249,7 @@ export default function RideSearchCard({
                   <Text style={styles.ratingText}>
                     {ride.driver_details?.rating ? Number(ride.driver_details.rating).toFixed(1) : '5.0'}
                   </Text>
-                  {ride.driver_details?.rides_count && ride.driver_details.rides_count > 10 && (
+                  {(ride.driver_details?.rides_count ?? 0) > 10 && (
                     <View style={styles.superDriverBadge}>
                       <Text style={styles.superDriverText}>Super Chauffeur</Text>
                     </View>
@@ -256,7 +260,7 @@ export default function RideSearchCard({
 
             {/* Badges de confort (Places dispo, etc.) */}
             <View style={styles.driverRight}>
-              {searchedSeats && seatsLeft < searchedSeats ? (
+              {searchedSeats !== undefined && searchedSeats > 0 && seatsLeft < searchedSeats ? (
                 <View style={styles.warningSeatsBadge}>
                   <Ionicons name="warning-outline" size={12} color="#DC2626" />
                   <Text style={styles.warningSeatsText}>

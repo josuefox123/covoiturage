@@ -78,3 +78,23 @@ Ce document récapitule l'organisation de vos dépôts Git pour ce projet. Le pr
 - **Rétrocompatibilité :**
   - Maintien des re-exports pour les anciens modules de `trip-mission` pour éviter toute régression.
   - Validation complète de la compilation TypeScript (0 erreur) et du fonctionnement sous Expo.
+
+---
+
+### 📅 Mise à jour du 14 Août 2026
+- **Moteur de Matching et Recherche Géographique (Backend) :**
+  - **Ajustement du rayon de recherche à 20 km** : Configuration de la recherche à `20.0` km (au lieu de 50 km ou 8 km) et prise en charge dynamique par `WaypointMatcher.find_closest_waypoint`.
+  - **Désactivation des notifications d'acceptation/refus** : Mise en commentaire des envois de push et d'e-mails de réservation acceptée ou refusée dans `BookingViewSet`.
+  - **Désactivation de la génération automatique d'escales** : Seuls les départ, arrivée et escales explicites du conducteur sont stockés en base, évitant les waypoints intermédiaires forcés.
+  - **Remplacement de la recherche avec correspondances** : Matching uniquement en direct, et mode corridor de repli par polyline réactivé uniquement pour les trajets sans waypoints explicites.
+  - **Tri des réservations** : Tri par date décroissante (`-created_at`) dans les requêtes de réservations.
+  - **Doublement par e-mail propre** : Envoi automatique d'un e-mail sans émojis ni stickers pour chaque notification.
+
+- **Application Mobile React Native / Expo (Frontend) :**
+  - **Forçage et affichage du trajet initial complet** :
+    - La carte (`RideMap`), la carte flottante en verre et l'écran de détails (`app/ride/[id].tsx`) affichent toujours l'itinéraire d'origine complet (A ➔ B) du conducteur sans modification ou zoom sur le segment de recherche.
+    - Création de la réservation forcée sur le départ et l'arrivée réels de la publication dans `useRideDetails.ts`.
+  - **Note du conducteur réorganisée** : Déploiement de la note de présentation rédigée par le chauffeur au tout début des détails pour plus de visibilité.
+  - **Correction du crash de rendu de texte brut** : Résolution du plantage lié à l'affichage conditionnel d'un `0` numérique non-encapsulé dans un composant `<Text>`.
+  - **Bouton de Demande de Remboursement** : Ajout de l'accès au remboursement pour les réservations annulées dans l'historique de paiement.
+

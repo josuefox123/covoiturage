@@ -554,6 +554,10 @@ class UserPaymentSerializer(serializers.ModelSerializer):
     departure_location = serializers.SerializerMethodField()
     arrival_location = serializers.SerializerMethodField()
     departure_date = serializers.SerializerMethodField()
+    booking_id = serializers.UUIDField(source='booking.id', read_only=True, allow_null=True)
+    booking_status = serializers.CharField(source='booking.status', read_only=True, allow_null=True)
+    driver_id = serializers.UUIDField(source='booking.ride.driver.id', read_only=True, allow_null=True)
+    has_refund_request = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -561,7 +565,13 @@ class UserPaymentSerializer(serializers.ModelSerializer):
             'id', 'transaction_id', 'amount', 'status', 'provider',
             'service_type', 'service_label', 'departure_location',
             'arrival_location', 'departure_date', 'created_at',
+            'booking_id', 'booking_status', 'driver_id', 'has_refund_request',
         ]
+
+    def get_has_refund_request(self, obj):
+        if obj.booking:
+            return obj.booking.refund_requests.exists()
+        return False
 
     def get_service_type(self, obj):
         if obj.booking:

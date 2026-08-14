@@ -8,126 +8,70 @@
     
     <!-- FeexPay V2 React SDK does not require a separate stylesheet -->
     
+    <!-- Import Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
         body {
             margin: 0;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             min-height: 100vh;
-            background-color: #F9FAFB;
-            color: #1F2937;
+            background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);
+            color: #0F172A;
+            box-sizing: border-box;
         }
         #root {
             width: 100%;
-            max-width: 400px;
-            background: #FFFFFF;
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border: 1px solid #E5E7EB;
+            min-height: 100vh;
+            background: transparent;
+            padding: 24px 16px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
+        
+        /* Desktop/Tablet viewports: show as card */
+        @media (min-width: 480px) {
+            body {
+                padding: 40px 20px;
+                justify-content: center;
+            }
+            #root {
+                min-height: auto;
+                max-width: 420px;
+                background: #FFFFFF;
+                border-radius: 28px;
+                padding: 32px 24px;
+                box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 16px -6px rgba(15, 23, 42, 0.04);
+                border: 1px solid #E2E8F0;
+            }
+        }
+
         .header {
             text-align: center;
             margin-bottom: 24px;
-        }
-        .logo {
-            height: 48px;
-            object-fit: contain;
-            margin-bottom: 12px;
+            width: 100%;
         }
         .title {
             font-size: 20px;
-            font-weight: 700;
+            font-weight: 800;
             margin: 0;
-            color: #1F2937;
+            color: #0F172A;
+            letter-spacing: -0.5px;
         }
         .subtitle {
-            font-size: 14px;
-            color: #6B7280;
-            margin: 4px 0 0 0;
-        }
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #2F80ED;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 20px 0;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .error-message {
-            color: #DC2626;
-            text-align: center;
-            font-weight: 500;
-            margin: 10px 0;
-        }
-        .feexpay-btn {
-            width: 100%;
-            background-color: #2563EB;
-            color: #FFFFFF;
-            font-size: 16px;
-            font-weight: 700;
-            padding: 14px 20px;
-            border-radius: 12px;
-            border: none;
-            cursor: pointer;
-            text-align: center;
-            display: block;
-            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1);
-            transition: all 0.2s ease;
-            box-sizing: border-box;
-            margin-top: 16px;
-        }
-        .feexpay-btn:hover {
-            background-color: #1D4ED8;
-            transform: translateY(-1px);
-            box-shadow: 0 6px 8px -1px rgba(37, 99, 235, 0.3), 0 3px 6px -1px rgba(37, 99, 235, 0.15);
-        }
-        .feexpay-btn:active {
-            transform: translateY(1px);
-        }
-        .form-group {
-            width: 100%;
-            margin-bottom: 16px;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            box-sizing: border-box;
-        }
-        .input-label {
             font-size: 13px;
-            font-weight: 600;
-            color: #4B5563;
-            margin-bottom: 6px;
-        }
-        .form-input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            border: 1px solid #D1D5DB;
-            font-size: 15px;
-            color: #1F2937;
-            background-color: #FAFAFA;
-            box-sizing: border-box;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .form-input:focus {
-            outline: none;
-            border-color: #2F80ED;
-            box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.15);
-            background-color: #FFFFFF;
+            color: #64748B;
+            margin: 6px 0 0 0;
+            font-weight: 500;
         }
         .logo-container {
             display: flex;
@@ -138,11 +82,11 @@
             width: 100%;
         }
         .zemy-logo {
-            height: 38px;
+            height: 36px;
             object-fit: contain;
         }
         .feexpay-logo {
-            height: 28px;
+            height: 24px;
             object-fit: contain;
         }
         .logo-separator {
@@ -150,21 +94,109 @@
             font-weight: bold;
             color: #9CA3AF;
         }
-        .payment-methods-logos {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 16px;
-            margin: 16px 0 8px 0;
+
+        /* Modern Details Card styling */
+        .details-card {
+            width: 100%;
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+            border: 1px solid #E2E8F0;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        .details-amount-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .details-amount {
+            font-size: 28px;
+            font-weight: 900;
+            color: #2F80ED;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .divider {
+            height: 1px;
+            background: #F1F5F9;
+            margin-bottom: 16px;
             width: 100%;
         }
-        .payment-logo-img {
-            height: 32px;
-            object-fit: contain;
-            border-radius: 6px;
-            border: 1px solid #E5E7EB;
-            padding: 2px 8px;
-            background-color: #FFFFFF;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+        .info-label {
+            color: #64748B;
+            font-weight: 500;
+        }
+        .info-val {
+            color: #0F172A;
+            font-weight: 700;
+            text-align: right;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .loader {
+            border: 3px solid #F1F5F9;
+            border-top: 3px solid #2F80ED;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            animation: spin 0.8s linear infinite;
+            margin: 24px auto 0 auto;
+        }
+        .loader-text {
+            font-size: 13px;
+            color: #64748B;
+            font-weight: 500;
+            text-align: center;
+            margin-top: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .feexpay-btn {
+            width: 100%;
+            background-color: #2F80ED;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 700;
+            padding: 16px 20px;
+            border-radius: 14px;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+            display: block;
+            box-shadow: 0 4px 12px rgba(47, 128, 237, 0.25);
+            transition: all 0.2s ease-in-out;
+            box-sizing: border-box;
+            margin-top: 16px;
+            letter-spacing: -0.1px;
+        }
+        .feexpay-btn:hover {
+            background-color: #1A65C8;
+            box-shadow: 0 6px 16px rgba(47, 128, 237, 0.35);
+        }
+        .feexpay-btn:active {
+            transform: scale(0.98);
         }
     </style>
 </head>
@@ -174,12 +206,36 @@
             <div class="logo-container">
                 <img class="zemy-logo" src="{% static 'logozemy.png' %}" alt="Zemy Logo" onerror="this.style.display='none';">
                 <span class="logo-separator">+</span>
-                <img class="feexpay-logo" src="https://api.feexpay.me/api/static/feexpay_logo-h.png" alt="FeexPay Logo" onerror="this.src='https://feexpay.me/wp-content/uploads/2022/08/logo_feexpay.png';">
+                <img class="feexpay-logo" src="https://feexpay.me/_next/static/media/logo.65cc21ed.svg" alt="FeexPay Logo" onerror="this.outerHTML='<span style=\'font-weight: 800; color: #2F80ED; font-size: 18px; font-family: sans-serif; letter-spacing: -0.5px;\'>FeexPay</span>';">
             </div>
-            <h1 class="title">Finaliser le paiement</h1>
-            <p class="subtitle">Veuillez vérifier vos informations et payer</p>
+            <h1 class="title">Paiement Sécurisé</h1>
+            <p class="subtitle">Veuillez vérifier vos informations ci-dessous</p>
         </div>
-        <div class="loader" id="page-loader"></div>
+
+        <!-- Details Card -->
+        <div class="details-card">
+            <div class="details-amount-title">Montant total</div>
+            <div class="details-amount" id="summary-amount">... FCFA</div>
+            <div class="divider"></div>
+            <div class="info-row">
+                <div class="info-label">Trajet</div>
+                <div class="info-val" id="summary-route">Chargement...</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Passager</div>
+                <div class="info-val" id="summary-passenger">Chargement...</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Téléphone</div>
+                <div class="info-val" id="summary-phone">Chargement...</div>
+            </div>
+        </div>
+
+        <div id="loader-container" style="width: 100%; margin-bottom: 24px;">
+            <div class="loader"></div>
+            <div class="loader-text">Initialisation de FeexPay...</div>
+        </div>
+
         <div id="payment-container" style="width: 100%;"></div>
     </div>
 
@@ -204,10 +260,6 @@
 
         try {
             console.log('Dependencies loaded successfully. Initializing parameters...');
-
-            // Masquer le loader de chargement initial
-            const loader = document.getElementById('page-loader');
-            if (loader) loader.style.display = 'none';
 
             // Extraction des paramètres de l'URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -234,6 +286,41 @@
             const rawPhone = urlParams.get('phone') || '';
             // Keep only digits (remove + prefix and other non-digits)
             const phone = rawPhone.replace(/\D/g, "");
+
+            // Masquer le loader de chargement initial
+            const loader = document.getElementById('loader-container');
+            if (loader) loader.style.display = 'none';
+
+            // Remplir la carte récapitulative
+            const summaryAmountEl = document.getElementById('summary-amount');
+            if (summaryAmountEl) summaryAmountEl.innerText = `${amount.toLocaleString()} FCFA`;
+
+            const summaryRouteEl = document.getElementById('summary-route');
+            if (summaryRouteEl) {
+                let routeStr = rawDescription;
+                if (rawDescription.includes('Trajet ')) {
+                    routeStr = rawDescription.split('Trajet ')[1];
+                }
+                summaryRouteEl.innerText = routeStr;
+            }
+
+            const summaryPassengerEl = document.getElementById('summary-passenger');
+            if (summaryPassengerEl) summaryPassengerEl.innerText = fullname || 'Client Zemy';
+
+            const summaryPhoneEl = document.getElementById('summary-phone');
+            if (summaryPhoneEl) {
+                let formattedPhone = phone;
+                if (phone.length === 8) {
+                    formattedPhone = `+229 ${phone.substring(0, 2)} ${phone.substring(2, 4)} ${phone.substring(4, 6)} ${phone.substring(6, 8)}`;
+                } else if (phone.length === 11 && phone.startsWith('229')) {
+                    formattedPhone = `+229 ${phone.substring(3, 5)} ${phone.substring(5, 7)} ${phone.substring(7, 9)} ${phone.substring(9, 11)}`;
+                } else if (phone) {
+                    formattedPhone = `+${phone}`;
+                } else {
+                    formattedPhone = '-';
+                }
+                summaryPhoneEl.innerText = formattedPhone;
+            }
 
             // Identifiants serveur injectés par Django
             const merchantId = "{{ merchant_id }}";
@@ -289,49 +376,7 @@
                 const cleanedPhone = phoneState.replace(/\D/g, "");
 
                 return React.createElement('div', { style: { width: '100%' } },
-                    React.createElement('div', { className: 'form-group' },
-                        React.createElement('label', { className: 'input-label' }, 'Nom complet'),
-                        React.createElement('input', {
-                            type: 'text',
-                            className: 'form-input',
-                            value: fullnameState,
-                            onChange: (e) => setFullnameState(e.target.value)
-                        })
-                    ),
-                    React.createElement('div', { className: 'form-group' },
-                        React.createElement('label', { className: 'input-label' }, 'Adresse e-mail'),
-                        React.createElement('input', {
-                            type: 'email',
-                            className: 'form-input',
-                            value: emailState,
-                            onChange: (e) => setEmailState(e.target.value)
-                        })
-                    ),
-                    React.createElement('div', { className: 'form-group' },
-                        React.createElement('label', { className: 'input-label' }, 'Numéro de téléphone (Mobile Money)'),
-                        React.createElement('input', {
-                            type: 'tel',
-                            className: 'form-input',
-                            placeholder: 'ex: 229XXXXXXXX',
-                            value: phoneState,
-                            onChange: (e) => setPhoneState(e.target.value)
-                        })
-                    ),
-                    React.createElement('div', { className: 'payment-methods-logos' },
-                        React.createElement('img', { 
-                            src: 'https://feexpay.me/wp-content/uploads/2023/02/MTN-MoMo-Logo-PNG.png', 
-                            alt: 'MTN Mobile Money', 
-                            className: 'payment-logo-img',
-                            onError: (e) => { e.target.src = 'https://api.feexpay.me/api/static/mtn_momo.png'; }
-                        }),
-                        React.createElement('img', { 
-                            src: 'https://feexpay.me/wp-content/uploads/2023/02/Moov-Money-Logo.png', 
-                            alt: 'Moov Money', 
-                            className: 'payment-logo-img',
-                            onError: (e) => { e.target.src = 'https://api.feexpay.me/api/static/moov_money.png'; }
-                        })
-                    ),
-                    React.createElement('div', { style: { marginTop: '16px' } },
+                    React.createElement('div', { style: { marginTop: '0px' } },
                         React.createElement(FeexPay, {
                             amount: amount,
                             description: description,
@@ -339,6 +384,14 @@
                             token: apiToken,
                             reference: customId,
                             callback_url: urlParams.get('callback_url') || 'zemy://payments',
+                            // Pré-remplissage des champs "Informations Personnelles" du widget FeexPay
+                            first_name: fullnameState,
+                            email: emailState,
+                            defaultValueField: {
+                                country_iban: 'BJ',
+                                name: fullnameState,
+                                email: emailState
+                            },
                             callback_info: {
                                 description: description,
                                 fullname: cleanedFullname,
@@ -355,6 +408,35 @@
                     )
                 );
             }
+
+            // Script d'injection DOM pour pré-remplir le numéro de téléphone Mobile Money
+            // Puisque le SDK FeexPay React v2 ne propose pas d'option native stable pour pré-remplir le champ de téléphone
+            const countryPrefix = "229"; // Bénin par défaut
+            const cleanLocalPhone = phone.replace(/\D/g, "").replace(/^(229|225|228|221|226)/, "");
+
+            setInterval(() => {
+                const phoneInput = document.querySelector('input[type="tel"]') || 
+                                   document.querySelector('input[placeholder*="sans indicatif"]') || 
+                                   document.querySelector('input[placeholder*="ex:"]');
+                if (phoneInput && !phoneInput.dataset.prefilled) {
+                    phoneInput.value = cleanLocalPhone;
+                    phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    phoneInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    phoneInput.dataset.prefilled = "true";
+                    console.log('Phone number injected successfully.');
+                }
+            }, 500);
+
+            // Clic automatique sur le bouton FeexPay pour ouvrir directement le widget de paiement
+            const autoClickInterval = setInterval(() => {
+                const btn = document.querySelector('.feexpay-btn');
+                if (btn && !btn.dataset.autoclicked) {
+                    btn.dataset.autoclicked = "true";
+                    btn.click();
+                    clearInterval(autoClickInterval);
+                    console.log('FeexPay button auto-clicked.');
+                }
+            }, 300);
 
             console.log('Rendering FeexPayButton component...');
             const container = document.getElementById('payment-container');

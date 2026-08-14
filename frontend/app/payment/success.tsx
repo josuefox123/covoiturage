@@ -94,11 +94,25 @@ export default function PaymentSuccessScreen() {
         try {
             const response = await verifyPayment(txRef, txId);
             if (response && response.status === 'SUCCESS') {
-                // Charger les détails de la réservation pour afficher le ticket complet
+                // Charger les détails de la réservation
                 const details = await authFetch(`/bookings/${bookingId}/`);
-                setBookingDetails(details);
-                setStatus('success');
-                setMessage('Votre paiement a été validé avec succès !');
+                const rideId = details?.ride_details?.id || details?.ride?.id || details?.ride;
+
+                if (!rideId) {
+                    throw new Error("Impossible de récupérer l'identifiant du trajet.");
+                }
+
+                // Récupérer ou créer la conversation de chat
+                const conv = await authFetch('/conversations/ride-chat/', {
+                    method: 'POST',
+                    body: JSON.stringify({ ride_id: rideId })
+                });
+
+                // Rediriger directement dans le chat avec le conducteur
+                router.replace({
+                    pathname: `/chat/${conv.id}`,
+                    params: { show_proposal: 'true' }
+                });
             } else {
                 setStatus('failed');
                 setMessage(response?.message || 'Le paiement n\'a pas pu être validé.');

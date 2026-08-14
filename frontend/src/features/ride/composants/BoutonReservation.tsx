@@ -97,14 +97,27 @@ export function BoutonReservation({
     // ─────────────────────────────────────────────────────────────────────────────────────────────────
 
     case 'pay':
-      return wrap(
-        bookingLoading ? <ActivityIndicator color={C.white} /> : (
-          <View style={styles.rowC}>
-            <Ionicons name="card" size={17} color={C.white} />
-            <Text style={styles.bookBtnTxt} adjustsFontSizeToFit numberOfLines={1}>{rideAction.label}</Text>
-          </View>
-        ),
-        onRetryPayment, {}, bookingLoading
+      return (
+        <View style={{ flexDirection: 'row', gap: 12, flex: 1 }}>
+          {wrap(
+            bookingLoading ? <ActivityIndicator color={C.white} /> : (
+              <View style={styles.rowC}>
+                <Ionicons name="card" size={17} color={C.white} />
+                <Text style={styles.bookBtnTxt} adjustsFontSizeToFit numberOfLines={1}>{rideAction.label}</Text>
+              </View>
+            ),
+            onRetryPayment, {}, bookingLoading
+          )}
+          {wrap(
+            bookingLoading ? <ActivityIndicator color={C.white} /> : (
+              <View style={styles.rowC}>
+                <Ionicons name="close-circle" size={17} color={C.white} />
+                <Text style={styles.bookBtnTxt} adjustsFontSizeToFit numberOfLines={1}>Annuler</Text>
+              </View>
+            ),
+            onCancel, { backgroundColor: C.error }, bookingLoading
+          )}
+        </View>
       );
 
     case 'payment_processing':

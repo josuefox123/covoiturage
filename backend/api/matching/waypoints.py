@@ -26,23 +26,19 @@ class WaypointMatcher:
             d = haversine_km(lat, lon, wp.latitude, wp.longitude)
             w_type = getattr(wp, 'waypoint_type', 'gps')
 
-            # RAYONS REDUITS POUR CETTE VERSION
-            if w_type in ['departure', 'arrival']:
-                allowed_radius = 1.5  # Reduit de 5.0 -> 1.5 km
-            elif w_type == 'stopover' or getattr(wp, 'is_stopover', False):
-                allowed_radius = 2.0  # Reduit de 5.0 -> 2.0 km
-            elif w_type == 'city':
-                allowed_radius = 1.5  # Reduit de 3.0 -> 1.5 km
+            # Utiliser max_radius_km s'il est fourni (ex: 50.0 km)
+            if max_radius_km is not None:
+                allowed_radius = max_radius_km
             else:
-                allowed_radius = 1.0  # GPS : inchange
-
-            # ANCIENS RAYONS (a reactiver si besoin de matches plus larges) :
-            # if w_type in ['departure', 'arrival', 'stopover'] or getattr(wp, 'is_stopover', False):
-            #     allowed_radius = 5.0
-            # elif w_type == 'city':
-            #     allowed_radius = 3.0
-            # else:
-            #     allowed_radius = 1.0
+                # RAYONS REDUITS POUR CETTE VERSION (FALLBACK)
+                if w_type in ['departure', 'arrival']:
+                    allowed_radius = 1.5
+                elif w_type == 'stopover' or getattr(wp, 'is_stopover', False):
+                    allowed_radius = 2.0
+                elif w_type == 'city':
+                    allowed_radius = 1.5
+                else:
+                    allowed_radius = 1.0
 
             if d <= allowed_radius and d < best_dist:
                 best_dist = d
