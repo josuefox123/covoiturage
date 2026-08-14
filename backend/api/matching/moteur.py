@@ -142,29 +142,32 @@ class MatchingEngine:
                 PriceCalculator, TimingCalculator
             )
 
-        polyline = CorridorMatcher.get_ride_polyline_points(ride)
-
-        if not polyline:
-            legs = list(ride.legs.order_by('order'))
-            for leg in legs:
-                if leg.start_latitude and abs(leg.start_latitude) > 0.001:
-                    polyline.append((leg.start_latitude, leg.start_longitude))
-            if legs:
-                last = legs[-1]
-                if last.end_latitude and abs(last.end_latitude) > 0.001:
-                    polyline.append((last.end_latitude, last.end_longitude))
-
-        if not polyline:
-            if ride.departure_latitude and abs(ride.departure_latitude) > 0.001:
-                polyline.append((ride.departure_latitude, ride.departure_longitude))
-            if ride.arrival_latitude and abs(ride.arrival_latitude) > 0.001:
-                polyline.append((ride.arrival_latitude, ride.arrival_longitude))
-
-        if not polyline:
-            return None
-
-        return CorridorMatcher.match_via_polyline(
-            ride, polyline, departure_lat, departure_lon,
-            arrival_lat, arrival_lon, seats_requested, MAX_RADIUS_KM,
-            PriceCalculator, TimingCalculator
-        )
+        # Désactivation de la recherche par corridor (polyline) pour n'autoriser
+        # que les points d'arrêts (waypoints) explicitement publiés par le conducteur.
+        # polyline = CorridorMatcher.get_ride_polyline_points(ride)
+        # 
+        # if not polyline:
+        #     legs = list(ride.legs.order_by('order'))
+        #     for leg in legs:
+        #         if leg.start_latitude and abs(leg.start_latitude) > 0.001:
+        #             polyline.append((leg.start_latitude, leg.start_longitude))
+        #     if legs:
+        #         last = legs[-1]
+        #         if last.end_latitude and abs(last.end_latitude) > 0.001:
+        #             polyline.append((last.end_latitude, last.end_longitude))
+        # 
+        # if not polyline:
+        #     if ride.departure_latitude and abs(ride.departure_latitude) > 0.001:
+        #         polyline.append((ride.departure_latitude, ride.departure_longitude))
+        #     if ride.arrival_latitude and abs(ride.arrival_latitude) > 0.001:
+        #         polyline.append((ride.arrival_latitude, ride.arrival_longitude))
+        # 
+        # if not polyline:
+        #     return None
+        # 
+        # return CorridorMatcher.match_via_polyline(
+        #     ride, polyline, departure_lat, departure_lon,
+        #     arrival_lat, arrival_lon, seats_requested, MAX_RADIUS_KM,
+        #     PriceCalculator, TimingCalculator
+        # )
+        return None
