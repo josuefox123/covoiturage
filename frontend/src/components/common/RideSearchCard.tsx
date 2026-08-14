@@ -165,7 +165,7 @@ export default function RideSearchCard({
           {/* En-tête avec conducteur et prix */}
           <View style={styles.rideHeader}>
             <View style={styles.driverSection}>
-              <ProfileAvatar name={driverName} url={ride.driver_details?.avatar} size={48} showBorder={false} />
+              <ProfileAvatar name={driverName} url={ride.driver_details?.avatar} size={36} showBorder={false} />
               <View style={styles.driverMeta}>
                 <Text style={styles.driverName} numberOfLines={1}>{driverName}</Text>
                 <View style={styles.ratingContainer}>
@@ -180,7 +180,7 @@ export default function RideSearchCard({
               {isIntermediate ? (
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={[styles.priceValue, { fontSize: 13, color: '#D97706', fontWeight: '800' }]}>À confirmer</Text>
-                  <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '600', marginTop: 2 }}>
+                  <Text style={{ fontSize: 9, color: '#9CA3AF', fontWeight: '600', marginTop: 1 }}>
                     avec le chauffeur
                   </Text>
                 </View>
@@ -193,15 +193,15 @@ export default function RideSearchCard({
             </View>
           </View>
 
-          {/* Date de départ */}
-          <View style={styles.dateBar}>
-            <Ionicons name="calendar-outline" size={14} color={PRIMARY_COLOR} />
-            <Text style={styles.dateText}>
+          {/* Date de départ (Simple ligne de texte discrète) */}
+          <View style={styles.dateBarSimple}>
+            <Ionicons name="calendar-outline" size={13} color="#6B7280" />
+            <Text style={styles.dateTextSimple}>
               {formatFullDate(ride.departure_date)}
             </Text>
           </View>
 
-          {/* Trajet */}
+          {/* Trajet épuré style BlaBlaCar */}
           <View style={styles.routeSection}>
             <View style={styles.timeline}>
               <View style={[styles.timelineDot, { backgroundColor: PRIMARY_COLOR }]} />
@@ -211,39 +211,36 @@ export default function RideSearchCard({
             <View style={styles.routeDetails}>
               {/* Point de départ */}
               <View style={styles.routePoint}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.locationLabel}>DÉPART</Text>
-                  <Text style={styles.locationName} numberOfLines={1}>
-                    {displayDeparture}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                  <Text style={styles.routeTime}>{departureTime}</Text>
-                </View>
+                <Text style={styles.locationName} numberOfLines={1}>
+                  {displayDeparture}
+                </Text>
+                <Text style={styles.routeTime}>{departureTime}</Text>
               </View>
               
-              <View style={{ height: 16 }} />
+              <View style={{ height: 8 }} />
               
               {/* Point d'arrivée */}
               <View style={styles.routePoint}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.locationLabel}>ARRIVÉE</Text>
-                  <Text style={styles.locationName} numberOfLines={1}>
-                    {displayArrival}
+                <Text style={styles.locationName} numberOfLines={1}>
+                  {displayArrival}
+                </Text>
+                {ride.duration_min ? (
+                  <Text style={styles.durationText}>
+                    {Math.floor(ride.duration_min / 60) > 0 ? `${Math.floor(ride.duration_min / 60)}h` : ''}${ride.duration_min % 60}m
                   </Text>
-                </View>
+                ) : null}
               </View>
             </View>
           </View>
 
           {/* Stopovers List */}
           {ride.stopovers && Array.isArray(ride.stopovers) && ride.stopovers.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 12, paddingLeft: 18 }}>
-              <Ionicons name="location-outline" size={12} color="#D97706" />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: '#6B7280' }}>Via :</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 8, paddingLeft: 18 }}>
+              <Ionicons name="location-outline" size={11} color="#D97706" />
+              <Text style={{ fontSize: 10, fontWeight: '600', color: '#6B7280' }}>Via :</Text>
               {ride.stopovers.map((stop: any, idx: number) => (
-                <View key={idx} style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A' }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>{stop.name}</Text>
+                <View key={idx} style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#D97706' }}>{stop.name}</Text>
                 </View>
               ))}
             </View>
@@ -253,7 +250,7 @@ export default function RideSearchCard({
           {(isIntermediatePickup || isIntermediateDropoff) && (
             <View style={styles.intermediateBanner}>
               <View style={styles.intermediateBannerLeft}>
-                <Ionicons name="information-circle" size={15} color="#D97706" />
+                <Ionicons name="information-circle" size={14} color="#D97706" />
                 <Text style={styles.intermediateBannerNB}>NB</Text>
               </View>
               <Text style={styles.intermediateBannerText}>
@@ -271,7 +268,7 @@ export default function RideSearchCard({
             <View style={styles.badgesContainer}>
               {searchedSeats && seatsLeft < searchedSeats ? (
                 <View style={styles.warningSeatsBadge}>
-                  <Ionicons name="warning-outline" size={13} color="#DC2626" />
+                  <Ionicons name="warning-outline" size={12} color="#DC2626" />
                   <Text style={styles.warningSeatsText}>
                     {seatsLeft} place{seatsLeft > 1 ? 's' : ''} dispo.
                   </Text>
@@ -280,7 +277,7 @@ export default function RideSearchCard({
                 <View style={styles.seatsContainer}>
                   <Ionicons 
                     name={ride.status === 'started' || ride.status === 'completed' ? "car-sport-outline" : "people-outline"} 
-                    size={14} 
+                    size={13} 
                     color={PRIMARY_COLOR} 
                   />
                   <Text style={styles.seatsText}>
@@ -302,7 +299,7 @@ export default function RideSearchCard({
                 const icon = vType === 'moto' ? 'bicycle-outline' : vType === 'tricycle' ? 'car-sport-outline' : 'car-outline';
                 return (
                   <View style={styles.vehicleBadgeContainer}>
-                    <Ionicons name={icon} size={13} color="#4B5563" />
+                    <Ionicons name={icon} size={12} color="#4B5563" />
                     <Text style={styles.vehicleBadgeText}>{label}</Text>
                   </View>
                 );
@@ -311,17 +308,15 @@ export default function RideSearchCard({
               {/* Badge Kilométrage et Durée */}
               {ride.distance_km ? (
                 <View style={styles.vehicleBadgeContainer}>
-                  <Ionicons name="map-outline" size={13} color="#4B5563" />
+                  <Ionicons name="map-outline" size={12} color="#4B5563" />
                   <Text style={styles.vehicleBadgeText}>
                     {ride.distance_km} km
-                    {ride.duration_min ? ` (${Math.floor(ride.duration_min / 60) > 0 ? `${Math.floor(ride.duration_min / 60)}h` : ''}${ride.duration_min % 60}m)` : ''}
                   </Text>
                 </View>
               ) : null}
             </View>
             <View style={styles.viewButton}>
-              <Text style={styles.viewButtonText}>Voir détail</Text>
-              <Ionicons name="arrow-forward" size={14} color={PRIMARY_COLOR} />
+              <Ionicons name="chevron-forward" size={18} color={PRIMARY_COLOR} />
             </View>
           </View>
         </LinearGradient>
@@ -341,8 +336,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   rideCard: {
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#F3F4F6',
   },
@@ -350,7 +345,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   driverSection: {
     flexDirection: 'row',
@@ -360,21 +355,21 @@ const styles = StyleSheet.create({
   },
   driverMeta: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
     marginRight: 4,
   },
   driverName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   ratingText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#374151',
     marginLeft: 3,
@@ -391,62 +386,56 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   priceValue: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
     color: PRIMARY_COLOR,
   },
   priceUnit: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#6B7280',
     fontWeight: '600',
     marginTop: 1,
   },
-  dateBar: {
+  dateBarSimple: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginBottom: 16,
-    gap: 8,
+    marginBottom: 10,
+    gap: 6,
+    paddingLeft: 2,
   },
-  dateText: {
-    fontSize: 13,
+  dateTextSimple: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
+    color: '#6B7280',
   },
   routeSection: {
     flexDirection: 'row',
-    marginBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    marginBottom: 12,
+    paddingLeft: 2,
   },
   timeline: {
-    width: 24,
+    width: 20,
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
+    paddingTop: 3,
   },
   timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 2,
+    elevation: 1,
   },
   timelineLine: {
     width: 2,
     flex: 1,
     backgroundColor: '#E5E7EB',
-    marginVertical: 4,
+    marginVertical: 2,
     borderRadius: 1,
   },
   routeDetails: {
@@ -457,30 +446,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  locationLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
   locationName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#111827',
     flex: 1,
     marginRight: 12,
   },
   routeTime: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#111827',
+  },
+  durationText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   rideFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 16,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
@@ -489,19 +476,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
     marginRight: 8,
   },
   seatsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   seatsText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: PRIMARY_COLOR,
     marginLeft: 4,
@@ -510,12 +497,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   parcelBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#10B981',
     marginLeft: 4,
     fontWeight: '700',
@@ -525,8 +512,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 10,
     gap: 4,
   },
   vehicleBadgeText: {
