@@ -304,6 +304,70 @@ export default function ProfileScreen() {
           </Text>
         </LinearGradient>
 
+        {/* Mettre en avant la vérification d'identité */}
+        {!user.is_verified ? (
+          <TouchableOpacity
+            style={[
+              styles.verificationBanner,
+              {
+                backgroundColor: '#FEF2F2',
+                borderColor: '#FEE2E2',
+                shadowColor: '#EF4444',
+              }
+            ]}
+            onPress={() => router.push('/verify-identity')}
+            activeOpacity={0.9}
+          >
+            <View style={styles.verificationHeader}>
+              <View style={{ backgroundColor: '#FEE2E2', padding: 8, borderRadius: 12, marginTop: 2 }}>
+                <Ionicons name="shield-outline" size={24} color="#EF4444" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.verificationTitle, { color: '#991B1B' }]}>
+                  Vérifiez votre identité
+                </Text>
+                <Text style={[styles.verificationText, { color: '#7F1D1D' }]}>
+                  Pour pouvoir publier vos trajets et gagner la confiance des passagers, validez vos documents d'identité officielle.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.verificationBtn, { backgroundColor: '#EF4444' }]}
+              onPress={() => router.push('/verify-identity')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.verificationBtnText, { color: '#FFFFFF' }]}>
+                Lancer la vérification
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={[
+              styles.verificationBanner,
+              {
+                backgroundColor: '#ECFDF5',
+                borderColor: '#D1FAE5',
+                shadowColor: '#10B981',
+              }
+            ]}
+          >
+            <View style={styles.verificationHeader}>
+              <View style={{ backgroundColor: '#D1FAE5', padding: 8, borderRadius: 12, marginTop: 2 }}>
+                <Ionicons name="shield-checkmark" size={24} color="#10B981" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.verificationTitle, { color: '#065F46' }]}>
+                  Profil vérifié & sécurisé
+                </Text>
+                <Text style={[styles.verificationText, { color: '#047857' }]}>
+                  Merci d'avoir validé vos documents officiels. Votre badge vert de confiance est maintenant affiché sur tous vos trajets.
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Paramètres du compte */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Paramètres du compte</Text>
