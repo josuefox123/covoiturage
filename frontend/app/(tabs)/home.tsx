@@ -143,6 +143,7 @@ export default function HomeScreen() {
         <SafeAreaView edges={['top']} style={styles.safeHeader}>
           <Header
             userName={userName}
+            userAvatar={user?.avatar}
             scrollY={scrollY}
             onNotifPress={() => router.push('/notifications')}
             onProfilePress={() => router.push('/(tabs)/profile')}

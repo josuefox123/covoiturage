@@ -15,6 +15,7 @@ const PRIMARY = '#0066FF';
 
 interface HeaderProps {
   userName: string;
+  userAvatar?: string | null;
   onNotifPress: () => void;
   onProfilePress?: () => void;
   scrollY: Animated.Value;
@@ -22,6 +23,7 @@ interface HeaderProps {
 
 export default function Header({
   userName,
+  userAvatar,
   onNotifPress,
   onProfilePress,
   scrollY,
@@ -82,8 +84,19 @@ export default function Header({
             <View style={styles.notifDot} />
           </TouchableOpacity>
           {onProfilePress && (
-            <TouchableOpacity style={styles.iconBtn} onPress={onProfilePress} activeOpacity={0.8}>
-              <Ionicons name="person-outline" size={22} color="#fff" />
+            <TouchableOpacity style={styles.profileBtn} onPress={onProfilePress} activeOpacity={0.8}>
+              {userAvatar ? (
+                <Image
+                  source={{ uri: getMediaUrl(userAvatar) }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarInitial}>
+                    {userName.substring(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -170,11 +183,11 @@ const styles = StyleSheet.create({
     borderColor: '#0066FF',
   },
   avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2.5,
-    borderColor: 'rgba(255,255,255,0.5)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.8)',
   },
   avatarFallback: {
     backgroundColor: 'rgba(255,255,255,0.25)',
@@ -182,8 +195,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarInitial: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  profileBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
