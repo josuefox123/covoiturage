@@ -92,9 +92,7 @@ export default function Header({
                 />
               ) : (
                 <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarInitial}>
-                    {userName.substring(0, 2).toUpperCase()}
-                  </Text>
+                  <Ionicons name="person-outline" size={20} color="#fff" />
                 </View>
               )}
             </TouchableOpacity>
