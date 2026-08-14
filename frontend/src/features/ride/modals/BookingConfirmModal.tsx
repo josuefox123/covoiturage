@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Ride } from '../../../../src/types';
@@ -65,7 +65,7 @@ export function BookingConfirmModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>RÃ©server ce trajet</Text>
+            <Text style={styles.modalTitle}>Réserver ce trajet</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color="#1F2937" />
             </TouchableOpacity>
@@ -73,13 +73,13 @@ export function BookingConfirmModal({
 
           <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
 
-            {/* RÃ©capitulatif portion */}
+            {/* Récapitulatif portion */}
             <View style={{ backgroundColor: '#F3F4F6', borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 4 }}>
-                PORTION SÃ‰LECTIONNÃ‰E
+                PORTION S{'\u00c9'}LECTIONN{'\u00c9'}E
               </Text>
               <Text style={{ fontSize: 14, fontWeight: '600', color: '#1F2937', marginBottom: 12 }} numberOfLines={2}>
-                {departure || ride?.departure_location} â†’ {destination || ride?.arrival_location}
+                {departure || ride?.departure_location}{' \u2192 '}{destination || ride?.arrival_location}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="people-outline" size={18} color="#2F80ED" />
@@ -89,7 +89,7 @@ export function BookingConfirmModal({
               </View>
             </View>
 
-            {/* SÃ©lecteur de places */}
+            {/* Sélecteur de places */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
               <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>Nombre de places</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -111,7 +111,7 @@ export function BookingConfirmModal({
               </View>
             </View>
 
-            {/* RÃ©capitulatif du prix */}
+            {/* Récapitulatif du prix */}
             <View style={{ backgroundColor: '#EFF6FF', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1.5, borderColor: '#BFDBFE' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text style={{ fontSize: 14, color: '#4B5563' }}>Prix par place</Text>
@@ -122,13 +122,13 @@ export function BookingConfirmModal({
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text style={{ fontSize: 14, color: '#4B5563' }}>Nombre de places</Text>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>
-                  Ã— {seatsToBook}
+                  {'\u00d7'} {seatsToBook}
                 </Text>
               </View>
               <View style={{ height: 1, backgroundColor: '#BFDBFE', marginBottom: 12 }} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E40AF' }}>TOTAL Ã€ PAYER</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E40AF' }}>TOTAL {'\u00c0'} PAYER</Text>
                   <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Frais Zemy inclus</Text>
                 </View>
                 <Text style={{ fontSize: 24, fontWeight: '900', color: '#2F80ED' }}>
