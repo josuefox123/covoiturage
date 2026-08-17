@@ -54,7 +54,7 @@ class SegmentMatcher:
             return None
 
         pricing = price_calculator.calculate_segment_price(ride, dep_leg_idx, arr_leg_idx, seats=1)
-        price = pricing['base_price']
+        price = pricing['total_price']
 
         if not price:
             price = ride.price_per_seat
