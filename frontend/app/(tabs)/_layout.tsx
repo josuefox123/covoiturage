@@ -10,7 +10,8 @@
  * Zemy
  * ==============================================================
  */
-import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -18,7 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SupportBubble from '../../src/components/SupportBubble';
 import { useAuth } from '../../src/context/AuthContext';
 import { useBadges } from '../../src/context/BadgeContext';
-
 /**
  * Badge rouge flottant affiché sur une icône de tab.
  * - Si count <= 0 → rien
@@ -51,9 +51,16 @@ function TabBadge({ count }: { count: number }) {
  * - Affichage et gestion de l'état lié à TabsLayout.
  */
 export default function TabsLayout() {
-  const { authFetch, user } = useAuth();
+  const { authFetch, user, isLoading } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { notifCount, tripCount, messageCount } = useBadges();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/');
+    }
+  }, [user, isLoading]);
 
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 20 : 16);
   const tabBarHeight = 56 + bottomPadding;

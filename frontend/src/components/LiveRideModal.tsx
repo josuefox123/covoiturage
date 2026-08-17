@@ -638,7 +638,7 @@ export default function LiveRideModal() {
         stopTracking();
       }
     } catch (error) {
-      console.error('Error checking active rides:', error);
+      console.warn('Error checking active rides:', error);
     }
   }, [user, authFetch, startTracking, stopTracking, speakText, geocodeRide]);
 
