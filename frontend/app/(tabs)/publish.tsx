@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,6 +15,7 @@ import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { theme } from '../../src/styles/theme';
 import { useAuth } from '../../src/context/AuthContext';
@@ -42,6 +43,14 @@ export default function PublishScreen() {
   const form = usePublishForm(authCtx);
   const webviewRef = useRef<WebView>(null);
   const buttonScale = useRef(new Animated.Value(1)).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user && user.is_verified) {
+        form.checkVehicle();
+      }
+    }, [user, form.checkVehicle])
+  );
 
   // Google Maps HTML code
   const googleMapHtml = useMemo(() => {

@@ -725,16 +725,16 @@ export function usePublishForm(authCtx: any) {
 
   // Avatar and license picker
   const pickAvatar = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { CustomAlert.alert('Permission refusée', 'Autorisez l\'accès à vos photos.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') { CustomAlert.alert('Permission refusée', 'Autorisez l\'accès à votre caméra.'); return; }
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.8 });
     if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
   };
 
   const pickLicensePhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { CustomAlert.alert('Permission refusée', 'Autorisez l\'accès à vos photos.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') { CustomAlert.alert('Permission refusée', 'Autorisez l\'accès à votre caméra.'); return; }
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.8 });
     if (!result.canceled && result.assets[0]) setDriverLicensePhoto(result.assets[0].uri);
   };
 
@@ -773,7 +773,7 @@ export function usePublishForm(authCtx: any) {
     const formData = new FormData();
     formData.append('owner', user!.id);
     formData.append('brand_model', brandModel);
-    formData.append('color', vehicleColor);
+    formData.append('color', vehicleColor.trim() || 'Gris');
     formData.append('license_plate', plate);
     formData.append('vehicle_type', vehicleType);
     if (vehicleType === 'voiture') {
@@ -888,6 +888,7 @@ export function usePublishForm(authCtx: any) {
     hasVehicle,
     vehicleId,
     checkingVehicle,
+    checkVehicle,
     showVehicleWarning,
     showExpiredLicenseWarning,
     setDeparture,

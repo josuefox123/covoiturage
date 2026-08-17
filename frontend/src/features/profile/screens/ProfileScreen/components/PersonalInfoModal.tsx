@@ -51,13 +51,12 @@ export function PersonalInfoModal({
   }, [visible, user]);
 
   const pickAvatar = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      CustomAlert.alert('Permission refusée', 'Vous devez autoriser l\'accès à vos photos.');
+      CustomAlert.alert('Permission refusée', 'Vous devez autoriser l\'accès à votre caméra.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+    const result = await ImagePicker.launchCameraAsync({
       allowsEditing: false,
       quality: 0.8,
     });

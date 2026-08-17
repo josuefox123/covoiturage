@@ -10,9 +10,20 @@ export const getMediaUrl = (url: string | null | undefined): string | undefined 
     url.startsWith('http://') || 
     url.startsWith('https://') || 
     url.startsWith('file://') || 
+    url.startsWith('ph://') ||
+    url.startsWith('assets-library://') ||
     url.startsWith('data:')
   ) {
     return url;
+  }
+
+  // If it's a local filesystem path under Android or iOS
+  if (
+    url.startsWith('/data/') || 
+    url.startsWith('/storage/') || 
+    url.startsWith('/var/')
+  ) {
+    return `file://${url}`;
   }
   
   // Otherwise, prepend the BASE_URL
