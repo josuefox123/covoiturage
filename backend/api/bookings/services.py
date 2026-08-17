@@ -173,12 +173,16 @@ class BookingService:
             if not resolved_arrival_location:
                 resolved_arrival_location = ride.arrival_location
 
+            initial_status = 'pending_payment'
+            if passenger_proposed_price is not None or negotiation_message:
+                initial_status = 'pending'
+
             # Créer la réservation à l'état initial
             booking = Booking.objects.create(
                 ride=ride,
                 passenger=passenger,
                 seats_booked=seats_booked,
-                status='pending_payment',
+                status=initial_status,
                 payment_status='pending',
                 departure_location=resolved_departure_location,
                 arrival_location=resolved_arrival_location,

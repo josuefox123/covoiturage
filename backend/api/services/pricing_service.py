@@ -76,6 +76,13 @@ class PricingService:
         if not booking.custom_price and not booking.driver_counter_price and not booking.passenger_proposed_price:
             ride = booking.ride
             seats = booking.seats_booked
+            if booking.departure_waypoint_order is not None and booking.arrival_waypoint_order is not None:
+                return PricingService.compute_for_segment(
+                    ride,
+                    booking.departure_waypoint_order,
+                    booking.arrival_waypoint_order,
+                    seats
+                )
             return PricingResult(
                 driver_price=ride.driver_payout,
                 commission=ride.zemy_commission,
@@ -100,6 +107,8 @@ class PricingService:
         try:
             waypoints = list(ride.waypoints.order_by('order'))
             if not waypoints:
+                return PricingService._fallback(ride, seats)
+            if dep_waypoint_order == waypoints[0].order and arr_waypoint_order == waypoints[-1].order:
                 return PricingService._fallback(ride, seats)
             dep_wp = next((w for w in waypoints if w.order == dep_waypoint_order), None)
             arr_wp = next((w for w in waypoints if w.order == arr_waypoint_order), None)
@@ -148,6 +157,8 @@ class PricingService:
                 return PricingService._fallback(ride, seats)
             dep_leg_idx = max(0, dep_leg_idx)
             arr_leg_idx = min(arr_leg_idx, len(legs) - 1)
+            if dep_leg_idx == 0 and arr_leg_idx == len(legs) - 1:
+                return PricingService._fallback(ride, seats)
             
             passenger_price = sum(legs[i].price for i in range(dep_leg_idx, arr_leg_idx + 1))
             

@@ -147,7 +147,7 @@ export function useRideDetails(
     if (bookingId) {
       // PAIEMENT DIRECT — rediriger immédiatement vers l'écran de paiement
       // sans attendre la validation du conducteur (négociation désactivée)
-      const pricePerSeat = ride?.price_per_seat ?? 0;
+      const pricePerSeat = bookingState?.price ?? ride?.price_per_seat ?? 0;
       const amount = pricePerSeat * seatsToBook;
       router.push({
         pathname: '/payment',

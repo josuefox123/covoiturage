@@ -383,6 +383,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Seul le conducteur de ce trajet peut accepter cette réservation."}, status=status.HTTP_403_FORBIDDEN)
             
+        if booking.status == 'pending_payment':
+            return Response({"status": "Réservation acceptée.", "booking_status": booking.status})
+
         if booking.status not in ['pending', 'pending_driver']:
             return Response({"error": f"Impossible d'accepter une réservation au statut actuel: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
             
