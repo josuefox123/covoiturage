@@ -190,10 +190,37 @@ export function ProfileCompletionModal({
                     }}
                   />
                 )}
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 24, gap: 12 }} onPress={pickLicensePhoto}>
-                  <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
-                  <Text style={{ flex: 1, color: theme.colors.text, fontSize: 14 }}>{driverLicensePhoto ? 'Photo sélectionnée' : 'Ajouter une photo du permis'}</Text>
-                  {driverLicensePhoto && <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />}
+                <TouchableOpacity 
+                  style={[styles.imagePickerBtn, { backgroundColor: theme.colors.white, height: driverLicensePhoto ? 160 : 54, padding: 0, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, marginBottom: 24 }]} 
+                  onPress={pickLicensePhoto}
+                >
+                  {driverLicensePhoto ? (
+                    <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+                      <Image
+                        source={{ uri: getMediaUrl(driverLicensePhoto) }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                      <View style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        paddingVertical: 6,
+                        alignItems: 'center'
+                      }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                          Modifier la photo du permis
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: '100%', width: '100%' }}>
+                      <Ionicons name="camera-outline" size={24} color={theme.colors.primary} />
+                      <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>Ajouter la photo du permis</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               </>
             )}
@@ -270,5 +297,20 @@ const styles = StyleSheet.create({
   prefCardLabelActive: { color: theme.colors.primary },
   prefBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8 },
   prefBadgeInactive: { backgroundColor: '#E5E7EB' },
-  prefBadgeActive: { backgroundColor: theme.colors.primary }
+  prefBadgeActive: { backgroundColor: theme.colors.primary },
+  imagePickerBtn: {
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  imagePickerText: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontWeight: '500',
+  }
 });

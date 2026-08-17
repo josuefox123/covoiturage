@@ -787,7 +787,10 @@ export function usePublishForm(authCtx: any) {
       formData.append('driver_license_photo', { uri: driverLicensePhoto, name: filename, type } as any);
     }
     try {
-      await authFetch('/vehicles/', { method: 'POST', body: formData });
+      const res = await authFetch('/vehicles/', { method: 'POST', body: formData });
+      if (res && res.id) {
+        setVehicleId(res.id);
+      }
       setHasVehicle(true);
       setProfileStep('preferences');
     } catch (e: any) {
