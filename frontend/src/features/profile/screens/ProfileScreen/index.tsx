@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Animated,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme } from '../../../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { getMediaUrl } from '../../../../utils/media';
@@ -27,6 +27,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { openVehicleModal } = useLocalSearchParams<{ openVehicleModal?: string }>();
   const authCtx = useAuth();
   const user = authCtx?.user ?? null;
   const authFetch = authCtx?.authFetch ?? (async () => ({}));
@@ -65,6 +66,12 @@ export default function ProfileScreen() {
       }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    if (openVehicleModal === 'true') {
+      setVehicleModalVisible(true);
+    }
+  }, [openVehicleModal]);
 
   const fetchVehicle = async () => {
     try {

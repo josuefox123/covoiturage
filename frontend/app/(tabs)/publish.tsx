@@ -505,9 +505,9 @@ export default function PublishScreen() {
         <Ionicons name="car-sport-outline" size={80} color={theme.colors.textMuted} />
         <Text style={styles.notLoggedTitle}>Véhicule requis</Text>
         <Text style={styles.notLoggedText}>Vous devez enregistrer un véhicule dans votre profil pour pouvoir proposer un trajet.</Text>
-        <TouchableOpacity style={styles.notLoggedButton} onPress={() => router.push('/(tabs)/profile')}>
+        <TouchableOpacity style={styles.notLoggedButton} onPress={() => router.push('/(tabs)/profile?openVehicleModal=true')}>
           <LinearGradient colors={[theme.colors.primary, theme.colors.primaryDark]} style={styles.notLoggedGradient}>
-            <Text style={styles.notLoggedButtonText}>Aller au profil</Text>
+            <Text style={styles.notLoggedButtonText}>Ajouter un véhicule</Text>
           </LinearGradient>
         </TouchableOpacity>
       </SafeAreaView>
@@ -735,9 +735,9 @@ export default function PublishScreen() {
           </View>
           <Text style={styles.modalTitle}>Véhicule requis</Text>
           <Text style={[styles.notLoggedText, { textAlign: 'center', marginTop: 8 }]}>Enregistrez votre véhicule dans votre profil avant de publier.</Text>
-          <TouchableOpacity style={[styles.modalBtn, { marginTop: 24, width: '100%' }]} onPress={() => { form.setShowVehicleWarning(false); router.push('/(tabs)/profile'); }}>
+          <TouchableOpacity style={[styles.modalBtn, { marginTop: 24, width: '100%' }]} onPress={() => { form.setShowVehicleWarning(false); router.push('/(tabs)/profile?openVehicleModal=true'); }}>
             <LinearGradient colors={[theme.colors.primary, '#3B82F6']} style={styles.modalBtnGradient}>
-              <Text style={styles.modalBtnText}>Aller au profil</Text>
+              <Text style={styles.modalBtnText}>Ajouter un véhicule</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
