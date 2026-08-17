@@ -67,12 +67,6 @@ export default function ProfileScreen() {
     ]).start();
   }, []);
 
-  useEffect(() => {
-    if (openVehicleModal === 'true') {
-      setVehicleModalVisible(true);
-    }
-  }, [openVehicleModal]);
-
   const fetchVehicle = async () => {
     try {
       const data = await authFetch('/vehicles/');
@@ -98,7 +92,11 @@ export default function ProfileScreen() {
         fetchVehicle();
         refreshUser();
       }
-    }, [user])
+      if (openVehicleModal === 'true') {
+        setVehicleModalVisible(true);
+        router.setParams({ openVehicleModal: undefined });
+      }
+    }, [user, openVehicleModal])
   );
 
   const onRefresh = useCallback(async () => {
