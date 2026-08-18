@@ -57,9 +57,9 @@ const activeRange = ref('7J')
 const chartRef = ref<HTMLElement | null>(null)
 let chart: any = null
 
-const getChartOptions = (data: any[]) => ({
+const getChartOptions = (data: any[]): any => ({
   chart: {
-    type: 'area',
+    type: 'area' as const,
     height: 300,
     fontFamily: 'inherit',
     toolbar: { show: false },
@@ -114,7 +114,7 @@ const getChartOptions = (data: any[]) => ({
 })
 
 const initChart = async () => {
-  if (!process.client || !chartRef.value) return
+  if (!import.meta.client || !chartRef.value) return
   try {
     const ApexCharts = (await import('apexcharts')).default
     if (chart) {
@@ -128,7 +128,7 @@ const initChart = async () => {
 }
 
 watch(() => props.data, (newData) => {
-  if (chart && process.client) {
+  if (chart && import.meta.client) {
     chart.updateOptions({
       xaxis: {
         categories: newData.map((d: any) => d.x)

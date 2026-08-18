@@ -12,6 +12,7 @@
  */
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  ssr: false,
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', '@nuxt/icon'],
@@ -22,8 +23,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
-      apiUrl: process.env.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
+      apiBase: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
+      apiUrl: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
     },
   },
 

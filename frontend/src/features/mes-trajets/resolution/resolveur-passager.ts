@@ -201,7 +201,7 @@ export class ResolveurPassager {
     // Pour les bookings pending non payés, afficher 'Paiement en attente'
     if (bookingStatus === 'pending' || bookingStatus === 'pending_driver' || action === 'waiting_driver') {
       return this.creerMission({
-        state: 'PAYMENT_PENDING',
+        state: 'PAYMENT',
         title: 'Paiement en attente',
         description: 'Votre réservation est créée. Veuillez procéder au paiement pour la confirmer.',
         iconName: 'card-outline',

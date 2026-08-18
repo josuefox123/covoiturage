@@ -4,7 +4,7 @@ Fichier :
 index.vue
 
 Description :
-Composant / Vue de l'application Dashboard Zemy.
+Composant / Vue de l'application Zemy.
 
 Projet :
 Zemy
@@ -23,7 +23,7 @@ definePageMeta({
 })
 
 // Redirige vers le site Bootstrap statique
-if (process.client) {
+if (import.meta.client) {
   window.location.href = '/landing/index.html'
 } else {
   await navigateTo('/landing/index.html', { external: true })

@@ -40,9 +40,9 @@ const props = defineProps({
 const chartRef = ref<HTMLElement | null>(null)
 let chart: any = null
 
-const getChartOptions = (labels: any[], series: any[], colors: any[]) => ({
+const getChartOptions = (labels: any[], series: any[], colors: any[]): any => ({
   chart: {
-    type: 'donut',
+    type: 'donut' as const,
     height: 250,
     fontFamily: 'inherit',
     animations: { enabled: true, easing: 'easeinout', speed: 800 }
@@ -97,7 +97,7 @@ const getChartOptions = (labels: any[], series: any[], colors: any[]) => ({
 })
 
 const initChart = async () => {
-  if (!process.client || !chartRef.value) return
+  if (!import.meta.client || !chartRef.value) return
   try {
     const ApexCharts = (await import('apexcharts')).default
     if (chart) {
@@ -111,7 +111,7 @@ const initChart = async () => {
 }
 
 watch(() => [props.labels, props.series, props.colors], ([newLabels, newSeries, newColors]) => {
-  if (chart && process.client) {
+  if (chart && import.meta.client) {
     chart.updateOptions({
       labels: newLabels,
       colors: newColors
