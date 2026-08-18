@@ -92,9 +92,13 @@ export default function ProfileScreen() {
         fetchVehicle();
         refreshUser();
       }
+      // Délai pour laisser l'écran se monter complètement avant d'ouvrir la modale
       if (openVehicleModal === 'true') {
-        setVehicleModalVisible(true);
-        router.setParams({ openVehicleModal: undefined });
+        const timer = setTimeout(() => {
+          setVehicleModalVisible(true);
+          router.setParams({ openVehicleModal: undefined });
+        }, 150);
+        return () => clearTimeout(timer);
       }
     }, [user, openVehicleModal])
   );

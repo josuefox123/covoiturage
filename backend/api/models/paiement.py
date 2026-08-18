@@ -143,35 +143,91 @@ class Payment(models.Model):
 
 class DriverPayout(models.Model):
     """
-    ModÃ¨le reprÃ©sentant une demande de virement du conducteur.
+    Modèle représentant une demande de virement du conducteur.
 
-    RÃ´le :
-        Permet au conducteur de rÃ©clamer son paiement aprÃ¨s la confirmation
-        d'un trajet terminÃ©. L'admin traite ensuite le virement via Mobile Money.
+    Rôle :
+        Permet au conducteur de réclamer tout ou partie de ses gains disponibles
+        après la complétion d'un trajet. Supporte deux modes :
+        - automatic : via l'API FeexPay Payout si configurée
+        - manual    : traitement manuel par l'administrateur (fallback)
     """
     STATUS_CHOICES = [
         ('pending', 'En attente'),
         ('processing', 'En cours de traitement'),
-        ('paid', 'VersÃ©'),
-        ('failed', 'Ã‰chouÃ©'),
+        ('paid', 'Versé'),
+        ('failed', 'Échoué'),
+        ('cancelled', 'Annulé'),
+    ]
+
+    OPERATOR_CHOICES = [
+        ('mtn', 'MTN Mobile Money'),
+        ('moov', 'Moov Money'),
+        ('celtiis', 'Celtiis Cash'),
+        ('other', 'Autre'),
+    ]
+
+    PAYMENT_MODE_CHOICES = [
+        ('automatic', 'Automatique (FeexPay)'),
+        ('manual', 'Manuel (Admin)'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     driver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='driver_payouts')
-    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='driver_payouts')
-    amount = models.IntegerField(help_text="Montant net dÃ» au conducteur en XOF")
-    phone_number = models.CharField(max_length=30, help_text="NumÃ©ro Mobile Money du conducteur")
+    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='driver_payouts', null=True, blank=True)
+
+    # Montant et coordonnées Mobile Money
+    amount = models.IntegerField(help_text="Montant demandé en XOF")
+    phone_number = models.CharField(max_length=30, help_text="Numéro Mobile Money du conducteur")
+    operator = models.CharField(max_length=20, choices=OPERATOR_CHOICES, default='mtn',
+                                 help_text="Opérateur Mobile Money")
+
+    # Statut et mode
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payment_mode = models.CharField(max_length=20, choices=PAYMENT_MODE_CHOICES, default='manual',
+                                     help_text="Mode de paiement utilisé")
+
+    # Références
+    payout_reference = models.CharField(max_length=50, unique=True, null=True, blank=True,
+                                         help_text="Référence interne Zemy (ZMY-PAYOUT-XXXXXXXX)")
+    feexpay_reference = models.CharField(max_length=255, null=True, blank=True,
+                                          help_text="Référence de la transaction FeexPay")
+
+    # Notes admin
     admin_note = models.TextField(blank=True, null=True, help_text="Note de l'admin lors du traitement")
+
+    # Gestion des échecs
+    failure_reason = models.TextField(null=True, blank=True,
+                                       help_text="Raison de l'échec du reversement")
+    failure_code = models.CharField(max_length=50, null=True, blank=True,
+                                     help_text="Code d'erreur FeexPay ou interne")
+
+    # Timestamps
     requested_at = models.DateTimeField(auto_now_add=True)
-    paid_at = models.DateTimeField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True,
+                                         help_text="Date de passage en processing")
+    paid_at = models.DateTimeField(null=True, blank=True,
+                                    help_text="Date de confirmation du paiement réel")
+    failed_at = models.DateTimeField(null=True, blank=True,
+                                      help_text="Date d'échec du reversement")
 
     class Meta:
         verbose_name = "Demande de virement conducteur"
         verbose_name_plural = "Demandes de virement conducteurs"
         ordering = ['-requested_at']
-        unique_together = [('driver', 'ride')]
+        # Retiré unique_together sur (driver, ride) pour permettre les retraits partiels
+        # Un conducteur peut maintenant avoir plusieurs payouts pour le même trajet
 
     def __str__(self):
-        return f"Payout {self.driver} - Trajet {self.ride_id} - {self.amount} XOF ({self.status})"
+        ref = self.payout_reference or str(self.id)[:8]
+        return f"[{ref}] {self.driver} — {self.amount} XOF ({self.status})"
 
+    @classmethod
+    def generate_reference(cls):
+        """Génère une référence unique ZMY-PAYOUT-XXXXXXXX."""
+        import random
+        import string
+        while True:
+            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            ref = f"ZMY-PAYOUT-{suffix}"
+            if not cls.objects.filter(payout_reference=ref).exists():
+                return ref

@@ -242,10 +242,17 @@ if not DEBUG:
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-# FeexPay Configuration
+# FeexPay Configuration — Paiement entrant (passager)
 FEEXPAY_API_TOKEN = os.getenv('FEEXPAY_API_TOKEN', 'YOUR_FEEXPAY_API_TOKEN')
 FEEXPAY_MERCHANT_ID = os.getenv('FEEXPAY_MERCHANT_ID', 'YOUR_FEEXPAY_MERCHANT_ID')
-FEEXPAY_MODE = os.getenv('FEEXPAY_MODE', 'SANDBOX') # 'SANDBOX' ou 'LIVE'
+FEEXPAY_MODE = os.getenv('FEEXPAY_MODE', 'SANDBOX')  # 'SANDBOX' ou 'LIVE'
+
+# FeexPay Payout Configuration — Reversement conducteur (Mobile Money sortant)
+# Mettre FEEXPAY_PAYOUT_ENABLED=True UNIQUEMENT lorsque l'URL et les credentials Payout
+# sont confirmés par FeexPay. En attendant, le mode manuel (admin) reste actif.
+FEEXPAY_PAYOUT_ENABLED = os.getenv('FEEXPAY_PAYOUT_ENABLED', 'False').lower() == 'true'
+FEEXPAY_PAYOUT_URL = os.getenv('FEEXPAY_PAYOUT_URL', '')           # À configurer avec l'URL FeexPay Payout
+FEEXPAY_PAYOUT_STATUS_URL = os.getenv('FEEXPAY_PAYOUT_STATUS_URL', '')  # URL de vérification statut (optionnel)
 
 AUTH_USER_MODEL = 'api.User'
 

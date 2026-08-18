@@ -130,3 +130,74 @@ class SupportTicketAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
     readonly_fields = ('id', 'created_at', 'updated_at')
 
+
+from .models.paiement import DriverPayout
+
+@admin.register(DriverPayout)
+class DriverPayoutAdmin(admin.ModelAdmin):
+    list_display = (
+        'payout_reference', 'driver_name', 'driver_phone_display',
+        'amount_display', 'operator', 'phone_number',
+        'status_display_colored', 'payment_mode', 'requested_at', 'paid_at'
+    )
+    list_filter = ('status', 'payment_mode', 'operator')
+    search_fields = (
+        'payout_reference', 'driver__full_name', 'driver__phone',
+        'phone_number', 'feexpay_reference'
+    )
+    ordering = ('-requested_at',)
+    list_per_page = 25
+    readonly_fields = (
+        'id', 'payout_reference', 'requested_at', 'processed_at',
+        'paid_at', 'failed_at', 'feexpay_reference', 'failure_code'
+    )
+    fieldsets = (
+        ("Conducteur", {
+            'fields': ('driver', 'payout_reference')
+        }),
+        ("Montant et coordonnées", {
+            'fields': ('amount', 'phone_number', 'operator')
+        }),
+        ("Statut et mode", {
+            'fields': ('status', 'payment_mode')
+        }),
+        ("Références", {
+            'fields': ('feexpay_reference',)
+        }),
+        ("Notes et erreurs", {
+            'fields': ('admin_note', 'failure_reason', 'failure_code')
+        }),
+        ("Timestamps", {
+            'fields': ('requested_at', 'processed_at', 'paid_at', 'failed_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    @admin.display(description='Conducteur')
+    def driver_name(self, obj):
+        return obj.driver.full_name or '—'
+
+    @admin.display(description='Téléphone conducteur')
+    def driver_phone_display(self, obj):
+        return obj.driver.phone or '—'
+
+    @admin.display(description='Montant')
+    def amount_display(self, obj):
+        return f"{obj.amount:,} XOF".replace(',', ' ')
+
+    @admin.display(description='Statut')
+    def status_display_colored(self, obj):
+        from django.utils.html import format_html
+        colors = {
+            'pending': '#F59E0B',
+            'processing': '#3B82F6',
+            'paid': '#10B981',
+            'failed': '#EF4444',
+            'cancelled': '#6B7280',
+        }
+        color = colors.get(obj.status, '#6B7280')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            obj.get_status_display()
+        )

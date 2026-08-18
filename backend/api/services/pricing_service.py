@@ -181,7 +181,7 @@ class PricingService:
                 driver_amount=driver_price * seats,
                 zemy_amount=commission * seats,
                 seats=seats,
-                segment_distance_m=int(sub_distance),
+                segment_distance_m=sub_distance,
                 segment_distance_km=round(sub_distance / 1000, 1)
             )
         except Exception as e:

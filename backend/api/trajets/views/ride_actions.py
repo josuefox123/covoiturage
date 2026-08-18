@@ -90,16 +90,23 @@ class RideActionsMixin:
         ride.save()
         
         bookings = ride.bookings.filter(status__in=['pending', 'confirmed'])
+        total_driver_gain = 0
         for booking in bookings:
             booking.status = 'completed'
             booking.save()
             
             if booking.payment_status in ['paid', 'escrow']:
+                gain = 0
+                try:
+                    gain = int(booking.amount_due_to_driver)
+                except Exception:
+                    pass
+                total_driver_gain += gain
                 Transaction.objects.create(
                     user=ride.driver,
                     ride=ride,
                     transaction_type='ride',
-                    amount=booking.amount_due_to_driver,
+                    amount=gain,
                     status='completed'
                 )
 
@@ -111,11 +118,18 @@ class RideActionsMixin:
                 message=f"Votre trajet {b_dep} -> {b_arr} est terminé. Merci d'avoir voyagé avec nous !",
                 data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
+
+        # Notification conducteur : gains disponibles
+        if ride.driver and total_driver_gain > 0:
             create_and_send_notification(
                 user=ride.driver,
-                title="Passager arrivé",
-                message=f"Le passager {booking.passenger.full_name or booking.passenger.phone} est bien arrivé à destination.",
-                data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
+                title="Gains disponibles 💰",
+                message=(
+                    f"Trajet {ride.departure_location} → {ride.arrival_location} terminé. "
+                    f"Vos gains de {total_driver_gain:,} FCFA sont maintenant disponibles. "
+                    f"Rendez-vous dans 'Mes revenus' pour effectuer un retrait."
+                ).replace(',', ' '),
+                data={'type': 'driver_gains_available', 'ride_id': str(ride.id), 'screen': 'earnings'}
             )
             
         return Response({"status": "Trajet terminé avec succès."})
@@ -252,12 +266,14 @@ class RideActionsMixin:
         if freed_seats_total > 0 and next_idx < total_legs:
             try:
                 from api.tasks import notify_compatible_passengers_task
-                if hasattr(notify_compatible_passengers_task, 'apply_async'):
-                    notify_compatible_passengers_task.apply_async(
-                        args=[str(ride.id), next_idx, freed_seats_total], countdown=5
+                from typing import Any
+                task: Any = notify_compatible_passengers_task
+                if hasattr(task, 'apply_async'):
+                    task.apply_async(
+                        args=(str(ride.id), next_idx, freed_seats_total), countdown=5
                     )
                 else:
-                    notify_compatible_passengers_task(str(ride.id), next_idx, freed_seats_total)
+                    task(str(ride.id), next_idx, freed_seats_total)
             except Exception:
                 from api.services.matching_service import MatchingService as MS
                 compatible = MS.find_compatible_search_alerts(ride, next_idx, freed_seats_total)

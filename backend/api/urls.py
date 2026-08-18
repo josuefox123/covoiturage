@@ -28,6 +28,7 @@ from .views import (
     update_profile, change_password,
     contact_view, SupportTicketViewSet,
     DriverEarningsView, DriverClaimPayoutView, DriverPayoutViewSet,
+    DriverPayoutsListView, DriverPayoutDetailView,
 )
 
 router = DefaultRouter()
@@ -70,5 +71,7 @@ urlpatterns = [
     path('contact/', contact_view, name='contact'),
     path('driver/earnings/', DriverEarningsView.as_view(), name='driver_earnings'),
     path('driver/claim/', DriverClaimPayoutView.as_view(), name='driver_claim_payout'),
+    path('driver/payouts/', DriverPayoutsListView.as_view(), name='driver_payouts_list'),
+    path('driver/payouts/<uuid:pk>/', DriverPayoutDetailView.as_view(), name='driver_payouts_detail'),
     path('', include(router.urls)),
 ]

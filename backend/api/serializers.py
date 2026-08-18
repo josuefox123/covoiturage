@@ -610,16 +610,26 @@ class DriverPayoutSerializer(serializers.ModelSerializer):
     """
     driver_name = serializers.ReadOnlyField(source='driver.full_name')
     driver_email = serializers.ReadOnlyField(source='driver.email')
+    driver_phone = serializers.ReadOnlyField(source='driver.phone')
     ride_route = serializers.SerializerMethodField()
     ride_date = serializers.ReadOnlyField(source='ride.departure_date')
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    operator_display = serializers.CharField(source='get_operator_display', read_only=True)
+    payment_mode_display = serializers.CharField(source='get_payment_mode_display', read_only=True)
 
     class Meta:
         model = DriverPayout
         fields = [
-            'id', 'driver', 'driver_name', 'driver_email', 'ride', 'ride_route', 
-            'ride_date', 'amount', 'phone_number', 'status', 'admin_note', 
-            'requested_at', 'paid_at'
+            'id', 'driver', 'driver_name', 'driver_email', 'driver_phone',
+            'ride', 'ride_route', 'ride_date',
+            'amount', 'phone_number', 'operator', 'operator_display',
+            'status', 'status_display',
+            'payment_mode', 'payment_mode_display',
+            'payout_reference', 'feexpay_reference',
+            'admin_note', 'failure_reason', 'failure_code',
+            'requested_at', 'processed_at', 'paid_at', 'failed_at',
         ]
+        read_only_fields = ['id', 'payout_reference', 'requested_at']
 
     def get_ride_route(self, obj):
         if obj.ride:
@@ -627,3 +637,4 @@ class DriverPayoutSerializer(serializers.ModelSerializer):
         return ""
 
 # updated
+

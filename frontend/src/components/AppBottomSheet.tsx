@@ -10,7 +10,7 @@
  * Zemy
  * ==============================================================
  */
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { theme } from '../styles/theme';
@@ -55,11 +55,15 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
   // Le BottomSheet reste TOUJOURS monté — on pilote l'ouverture/fermeture via l'index.
   // Cela évite le coûteux cycle mount/unmount (et les re-fetch) à chaque ouverture.
   useEffect(() => {
-    if (visible) {
-      bottomSheetRef.current?.snapToIndex(initialIndex);
-    } else {
-      bottomSheetRef.current?.close();
-    }
+    // Léger délai pour laisser le layout se stabiliser avant l'animation
+    const timer = setTimeout(() => {
+      if (visible) {
+        bottomSheetRef.current?.snapToIndex(initialIndex);
+      } else {
+        bottomSheetRef.current?.close();
+      }
+    }, 10);
+    return () => clearTimeout(timer);
   }, [visible, initialIndex]);
 
   const handleSheetChanges = useCallback((index: number) => {
@@ -73,23 +77,25 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
       <BottomSheetBackdrop
         {...props}
         disappearsOnIndex={-1}
-        appearsOnIndex={initialIndex}
+        appearsOnIndex={0}
+        pressBehavior="close"
+        opacity={0.5}
       />
     ),
-    [initialIndex]
+    []
   );
 
-  // Mémoïser les snapPoints pour éviter un re-render du BottomSheet si le parent re-rend
-  const stableSnapPoints = useMemo(() => snapPoints, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: snapPoints est passé directement — le BottomSheet est stable car rendu toujours monté
 
   return (
     <BottomSheet
       ref={bottomSheetRef}
-      snapPoints={stableSnapPoints}
-      index={visible ? initialIndex : -1}
+      snapPoints={snapPoints}
+      index={-1}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}
       enablePanDownToClose
+      animateOnMount={false}
       backgroundStyle={styles.bottomSheetBackground}
       handleIndicatorStyle={styles.handleIndicator}
       keyboardBehavior="extend"

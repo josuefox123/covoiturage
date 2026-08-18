@@ -16,6 +16,8 @@ from ..paiements.views.earnings import (
     DriverEarningsView,
     DriverClaimPayoutView,
     DriverPayoutViewSet,
+    DriverPayoutsListView,
+    DriverPayoutDetailView,
 )
 
 # Re-exports pour compatibilité avec views/__init__.py et urls.py
@@ -30,4 +32,7 @@ __all__ = [
     'DriverEarningsView',
     'DriverClaimPayoutView',
     'DriverPayoutViewSet',
+    'DriverPayoutsListView',
+    'DriverPayoutDetailView',
 ]
+

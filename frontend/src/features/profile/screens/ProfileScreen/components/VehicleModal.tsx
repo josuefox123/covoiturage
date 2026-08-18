@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Platform,
   Image,
+  Animated,
 } from 'react-native';
 import { getMediaUrl } from '../../../../../utils/media';
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet';
@@ -36,6 +37,7 @@ export function VehicleModal({
   onSaveSuccess,
 }: VehicleModalProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [color, setColor] = useState('');
@@ -46,11 +48,21 @@ export function VehicleModal({
   const [licenseExpirationError, setLicenseExpirationError] = useState('');
   const [driverLicensePhoto, setDriverLicensePhoto] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Fetch current vehicle info if modal becomes visible
+  // Fetch vehicle data APRES ouverture (non-bloquant) — la modale s'affiche instantanément
   useEffect(() => {
+    if (!visible || !user) return;
+
+    setIsLoading(true);
+    // Animation d'apparition du contenu
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+
     const fetchVehicle = async () => {
-      if (!visible || !user) return;
       try {
         const data = await authFetch('/vehicles/');
         if (data && data.length > 0) {
@@ -65,7 +77,6 @@ export function VehicleModal({
           setLicenseExpiration(vehicle.license_expiration || '');
           setDriverLicensePhoto(vehicle.driver_license_photo || null);
         } else {
-          // Reset fields
           setBrand('');
           setModel('');
           setColor('');
@@ -77,10 +88,20 @@ export function VehicleModal({
         }
         setLicenseExpirationError('');
       } catch (e) {}
+      finally {
+        setIsLoading(false);
+      }
     };
 
     fetchVehicle();
   }, [visible, user]);
+
+  // Réinitialiser l'animation à la fermeture
+  useEffect(() => {
+    if (!visible) {
+      fadeAnim.setValue(0);
+    }
+  }, [visible]);
 
   const pickLicensePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -178,9 +199,12 @@ export function VehicleModal({
     >
       <View style={styles.modalHeader}>
         <Text style={styles.modalTitle}>Mon véhicule</Text>
+        {isLoading && (
+          <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginLeft: 8 }} />
+        )}
       </View>
 
-      <View style={{ paddingBottom: 60 }}>
+      <Animated.View style={{ opacity: fadeAnim, paddingBottom: 60 }}>
         <View style={styles.vehicleIconContainer}>
           <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
             <Ionicons name="car-sport" size={48} color={theme.colors.white} />
@@ -350,7 +374,7 @@ export function VehicleModal({
             )}
           </LinearGradient>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </AppBottomSheet>
   );
 }
