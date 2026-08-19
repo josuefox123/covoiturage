@@ -190,11 +190,22 @@ class BookingStateService:
         can_cancel = False
         can_pay = False
 
-        if status in ['pending', 'pending_driver', 'pending_payment']:
+        if status in ['pending', 'pending_driver']:
+            action = "waiting_driver"
+            label = "En attente de validation..."
+            can_cancel = True
+            can_pay = False
+        elif status == 'pending_passenger':
+            action = "offer_received"
+            label = f"Proposition reçue — {(booking_pricing.driver_price + booking_pricing.commission):,} FCFA (OUI / NON)".replace(",", " ")
+            can_cancel = True
+            can_pay = False
+        elif status == 'pending_payment':
             action = "pay"
             label = f"Payer {amount:,} FCFA".replace(",", " ")
             can_cancel = True
             can_pay = True
+
         elif status == 'payment_processing':
             action = "payment_processing"
             label = "Validation du paiement..."

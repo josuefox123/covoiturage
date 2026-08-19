@@ -103,7 +103,22 @@ class RidePublicationService:
             est_duration = int(total_actual_duration_sec * matched['pct'])
             return matched['dist_m'], est_duration
 
-        # 6. Traitement des points d'arrêt (uniquement si publiés par le conducteur)
+        # 5. Détection automatique des villes étapes intermédiaires (si le conducteur n'en a pas saisi)
+        auto_stopovers = []
+        if polyline:
+            detected_cities = find_cities_along_route(polyline)
+            for city in detected_cities:
+                d_start = haversine_km(dep_lat, dep_lon, city['latitude'], city['longitude'])
+                d_end = haversine_km(arr_lat, arr_lon, city['latitude'], city['longitude'])
+                if d_start > 8.0 and d_end > 8.0:
+                    auto_stopovers.append({
+                        'name': city['name'],
+                        'latitude': city['latitude'],
+                        'longitude': city['longitude'],
+                        'stop_duration_min': 10
+                    })
+
+        # 6. Tri et fusion des points d'arrêt
         final_stopovers = []
         if stopovers:
             for s in stopovers:
@@ -113,6 +128,15 @@ class RidePublicationService:
                     'longitude': float(s.get('longitude')),
                     'is_driver': True
                 })
+        else:
+            for ac in auto_stopovers:
+                final_stopovers.append({
+                    'name': ac['name'],
+                    'latitude': ac['latitude'],
+                    'longitude': ac['longitude'],
+                    'is_driver': False
+                })
+
 
         def get_node_polyline_index(node):
             if not polyline:

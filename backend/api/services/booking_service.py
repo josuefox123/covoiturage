@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+﻿from datetime import date, datetime, timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import make_aware, now
@@ -81,20 +81,18 @@ class BookingService:
             # NE PAS décrémenter les places lors de la création de la réservation.
             # Elles seront décrémentées lors de la validation du paiement (confirm_payment).
             
-            # PAIEMENT DIRECT : La réservation est créée en attente de paiement.
-            # On n'envoie PAS de notification au conducteur ici — il sera notifié
-            # uniquement après confirmation du paiement par FeexPay.
+
             booking = Booking.objects.create(
                 ride=ride,
                 passenger=passenger,
                 seats_booked=seats_booked,
                 payment_status='pending',
-                status='pending_payment',  # En attente de paiement (pas de validation conducteur)
+                status='pending',  # En attente de validation conducteur
+                # Négociation de prix
                 departure_location=departure_location,
                 arrival_location=arrival_location,
-                # NÉGOCIATION DÉSACTIVÉE : passenger_proposed_price et negotiation_message ignorés
-                # passenger_proposed_price=passenger_proposed_price,
-                # negotiation_message=negotiation_message
+                passenger_proposed_price=passenger_proposed_price,
+                negotiation_message=negotiation_message
             )
             
             # Planifier la tâche d'expiration automatique avec délai intelligent
@@ -267,5 +265,6 @@ class BookingService:
     def deallocate_seats(booking):
         from api.bookings.services import BookingService as CoreBookingService
         return CoreBookingService.deallocate_seats(booking)
+
 
 

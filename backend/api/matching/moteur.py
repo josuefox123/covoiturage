@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class MatchingEngine:
     """Moteur de recherche et de matching de trajets intelligent."""
 
-    MAX_RADIUS_KM = 20.0
+    MAX_RADIUS_KM = 8.0
 
     @classmethod
     def find_rides(
@@ -106,11 +106,10 @@ class MatchingEngine:
         # Tri et classement par pertinence
         direct_matches = SearchRanker.rank_matches(direct_matches)
 
-        # Récupération des correspondances (Commenté pour désactiver la recherche approfondie)
-        # connection_matches = ConnectionMatcher.find_connection_matches(
-        #     departure_lat, departure_lon, arrival_lat, arrival_lon, target_date, seats_requested
-        # )
-        connection_matches = []
+        # Récupération des correspondances (trajets intermédiaires)
+        connection_matches = ConnectionMatcher.find_connection_matches(
+            departure_lat, departure_lon, arrival_lat, arrival_lon, target_date, seats_requested
+        )
 
         results = {
             'directs': direct_matches,
