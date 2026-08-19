@@ -231,6 +231,99 @@
     [data-aos].aos-animate {
       pointer-events: auto;
     }
+  
+    /* ===== BOTTOM NAV MOBILE (APP STYLE) ===== */
+    @media (max-width: 991.98px) {
+
+      /* Masquer le bouton hamburger Bootstrap classique */
+      .navbar-toggler { display: none !important; }
+      .navbar-collapse { display: none !important; }
+
+      /* Padding bottom du body pour que le contenu ne soit pas cache sous la barre */
+      body { padding-bottom: 76px !important; }
+
+      /* Barre de navigation fixe en bas de l ecran */
+      .bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 2000;
+        background: rgba(255, 255, 255, 0.97);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.10);
+        padding: env(safe-area-inset-bottom, 0) 0 0 0;
+        height: 68px;
+      }
+    }
+
+    @media (min-width: 992px) {
+      .bottom-nav { display: none !important; }
+    }
+
+    .bottom-nav {
+      display: none;
+    }
+
+    .bottom-nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 8px 4px;
+      text-decoration: none;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: all 0.2s ease;
+      position: relative;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .bottom-nav-item.active {
+      color: var(--primary-color, #2563eb);
+    }
+
+    .bottom-nav-item.active::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 32px;
+      height: 3px;
+      background: var(--primary-color, #2563eb);
+      border-radius: 0 0 4px 4px;
+    }
+
+    .bottom-nav-icon {
+      font-size: 22px;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .bottom-nav-item.active .bottom-nav-icon {
+      transform: scale(1.1);
+    }
+
+    .bottom-nav-item:hover:not(.active) {
+      color: #64748b;
+    }
+
+    .bottom-nav-label {
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      margin-top: 1px;
+    }
+
   </style>
 </head>
 
@@ -415,6 +508,28 @@
       else { navbar.classList.remove('scrolled'); }
     });
   </script>
+
+  <!-- Bottom Navigation Bar - Mobile App Style -->
+  <nav class="bottom-nav">
+    <a href="/" class="bottom-nav-item">
+      <i class="bottom-nav-icon ph ph-house"></i>
+      <span class="bottom-nav-label">Accueil</span>
+    </a>
+    <a href="/about" class="bottom-nav-item">
+      <i class="bottom-nav-icon ph ph-info"></i>
+      <span class="bottom-nav-label">A propos</span>
+    </a>
+    <a href="/download" class="bottom-nav-item">
+      <i class="bottom-nav-icon ph ph-device-mobile"></i>
+      <span class="bottom-nav-label">Application</span>
+    </a>
+    <a href="/contact" class="bottom-nav-item active">
+      <i class="bottom-nav-icon ph-fill ph-chats"></i>
+      <span class="bottom-nav-label">Contact</span>
+    </a>
+  </nav>
+
 </body>
 
 </html>
+
