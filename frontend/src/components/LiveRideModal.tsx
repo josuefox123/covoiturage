@@ -315,17 +315,36 @@ export default function LiveRideModal() {
   // ============================================================
 
   useEffect(() => {
+    let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
     const unsubscribe = NetInfo.addEventListener(state => {
-      setIsConnected(state.isConnected ?? true);
-      if (!state.isConnected) {
-        CustomAlert.alert(
-          'Connexion perdue',
-          'Votre connexion internet est instable. Le suivi GPS pourrait être affecté.'
-        );
+      const connected = state.isConnected ?? true;
+      setIsConnected(connected);
+
+      if (!connected) {
+        // N'alerter qu'après 5 secondes de déconnexion continue
+        // pour éviter les faux positifs lors des transitions 4G ↔ WiFi
+        disconnectTimer = setTimeout(() => {
+          CustomAlert.alert(
+            'Connexion perdue',
+            'Votre connexion internet est instable. Le suivi GPS pourrait être affecté.'
+          );
+        }, 5000);
+      } else {
+        // Connexion rétablie → annuler l'alerte programmée
+        if (disconnectTimer) {
+          clearTimeout(disconnectTimer);
+          disconnectTimer = null;
+        }
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      if (disconnectTimer) clearTimeout(disconnectTimer);
+    };
   }, []);
+
 
   // ============================================================
   // SPEECH UTILITIES

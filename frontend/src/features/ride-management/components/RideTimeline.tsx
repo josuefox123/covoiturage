@@ -139,7 +139,7 @@ export function RideTimeline({ ride, bookings = [] }: RideTimelineProps) {
         <View style={[styles.timelineDot, { borderColor: '#16A34A', backgroundColor: '#16A34A' }]} />
         <View style={styles.timelineContent}>
           <Text style={styles.locationText}>{ride.arrival_location}</Text>
-          <Text style={styles.timeText}>Estimation {ride.distance_km ? '~' + Math.round(ride.distance_km / 60) + 'h' : '--:--'}</Text>
+          <Text style={styles.timeText}>{ride.distance_km ? ride.distance_km + ' km' : 'Distance non définie'}</Text>
           {renderLocationPassengers(ride.arrival_location, stopoversLength + 1)}
         </View>
       </View>
