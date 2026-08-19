@@ -602,7 +602,20 @@
       margin-top: 1px;
     }
 
+  
+    /* ===== MATERIAL SYMBOLS STYLE IN BOTTOM NAV ===== */
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size: 24px;
+      line-height: 1;
+      transition: font-variation-settings 0.2s ease;
+    }
+    .bottom-nav-item.active .material-symbols-outlined {
+      font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+    }
+
   </style>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0" rel="stylesheet" />
 </head>
 
 <body>
@@ -1049,22 +1062,25 @@
       fetchDynamicStats();
     </script>
 
+  
+
+
   <!-- Bottom Navigation Bar - Mobile App Style -->
   <nav class="bottom-nav">
     <a href="/" class="bottom-nav-item active">
-      <i class="bottom-nav-icon ph-fill ph-house"></i>
+      <span class="material-symbols-outlined">home</span>
       <span class="bottom-nav-label">Accueil</span>
     </a>
     <a href="/about" class="bottom-nav-item">
-      <i class="bottom-nav-icon ph ph-info"></i>
+      <span class="material-symbols-outlined">info</span>
       <span class="bottom-nav-label">A propos</span>
     </a>
     <a href="/download" class="bottom-nav-item">
-      <i class="bottom-nav-icon ph ph-device-mobile"></i>
+      <span class="material-symbols-outlined">smartphone</span>
       <span class="bottom-nav-label">Application</span>
     </a>
     <a href="/contact" class="bottom-nav-item">
-      <i class="bottom-nav-icon ph ph-chats"></i>
+      <span class="material-symbols-outlined">chat</span>
       <span class="bottom-nav-label">Contact</span>
     </a>
   </nav>
@@ -1072,4 +1088,5 @@
 </body>
 
 </html>
+
 
