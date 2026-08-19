@@ -143,15 +143,12 @@ export default function RideSearchCard({
   */
 
   const isSegment = !!(ride.price_per_seat && ride.original_price_per_seat && ride.price_per_seat !== ride.original_price_per_seat);
-  // TRAJETS INTERMÉDIAIRES DÉSACTIVÉS pour cette version :
-  // On n'affiche plus "\u00c0 confirmer" pour les trajets o\u00f9 la ville recherchée diff\u00e8re de la ville du conducteur.
-  // La recherche ne retourne que les trajets dont les waypoints correspondent exactement.
-  // const isIntermediate = !!(
-  //   (searchedDeparture && (extractCity(searchedDeparture) !== extractCity(ride.departure_location))) ||
-  //   (searchedDestination && (extractCity(searchedDestination) !== extractCity(ride.arrival_location))) ||
-  //   isSegment
-  // );
-  const isIntermediate = false; // DÉSACTIVÉ — toujours afficher le prix réel
+  // Trajet intermédiaire : la ville recherchée diffère de la ville de départ/arrivée du conducteur
+  const isIntermediate = !!(
+    (searchedDeparture && (extractCity(searchedDeparture) !== extractCity(ride.departure_location))) ||
+    (searchedDestination && (extractCity(searchedDestination) !== extractCity(ride.arrival_location))) ||
+    isSegment
+  );
 
   const getArrivalTime = () => getArrivalTimeHelper(ride.departure_time, ride.duration_min);
   const getDurationText = () => getDurationTextHelper(ride.duration_min);

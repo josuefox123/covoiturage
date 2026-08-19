@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+﻿import React, { useState } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 import { Ride } from '../../../../src/types';
 
@@ -26,6 +27,9 @@ export function BookingConfirmModal({
 }: BookingConfirmModalProps) {
   const [seatsToBook, setSeatsToBook] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [proposeCustomPrice, setProposeCustomPrice] = useState(false);
+  const [proposedPriceText, setProposedPriceText] = useState('');
+  const [passengerMessageText, setPassengerMessageText] = useState('');
 
   // â”€â”€ NÃ‰GOCIATION DÃ‰SACTIVÃ‰E â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // const [proposeCustomPrice, setProposeCustomPrice] = useState(false);
@@ -38,6 +42,9 @@ export function BookingConfirmModal({
     if (!visible) {
       setSubmitting(false);
       setSeatsToBook(1);
+      setProposeCustomPrice(false);
+      setProposedPriceText('');
+      setPassengerMessageText('');
     }
   }, [visible]);
 
@@ -48,8 +55,11 @@ export function BookingConfirmModal({
     if (submitting || bookingLoading) return;
     setSubmitting(true);
     try {
-      // Plus de nÃ©gociation : on confirme directement avec le prix affichÃ©
-      await onConfirm(seatsToBook, undefined, undefined);
+      const customPrice = proposeCustomPrice && proposedPriceText
+        ? parseInt(proposedPriceText, 10)
+        : undefined;
+      const message = passengerMessageText.trim() || undefined;
+      await onConfirm(seatsToBook, customPrice, message);
     } catch (e) {
       setSubmitting(false);
     }
@@ -137,50 +147,80 @@ export function BookingConfirmModal({
               </View>
             </View>
 
-            {/* â”€â”€ NÃ‰GOCIATION DÃ‰SACTIVÃ‰E â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            {/* Negociation de prix */}
             <View style={{ marginBottom: 20 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1F2937', marginBottom: 10 }}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: "#1F2937", marginBottom: 10 }}>
                 Souhaitez-vous proposer un prix ?
               </Text>
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-                <TouchableOpacity onPress={() => setProposeCustomPrice(false)} ...>
-                  <Text>NON</Text>
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setProposeCustomPrice(false)}
+                  style={{
+                    flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1.5,
+                    borderColor: !proposeCustomPrice ? "#2F80ED" : "#CBD5E1",
+                    backgroundColor: !proposeCustomPrice ? "#EFF6FF" : "#FFFFFF",
+                    alignItems: "center"
+                  }}
+                >
+                  <Text style={{ fontWeight: "700", color: !proposeCustomPrice ? "#2F80ED" : "#6B7280" }}>NON</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setProposeCustomPrice(true)} ...>
-                  <Text>OUI</Text>
+                <TouchableOpacity
+                  onPress={() => setProposeCustomPrice(true)}
+                  style={{
+                    flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1.5,
+                    borderColor: proposeCustomPrice ? "#2F80ED" : "#CBD5E1",
+                    backgroundColor: proposeCustomPrice ? "#EFF6FF" : "#FFFFFF",
+                    alignItems: "center"
+                  }}
+                >
+                  <Text style={{ fontWeight: "700", color: proposeCustomPrice ? "#2F80ED" : "#6B7280" }}>OUI</Text>
                 </TouchableOpacity>
               </View>
               {proposeCustomPrice && (
-                <TextInput keyboardType="numeric" placeholder="Ex: 700 FCFA" ... />
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280", marginBottom: 6 }}>
+                    Votre proposition (par place)
+                  </Text>
+                  <TextInput
+                    style={{ borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 12, fontSize: 15, color: "#1F2937", backgroundColor: "#F8FAFC" }}
+                    keyboardType="numeric"
+                    placeholder="Ex: 700 FCFA"
+                    value={proposedPriceText}
+                    onChangeText={setProposedPriceText}
+                  />
+                </View>
               )}
             </View>
-            <View style={{ marginBottom: 24 }}>
-              <Text ...>Message (facultatif)</Text>
-              <TextInput multiline placeholder="Ã‰crivez un message pour le chauffeur..." ... />
-            </View>
-            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
-            {/* Bouton PAYER */}
+            {/* Message facultatif pour le chauffeur */}
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: "#1F2937", marginBottom: 8 }}>
+                Message (facultatif)
+              </Text>
+              <TextInput
+                style={{ borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 8, padding: 12, fontSize: 14, color: "#1F2937", backgroundColor: "#F8FAFC", minHeight: 80, textAlignVertical: "top" }}
+                placeholder="Ecrivez un message pour le chauffeur..."
+                multiline={true}
+                numberOfLines={3}
+                value={passengerMessageText}
+                onChangeText={setPassengerMessageText}
+              />
+            </View>
+
+            {/* Bouton CONTINUER */}
             <TouchableOpacity
-              style={[
-                styles.bookBtn,
-                { width: '100%', marginBottom: 12, backgroundColor: '#2F80ED' },
-                (submitting || bookingLoading) && { opacity: 0.65 }
-              ]}
+              style={[styles.bookBtn, { width: "100%", marginBottom: 12, backgroundColor: "#2F80ED" }, (submitting || bookingLoading) && { opacity: 0.65 }]}
               onPress={handleConfirm}
               disabled={submitting || bookingLoading}
               activeOpacity={0.8}
             >
               {submitting || bookingLoading ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 }}>
                   <ActivityIndicator color="#FFFFFF" size="small" />
-                  <Text style={styles.bookBtnText}>TRAITEMENT...</Text>
+                  <Text style={styles.bookBtnText}>ENVOI EN COURS...</Text>
                 </View>
               ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <Ionicons name="card" size={18} color="#FFFFFF" />
-                  <Text style={styles.bookBtnText}>PAYER {totalToPay.toLocaleString()} FCFA</Text>
-                </View>
+                <Text style={styles.bookBtnText}>CONTINUER</Text>
               )}
             </TouchableOpacity>
 
@@ -239,3 +279,4 @@ const styles = StyleSheet.create({
     color: '#FFFFFF'
   }
 });
+
