@@ -17,9 +17,16 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', '@nuxt/icon'],
 
-  routeRules: {
-    '/landing/index.html': { redirect: '/landing/' }
+  app: {
+    head: {
+      title: 'Zemy Admin',
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/images/logozemy.png' }
+      ]
+    }
   },
+
+
 
   runtimeConfig: {
     public: {
