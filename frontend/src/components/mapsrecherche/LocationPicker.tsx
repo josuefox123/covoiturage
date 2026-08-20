@@ -7,6 +7,7 @@ import {
   Keyboard,
   Dimensions,
   TouchableWithoutFeedback,
+  TouchableOpacity,
   PanResponder,
   Animated,
   Alert,
