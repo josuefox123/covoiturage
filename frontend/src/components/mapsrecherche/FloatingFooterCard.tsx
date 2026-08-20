@@ -149,7 +149,7 @@ export default function FloatingFooterCard({
           <Ionicons name="pencil" size={16} color="#6B7280" />
           <TextInput
             style={styles.customNoteInput}
-            placeholder="Ajouter un détail (bâtiment, référence...)"
+            placeholder="Ajouter un nom précis pour la position"
             placeholderTextColor="#9CA3AF"
             value={customLocationName}
             onChangeText={setCustomLocationName}
