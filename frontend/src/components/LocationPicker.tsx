@@ -273,11 +273,18 @@ export default function LocationPicker({
     fetchPopularPlaces();
     initializeLocation();
 
+    // Auto-focus search input when the location picker opens
+    const focusTimer = setTimeout(() => {
+      setIsSearchFocused(true);
+      searchInputRef.current?.focus();
+    }, 200);
+
     return () => {
       searchAbort.current?.abort();
       abortRef.current?.abort();
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+      clearTimeout(focusTimer);
     };
   }, []);
 
@@ -1141,6 +1148,7 @@ export default function LocationPicker({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
+          autoFocus={true}
         />
         {isSearching ? (
           <ActivityIndicator size="small" color="#0066FF" style={{ marginRight: 4 }} />
