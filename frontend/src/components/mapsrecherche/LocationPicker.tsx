@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: SCREEN_HEIGHT * 0.22,
+    bottom: SCREEN_HEIGHT * 0.42,
   },
   mapWebView: {
     ...StyleSheet.absoluteFillObject,
