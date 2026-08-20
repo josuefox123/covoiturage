@@ -485,10 +485,34 @@ export function usePublishForm(authCtx: any) {
           const straightKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const distanceKm = Math.round(straightKm * 1.35);
           const durationMin = Math.round((distanceKm / 45) * 60);
-          setEstimation((prev) => {
-            if (prev && prev.distanceKm === distanceKm && prev.durationMin === durationMin) return prev;
-            return { distanceKm, durationMin };
-          });
+          
+          const hrs = Math.floor(durationMin / 60);
+          const mins = durationMin % 60;
+          const durText = hrs > 0 ? `${hrs} h ${mins} min` : `${mins} min`;
+          
+          const fallbackRoutes = [
+            {
+              index: 0,
+              summary: 'Itinéraire par défaut',
+              distanceText: `${distanceKm} km`,
+              distanceValue: distanceKm * 1000,
+              durationText: durText,
+              durationValue: durationMin * 60,
+              legs: [{ distanceKm, durationMin, start_location: departure, end_location: arrival }]
+            },
+            {
+              index: 1,
+              summary: 'Itinéraire alternatif via nationales',
+              distanceText: `${Math.round(distanceKm * 1.15)} km`,
+              distanceValue: Math.round(distanceKm * 1.15) * 1000,
+              durationText: hrs > 0 ? `${hrs} h ${Math.round(mins * 1.15)} min` : `${Math.round(durationMin * 1.15)} min`,
+              durationValue: Math.round(durationMin * 1.15) * 60,
+              legs: [{ distanceKm: Math.round(distanceKm * 1.15), durationMin: Math.round(durationMin * 1.15), start_location: departure, end_location: arrival }]
+            }
+          ];
+          
+          setGoogleRoutes(fallbackRoutes);
+          setEstimation({ distanceKm, durationMin });
           fetchPriceSuggestion(distanceKm);
         }
         setEstimationLoading(false);
