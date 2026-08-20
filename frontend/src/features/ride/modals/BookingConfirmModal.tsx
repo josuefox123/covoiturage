@@ -1122,14 +1122,14 @@ const styles = StyleSheet.create({
   securityTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: theme.colors.successDark || '#15803D',
+    color: theme.colors.secondaryDark || '#15803D',
     marginBottom: 2,
   },
 
   securityText: {
     fontSize: 10,
     lineHeight: 15,
-    color: theme.colors.successDark || '#166534',
+    color: theme.colors.secondaryDark || '#166534',
   },
 
   actions: {
