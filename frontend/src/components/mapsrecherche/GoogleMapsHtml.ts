@@ -14,6 +14,7 @@ export const getGoogleMapsHtml = (defaultLat: number, defaultLon: number): strin
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html, #map { width: 100%; height: 100%; background: #f0f4f8; }
     .center-marker {
+      display: none;
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       z-index: 1000; pointer-events: none; transition: transform 0.18s ease;
