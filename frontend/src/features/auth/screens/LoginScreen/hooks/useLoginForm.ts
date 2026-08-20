@@ -106,6 +106,7 @@ export function useLoginForm() {
   }, [identifier, callingCode]);
 
   const handleLogin = useCallback(async () => {
+    if (loading) return;
     Keyboard.dismiss();
     if (!identifier || !password) {
       setAlertConfig({ visible: true, title: 'Champs manquants', message: 'Veuillez remplir tous les champs.', type: 'error' });
@@ -130,7 +131,7 @@ export function useLoginForm() {
     } finally {
       setLoading(false);
     }
-  }, [identifier, password, getIdentifierError, formatIdentifier, loginWithPassword, router]);
+  }, [loading, identifier, password, getIdentifierError, formatIdentifier, loginWithPassword, router]);
 
   return {
     identifier,

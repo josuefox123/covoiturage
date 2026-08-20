@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   Text,
   View,
@@ -41,7 +41,6 @@ export default function LoginScreen() {
   const buttonScale = useRef(new Animated.Value(1)).current;
   const logoScale = useRef(new Animated.Value(0.8)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const waveAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Initial animations
@@ -76,28 +75,34 @@ export default function LoginScreen() {
         duration: 400,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(waveAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-          Animated.timing(waveAnim, { toValue: -1, duration: 250, useNativeDriver: true }),
-          Animated.timing(waveAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-          Animated.timing(waveAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-          Animated.delay(1500),
-        ])
-      ).start();
-    });
+    ]).start();
   }, []);
 
   const handleIdentifierFocus = useCallback(() => {
     form.setIdentifierFocused(true);
-    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 220, animated: true }), 200);
-  }, [form]);
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: 180,
+          animated: true,
+        });
+      }, 150);
+    });
+  }, [form.setIdentifierFocused]);
 
   const handlePasswordFocus = useCallback(() => {
     form.setPasswordFocused(true);
-    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 380, animated: true }), 200);
-  }, [form]);
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: 300,
+          animated: true,
+        });
+      }, 150);
+    });
+  }, [form.setPasswordFocused]);
 
   const handlePressIn = useCallback(() => {
     Animated.spring(buttonScale, { toValue: 0.96, friction: 5, tension: 120, useNativeDriver: true }).start();
@@ -119,20 +124,11 @@ export default function LoginScreen() {
     router.push({ pathname: '/(auth)/forgot-password', params: { email: emailParam } });
   }, [form.identifier, router]);
 
-  const spin = waveAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-20deg', '0deg', '20deg'],
-  });
-
-  const scale = waveAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: [0.95, 1, 1.08],
-  });
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <SafeAreaView style={styles.container}>
@@ -152,7 +148,13 @@ export default function LoginScreen() {
               {/* Bouton retour */}
               <TouchableOpacity
                 style={styles.backButton}
-                onPress={() => router.replace('/')}
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/');
+                  }
+                }}
                 activeOpacity={0.7}
                 accessibilityLabel="Retour"
               >
@@ -252,7 +254,10 @@ export default function LoginScreen() {
                     placeholder="ex: 01 95 95 95 95"
                     placeholderTextColor={theme.colors.textMuted}
                     value={form.identifier}
-                    onChangeText={form.setIdentifier}
+                    onChangeText={(value) => {
+                      const cleaned = value.replace(/[^\d\s]/g, '');
+                      form.setIdentifier(cleaned);
+                    }}
                     onFocus={handleIdentifierFocus}
                     onBlur={() => form.setIdentifierFocused(false)}
                     autoCapitalize="none"
@@ -260,6 +265,8 @@ export default function LoginScreen() {
                     returnKeyType="next"
                     onSubmitEditing={() => passwordInputRef.current?.focus()}
                     blurOnSubmit={false}
+                    autoComplete="tel"
+                    textContentType="telephoneNumber"
                     accessibilityLabel="Numéro de téléphone"
                   />
 
@@ -316,6 +323,8 @@ export default function LoginScreen() {
                     secureTextEntry={!form.showPassword}
                     returnKeyType="done"
                     onSubmitEditing={form.handleLogin}
+                    autoComplete="password"
+                    textContentType="password"
                     accessibilityLabel="Mot de passe"
                   />
                   <TouchableOpacity
