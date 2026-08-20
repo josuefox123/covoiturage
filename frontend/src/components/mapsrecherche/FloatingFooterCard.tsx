@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,46 @@ export default function FloatingFooterCard({
   sendToMap,
 }: FloatingFooterCardProps) {
   const insets = useSafeAreaInsets();
+
+  const borderPulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let anim: Animated.CompositeAnimation | null = null;
+    if (customLocationName.trim().length === 0) {
+      anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(borderPulseAnim, {
+            toValue: 1,
+            duration: 900,
+            useNativeDriver: false,
+          }),
+          Animated.timing(borderPulseAnim, {
+            toValue: 0,
+            duration: 900,
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      anim.start();
+    } else {
+      borderPulseAnim.setValue(0);
+    }
+
+    return () => {
+      if (anim) anim.stop();
+    };
+  }, [customLocationName]);
+
+  const animatedBorderColor = borderPulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E2E8F0', '#0066FF'],
+  });
+
+  const animatedBorderWidth = borderPulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.8],
+  });
+
 
   return (
     <Animated.View
@@ -105,7 +145,7 @@ export default function FloatingFooterCard({
       {/* Scrollable sheet body content */}
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
         {/* Saisie précision optionnelle */}
-        <View style={styles.customNoteInputRow}>
+        <Animated.View style={[styles.customNoteInputRow, { borderColor: animatedBorderColor, borderWidth: animatedBorderWidth }]}>
           <Ionicons name="pencil" size={16} color="#6B7280" />
           <TextInput
             style={styles.customNoteInput}
@@ -114,7 +154,7 @@ export default function FloatingFooterCard({
             value={customLocationName}
             onChangeText={setCustomLocationName}
           />
-        </View>
+        </Animated.View>
 
         {/* Bouton de confirmation principal */}
         <TouchableOpacity

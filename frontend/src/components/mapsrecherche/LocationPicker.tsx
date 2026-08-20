@@ -310,7 +310,7 @@ export default function LocationPicker({
           country: address.country || '',
         };
         setSelectedLocation(formatted);
-        setCustomLocationName(name);
+        setCustomLocationName('');
       }
     } catch (e) {
     } finally {
@@ -354,7 +354,7 @@ export default function LocationPicker({
 
   const handleSelectSuggestion = (loc: LocationData) => {
     setSelectedLocation(loc);
-    setCustomLocationName(loc.name);
+    setCustomLocationName('');
     sendToMap({ type: 'setView', lat: loc.latitude, lon: loc.longitude, zoom: 16 });
     setIsSearchFocused(false);
   };
@@ -372,7 +372,7 @@ export default function LocationPicker({
       city: item.address?.city || item.address?.town || '',
     };
     setSelectedLocation(loc);
-    setCustomLocationName(name);
+    setCustomLocationName('');
     sendToMap({ type: 'setView', lat, lon, zoom: 16 });
     setIsSearchFocused(false);
   };
@@ -392,7 +392,7 @@ export default function LocationPicker({
       if (saved) {
         const loc = JSON.parse(saved);
         setSelectedLocation(loc);
-        setCustomLocationName(loc.name);
+        setCustomLocationName('');
         sendToMap({ type: 'setView', lat: loc.latitude, lon: loc.longitude, zoom: 16 });
       } else if (selectedLocation) {
         await AsyncStorage.setItem(key, JSON.stringify(selectedLocation));
