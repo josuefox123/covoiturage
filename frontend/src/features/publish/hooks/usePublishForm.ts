@@ -499,6 +499,18 @@ export function usePublishForm(authCtx: any) {
     }
   }, [departureCords, arrivalCords]);
 
+  // Sync loading state and clear old routes when departure/arrival coordinates change
+  useEffect(() => {
+    if (departureCords && arrivalCords) {
+      setEstimationLoading(true);
+      setGoogleRoutes([]);
+      setSelectedRouteIndex(0);
+    } else {
+      setGoogleRoutes([]);
+      setEstimationLoading(false);
+    }
+  }, [departureCords, arrivalCords]);
+
   const toggleStopoverCheck = (id: string) => {
     setDetectedStopovers((prev) =>
       prev.map((item) => {
