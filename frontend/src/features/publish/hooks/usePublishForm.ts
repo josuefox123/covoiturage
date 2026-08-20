@@ -84,6 +84,7 @@ export function usePublishForm(authCtx: any) {
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [repeatType, setRepeatType] = useState<'single_week' | 'weekly'>('single_week');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [daySchedules, setDaySchedules] = useState<{ day: number; time: string }[]>([]);
 
   // Stopovers
   const [stopovers, setStopovers] = useState<{ id: string; name: string; coords?: { lat: number; lon: number }; stopDurationMin: number }[]>([]);
@@ -722,21 +723,35 @@ export function usePublishForm(authCtx: any) {
         });
       }
 
-      if (isRecurrent) {
-        payload.is_recurrent = true;
-        payload.start_date = dateString;
-        if (repeatType === 'single_week') {
-          const end = new Date(selectedDateObj); end.setDate(end.getDate() + 6);
-          payload.end_date = end.toISOString().split('T')[0];
-        } else {
-          payload.end_date = endDateObj.toISOString().split('T')[0];
-        }
-        payload.repeat_type = 'weekly';
-        payload.week_days = selectedDays;
-      }
+      let message = `Votre trajet de ${departure} vers ${arrival} a été publié !`;
 
-      const res = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(payload) });
-      const message = isRecurrent && res.message ? res.message : `Votre trajet de ${departure} vers ${arrival} a été publié !`;
+      if (isRecurrent) {
+        if (daySchedules.length === 0) {
+          throw new Error("Veuillez sélectionner au moins un jour de départ.");
+        }
+
+        const publishPromises = daySchedules.map(async (schedule) => {
+          const schedulePayload = {
+            ...payload,
+            is_recurrent: true,
+            start_date: dateString,
+            end_date: repeatType === 'single_week'
+              ? (() => { const end = new Date(selectedDateObj); end.setDate(end.getDate() + 6); return end.toISOString().split('T')[0]; })()
+              : endDateObj.toISOString().split('T')[0],
+            repeat_type: 'weekly',
+            week_days: [schedule.day],
+            departure_time: schedule.time + ':00',
+          };
+          return authFetch('/rides/', { method: 'POST', body: JSON.stringify(schedulePayload) });
+        });
+
+        const results = await Promise.all(publishPromises);
+        const firstRes = results[0];
+        message = firstRes && firstRes.message ? firstRes.message : `Vos trajets récurrents ont été publiés !`;
+      } else {
+        const res = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(payload) });
+        message = res.message ? res.message : message;
+      }
 
       CustomAlert.alert('Félicitations !', message, [
         { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
@@ -746,7 +761,7 @@ export function usePublishForm(authCtx: any) {
       setDeparture(''); setArrival(''); setDepartureCords(null); setArrivalCords(null);
       setStopovers([]); setDetectedStopovers([]); setGoogleRoutes([]); setSelectedRouteIndex(0);
       setEstimation(null); setPrice(''); setSeats(3); setDescription('');
-      setIsRecurrent(false); setSelectedDays([]);
+      setIsRecurrent(false); setSelectedDays([]); setDaySchedules([]);
       setPriceSuggestion(null);
       goToStep(1);
     } catch (error: any) {
@@ -883,6 +898,7 @@ export function usePublishForm(authCtx: any) {
     showEndDatePicker,
     repeatType,
     selectedDays,
+    daySchedules,
     stopovers,
     detectedStopovers,
     priceSuggestion,
@@ -939,6 +955,7 @@ export function usePublishForm(authCtx: any) {
     setDescription,
     setIsRecurrent,
     setSelectedDays,
+    setDaySchedules,
     setRepeatType,
     setSelectedDateObj,
     setEndDateObj,

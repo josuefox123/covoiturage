@@ -359,11 +359,13 @@ export default function PublishScreen() {
             repeatType={form.repeatType}
             endDateObj={form.endDateObj}
             selectedDays={form.selectedDays}
+            daySchedules={form.daySchedules}
             showDatePicker={form.showDatePicker}
             showTimePicker={form.showTimePicker}
             showEndDatePicker={form.showEndDatePicker}
             timeDate={form.timeDate}
             setSelectedDays={form.setSelectedDays}
+            setDaySchedules={form.setDaySchedules}
             setRepeatType={form.setRepeatType}
             setIsRecurrent={form.setIsRecurrent}
             setSeats={form.setSeats}
