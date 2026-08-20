@@ -127,17 +127,7 @@ export default function FloatingFooterCard({
           <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
         </TouchableOpacity>
 
-        {/* Raccourcis Maison/Travail */}
-        <View style={styles.shortcutsRow}>
-          <TouchableOpacity style={styles.shortcutBadge} onPress={() => selectShortcut('Maison')} activeOpacity={0.7}>
-            <Ionicons name="home-outline" size={15} color="#4B5563" style={{ marginRight: 6 }} />
-            <Text style={styles.shortcutText}>Maison</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.shortcutBadge} onPress={() => selectShortcut('Travail')} activeOpacity={0.7}>
-            <Ionicons name="briefcase-outline" size={15} color="#4B5563" style={{ marginRight: 6 }} />
-            <Text style={styles.shortcutText}>Travail</Text>
-          </TouchableOpacity>
-        </View>
+
 
         {/* Suggestions proches */}
         {nearbySuggestions.length > 0 && (
