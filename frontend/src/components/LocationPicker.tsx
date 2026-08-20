@@ -972,7 +972,7 @@ export default function LocationPicker({
 
         {!mapReady && (
           <View style={styles.mapLoadingOverlay}>
-            <ActivityIndicator size="large" color="#10B981" />
+            <ActivityIndicator size="large" color="#0066FF" />
             <Text style={styles.mapLoadingText}>Chargement de la carte...</Text>
           </View>
         )}
@@ -989,7 +989,7 @@ export default function LocationPicker({
           activeOpacity={0.8}
         >
           <Animated.View style={isLoadingGPS ? { transform: [{ rotate: gpsRotation }] } : null}>
-            <Ionicons name="navigate" size={22} color="#10B981" />
+            <Ionicons name="navigate" size={22} color="#0066FF" />
           </Animated.View>
         </TouchableOpacity>
       )}
@@ -1021,12 +1021,12 @@ export default function LocationPicker({
             {/* Location Title Header with Favorite Star */}
             <View style={styles.bottomSheetHeader}>
               <View style={styles.locationIconCircle}>
-                <Ionicons name="location" size={20} color="#10B981" />
+                <Ionicons name="location" size={20} color="#0066FF" />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 {isLoadingAddress ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <ActivityIndicator size="small" color="#10B981" style={{ marginRight: 6 }} />
+                    <ActivityIndicator size="small" color="#0066FF" style={{ marginRight: 6 }} />
                     <Text style={styles.loadingAddrText}>Recherche du lieu...</Text>
                   </View>
                 ) : (
@@ -1135,7 +1135,7 @@ export default function LocationPicker({
             <Ionicons name="arrow-back" size={22} color="#1F2937" />
           </TouchableOpacity>
         ) : (
-          <Ionicons name="location" size={20} color="#10B981" style={{ marginRight: 8 }} />
+          <Ionicons name="location" size={20} color="#0066FF" style={{ marginRight: 8 }} />
         )}
         <TextInput
           ref={searchInputRef}
@@ -1151,7 +1151,7 @@ export default function LocationPicker({
           autoFocus={true}
         />
         {isSearching ? (
-          <ActivityIndicator size="small" color="#10B981" style={{ marginRight: 4 }} />
+          <ActivityIndicator size="small" color="#0066FF" style={{ marginRight: 4 }} />
         ) : searchQuery.length > 0 ? (
           <TouchableOpacity onPress={() => handleSearchChange('')}>
             <Ionicons name="close-circle" size={18} color="#9CA3AF" />
@@ -1162,7 +1162,7 @@ export default function LocationPicker({
           </TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={() => { Keyboard.dismiss(); setIsSearchFocused(false); }}>
-            <Ionicons name="chevron-up" size={18} color="#10B981" />
+            <Ionicons name="chevron-up" size={18} color="#0066FF" />
           </TouchableOpacity>
         )}
       </View>
@@ -1196,7 +1196,7 @@ export default function LocationPicker({
               <View style={styles.dropdownSection}>
                 <View style={styles.dropdownSectionHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Ionicons name="time-outline" size={15} color="#10B981" style={{ marginRight: 5 }} />
+                    <Ionicons name="time-outline" size={15} color="#0066FF" style={{ marginRight: 5 }} />
                     <Text style={styles.dropdownSectionTitle}>Départs récents</Text>
                   </View>
                   <TouchableOpacity onPress={clearRecentLocations} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -1211,7 +1211,7 @@ export default function LocationPicker({
                     activeOpacity={0.7}
                   >
                     <View style={styles.recentIconBadge}>
-                      <Ionicons name="time" size={15} color="#10B981" />
+                      <Ionicons name="time" size={15} color="#0066FF" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
@@ -1242,7 +1242,7 @@ export default function LocationPicker({
                     activeOpacity={0.7}
                   >
                     <View style={styles.popularIconBadge}>
-                      <Ionicons name="location-sharp" size={15} color="#10B981" />
+                      <Ionicons name="location-sharp" size={15} color="#0066FF" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.suggestionTitle} numberOfLines={1}>{item.name}</Text>
@@ -1261,7 +1261,7 @@ export default function LocationPicker({
               <View>
                 {isSearching && searchResults.length === 0 && (
                   <View style={styles.searchingRow}>
-                    <ActivityIndicator size="small" color="#10B981" />
+                    <ActivityIndicator size="small" color="#0066FF" />
                     <Text style={styles.searchingText}>Recherche en cours...</Text>
                   </View>
                 )}
@@ -1289,7 +1289,7 @@ export default function LocationPicker({
                       activeOpacity={0.7}
                     >
                       <View style={[styles.searchIconBadge, index === 0 && styles.searchIconBadgeTop]}>
-                        <Ionicons name={index === 0 ? 'location' : 'navigate-outline'} size={15} color={index === 0 ? '#10B981' : '#6B7280'} />
+                        <Ionicons name={index === 0 ? 'location' : 'navigate-outline'} size={15} color={index === 0 ? '#0066FF' : '#6B7280'} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.suggestionTitle, index === 0 && styles.suggestionTitleTop]} numberOfLines={1}>{itemTitle}</Text>
@@ -1463,17 +1463,17 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   markerPin: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#10B981',
-    borderWidth: 3,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#0066FF',
+    borderWidth: 3.5,
     borderColor: '#FFFFFF',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+    elevation: 6,
   },
   markerShadow: {
     width: 12,
@@ -1561,9 +1561,9 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   searchBoxActive: {
-    borderColor: '#10B981',
+    borderColor: '#0066FF',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#10B981',
+    shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -1624,11 +1624,11 @@ const styles = StyleSheet.create({
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    gap: 10,
+    borderBottomColor: '#F1F5F9',
+    gap: 12,
   },
   suggestionItemFirst: {
     backgroundColor: '#F0F7FF',
@@ -1643,7 +1643,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1651,7 +1651,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1664,7 +1664,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchIconBadgeTop: {
-    backgroundColor: '#A7F3D0',
+    backgroundColor: '#DBEAFE',
   },
   suggestionTitle: {
     fontSize: 13,
@@ -1673,7 +1673,7 @@ const styles = StyleSheet.create({
   },
   suggestionTitleTop: {
     fontSize: 14,
-    color: '#047857',
+    color: '#1D4ED8',
   },
   suggestionSubtitle: {
     fontSize: 11,
@@ -1778,10 +1778,10 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   sheetHandle: {
-    width: 38,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#E2E8F0',
     alignSelf: 'center',
     marginBottom: 16,
   },
@@ -1807,13 +1807,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingAddrText: {
     fontSize: 12,
-    color: '#10B981',
+    color: '#0066FF',
     marginTop: 2,
   },
   customNoteInputRow: {
@@ -1835,13 +1835,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   confirmLocationBtn: {
-    backgroundColor: '#059669', // Zemy Blue
+    backgroundColor: '#0B56E4', // Zemy Blue
     height: 52,
     borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#059669',
+    shadowColor: '#0B56E4',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -1920,16 +1920,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: '#BFDBFE',
     marginTop: 8,
   },
   seeMapBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#10B981',
+    color: '#0066FF',
   },
   filterModalOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1986,8 +1986,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   filterOptBtnActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#10B981',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
   },
   filterOptText: {
     fontSize: 13,
@@ -1995,7 +1995,7 @@ const styles = StyleSheet.create({
     color: '#4B5563',
   },
   filterOptTextActive: {
-    color: '#10B981',
+    color: '#0066FF',
     fontWeight: '700',
   },
   filterRadiusRow: {
@@ -2014,8 +2014,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radiusBtnActive: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    backgroundColor: '#0066FF',
+    borderColor: '#0066FF',
   },
   radiusText: {
     fontSize: 13,
@@ -2027,12 +2027,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   applyFiltersBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#0B56E4',
     height: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#059669',
+    shadowColor: '#0B56E4',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -2044,3 +2044,4 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
