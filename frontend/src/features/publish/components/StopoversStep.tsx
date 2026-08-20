@@ -669,7 +669,7 @@ export function StopoversStep({
       {/* Estimation */}
       {departure && arrival && (
         <View style={styles.estimationCard}>
-          {estimationLoading ? (
+          {estimationLoading && !estimation ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator
                 size="small"
