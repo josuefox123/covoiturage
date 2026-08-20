@@ -436,6 +436,43 @@ export function usePublishForm(authCtx: any) {
     });
   };
 
+  /**
+   * Re-trie les stopovers actifs selon l'ordre géographique Google.
+   * On utilise orderedStopoverNames fourni par getRouteLegs dans publish.tsx.
+   */
+  const reorderStopoversFromRoute = (route: any) => {
+    const orderedNames: string[] = route?.orderedStopoverNames || [];
+    if (orderedNames.length === 0) return;
+
+    setStopovers((prev) => {
+      if (prev.length === 0) return prev;
+
+      const normalize = (s: string) =>
+        (s || '').split(',')[0].trim().toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      // Build a lookup: normalizedName -> index in Google's ordered list
+      const orderMap = new Map<string, number>();
+      orderedNames.forEach((name, idx) => {
+        orderMap.set(normalize(name), idx);
+      });
+
+      // Sort stopovers by their Google-order index; unknown ones go to end
+      const sorted = [...prev].sort((a, b) => {
+        const ia = orderMap.get(normalize(a.name)) ?? 9999;
+        const ib = orderMap.get(normalize(b.name)) ?? 9999;
+        return ia - ib;
+      });
+
+      // Only update if order actually changed
+      const prev_ids = prev.map(s => s.id).join(',');
+      const sorted_ids = sorted.map(s => s.id).join(',');
+      if (prev_ids === sorted_ids) return prev;
+
+      return sorted;
+    });
+  };
+
   const handleSelectRoute = (idx: number) => {
     setSelectedRouteIndex(idx);
     const selectedRoute = googleRoutes[idx];
@@ -445,6 +482,7 @@ export function usePublishForm(authCtx: any) {
     });
     fetchPriceSuggestion(Math.round(selectedRoute.distanceValue / 1000));
     suggestStopoversForRoute(selectedRoute);
+    reorderStopoversFromRoute(selectedRoute);
     setLegs(selectedRoute.legs || []);
   };
 
@@ -467,6 +505,7 @@ export function usePublishForm(authCtx: any) {
 
           fetchPriceSuggestion(distKm);
           suggestStopoversForRoute(firstRoute);
+          reorderStopoversFromRoute(firstRoute);
           setLegs((prevLegs) => {
             const nextLegs = firstRoute.legs || [];
             if (JSON.stringify(prevLegs) === JSON.stringify(nextLegs)) return prevLegs;

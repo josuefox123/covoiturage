@@ -147,151 +147,75 @@ export function PriceStep({
 
   /**
    * ---------------------------------------------------------
-   * CONSTRUCTION PROPRE DU PARCOURS
+   * SOURCE DE VÉRITÉ : LES LEGS GOOGLE
    *
-   * IMPORTANT :
-   * On conserve l'ordre fourni par l'application / Google.
-   * Aucun tri alphabétique.
-   * Aucun doublon.
-   * ---------------------------------------------------------
-   */
-
-  const orderedStops = useMemo(() => {
-    const result: any[] = [];
-
-    for (const stop of stopovers || []) {
-      if (!stop) continue;
-
-      const name = stop.name || '';
-
-      if (!name) continue;
-
-      // Ne jamais dupliquer le départ
-      if (samePlace(name, departure)) {
-        continue;
-      }
-
-      // Ne jamais dupliquer l'arrivée
-      if (samePlace(name, arrival)) {
-        continue;
-      }
-
-      // Ne jamais dupliquer deux arrêts identiques
-      const alreadyExists = result.some(
-        existing => samePlace(existing.name, name)
-      );
-
-      if (!alreadyExists) {
-        result.push(stop);
-      }
-    }
-
-    return result;
-  }, [stopovers, departure, arrival]);
-
-  /**
-   * ---------------------------------------------------------
-   * PARCOURS COMPLET
+   * Les legs retournés par Google DirectionsService sont
+   * TOUJOURS dans l'ordre géographique correct :
    *
-   * départ
-   *   ↓
-   * arrêt 1
-   *   ↓
-   * arrêt 2
-   *   ↓
-   * arrivée
+   *   legs[0] : Départ → Arrêt 1
+   *   legs[1] : Arrêt 1 → Arrêt 2
+   *   ...
+   *   legs[N] : Arrêt N → Arrivée
    *
-   * Aucun tronçon artificiel.
-   * ---------------------------------------------------------
-   */
-
-  const routePoints = useMemo(() => {
-    const points: string[] = [];
-
-    if (departure) {
-      points.push(departure);
-    }
-
-    orderedStops.forEach(stop => {
-      if (stop?.name) {
-        points.push(stop.name);
-      }
-    });
-
-    if (arrival) {
-      points.push(arrival);
-    }
-
-    // Sécurité supplémentaire contre les doublons consécutifs
-    return points.filter((point, index, arr) => {
-      if (index === 0) return true;
-
-      return !samePlace(point, arr[index - 1]);
-    });
-  }, [departure, arrival, orderedStops]);
-
-  /**
-   * ---------------------------------------------------------
-   * TRONÇONS
-   *
-   * On utilise uniquement les legs réellement fournis.
-   *
-   * Si Google fournit :
-   *
-   * A → B → C
-   *
-   * alors :
-   *
-   * leg 1 = A → B
-   * leg 2 = B → C
-   *
-   * Jamais :
-   *
-   * A → B
-   * B → B
-   * B → C
+   * On utilise directement leg.startName / leg.endName
+   * fournis par getRouteLegs() dans publish.tsx.
+   * On ne reconstruit JAMAIS l'ordre depuis stopovers.
    * ---------------------------------------------------------
    */
 
   const cleanLegs = useMemo(() => {
-    const result: any[] = [];
+    if (!legs || legs.length === 0) return [];
 
-    if (!legs || legs.length === 0) {
-      return result;
+    return legs
+      .map((leg: any) => {
+        // Prefer the pre-computed short names from publish.tsx
+        const startName =
+          leg.startName ||
+          getPlaceName(leg.start_address || leg.startAddress || '');
+        const endName =
+          leg.endName ||
+          getPlaceName(leg.end_address || leg.endAddress || '');
+
+        if (!startName || !endName) return null;
+
+        // Skip identical endpoints (safety guard)
+        if (samePlace(startName, endName)) return null;
+
+        return {
+          ...leg,
+          startName,
+          endName,
+          distanceKm: Number(leg.distanceKm || 0),
+        };
+      })
+      .filter(Boolean);
+  }, [legs]);
+
+  /**
+   * Points de passage dans l'ordre Google pour l'affichage visuel.
+   * Construit à partir des legs — jamais depuis stopovers.
+   */
+  const routePoints = useMemo(() => {
+    if (cleanLegs.length === 0) {
+      // Fallback: just departure → arrival
+      const pts: string[] = [];
+      if (departure) pts.push(departure);
+      if (arrival) pts.push(arrival);
+      return pts;
     }
 
-    legs.forEach((leg, index) => {
-      if (!leg) return;
-
-      const start =
-        routePoints[index] ||
-        leg.startAddress ||
-        leg.start ||
-        '';
-
-      const end =
-        routePoints[index + 1] ||
-        leg.endAddress ||
-        leg.end ||
-        '';
-
-      if (!start || !end) return;
-
-      // Protection contre A → A
-      if (samePlace(start, end)) {
-        return;
-      }
-
-      result.push({
-        ...leg,
-        startName: getPlaceName(start),
-        endName: getPlaceName(end),
-        distanceKm: Number(leg.distanceKm || 0),
-      });
+    const pts: string[] = [];
+    cleanLegs.forEach((leg: any, idx: number) => {
+      if (idx === 0) pts.push(leg.startName);
+      pts.push(leg.endName);
     });
 
-    return result;
-  }, [legs, routePoints]);
+    // Remove consecutive duplicates
+    return pts.filter((p, i, arr) =>
+      i === 0 || !samePlace(p, arr[i - 1])
+    );
+  }, [cleanLegs, departure, arrival]);
+
 
   /**
    * ---------------------------------------------------------

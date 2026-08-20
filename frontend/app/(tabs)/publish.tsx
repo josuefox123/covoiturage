@@ -93,11 +93,15 @@ export default function PublishScreen() {
  
     function getRouteLegs(r) {
       return r.legs.map(function(l) {
+        var startAddr = l.start_address || '';
+        var endAddr = l.end_address || '';
         return {
-          start_address: l.start_address,
-          end_address: l.end_address,
-          distanceKm: Math.round(l.distance.value / 1000),
-          durationMin: Math.round(l.duration.value / 60)
+          start_address: startAddr,
+          end_address: endAddr,
+          startName: startAddr.split(',')[0].trim(),
+          endName: endAddr.split(',')[0].trim(),
+          distanceKm: l.distance ? Math.round(l.distance.value / 1000) : 0,
+          durationMin: l.duration ? Math.round(l.duration.value / 60) : 0
         };
       });
     }
@@ -218,6 +222,7 @@ export default function PublishScreen() {
         console.error("Error parsing stops", e);
       }
  
+      // Build waypoints in the order stopovers were provided
       var waypoints = [];
       stops.forEach(function(s) {
         if (s.coords && s.coords.lat && s.coords.lon) {
@@ -255,6 +260,17 @@ export default function PublishScreen() {
             var mins = totalMin % 60;
             var durText = hrs > 0 ? hrs + ' h ' + mins + ' min' : mins + ' min';
  
+            var legs = getRouteLegs(r);
+
+            // Build ordered stopover names from the middle legs (leg 0 = dep→stop1, last = stopN→arr)
+            // Each intermediate leg's start_address is a stopover in the correct geographic order
+            var orderedStopoverNames = [];
+            if (legs.length > 1) {
+              for (var li = 0; li < legs.length - 1; li++) {
+                orderedStopoverNames.push(legs[li].endName);
+              }
+            }
+ 
             return {
               index: idx,
               summary: r.summary || 'Itinéraire proposé',
@@ -263,7 +279,8 @@ export default function PublishScreen() {
               durationText: durText,
               durationValue: durVal,
               steps: getRouteSteps(r),
-              legs: getRouteLegs(r)
+              legs: legs,
+              orderedStopoverNames: orderedStopoverNames
             };
           });
  
