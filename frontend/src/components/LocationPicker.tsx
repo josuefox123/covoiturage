@@ -209,7 +209,7 @@ export default function LocationPicker({
     (target: 'expanded' | 'lowered' | 'closed') => {
       let toValue = 0;
       if (target === 'lowered') {
-        toValue = SCREEN_HEIGHT * 0.22;
+        toValue = SCREEN_HEIGHT * 0.38;
       } else if (target === 'closed') {
         toValue = SCREEN_HEIGHT;
       }
@@ -238,21 +238,21 @@ export default function LocationPicker({
         return Math.abs(gestureState.dy) > 5;
       },
       onPanResponderMove: (_, gestureState) => {
-        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.22 : 0;
+        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.38 : 0;
         const newY = baseOffset + gestureState.dy;
-        // Clamp the Y coordinate between -30 (drag up compression) and SCREEN_HEIGHT * 0.22 (1/3 of app height lock)
-        const clampedY = Math.max(-30, Math.min(SCREEN_HEIGHT * 0.22, newY));
+        // Clamp the Y coordinate: allow dragging up to -120px (taller) and down to lowered position
+        const clampedY = Math.max(-120, Math.min(SCREEN_HEIGHT * 0.38, newY));
         panY.setValue(clampedY);
       },
       onPanResponderRelease: (_, gestureState) => {
-        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.22 : 0;
+        const baseOffset = currentSnapRef.current === 'lowered' ? SCREEN_HEIGHT * 0.38 : 0;
         const finalY = baseOffset + gestureState.dy;
 
         if (gestureState.vy > 0.4) {
           snapTo('lowered');
         } else if (gestureState.vy < -0.4) {
           snapTo('expanded');
-        } else if (finalY > SCREEN_HEIGHT * 0.11) {
+        } else if (finalY > SCREEN_HEIGHT * 0.19) {
           snapTo('lowered');
         } else {
           snapTo('expanded');
@@ -983,7 +983,7 @@ export default function LocationPicker({
         <TouchableOpacity
           style={[
             styles.myLocationFloatingBtn,
-            { bottom: snapState === 'lowered' ? insets.bottom + 280 : insets.bottom + 380 }
+            { bottom: snapState === 'lowered' ? insets.bottom + 200 : insets.bottom + 480 }
           ]}
           onPress={goToMyLocation}
           activeOpacity={0.8}
@@ -1723,7 +1723,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: SCREEN_HEIGHT * 0.28,
+    bottom: SCREEN_HEIGHT * 0.22,
   },
   dragZone: {
     width: '100%',
@@ -1764,7 +1764,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.45,
+    height: SCREEN_HEIGHT * 0.60,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -2044,4 +2044,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
 
