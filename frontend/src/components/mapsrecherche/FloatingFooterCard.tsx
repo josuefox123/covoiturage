@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   View,
   Text,
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   },
   loadingAddrText: {
     fontSize: 12,
-    color: '#10B981',
+    color: '#0066FF',
     marginTop: 2,
   },
   starBtn: {
@@ -240,13 +240,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   confirmLocationBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#0B56E4',
     height: 52,
     borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#059669',
+    shadowColor: '#0B56E4',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   View,
   Text,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchIconBadgeTop: {
-    backgroundColor: '#A7F3D0',
+    backgroundColor: '#DBEAFE',
   },
   suggestionTitle: {
     fontSize: 13,
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
   suggestionTitleTop: {
     fontSize: 14,
-    color: '#047857',
+    color: '#1D4ED8',
   },
   suggestionSubtitle: {
     fontSize: 11,
