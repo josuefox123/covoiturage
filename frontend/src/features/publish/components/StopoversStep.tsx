@@ -444,8 +444,8 @@ export function StopoversStep({
                       onPress={() =>
                         updateStopover(s.id, {
                           stopDurationMin: Math.max(
-                            5,
-                            (s.stopDurationMin || 15) - 5
+                            1,
+                            (s.stopDurationMin || 15) - 1
                           ),
                         })
                       }
@@ -470,7 +470,7 @@ export function StopoversStep({
                       onPress={() =>
                         updateStopover(s.id, {
                           stopDurationMin:
-                            (s.stopDurationMin || 15) + 5,
+                            (s.stopDurationMin || 15) + 1,
                         })
                       }
                       style={styles.timelineDurationBtn}
