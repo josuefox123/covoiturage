@@ -164,32 +164,76 @@ export function PriceStep({
    */
 
   const cleanLegs = useMemo(() => {
-    if (!legs || legs.length === 0) return [];
+    // -------------------------------------------------------
+    // CAS 1 : Google a fourni plusieurs legs (avec stopovers)
+    // On utilise directement startName/endName des legs Google
+    // -------------------------------------------------------
+    if (legs && legs.length > 1) {
+      return legs
+        .map((leg: any) => {
+          const startName =
+            leg.startName ||
+            getPlaceName(leg.start_address || leg.startAddress || '');
+          const endName =
+            leg.endName ||
+            getPlaceName(leg.end_address || leg.endAddress || '');
 
-    return legs
-      .map((leg: any) => {
-        // Prefer the pre-computed short names from publish.tsx
-        const startName =
-          leg.startName ||
-          getPlaceName(leg.start_address || leg.startAddress || '');
-        const endName =
-          leg.endName ||
-          getPlaceName(leg.end_address || leg.endAddress || '');
+          if (!startName || !endName) return null;
+          if (samePlace(startName, endName)) return null;
 
-        if (!startName || !endName) return null;
+          return {
+            ...leg,
+            startName,
+            endName,
+            distanceKm: Number(leg.distanceKm || 0),
+          };
+        })
+        .filter(Boolean);
+    }
 
-        // Skip identical endpoints (safety guard)
-        if (samePlace(startName, endName)) return null;
+    // -------------------------------------------------------
+    // CAS 2 : Fallback — construire les tronçons depuis stopovers
+    // Utilisé quand Google n'a pas encore recalculé avec les waypoints,
+    // ou quand les legs ne contiennent pas les adresses intermédiaires.
+    // -------------------------------------------------------
+    if (!stopovers || stopovers.length === 0) return [];
 
-        return {
-          ...leg,
-          startName,
-          endName,
-          distanceKm: Number(leg.distanceKm || 0),
-        };
-      })
-      .filter(Boolean);
-  }, [legs]);
+    // Build ordered stops (deduplicated, no dep/arr)
+    const seen = new Set<string>();
+    const validStops: any[] = [];
+    for (const stop of stopovers) {
+      if (!stop?.name) continue;
+      const n = normalizeText(getPlaceName(stop.name));
+      if (samePlace(stop.name, departure)) continue;
+      if (samePlace(stop.name, arrival)) continue;
+      if (seen.has(n)) continue;
+      seen.add(n);
+      validStops.push(stop);
+    }
+
+    if (validStops.length === 0) return [];
+
+    // Build route points: dep → stops... → arr
+    const points = [
+      departure,
+      ...validStops.map((s: any) => s.name),
+      arrival,
+    ].filter(Boolean);
+
+    // Build legs from consecutive points
+    const result: any[] = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+      if (!start || !end || samePlace(start, end)) continue;
+      result.push({
+        startName: getPlaceName(start),
+        endName: getPlaceName(end),
+        distanceKm: 0,
+      });
+    }
+    return result;
+  }, [legs, stopovers, departure, arrival]);
 
   /**
    * Points de passage dans l'ordre Google pour l'affichage visuel.

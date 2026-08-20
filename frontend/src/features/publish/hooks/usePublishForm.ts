@@ -285,7 +285,7 @@ export function usePublishForm(authCtx: any) {
     }
   };
 
-  // Build legs based on stopovers
+  // Build legs based on stopovers (fallback when WebView hasn't recalculated)
   useEffect(() => {
     if (!departure || !arrival) return;
 
@@ -294,22 +294,30 @@ export function usePublishForm(authCtx: any) {
     const activeRoute = googleRoutes[selectedRouteIndex];
     const numLegs = stopovers.length + 1;
 
+    const getShortName = (s: string) => (s || '').split(',')[0].trim();
+
     let computedLegs: any[] = [];
 
     if (activeRoute && activeRoute.legs && activeRoute.legs.length === numLegs) {
+      // Google a recalculé avec les bons waypoints → on garde les legs Google (ils ont déjà startName/endName)
+      // On ne remplace pas les legs si ils viennent déjà de Google (ils auront start_address défini)
+      if (activeRoute.legs[0]?.start_address !== undefined) {
+        // Legs Google complets — ne pas écraser
+        return;
+      }
       computedLegs = activeRoute.legs.map((googleLeg: any, idx: number) => {
         const startLoc = idx === 0 ? departure : stopovers[idx - 1].name;
         const endLoc = idx === numLegs - 1 ? arrival : stopovers[idx].name;
-        const distVal = googleLeg.distanceValue || googleLeg.distance?.value || 0;
-        const durVal = googleLeg.durationValue || googleLeg.duration?.value || 0;
-        const distKm = distVal > 0 ? Math.round(distVal / 1000) : Math.round(totalDist / numLegs);
-        const durMin = durVal > 0 ? Math.round(durVal / 60) : Math.round(totalDur / numLegs);
+        const distKm = Math.round((googleLeg.distanceKm || 0));
+        const durMin = Math.round((googleLeg.durationMin || 0));
 
         return {
           start_location: startLoc,
           end_location: endLoc,
-          distanceKm: distKm,
-          durationMin: durMin,
+          startName: getShortName(startLoc),
+          endName: getShortName(endLoc),
+          distanceKm: distKm || Math.round(totalDist / numLegs),
+          durationMin: durMin || Math.round(totalDur / numLegs),
         };
       });
     } else if (stopovers.length === 0) {
@@ -317,11 +325,14 @@ export function usePublishForm(authCtx: any) {
         {
           start_location: departure,
           end_location: arrival,
+          startName: getShortName(departure),
+          endName: getShortName(arrival),
           distanceKm: totalDist,
           durationMin: totalDur,
         }
       ];
     } else {
+      // Fallback : répartition proportionnelle sans Google
       const legDist = Math.round(totalDist / numLegs);
       const legDur = Math.round(totalDur / numLegs);
       for (let i = 0; i < numLegs; i++) {
@@ -330,6 +341,8 @@ export function usePublishForm(authCtx: any) {
         computedLegs.push({
           start_location: startLoc,
           end_location: endLoc,
+          startName: getShortName(startLoc),
+          endName: getShortName(endLoc),
           distanceKm: legDist,
           durationMin: legDur,
         });
