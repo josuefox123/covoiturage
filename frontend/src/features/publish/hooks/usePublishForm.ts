@@ -420,21 +420,18 @@ export function usePublishForm(authCtx: any) {
       }
     });
 
-    const checkedStatus = suggestions.map(s => ({ ...s, checked: true }));
-    const newStopovers = checkedStatus.map(s => ({ id: s.id, name: s.name, coords: s.coords, stopDurationMin: s.stopDurationMin }));
+    const uncheckedStatus = suggestions.map(s => ({ ...s, checked: false }));
 
     setDetectedStopovers((prev) => {
       const prevKey = prev.map(p => p.id).sort().join(',');
-      const nextKey = checkedStatus.map(n => n.id).sort().join(',');
+      const nextKey = uncheckedStatus.map(n => n.id).sort().join(',');
       if (prevKey === nextKey) return prev;
-      return checkedStatus;
+      return uncheckedStatus;
     });
 
     setStopovers((prev) => {
-      const prevKey = prev.map(p => p.id).sort().join(',');
-      const nextKey = newStopovers.map(n => n.id).sort().join(',');
-      if (prevKey === nextKey) return prev;
-      return newStopovers;
+      // Keep existing stopovers, do not auto-add suggested cities!
+      return prev;
     });
   };
 
