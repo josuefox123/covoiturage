@@ -1,5 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import React, { useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../../../src/styles/theme';
 
@@ -8,209 +14,742 @@ interface PriceStepProps {
   priceLoading: boolean;
   priceSuggestion: any;
   estimation: any;
+
   localPriceText: string;
   setLocalPriceText: (text: string) => void;
   updateOverallPrice: (text: string) => void;
+
   priceInputFocused: boolean;
   setPriceInputFocused: (focused: boolean) => void;
+
   legs: any[];
   legPrices: number[];
   setLegPrices: (prices: number[]) => void;
+
   departure: string;
   arrival: string;
   stopovers: any[];
+
   seats: number;
   financialSettings: any;
 }
+
+const normalizeText = (value: string = '') =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const getPlaceName = (value: string = '') => {
+  if (!value) return '';
+  return value.split(',')[0].trim();
+};
+
+const samePlace = (a: string, b: string) => {
+  return normalizeText(getPlaceName(a)) === normalizeText(getPlaceName(b));
+};
+
+const formatDistance = (distance: number) => {
+  if (!Number.isFinite(distance)) return '0 km';
+
+  if (distance < 1) {
+    return `${Math.round(distance * 1000)} m`;
+  }
+
+  return `${distance.toLocaleString('fr-FR', {
+    maximumFractionDigits: 1,
+  })} km`;
+};
 
 export function PriceStep({
   price,
   priceLoading,
   priceSuggestion,
   estimation,
+
   localPriceText,
   setLocalPriceText,
   updateOverallPrice,
+
   priceInputFocused,
   setPriceInputFocused,
+
   legs,
   legPrices,
   setLegPrices,
+
   departure,
   arrival,
   stopovers,
+
   seats,
-  financialSettings
+  financialSettings,
 }: PriceStepProps) {
-  const priceNum = parseInt(price, 10) || 0;
+  const priceNum = Math.max(0, parseInt(price, 10) || 0);
+
+  /**
+   * ---------------------------------------------------------
+   * COMMISSION
+   * ---------------------------------------------------------
+   */
 
   const calcCommission = (driverPayout: number) => {
+    if (driverPayout <= 0) return 0;
+
     if (!financialSettings) {
       const pct = 10;
       const minC = 100;
+
       let commission = Math.floor(driverPayout * (pct / 100));
-      if (commission < minC) commission = minC;
+
+      if (commission < minC) {
+        commission = minC;
+      }
+
       return commission;
     }
-    if (!financialSettings.is_commission_active) return 0;
-    const pct = financialSettings.commission_percentage !== undefined ? financialSettings.commission_percentage : 10;
-    const minC = financialSettings.min_commission !== undefined ? financialSettings.min_commission : 100;
-    const maxC = financialSettings.max_commission;
+
+    if (!financialSettings.is_commission_active) {
+      return 0;
+    }
+
+    const pct =
+      financialSettings.commission_percentage !== undefined
+        ? Number(financialSettings.commission_percentage)
+        : 10;
+
+    const minC =
+      financialSettings.min_commission !== undefined
+        ? Number(financialSettings.min_commission)
+        : 100;
+
+    const maxC =
+      financialSettings.max_commission !== undefined
+        ? Number(financialSettings.max_commission)
+        : null;
+
     let commission = Math.floor(driverPayout * (pct / 100));
-    if (commission < minC) commission = minC;
-    if (maxC && commission > maxC) commission = maxC;
+
+    if (commission < minC) {
+      commission = minC;
+    }
+
+    if (maxC !== null && commission > maxC) {
+      commission = maxC;
+    }
+
     return commission;
   };
 
   const commission = calcCommission(priceNum);
   const totalPassenger = priceNum + commission;
-  const driverPayout = priceNum;
+
+  /**
+   * ---------------------------------------------------------
+   * CONSTRUCTION PROPRE DU PARCOURS
+   *
+   * IMPORTANT :
+   * On conserve l'ordre fourni par l'application / Google.
+   * Aucun tri alphabétique.
+   * Aucun doublon.
+   * ---------------------------------------------------------
+   */
+
+  const orderedStops = useMemo(() => {
+    const result: any[] = [];
+
+    for (const stop of stopovers || []) {
+      if (!stop) continue;
+
+      const name = stop.name || '';
+
+      if (!name) continue;
+
+      // Ne jamais dupliquer le départ
+      if (samePlace(name, departure)) {
+        continue;
+      }
+
+      // Ne jamais dupliquer l'arrivée
+      if (samePlace(name, arrival)) {
+        continue;
+      }
+
+      // Ne jamais dupliquer deux arrêts identiques
+      const alreadyExists = result.some(
+        existing => samePlace(existing.name, name)
+      );
+
+      if (!alreadyExists) {
+        result.push(stop);
+      }
+    }
+
+    return result;
+  }, [stopovers, departure, arrival]);
+
+  /**
+   * ---------------------------------------------------------
+   * PARCOURS COMPLET
+   *
+   * départ
+   *   ↓
+   * arrêt 1
+   *   ↓
+   * arrêt 2
+   *   ↓
+   * arrivée
+   *
+   * Aucun tronçon artificiel.
+   * ---------------------------------------------------------
+   */
+
+  const routePoints = useMemo(() => {
+    const points: string[] = [];
+
+    if (departure) {
+      points.push(departure);
+    }
+
+    orderedStops.forEach(stop => {
+      if (stop?.name) {
+        points.push(stop.name);
+      }
+    });
+
+    if (arrival) {
+      points.push(arrival);
+    }
+
+    // Sécurité supplémentaire contre les doublons consécutifs
+    return points.filter((point, index, arr) => {
+      if (index === 0) return true;
+
+      return !samePlace(point, arr[index - 1]);
+    });
+  }, [departure, arrival, orderedStops]);
+
+  /**
+   * ---------------------------------------------------------
+   * TRONÇONS
+   *
+   * On utilise uniquement les legs réellement fournis.
+   *
+   * Si Google fournit :
+   *
+   * A → B → C
+   *
+   * alors :
+   *
+   * leg 1 = A → B
+   * leg 2 = B → C
+   *
+   * Jamais :
+   *
+   * A → B
+   * B → B
+   * B → C
+   * ---------------------------------------------------------
+   */
+
+  const cleanLegs = useMemo(() => {
+    const result: any[] = [];
+
+    if (!legs || legs.length === 0) {
+      return result;
+    }
+
+    legs.forEach((leg, index) => {
+      if (!leg) return;
+
+      const start =
+        routePoints[index] ||
+        leg.startAddress ||
+        leg.start ||
+        '';
+
+      const end =
+        routePoints[index + 1] ||
+        leg.endAddress ||
+        leg.end ||
+        '';
+
+      if (!start || !end) return;
+
+      // Protection contre A → A
+      if (samePlace(start, end)) {
+        return;
+      }
+
+      result.push({
+        ...leg,
+        startName: getPlaceName(start),
+        endName: getPlaceName(end),
+        distanceKm: Number(leg.distanceKm || 0),
+      });
+    });
+
+    return result;
+  }, [legs, routePoints]);
+
+  /**
+   * ---------------------------------------------------------
+   * SYNCHRONISATION DES PRIX DES TRONÇONS
+   *
+   * On garde le prix existant lorsqu'il existe.
+   * On ne recrée pas inutilement les valeurs.
+   * ---------------------------------------------------------
+   */
+
+  const safeLegPrices = useMemo(() => {
+    return cleanLegs.map((_, index) => {
+      const value = Number(legPrices?.[index]);
+
+      if (!Number.isFinite(value) || value < 0) {
+        return 0;
+      }
+
+      return Math.round(value);
+    });
+  }, [cleanLegs, legPrices]);
+
+  /**
+   * ---------------------------------------------------------
+   * SOMME DES TRONÇONS
+   * ---------------------------------------------------------
+   */
+
+  const totalLegPrices = useMemo(() => {
+    return safeLegPrices.reduce(
+      (sum, value) => sum + value,
+      0
+    );
+  }, [safeLegPrices]);
+
+  /**
+   * ---------------------------------------------------------
+   * PRIX AU FRANC PRÈS
+   * ---------------------------------------------------------
+   */
+
+  const changeLegPrice = (index: number, delta: number) => {
+    const nextPrices = [...safeLegPrices];
+
+    const current = nextPrices[index] || 0;
+
+    nextPrices[index] = Math.max(
+      0,
+      Math.round(current + delta)
+    );
+
+    setLegPrices(nextPrices);
+  };
+
+  const setLegPriceDirectly = (
+    index: number,
+    value: string
+  ) => {
+    const cleaned = value.replace(/[^0-9]/g, '');
+
+    const amount = cleaned
+      ? Math.max(0, parseInt(cleaned, 10))
+      : 0;
+
+    const nextPrices = [...safeLegPrices];
+
+    nextPrices[index] = amount;
+
+    setLegPrices(nextPrices);
+  };
+
+  /**
+   * ---------------------------------------------------------
+   * PRIX GLOBAL
+   * ---------------------------------------------------------
+   */
+
+  const handleGlobalPriceChange = (txt: string) => {
+    const cleaned = txt.replace(/[^0-9]/g, '');
+
+    const value = cleaned || '0';
+
+    setLocalPriceText(value);
+    updateOverallPrice(value);
+  };
 
   return (
     <View>
-      <Text style={styles.stepTitle}>Combien souhaitez-vous gagner ?</Text>
-      <Text style={styles.stepSubtitle}>
-        {legs.length > 1 
-          ? "Fixez le prix global pour tout le trajet, puis ajustez-le par tronçon si besoin."
-          : "Fixez le montant que vous souhaitez recevoir par place pour ce trajet."}
+      {/* HEADER */}
+      <Text style={styles.stepTitle}>
+        Combien souhaitez-vous gagner ?
       </Text>
 
+      <Text style={styles.stepSubtitle}>
+        Définissez le montant que vous souhaitez recevoir par
+        place. Zemy calculera automatiquement les frais de
+        service pour le passager.
+      </Text>
+
+      {/* SUGGESTION GOOGLE / BACKEND */}
       {priceLoading ? (
-        <Text style={styles.simpleSuggestionText}>Calcul du prix conseillé en cours...</Text>
-      ) : priceSuggestion ? (
-        <View style={{ marginBottom: 16 }}>
-          <Text style={styles.simpleSuggestionText}>
-            Prix conseillé pour ce trajet : <Text style={{ fontWeight: '800', color: theme.colors.primary }}>{priceSuggestion.suggested_price.toLocaleString()} FCFA</Text> (basé sur {estimation?.distanceKm || 0} km).
+        <View style={styles.loadingCard}>
+          <Ionicons
+            name="sparkles-outline"
+            size={18}
+            color={theme.colors.primary}
+          />
+
+          <Text style={styles.loadingText}>
+            Calcul du prix conseillé...
           </Text>
+        </View>
+      ) : priceSuggestion ? (
+        <View style={styles.suggestionCard}>
+          <View style={styles.suggestionHeader}>
+            <View style={styles.suggestionIcon}>
+              <Ionicons
+                name="bulb-outline"
+                size={18}
+                color={theme.colors.primary}
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.suggestionTitle}>
+                Prix conseillé
+              </Text>
+
+              <Text style={styles.suggestionDescription}>
+                Basé sur environ{' '}
+                {estimation?.distanceKm || 0} km
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.suggestionAmount}>
+            {Number(
+              priceSuggestion.suggested_price || 0
+            ).toLocaleString('fr-FR')}{' '}
+            FCFA
+          </Text>
+
           <View style={styles.suggestBtnRow}>
             {[
-              { label: 'Min', val: priceSuggestion.min_price },
-              { label: 'Conseillé', val: priceSuggestion.suggested_price },
-              { label: 'Max', val: priceSuggestion.max_price },
-            ].map((item, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.suggestPresetBtn, price === String(item.val) && styles.suggestPresetBtnActive]}
-                onPress={() => {
-                  setLocalPriceText(String(item.val));
-                  updateOverallPrice(String(item.val));
-                }}
-              >
-                <Text style={[styles.suggestPresetLabel, price === String(item.val) && styles.suggestPresetLabelActive]}>
-                  {item.label}
-                </Text>
-                <Text style={[styles.suggestPresetText, price === String(item.val) && styles.suggestPresetTextActive]}>
-                  {item.val.toLocaleString()} F
-                </Text>
-              </TouchableOpacity>
-            ))}
+              {
+                label: 'Minimum',
+                val: Number(priceSuggestion.min_price || 0),
+              },
+              {
+                label: 'Conseillé',
+                val: Number(
+                  priceSuggestion.suggested_price || 0
+                ),
+              },
+              {
+                label: 'Maximum',
+                val: Number(priceSuggestion.max_price || 0),
+              },
+            ].map(item => {
+              const active = price === String(item.val);
+
+              return (
+                <TouchableOpacity
+                  key={item.label}
+                  style={[
+                    styles.suggestPresetBtn,
+                    active &&
+                      styles.suggestPresetBtnActive,
+                  ]}
+                  onPress={() => {
+                    const value = String(item.val);
+
+                    setLocalPriceText(value);
+                    updateOverallPrice(value);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.suggestPresetLabel,
+                      active &&
+                        styles.suggestPresetLabelActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.suggestPresetText,
+                      active &&
+                        styles.suggestPresetTextActive,
+                    ]}
+                  >
+                    {item.val.toLocaleString('fr-FR')} F
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       ) : null}
 
+      {/* PRIX GLOBAL */}
       <View style={styles.priceInputCard}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={styles.priceInputLabel}>PRIX GLOBAL PAR PLACE (FCFA)</Text>
-          <TouchableOpacity onPress={() => {
-            setLocalPriceText('0');
-            updateOverallPrice('0');
-          }}>
-            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '700' }}>Effacer</Text>
+        <View style={styles.priceHeader}>
+          <View>
+            <Text style={styles.priceInputLabel}>
+              VOTRE GAIN PAR PLACE
+            </Text>
+
+            <Text style={styles.priceHint}>
+              Montant reçu par le conducteur
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              setLocalPriceText('0');
+              updateOverallPrice('0');
+            }}
+          >
+            <Text style={styles.clearText}>
+              Effacer
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <TextInput
-          style={[styles.simplePriceInput, priceInputFocused && styles.simplePriceInputFocused]}
-          value={localPriceText}
-          onChangeText={(txt) => {
-            let cleaned = txt.replace(/[^0-9]/g, '');
-            if (cleaned.startsWith('0') && cleaned.length > 1) {
-              cleaned = cleaned.substring(1);
+        <View
+          style={[
+            styles.priceInputWrapper,
+            priceInputFocused &&
+              styles.priceInputWrapperFocused,
+          ]}
+        >
+          <TextInput
+            style={styles.simplePriceInput}
+            value={localPriceText}
+            onChangeText={handleGlobalPriceChange}
+            keyboardType="numeric"
+            placeholder="Ex : 5000"
+            placeholderTextColor="#94A3B8"
+            selectTextOnFocus
+            maxLength={8}
+            autoFocus={false}
+            onFocus={() =>
+              setPriceInputFocused(true)
             }
-            const finalVal = cleaned || '0';
-            setLocalPriceText(finalVal);
-            updateOverallPrice(finalVal);
-          }}
-          keyboardType="numeric"
-          placeholder="Ex : 5000"
-          placeholderTextColor="#9CA3AF"
-          selectTextOnFocus
-          maxLength={7}
-          autoFocus={true}
-          onFocus={() => setPriceInputFocused(true)}
-          onBlur={() => setPriceInputFocused(false)}
-        />
+            onBlur={() =>
+              setPriceInputFocused(false)
+            }
+          />
+
+          <Text style={styles.currencyText}>
+            FCFA
+          </Text>
+        </View>
       </View>
 
-      {/* Adjust individual segments */}
-      {legs.length > 1 && (
-        <>
-          <View style={{ marginTop: 24, marginBottom: 8 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
-              Ajuster le prix des tronçons individuels
-            </Text>
-            <Text style={{ fontSize: 13, color: theme.colors.textLight, marginTop: 2 }}>
-              La modification d'un tronçon mettra à jour automatiquement le prix global ci-dessus.
-            </Text>
+      {/* PARCOURS RÉEL */}
+      {cleanLegs.length > 0 && (
+        <View style={styles.segmentsSection}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Ionicons
+                name="git-branch-outline"
+                size={18}
+                color={theme.colors.primary}
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionTitle}>
+                Prix par trajet
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>
+                Chaque portion suit l'ordre réel de votre
+                itinéraire.
+              </Text>
+            </View>
           </View>
 
-          {/* Bandeau obligatoire : prix par tronçon */}
-          <View style={{ backgroundColor: '#FFF7ED', borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderColor: '#FED7AA' }}>
-            <Ionicons name="alert-circle" size={18} color="#F97316" style={{ marginTop: 2 }} />
-            <Text style={{ flex: 1, fontSize: 13, color: '#92400E', fontWeight: '600', lineHeight: 18 }}>
-              {'Vous avez ajouté des points d\'arrêt. Le prix de chaque tronçon est obligatoire et sera affiché au passager pour paiement.'}
-            </Text>
-          </View>
+          <View style={styles.routeOrderCard}>
+            {routePoints.map((point, index) => (
+              <View
+                key={`${point}-${index}`}
+                style={styles.routePoint}
+              >
+                <View
+                  style={[
+                    styles.routePointDot,
+                    index === 0 &&
+                      styles.routePointStart,
+                    index === routePoints.length - 1 &&
+                      styles.routePointEnd,
+                  ]}
+                />
 
+                <Text
+                  style={[
+                    styles.routePointText,
+                    index === 0 &&
+                      styles.routePointStrong,
+                    index === routePoints.length - 1 &&
+                      styles.routePointStrong,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {getPlaceName(point)}
+                </Text>
+
+                {index < routePoints.length - 1 && (
+                  <Ionicons
+                    name="arrow-down"
+                    size={14}
+                    color="#CBD5E1"
+                    style={styles.routeArrow}
+                  />
+                )}
+              </View>
+            ))}
+          </View>
 
           <View style={styles.segmentPricesList}>
-            {legs.map((leg, idx) => {
-              const startCity = idx === 0 ? departure.split(',')[0].trim() : stopovers[idx - 1]?.name.split(',')[0].trim();
-              const endCity = idx === legs.length - 1 ? arrival.split(',')[0].trim() : stopovers[idx]?.name.split(',')[0].trim();
-              const legPrice = legPrices[idx] || 0;
-              const dist = leg.distanceKm || 0;
+            {cleanLegs.map((leg, idx) => {
+              const legPrice =
+                safeLegPrices[idx] || 0;
 
               return (
-                <View key={idx} style={styles.segmentRow}>
+                <View
+                  key={`leg-${idx}-${leg.startName}-${leg.endName}`}
+                  style={styles.segmentRow}
+                >
                   <View style={styles.segmentLeft}>
                     <View style={styles.segmentTimeline}>
-                      <View style={styles.segmentDotBlue} />
-                      <View style={styles.segmentLine} />
-                      <View style={styles.segmentDotGreen} />
+                      <View
+                        style={styles.segmentDotStart}
+                      />
+
+                      <View
+                        style={styles.segmentLine}
+                      />
+
+                      <View
+                        style={styles.segmentDotEnd}
+                      />
                     </View>
-                    <View style={styles.segmentAddresses}>
-                      <Text style={styles.segmentCityText}>
-                        {startCity} ➔ {endCity}
+
+                    <View
+                      style={styles.segmentAddresses}
+                    >
+                      <Text
+                        style={styles.segmentCityText}
+                        numberOfLines={1}
+                      >
+                        {leg.startName}
                       </Text>
-                      <Text style={{ fontSize: 12, color: theme.colors.textLight, marginTop: 2, fontWeight: '600' }}>
-                        Tronçon {idx + 1} • {dist} km
+
+                      <View
+                        style={styles.segmentArrowRow}
+                      >
+                        <Ionicons
+                          name="arrow-forward"
+                          size={13}
+                          color={
+                            theme.colors.primary
+                          }
+                        />
+
+                        <Text
+                          style={
+                            styles.segmentDestination
+                          }
+                          numberOfLines={1}
+                        >
+                          {leg.endName}
+                        </Text>
+                      </View>
+
+                      <Text
+                        style={
+                          styles.segmentDistance
+                        }
+                      >
+                        {formatDistance(
+                          leg.distanceKm
+                        )}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.segmentRight}>
+                  {/* PRIX AU FRANC PRÈS */}
+                  <View
+                    style={styles.segmentPriceBox}
+                  >
                     <TouchableOpacity
-                      style={styles.legPriceAdjustBtn}
-                      onPress={() => {
-                        const nextPrices = [...legPrices];
-                        nextPrices[idx] = Math.max(0, legPrice - 500);
-                        setLegPrices(nextPrices);
-                      }}
+                      style={
+                        styles.legPriceAdjustBtn
+                      }
+                      onPress={() =>
+                        changeLegPrice(
+                          idx,
+                          -1
+                        )
+                      }
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="remove" size={16} color={theme.colors.primary} />
+                      <Ionicons
+                        name="remove"
+                        size={16}
+                        color={
+                          theme.colors.primary
+                        }
+                      />
                     </TouchableOpacity>
-                    <Text style={styles.legPriceValueText}>{legPrice.toLocaleString()} F</Text>
+
+                    <TextInput
+                      value={String(legPrice)}
+                      onChangeText={value =>
+                        setLegPriceDirectly(
+                          idx,
+                          value
+                        )
+                      }
+                      keyboardType="numeric"
+                      style={
+                        styles.legPriceInput
+                      }
+                      selectTextOnFocus
+                    />
+
+                    <Text
+                      style={
+                        styles.legPriceCurrency
+                      }
+                    >
+                      F
+                    </Text>
+
                     <TouchableOpacity
-                      style={styles.legPriceAdjustBtn}
-                      onPress={() => {
-                        const nextPrices = [...legPrices];
-                        nextPrices[idx] = legPrice + 500;
-                        setLegPrices(nextPrices);
-                      }}
+                      style={
+                        styles.legPriceAdjustBtn
+                      }
+                      onPress={() =>
+                        changeLegPrice(
+                          idx,
+                          1
+                        )
+                      }
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="add" size={16} color={theme.colors.primary} />
+                      <Ionicons
+                        name="add"
+                        size={16}
+                        color={
+                          theme.colors.primary
+                        }
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -218,99 +757,698 @@ export function PriceStep({
             })}
           </View>
 
+          {/* TOTAL */}
           <View style={styles.totalSegmentSummaryCard}>
-            <Ionicons name="wallet" size={24} color="#059669" />
+            <View style={styles.totalWalletIcon}>
+              <Ionicons
+                name="wallet-outline"
+                size={20}
+                color="#059669"
+              />
+            </View>
+
             <View style={{ flex: 1 }}>
-              <Text style={styles.totalSegmentSummaryText}>
-                Somme totale des tronçons :
+              <Text
+                style={styles.totalSegmentSummaryText}
+              >
+                Total des portions
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: '#059669', marginTop: 2 }}>
-                {priceNum.toLocaleString()} FCFA
+
+              <Text
+                style={styles.totalSegmentSummaryAmount}
+              >
+                {totalLegPrices.toLocaleString(
+                  'fr-FR'
+                )}{' '}
+                FCFA
+              </Text>
+            </View>
+          </View>
+
+          {priceNum !== totalLegPrices && (
+            <View style={styles.warningCard}>
+              <Ionicons
+                name="information-circle-outline"
+                size={18}
+                color="#B45309"
+              />
+
+              <Text style={styles.warningText}>
+                Le prix global est de{' '}
+                <Text style={{ fontWeight: '800' }}>
+                  {priceNum.toLocaleString(
+                    'fr-FR'
+                  )}{' '}
+                  F
+                </Text>
+                , tandis que les portions totalisent{' '}
+                <Text style={{ fontWeight: '800' }}>
+                  {totalLegPrices.toLocaleString(
+                    'fr-FR'
+                  )}{' '}
+                  F
+                </Text>
+                .
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* GAIN TOTAL */}
+      {priceNum > 0 && (
+        <>
+          <View style={styles.totalEarningsCard}>
+            <View style={styles.totalEarningsIcon}>
+              <Ionicons
+                name="wallet"
+                size={22}
+                color="#059669"
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.totalEarningsTitle}>
+                VOTRE GAIN POTENTIEL
+              </Text>
+
+              <Text style={styles.totalEarningsSub}>
+                {priceNum.toLocaleString(
+                  'fr-FR'
+                )}{' '}
+                F × {seats} places
+              </Text>
+            </View>
+
+            <Text
+              style={styles.totalEarningsAmount}
+            >
+              {(priceNum * seats).toLocaleString(
+                'fr-FR'
+              )}{' '}
+              F
+            </Text>
+          </View>
+
+          {/* COMMISSION */}
+          <View style={styles.commissionCard}>
+            <View style={styles.commissionRow}>
+              <Text style={styles.commissionLabel}>
+                Votre gain par place
+              </Text>
+
+              <Text
+                style={styles.commissionValue}
+              >
+                {priceNum.toLocaleString(
+                  'fr-FR'
+                )}{' '}
+                F
+              </Text>
+            </View>
+
+            <View style={styles.commissionRow}>
+              <Text
+                style={styles.commissionLabelSub}
+              >
+                Frais de service Zemy (
+                {financialSettings
+                  ?.commission_percentage ??
+                  10}
+                %)
+              </Text>
+
+              <Text
+                style={styles.commissionValueSub}
+              >
+                +{commission.toLocaleString(
+                  'fr-FR'
+                )}{' '}
+                F
+              </Text>
+            </View>
+
+            <View
+              style={styles.commissionDivider}
+            />
+
+            <View style={styles.commissionRow}>
+              <Text
+                style={styles.commissionLabelTotal}
+              >
+                Le passager paiera
+              </Text>
+
+              <Text
+                style={styles.commissionValueTotal}
+              >
+                {totalPassenger.toLocaleString(
+                  'fr-FR'
+                )}{' '}
+                F
               </Text>
             </View>
           </View>
         </>
-      )}
-
-      {priceNum > 0 && (
-        <View style={styles.totalEarningsCard}>
-          <View style={styles.totalEarningsHeader}>
-            <Ionicons name="wallet" size={24} color="#059669" />
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.totalEarningsTitle}>VOTRE GAIN TOTAL ESTIMÉ</Text>
-              <Text style={styles.totalEarningsSub}>
-                Si les <Text style={{ fontWeight: '800' }}>{seats} places</Text> sont réservées ({driverPayout.toLocaleString()} F × {seats})
-              </Text>
-            </View>
-            <Text style={styles.totalEarningsAmount}>
-              {(driverPayout * seats).toLocaleString()} FCFA
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {priceNum > 0 && (
-        <View style={styles.commissionCard}>
-          <View style={styles.commissionRow}>
-            <Text style={styles.commissionLabel}>Vous recevrez par place</Text>
-            <Text style={styles.commissionValue}>{driverPayout.toLocaleString()} FCFA</Text>
-          </View>
-          <View style={styles.commissionRow}>
-            <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage ?? 10}%)</Text>
-            <Text style={styles.commissionValueSub}>+{commission.toLocaleString()} FCFA</Text>
-          </View>
-          <View style={styles.commissionDivider} />
-          <View style={styles.commissionRow}>
-            <Text style={styles.commissionLabelTotal}>Le passager paiera par place</Text>
-            <Text style={styles.commissionValueTotal}>{totalPassenger.toLocaleString()} FCFA</Text>
-          </View>
-        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stepTitle: { fontSize: 22, fontWeight: '800', color: theme.colors.text, marginTop: 20, marginBottom: 6 },
-  stepSubtitle: { fontSize: 14, color: theme.colors.textLight, marginBottom: 20, lineHeight: 20 },
-  simpleSuggestionText: { fontSize: 13, color: theme.colors.textLight, marginBottom: 16, marginTop: 4, lineHeight: 18 },
-  suggestBtnRow: { flexDirection: 'row', gap: 8 },
-  suggestPresetBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  suggestPresetBtnActive: { backgroundColor: `${theme.colors.primary}15`, borderColor: theme.colors.primary },
-  suggestPresetLabel: { fontSize: 10, fontWeight: '700', color: theme.colors.textLight, textTransform: 'uppercase', marginBottom: 2 },
-  suggestPresetLabelActive: { color: theme.colors.primary },
-  suggestPresetText: { fontSize: 13, fontWeight: '800', color: theme.colors.text },
-  suggestPresetTextActive: { color: theme.colors.primary },
-  priceInputCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  priceInputLabel: { fontSize: 11, fontWeight: '800', color: theme.colors.textLight, textTransform: 'uppercase', letterSpacing: 0.5 },
-  simplePriceInput: { height: 52, borderWidth: 1.5, borderColor: '#CBD5E1', borderRadius: 14, paddingHorizontal: 16, fontSize: 18, fontWeight: '700', color: theme.colors.text, backgroundColor: '#F8FAFC', marginTop: 10, textAlign: 'left' },
-  simplePriceInputFocused: { borderColor: theme.colors.primary, borderWidth: 2, backgroundColor: '#FFFFFF', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  segmentPricesList: { marginTop: 16, gap: 12 },
-  segmentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, padding: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
-  segmentLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 16 },
-  segmentTimeline: { alignItems: 'center', width: 16, marginRight: 12 },
-  segmentDotBlue: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#0066FF' },
-  segmentDotGreen: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
-  segmentLine: { width: 2, height: 16, backgroundColor: '#E2E8F0', marginVertical: 2 },
-  segmentAddresses: { flex: 1, gap: 4 },
-  segmentCityText: { fontSize: 14, fontWeight: '800', color: '#1F2937' },
-  segmentRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 4 },
-  legPriceAdjustBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
-  legPriceValueText: { fontSize: 14, fontWeight: '800', color: '#1F2937', marginHorizontal: 12, minWidth: 60, textAlign: 'center' },
-  totalSegmentSummaryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 16, padding: 16, marginTop: 20, gap: 10 },
-  totalSegmentSummaryText: { fontSize: 13, fontWeight: '700', color: '#065F46' },
-  totalEarningsCard: { backgroundColor: '#ECFDF5', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: '#A7F3D0', marginTop: 16, marginBottom: 14 },
-  totalEarningsHeader: { flexDirection: 'row', alignItems: 'center' },
-  totalEarningsTitle: { fontSize: 11, fontWeight: '800', color: '#065F46', letterSpacing: 0.5 },
-  totalEarningsSub: { fontSize: 12, color: '#047857', marginTop: 2 },
-  totalEarningsAmount: { fontSize: 20, fontWeight: '900', color: '#047857' },
-  commissionCard: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
-  commissionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  commissionLabel: { flex: 1, marginRight: 8, fontSize: 14, fontWeight: '600', color: theme.colors.text },
-  commissionValue: { fontSize: 15, fontWeight: '800', color: theme.colors.text },
-  commissionLabelSub: { flex: 1, marginRight: 8, fontSize: 12, color: theme.colors.textLight },
-  commissionValueSub: { fontSize: 13, color: theme.colors.textLight, fontWeight: '600' },
-  commissionDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 8 },
-  commissionLabelTotal: { flex: 1, marginRight: 8, fontSize: 15, fontWeight: '800', color: theme.colors.primary },
-  commissionValueTotal: { fontSize: 18, fontWeight: '900', color: theme.colors.primary }
+  stepTitle: {
+    fontSize: 23,
+    fontWeight: '800',
+    color: theme.colors.text,
+    marginTop: 20,
+    marginBottom: 6,
+  },
+
+  stepSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textLight,
+    marginBottom: 20,
+    lineHeight: 21,
+  },
+
+  loadingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+
+  loadingText: {
+    fontSize: 13,
+    color: theme.colors.textLight,
+    fontWeight: '600',
+  },
+
+  suggestionCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+
+  suggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  suggestionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  suggestionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#166534',
+  },
+
+  suggestionDescription: {
+    fontSize: 11,
+    color: '#4D7C0F',
+    marginTop: 2,
+  },
+
+  suggestionAmount: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#15803D',
+    marginVertical: 14,
+  },
+
+  suggestBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  suggestPresetBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 5,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+
+  suggestPresetBtnActive: {
+    backgroundColor: `${theme.colors.primary}12`,
+    borderColor: theme.colors.primary,
+  },
+
+  suggestPresetLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+
+  suggestPresetLabelActive: {
+    color: theme.colors.primary,
+  },
+
+  suggestPresetText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginTop: 3,
+  },
+
+  suggestPresetTextActive: {
+    color: theme.colors.primary,
+  },
+
+  priceInputCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+
+  priceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  priceInputLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: theme.colors.textLight,
+    letterSpacing: 0.6,
+  },
+
+  priceHint: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+
+  clearText: {
+    fontSize: 11,
+    color: theme.colors.primary,
+    fontWeight: '800',
+  },
+
+  priceInputWrapper: {
+    height: 60,
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 15,
+    backgroundColor: '#F8FAFC',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+
+  priceInputWrapperFocused: {
+    borderColor: theme.colors.primary,
+    backgroundColor: '#FFFFFF',
+  },
+
+  simplePriceInput: {
+    flex: 1,
+    fontSize: 25,
+    fontWeight: '900',
+    color: theme.colors.text,
+  },
+
+  currencyText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#64748B',
+  },
+
+  segmentsSection: {
+    marginTop: 4,
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  sectionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: `${theme.colors.primary}12`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.colors.text,
+  },
+
+  sectionSubtitle: {
+    fontSize: 12,
+    color: theme.colors.textLight,
+    marginTop: 2,
+  },
+
+  routeOrderCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+
+  routePoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 26,
+  },
+
+  routePointDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#CBD5E1',
+    marginRight: 10,
+  },
+
+  routePointStart: {
+    backgroundColor: '#22C55E',
+  },
+
+  routePointEnd: {
+    backgroundColor: '#EF4444',
+  },
+
+  routePointText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+
+  routePointStrong: {
+    color: '#1F2937',
+    fontWeight: '800',
+  },
+
+  routeArrow: {
+    position: 'absolute',
+    left: 0,
+    top: 25,
+  },
+
+  segmentPricesList: {
+    gap: 10,
+  },
+
+  segmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 14,
+  },
+
+  segmentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+
+  segmentTimeline: {
+    alignItems: 'center',
+    width: 16,
+    marginRight: 12,
+  },
+
+  segmentDotStart: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
+  },
+
+  segmentDotEnd: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+
+  segmentLine: {
+    width: 2,
+    height: 18,
+    backgroundColor: '#CBD5E1',
+    marginVertical: 2,
+  },
+
+  segmentAddresses: {
+    flex: 1,
+  },
+
+  segmentCityText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+
+  segmentArrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+
+  segmentDestination: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+
+  segmentDistance: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+
+  segmentPriceBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 3,
+  },
+
+  legPriceAdjustBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  legPriceInput: {
+    width: 62,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1F2937',
+  },
+
+  legPriceCurrency: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    marginRight: 2,
+  },
+
+  totalSegmentSummaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 16,
+    padding: 15,
+    marginTop: 12,
+    gap: 10,
+  },
+
+  totalWalletIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  totalSegmentSummaryText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+
+  totalSegmentSummaryAmount: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#059669',
+    marginTop: 2,
+  },
+
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+  },
+
+  warningText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 17,
+    color: '#92400E',
+  },
+
+  totalEarningsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 17,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    marginTop: 20,
+    marginBottom: 14,
+  },
+
+  totalEarningsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+
+  totalEarningsTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#065F46',
+    letterSpacing: 0.5,
+  },
+
+  totalEarningsSub: {
+    fontSize: 12,
+    color: '#047857',
+    marginTop: 3,
+  },
+
+  totalEarningsAmount: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#047857',
+  },
+
+  commissionCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+  },
+
+  commissionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 9,
+  },
+
+  commissionLabel: {
+    flex: 1,
+    marginRight: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+
+  commissionValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: theme.colors.text,
+  },
+
+  commissionLabelSub: {
+    flex: 1,
+    marginRight: 8,
+    fontSize: 12,
+    color: theme.colors.textLight,
+  },
+
+  commissionValueSub: {
+    fontSize: 13,
+    color: theme.colors.textLight,
+    fontWeight: '600',
+  },
+
+  commissionDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+
+  commissionLabelTotal: {
+    flex: 1,
+    marginRight: 8,
+    fontSize: 15,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+
+  commissionValueTotal: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: theme.colors.primary,
+  },
 });
