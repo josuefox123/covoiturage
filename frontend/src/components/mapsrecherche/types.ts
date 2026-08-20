@@ -5,6 +5,8 @@ export interface LocationData {
   address?: string;
   city?: string;
   country?: string;
+  distanceText?: string;
+  distKm?: number;
 }
 
 export interface LocationPickerProps {
