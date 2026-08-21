@@ -249,7 +249,11 @@ export default function RideManagementScreen() {
                 key={booking.id}
                 booking={booking}
                 ridePrice={ride.driver_payout || 0}
-                onAccept={() => handleAcceptBooking(booking.id)}
+                onAccept={() => {
+                  setEditingBooking(booking);
+                  const ip = booking.custom_price || booking.driver_counter_price || booking.passenger_proposed_price || ride?.driver_payout || 0;
+                  setCustomPriceText(String(ip));
+                }}
                 onReject={() => handleRejectBooking(booking.id)}
               />
             ))}
@@ -355,6 +359,9 @@ export default function RideManagementScreen() {
               />
               <Text style={styles.priceInputCur}>FCFA / place</Text>
             </View>
+            <Text style={{ fontSize: 11, color: C.textSec, fontStyle: 'italic', marginTop: 8, marginBottom: 12, textAlign: 'center', paddingHorizontal: 16 }}>
+              Ce tarif est votre gain net par place. Les frais Zemy et éventuels surcoûts d'options seront calculés et ajoutés à la fin au paiement du passager.
+            </Text>
             <TouchableOpacity
               style={styles.acceptBtnFull}
               onPress={() => {
