@@ -456,8 +456,8 @@ export default function BookingRequestModal() {
                   <TouchableOpacity
                     style={[styles.btn, styles.btnAccept]}
                     onPress={() => {
-                      const p = parseInt(pricePerSeatInput);
-                      if (isNaN(p) || p <= 0) {
+                      const p = parseInt(pricePerSeatInput) || 0;
+                      if (isNaN(p) || p < 0) {
                         Vibration.vibrate(200);
                       } else {
                         handleResponse('accept', p);

@@ -32,29 +32,11 @@ import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-print("=== FINANCIAL SETTINGS ===")
-from api.models import FinancialSettings
-for s in FinancialSettings.objects.all():
-    print(s.id, s.commission_percentage, s.min_commission, s.max_commission, s.is_commission_active)
+from api.models import Booking
+print(f"Total bookings: {Booking.objects.count()}")
+for b in Booking.objects.all():
+    print(f"ID: {b.id} | Status: {b.status} | Payment: {b.payment_status} | Total Amount: {b.total_amount} | Passenger: {b.passenger.phone} | Driver: {b.ride.driver.phone}")
 
-b = Booking.objects.get(id="05198db1-1c23-45c9-b221-1e6dff8fb138")
-from api.services.pricing_service import PricingService
-pricing = PricingService.compute_for_booking(b)
-print(f"custom_price: {b.custom_price}")
-print(f"passenger_proposed_price: {b.passenger_proposed_price}")
-print(f"driver_counter_price: {b.driver_counter_price}")
-print(f"total_amount: {b.total_amount}")
-print(f"amount_paid_online: {b.amount_paid_online}")
-print(f"seats_booked: {b.seats_booked}")
-print(f"pickup_location_extra: {getattr(b, 'pickup_location_extra', None)}")
-print(f"pickup_surcharge: {getattr(b, 'pickup_surcharge', None)}")
-print(f"dropoff_location_extra: {getattr(b, 'dropoff_location_extra', None)}")
-print(f"dropoff_surcharge: {getattr(b, 'dropoff_surcharge', None)}")
-print(f"pricing.driver_price: {pricing.driver_price}")
-print(f"pricing.commission: {pricing.commission}")
-print(f"pricing.driver_amount: {pricing.driver_amount}")
-print(f"pricing.zemy_amount: {pricing.zemy_amount}")
-print(f"pricing.total_to_pay: {pricing.total_to_pay}")
 
 """
 
