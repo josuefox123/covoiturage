@@ -10,12 +10,12 @@ class FeexPayClient:
         """
         Récupère les détails d'une transaction FeexPay par son identifiant unique.
         """
-        # Simulation en mode SANDBOX
+        # Simulation en mode SANDBOX uniquement pour les identifiants de test préfixés
         if settings.FEEXPAY_MODE == 'SANDBOX' and (
             str(transaction_id).startswith('sandbox-') or 
-            str(transaction_id).startswith('ref_') or 
             str(transaction_id).startswith('test_') or 
-            str(transaction_id).startswith('booking_')
+            str(transaction_id).startswith('booking_sandbox_') or
+            str(transaction_id).startswith('sandbox_test_')
         ):
             return {
                 "status": "SUCCESSFUL",

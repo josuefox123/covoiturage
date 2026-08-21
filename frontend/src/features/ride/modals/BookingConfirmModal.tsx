@@ -334,7 +334,7 @@ export function BookingConfirmModal({
                       style={[
                         styles.counterButton,
                         seatsToBook <= 1 &&
-                          styles.counterButtonDisabled,
+                        styles.counterButtonDisabled,
                       ]}
                       onPress={handleDecreaseSeats}
                       disabled={seatsToBook <= 1}
@@ -358,7 +358,7 @@ export function BookingConfirmModal({
                       style={[
                         styles.counterButton,
                         seatsToBook >= availableSeats &&
-                          styles.counterButtonDisabled,
+                        styles.counterButtonDisabled,
                       ]}
                       onPress={handleIncreaseSeats}
                       disabled={
@@ -401,29 +401,7 @@ export function BookingConfirmModal({
                   </View>
                 </View>
 
-                <View style={styles.priceRows}>
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>
-                      Prix du trajet ({seatsToBook} place{seatsToBook > 1 ? 's' : ''})
-                    </Text>
 
-                    <Text style={styles.priceValue}>
-                      {(driverPayoutPerSeat * seatsToBook).toLocaleString()} FCFA
-                    </Text>
-                  </View>
-
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>
-                      Frais de service Zemy
-                    </Text>
-
-                    <Text style={styles.priceValue}>
-                      {(zemyFeePerSeat * seatsToBook).toLocaleString()} FCFA
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.priceDivider} />
 
                 <View style={styles.totalRow}>
                   <View>
@@ -431,10 +409,7 @@ export function BookingConfirmModal({
                       TOTAL À PAYER
                     </Text>
 
-                    <Text style={styles.totalHint}>
-                      Frais Zemy inclus
-                      {(pickupSurchargeAmount > 0 || dropoffSurchargeAmount > 0) && ' · Surcoûts inclus'}
-                    </Text>
+
                   </View>
 
                   <Text style={styles.totalValue}>
@@ -527,14 +502,6 @@ export function BookingConfirmModal({
                         <Text style={styles.currency}>FCFA</Text>
                       </View>
                     </View>
-                    {pickupSurchargeAmount > 0 && (
-                      <View style={styles.surchargePreview}>
-                        <Ionicons name="information-circle-outline" size={14} color={theme.colors.primary} />
-                        <Text style={styles.surchargePreviewText}>
-                          +{pickupSurchargeAmount.toLocaleString()} FCFA ajoutés sans frais Zemy
-                        </Text>
-                      </View>
-                    )}
                   </View>
                 )}
 
@@ -610,14 +577,6 @@ export function BookingConfirmModal({
                         <Text style={styles.currency}>FCFA</Text>
                       </View>
                     </View>
-                    {dropoffSurchargeAmount > 0 && (
-                      <View style={styles.surchargePreview}>
-                        <Ionicons name="information-circle-outline" size={14} color="#7C3AED" />
-                        <Text style={[styles.surchargePreviewText, { color: '#7C3AED' }]}>
-                          +{dropoffSurchargeAmount.toLocaleString()} FCFA ajoutés sans frais Zemy
-                        </Text>
-                      </View>
-                    )}
                   </View>
                 )}
               </View>
@@ -652,7 +611,7 @@ export function BookingConfirmModal({
                   style={[
                     styles.confirmButton,
                     (isLoading || availableSeats <= 0) &&
-                      styles.confirmButtonDisabled,
+                    styles.confirmButtonDisabled,
                   ]}
                   onPress={handleConfirm}
                   disabled={

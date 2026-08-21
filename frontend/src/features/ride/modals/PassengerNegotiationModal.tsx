@@ -28,7 +28,12 @@ export function PassengerNegotiationModal({
 }: PassengerNegotiationModalProps) {
   // Prix chauffeur unitaire proposé ou contre-proposé
   const unitPrice = myBooking?.driver_counter_price || myBooking?.passenger_proposed_price || myBooking?.custom_price || 0;
-  const totalAmount = myBooking?.portion_price || myBooking?.amount_paid_online || 0;
+  
+  // Calcul robuste du montant total proposé (basePrice + commission) * seats + surcharges d'option
+  const commission = myBooking?.pricing_breakdown?.commission || 0;
+  const surcharge = (myBooking?.pickup_surcharge || 0) + (myBooking?.dropoff_surcharge || 0);
+  const calculatedTotal = ((unitPrice + commission) * (myBooking?.seats_booked || 1)) + surcharge;
+  const totalAmount = myBooking?.total_amount || myBooking?.portion_price || myBooking?.amount_paid_online || calculatedTotal || 0;
 
   return (
     <Modal
@@ -64,38 +69,11 @@ export function PassengerNegotiationModal({
             {/* Price card details */}
             <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A', borderRadius: 16, padding: 16, marginBottom: 24, gap: 10 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, color: '#6B7280' }}>Tarif unitaire négocié :</Text>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>
-                  {unitPrice.toLocaleString()} FCFA / place
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, color: '#6B7280' }}>Nombre de places :</Text>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>
-                  x {myBooking?.seats_booked}
-                </Text>
-              </View>
-
-              {Boolean(myBooking?.pricing_breakdown?.zemy_amount) && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 14, color: '#6B7280' }}>Frais Zemy :</Text>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>
-                    +{myBooking?.pricing_breakdown?.zemy_amount?.toLocaleString()} FCFA
-                  </Text>
-                </View>
-              )}
-
-              <View style={{ height: 1, backgroundColor: '#FDE68A', marginVertical: 4 }} />
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#B45309' }}>MONTANT TOTAL A PAYER :</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#B45309', flex: 1 }}>MONTANT TOTAL PROPOSÉ PAR LE CONDUCTEUR :</Text>
                 <Text style={{ fontSize: 20, fontWeight: '800', color: '#D97706' }}>
                   {totalAmount.toLocaleString()} FCFA
                 </Text>
               </View>
-              <Text style={{ fontSize: 11, color: '#B45309', fontStyle: 'italic', textAlign: 'right' }}>
-                (incluant la commission de service Zemy)
-              </Text>
             </View>
 
             {/* Action Buttons */}
@@ -124,7 +102,7 @@ export function PassengerNegotiationModal({
               ) : (
                 <View style={styles.btnRow}>
                   <Ionicons name="close-circle" size={20} color="#FFFFFF" />
-                  <Text style={styles.bookBtnText}>DÉCLINER (NON)</Text>
+                  <Text style={styles.bookBtnText}>REFUSER (NON)</Text>
                 </View>
               )}
             </TouchableOpacity>

@@ -21,6 +21,57 @@ class BookingService:
         if not passenger.is_verified:
             raise ValidationError({"error": "Votre compte doit être vérifié pour réserver."})
 
+        # SEV-020: Validation du nombre de places
+        try:
+            seats_booked = int(seats_booked)
+            if seats_booked < 1:
+                raise ValidationError({"error": "Le nombre de places doit être supérieur ou égal à 1."})
+            if seats_booked > 10:
+                raise ValidationError({"error": "Le nombre de places maximum autorisé pour une réservation est de 10."})
+        except (ValueError, TypeError):
+            raise ValidationError({"error": "Le nombre de places réservées est invalide."})
+
+        # SEV-018: Validation du prix proposé (si fourni)
+        if passenger_proposed_price is not None:
+            try:
+                passenger_proposed_price = int(passenger_proposed_price)
+                if passenger_proposed_price <= 0:
+                    raise ValidationError({"error": "Le prix proposé doit être supérieur à 0."})
+                if passenger_proposed_price > 100000:
+                    raise ValidationError({"error": "Le prix proposé dépasse la limite maximale autorisée (100 000 FCFA)."})
+            except (ValueError, TypeError):
+                raise ValidationError({"error": "Le prix proposé est invalide."})
+
+        # SEV-019: Validation des surcharges
+        try:
+            pickup_surcharge = int(pickup_surcharge or 0)
+            dropoff_surcharge = int(dropoff_surcharge or 0)
+            if pickup_surcharge < 0 or dropoff_surcharge < 0:
+                raise ValidationError({"error": "Les surcharges ne peuvent pas être négatives."})
+            if pickup_surcharge > 20000 or dropoff_surcharge > 20000:
+                raise ValidationError({"error": "Les surcharges ne peuvent pas dépasser 20 000 FCFA."})
+        except (ValueError, TypeError):
+            raise ValidationError({"error": "Les surcharges doivent être des entiers valides."})
+
+        # SEV-024: Validation des coordonnées GPS (limites et NaN/Inf)
+        import math
+        def validate_gps(lat, lon, label):
+            if lat is not None and lon is not None:
+                try:
+                    f_lat = float(lat)
+                    f_lon = float(lon)
+                    if math.isnan(f_lat) or math.isnan(f_lon) or math.isinf(f_lat) or math.isinf(f_lon):
+                        raise ValueError()
+                    if not (-90 <= f_lat <= 90) or not (-180 <= f_lon <= 180):
+                        raise ValueError()
+                    return f_lat, f_lon
+                except (ValueError, TypeError):
+                    raise ValidationError({"error": f"Coordonnées GPS de {label} invalides."})
+            return None, None
+
+        validate_gps(departure_latitude, departure_longitude, "départ")
+        validate_gps(arrival_latitude, arrival_longitude, "arrivée")
+
         with transaction.atomic():
             # Verrouiller le trajet pour éviter les lectures concurrentes incohérentes
             try:

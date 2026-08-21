@@ -382,7 +382,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         from rest_framework_simplejwt.exceptions import TokenError
 
         query_string = self.scope.get('query_string', b'').decode()
-        logger.error(f"DEBUG AUTH: query_string={query_string}")
         token_str = None
         for part in query_string.split('&'):
             if part.startswith('token='):
@@ -390,7 +389,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 break
 
         if not token_str:
-            logger.error("DEBUG AUTH: token_str is empty/None")
             return None
 
         try:
@@ -399,6 +397,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             from ..models import User
             return User.objects.get(id=user_id, is_active=True)
         except Exception as e:
-            logger.error(f"Auth NotificationWS échouée (token={token_str[:15]}...): {e}")
+            logger.warning(f"Auth NotificationWS échouée: {e}")
             return None
 

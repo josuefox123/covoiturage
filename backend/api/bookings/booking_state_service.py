@@ -232,6 +232,8 @@ class BookingStateService:
             "price": amount,
             # Décomposition pour l'affichage transparent
             "pricing_breakdown": booking_pricing.to_dict(),
+            "pickup_surcharge": booking.pickup_surcharge,
+            "dropoff_surcharge": booking.dropoff_surcharge,
             "seats_booked": booking.seats_booked,
             "can_cancel": can_cancel,
             "can_pay": can_pay,

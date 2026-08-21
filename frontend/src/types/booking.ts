@@ -44,4 +44,9 @@ export interface Booking {
   arrival_waypoint_order?: number | null;
   pricing_breakdown?: any;
   driver_payout?: number;
+  pickup_surcharge?: number;
+  dropoff_surcharge?: number;
+  pickup_location_extra?: string;
+  dropoff_location_extra?: string;
+  total_amount?: number;
 }

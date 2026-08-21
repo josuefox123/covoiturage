@@ -17,6 +17,7 @@
 import { DeviceEventEmitter, Platform } from 'react-native';
 import * as Speech from 'expo-speech';
 import { rideEventBus } from '../../features/ride-session/manager/EventBus';
+import { CustomAlert } from '../../utils/CustomAlert';
 
 export class WebSocketService {
   private static instance: WebSocketService | null = null;
@@ -96,6 +97,7 @@ export class WebSocketService {
         const speakTypes = [
           'new_booking_request',
           'booking_accepted_passenger',
+          'booking_rejected_passenger',
           'passenger_paid_driver',
           'passenger_refused_offer',
           'leg_seats_freed_driver',
@@ -127,9 +129,17 @@ export class WebSocketService {
             passenger_details: {
               full_name: data.passenger_name || 'Passager',
               phone: data.passenger_phone || ''
+            },
+            pickup_surcharge: parseInt(data.pickup_surcharge || '0'),
+            dropoff_surcharge: parseInt(data.dropoff_surcharge || '0'),
+            pricing_breakdown: {
+              driver_price: parseInt(data.driver_price || '0') || undefined,
+              commission: parseInt(data.commission || '0') || undefined,
+              total_to_pay: parseInt(data.total_to_pay || '0') || undefined,
             }
           });
-        } else if (data?.type === 'booking_accepted_passenger') {
+        } else if (data?.type === 'booking_accepted_passenger' || data?.type === 'booking_rejected_passenger') {
+          CustomAlert.alert(title || "Mise à jour de réservation", message || "Votre demande de réservation a été mise à jour.");
           DeviceEventEmitter.emit('refreshRideDetails');
           if (data?.ride_id) {
             rideEventBus.emit({

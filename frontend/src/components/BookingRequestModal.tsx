@@ -139,7 +139,7 @@ export default function BookingRequestModal() {
       if (currentBooking) {
         activeBookingId.current = currentBooking.id;
         
-        const defaultSurcharge = currentBooking.pickup_surcharge || currentBooking.dropoff_surcharge || 0;
+        const defaultSurcharge = (currentBooking.pickup_surcharge || 0) + (currentBooking.dropoff_surcharge || 0);
         setPricePerSeatInput(String(defaultSurcharge));
 
         if (booking?.id !== currentBooking.id) {
@@ -160,7 +160,7 @@ export default function BookingRequestModal() {
       if (targetBooking) {
         setBooking(targetBooking);
         activeBookingId.current = targetBooking.id;
-        const defaultSurcharge = targetBooking.pickup_surcharge || targetBooking.dropoff_surcharge || 0;
+        const defaultSurcharge = (targetBooking.pickup_surcharge || 0) + (targetBooking.dropoff_surcharge || 0);
         setPricePerSeatInput(String(defaultSurcharge));
         const passengerName = targetBooking.passenger_details?.full_name || 'un passager';
         startAlerts(passengerName, targetBooking.departure_location, targetBooking.arrival_location);
@@ -177,7 +177,7 @@ export default function BookingRequestModal() {
       if (targetBooking) {
         setBooking(targetBooking);
         activeBookingId.current = targetBooking.id;
-        const defaultSurcharge = targetBooking.pickup_surcharge || targetBooking.dropoff_surcharge || 0;
+        const defaultSurcharge = (targetBooking.pickup_surcharge || 0) + (targetBooking.dropoff_surcharge || 0);
         setPricePerSeatInput(String(defaultSurcharge));
         const passengerName = targetBooking.passenger_details?.full_name || 'un passager';
         startAlerts(passengerName, targetBooking.departure_location, targetBooking.arrival_location);
@@ -204,7 +204,10 @@ export default function BookingRequestModal() {
     try {
       const payload: any = {};
       if (customPrice !== undefined && !isNaN(customPrice)) {
-        if (booking.pickup_location_extra) {
+        if (booking.pickup_location_extra && booking.dropoff_location_extra) {
+          payload.pickup_surcharge = customPrice;
+          payload.dropoff_surcharge = 0;
+        } else if (booking.pickup_location_extra) {
           payload.pickup_surcharge = customPrice;
         } else if (booking.dropoff_location_extra) {
           payload.dropoff_surcharge = customPrice;
@@ -232,7 +235,7 @@ export default function BookingRequestModal() {
         setBooking(nextBooking);
         activeBookingId.current = nextBooking.id;
         
-        const defaultSurcharge = nextBooking.pickup_surcharge || nextBooking.dropoff_surcharge || 0;
+        const defaultSurcharge = (nextBooking.pickup_surcharge || 0) + (nextBooking.dropoff_surcharge || 0);
         setPricePerSeatInput(String(defaultSurcharge));
         
         const passengerName = nextBooking.passenger_details?.full_name || 'un passager';
@@ -301,6 +304,9 @@ export default function BookingRequestModal() {
 
   if (!visible || !booking) return null;
 
+  const driverPrice = booking.pricing_breakdown?.driver_price ?? 
+    (booking.total_amount ? (booking.total_amount > 50000 ? Math.round(booking.total_amount / booking.seats_booked) : booking.total_amount) : 100);
+
   return (
     <Modal
       transparent
@@ -308,12 +314,14 @@ export default function BookingRequestModal() {
       visible={visible}
       onRequestClose={closeModal}
     >
-      <View style={styles.overlay}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-        >
-          <View style={styles.card}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.container}>
+            <View style={styles.card}>
             {/* Header d'alerte agressive */}
             <View style={styles.header}>
               <View style={styles.bellIconCircle}>
@@ -322,7 +330,6 @@ export default function BookingRequestModal() {
               <Text style={styles.headerTitle}>
                 Nouvelle Demande ! {queue.length > 1 ? `(${currentIndex + 1}/${queue.length})` : ''}
               </Text>
-              <Text style={styles.timerText}>Expire dans : {timeLeft}</Text>
             </View>
 
             {/* Corps de la demande */}
@@ -401,11 +408,11 @@ export default function BookingRequestModal() {
                 <View style={[styles.detailBox, { flex: 2, alignItems: 'center' }]}>
                   <Text style={styles.detailLabel}>Transport (FCFA)</Text>
                   <Text style={[styles.detailValue, { color: '#475569', fontWeight: '800', marginTop: 6 }]}>
-                    {(booking.pricing_breakdown?.driver_price ?? 100).toLocaleString()}
+                    {driverPrice.toLocaleString()}
                   </Text>
                 </View>
                 <View style={[styles.detailBox, { flex: 2.2, alignItems: 'center' }]}>
-                  <Text style={styles.detailLabel}>Option (+ FCFA)</Text>
+                  <Text style={styles.detailLabel}>Surcoût Option</Text>
                   <TextInput
                     style={{
                       fontSize: 16,
@@ -430,10 +437,10 @@ export default function BookingRequestModal() {
 
               <View style={{ marginTop: 12, alignItems: 'center' }}>
                 <Text style={{ fontSize: 13, color: '#1E293B', fontWeight: '700' }}>
-                  Total proposé : {(((booking.pricing_breakdown?.driver_price ?? 100) + (parseInt(pricePerSeatInput) || 0)) * booking.seats_booked).toLocaleString()} FCFA
+                  Total proposé : {((driverPrice * booking.seats_booked) + (parseInt(pricePerSeatInput) || 0)).toLocaleString()} FCFA
                 </Text>
-                <Text style={{ fontSize: 10, color: '#64748B', fontStyle: 'italic', marginTop: 2 }}>
-                  (Le surcoût d'option est modifiable par vos soins)
+                <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '700', fontStyle: 'italic', marginTop: 4, textAlign: 'center', paddingHorizontal: 16 }}>
+                  (Modifiez le surcoût de l'option ci-dessus pour proposer votre tarif final de trajet personnalisé au passager)
                 </Text>
               </View>
             </View>
@@ -472,9 +479,10 @@ export default function BookingRequestModal() {
               )}
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
-    </Modal>
+    </KeyboardAvoidingView>
+  </Modal>
   );
 }
 

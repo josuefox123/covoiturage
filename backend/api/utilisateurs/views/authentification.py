@@ -1,14 +1,16 @@
 from rest_framework import permissions, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.conf import settings
 from datetime import timedelta
 import random
 import logging
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from ...throttles import LoginThrottle, OTPThrottle, ResetPasswordThrottle
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -22,6 +24,7 @@ from firebase_admin import auth as firebase_auth
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([OTPThrottle])
 @csrf_exempt
 def verify_code(request):
     """
@@ -35,10 +38,15 @@ def verify_code(request):
         return Response({'error': 'Jeton Firebase requis.'}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        if firebase_token == '123456':
+        # SEV-014: Le bypass de jeton de développement '123456' est réservé STRICTEMENT au mode DEBUG.
+        if firebase_token == '123456' and settings.DEBUG:
             if not phone:
                 return Response({'error': 'Numéro de téléphone requis pour le mode dev.'}, status=status.HTTP_400_BAD_REQUEST)
         else:
+            if firebase_token == '123456':
+                # Bypass refusé silencieusement ou explicitement en production
+                return Response({'error': 'Vérification de sécurité requise.'}, status=status.HTTP_400_BAD_REQUEST)
+                
             if not firebase_admin._apps:
                 return Response({'error': 'Firebase Admin non configuré sur le serveur.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
@@ -98,6 +106,7 @@ def register_user(request):
 @extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Authentification'])
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([LoginThrottle])
 @csrf_exempt
 def login_user(request):
     """
@@ -136,6 +145,7 @@ def login_user(request):
 @extend_schema(request=dict, responses={200: dict, 400: dict, 500: dict}, tags=['Authentification'])
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([ResetPasswordThrottle])
 @csrf_exempt
 def send_reset_code(request):
     """
@@ -147,8 +157,11 @@ def send_reset_code(request):
     
     email = email.strip()
     user = User.objects.filter(email__iexact=email).first()
+    
+    # SEV-015: Obfuscation pour masquer l'existence du compte (protection contre l'énumération)
     if not user:
-        return Response({'error': "Aucun compte n'est associé à cette adresse email."}, status=status.HTTP_404_NOT_FOUND)
+        # On retourne un message de succès factice sans envoyer de mail pour ne pas donner d'indice à un attaquant
+        return Response({'message': "Code de réinitialisation envoyé avec succès par email si le compte existe."}, status=status.HTTP_200_OK)
     
     PasswordResetOTP.objects.filter(email__iexact=email).delete()
     
@@ -157,7 +170,7 @@ def send_reset_code(request):
     
     try:
         send_zemy_reset_email(user.full_name or "Utilisateur Zemy", email, code)
-        return Response({'message': "Code de réinitialisation envoyé avec succès par email."}, status=status.HTTP_200_OK)
+        return Response({'message': "Code de réinitialisation envoyé avec succès par email si le compte existe."}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'error': "Une erreur est survenue lors de l'envoi de l'e-mail. Veuillez vérifier votre configuration."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

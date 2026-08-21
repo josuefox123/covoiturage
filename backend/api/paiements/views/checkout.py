@@ -25,7 +25,26 @@ def payment_checkout(request):
     fullname = request.GET.get('fullname', '')
     email = request.GET.get('email', '')
     phone = request.GET.get('phone', '')
+    transaction_id = request.GET.get('transaction_id', '')
+    sig = request.GET.get('sig', '')
     
+    # SEV-030: Signature obligatoire pour charger la page de checkout
+    if not sig:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Signature manquante.")
+
+    from django.core.signing import Signer, BadSignature
+    signer = Signer()
+    try:
+        token_payload = f"{custom_id}:{transaction_id}:{amount}"
+        unsigned_val = signer.unsign(sig)
+        if unsigned_val != token_payload:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Paramètres altérés.")
+    except BadSignature:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Signature invalide.")
+        
     context = {
         "merchant_id": settings.FEEXPAY_MERCHANT_ID,
         "api_token": settings.FEEXPAY_API_TOKEN,
@@ -36,6 +55,7 @@ def payment_checkout(request):
         "fullname": fullname,
         "email": email,
         "phone": phone,
+        "transaction_id": transaction_id,
     }
     response = render(request, 'api/payment_checkout.html', context)
     response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -238,9 +258,13 @@ def sync_payments(request):
                     if payment_locked.booking:
                         booking = payment_locked.booking
                         if booking.payment_status != 'escrow':
-                            ride = Ride.objects.select_for_update().get(id=booking.ride.id)
-                            ride.seats_available -= booking.seats_booked
-                            ride.save()
+                            from api.bookings.services import BookingService
+                            allocated = BookingService.allocate_seats(booking)
+                            if not allocated:
+                                booking.status = 'cancelled'
+                                booking.payment_status = 'pending'
+                                booking.save()
+                                continue
 
                             booking.payment_status = 'escrow'
                             booking.status = 'confirmed'

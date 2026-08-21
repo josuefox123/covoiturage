@@ -1,4 +1,4 @@
-﻿from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import make_aware, now
@@ -152,8 +152,8 @@ class BookingService:
             passenger = booking.passenger
             driver = ride.driver
             
-            # Logique de remboursement
-            price_paid = ride.price_per_seat * booking.seats_booked
+            # Logique de remboursement basée sur le montant réel payé en ligne (négociation comprise)
+            price_paid = booking.amount_paid_online
             
             if cancelled_by_user == driver:
                 # Conducteur annule -> Remboursement automatique approuvé

@@ -367,16 +367,16 @@ export class RideSessionManager {
     // Negotiation breakdown
     const pricePerSeat = ride?.price_per_seat || 0;
     const hasNegotiation = Boolean(
-      bookingState?.driver_counter_price ||
-        bookingState?.passenger_proposed_price ||
-        bookingState?.custom_price
+      bookingState?.negotiation?.driver_counter_price ||
+        bookingState?.negotiation?.passenger_proposed_price ||
+        bookingState?.negotiation?.custom_price
     );
 
     const negotiation: SessionNegotiationData = {
       hasNegotiation,
-      passengerProposedPrice: bookingState?.passenger_proposed_price,
-      driverCounterPrice: bookingState?.driver_counter_price,
-      customPrice: bookingState?.custom_price,
+      passengerProposedPrice: bookingState?.negotiation?.passenger_proposed_price,
+      driverCounterPrice: bookingState?.negotiation?.driver_counter_price,
+      customPrice: bookingState?.negotiation?.custom_price,
       negotiationMessage: bookingState?.negotiation_message,
       driverNote: bookingState?.driver_note,
       pricePerSeat,
@@ -428,7 +428,11 @@ export class RideSessionManager {
             pricing_breakdown: bookingState?.pricing_breakdown,
             driver_counter_price: bookingState?.negotiation?.driver_counter_price,
             passenger_proposed_price: bookingState?.negotiation?.passenger_proposed_price,
-            custom_price: bookingState?.negotiation?.custom_price
+            custom_price: bookingState?.negotiation?.custom_price,
+            pickup_surcharge: bookingState?.pickup_surcharge,
+            dropoff_surcharge: bookingState?.dropoff_surcharge,
+            total_amount: bookingState?.price,
+            portion_price: bookingState?.price
           } as any)
         : null,
       bookingStateRaw: bookingState,

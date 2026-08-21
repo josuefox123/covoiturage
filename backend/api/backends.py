@@ -29,16 +29,23 @@ class EmailOrPhoneModelBackend(ModelBackend):
         if username is None:
             username = kwargs.get(User.USERNAME_FIELD)
         
+        user = None
         try:
-            # Check if it matches phone OR email OR full_name
-            user = User.objects.get(Q(phone=username) | Q(email=username) | Q(full_name=username))
+            # Check if it matches phone OR email (full_name supprimé car non unique)
+            user = User.objects.get(Q(phone=username) | Q(email=username))
         except User.DoesNotExist:
-            return None
+            # Mitigation de timing attack : exécuter le hachage sur un utilisateur factice (SEV-026)
+            dummy = User()
+            dummy.set_password(password or "dummy")
         except User.MultipleObjectsReturned:
-            user = User.objects.filter(Q(phone=username) | Q(email=username) | Q(full_name=username)).order_by('id').first()
+            user = User.objects.filter(Q(phone=username) | Q(email=username)).order_by('id').first()
             
-        if user.check_password(password) and self.user_can_authenticate(user):
-            return user
+        if user:
+            if user.check_password(password) and self.user_can_authenticate(user):
+                return user
+        else:
+            # Vérification factice supplémentaire pour harmoniser le timing
+            User().check_password(password or "dummy")
         return None
 
 class SafeJWTAuthentication(JWTAuthentication):

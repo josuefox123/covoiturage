@@ -60,10 +60,15 @@ class PaymentService:
                     provider='feexpay'
                 )
 
-            # Construire les paramètres pour l'URL de checkout
             amount_to_pay = existing_payment.amount
             description = f"Paiement Zemy - Trajet {booking.ride.departure_location} -> {booking.ride.arrival_location}"
-            
+
+            # Signer le payload pour sécuriser le checkout de paiement contre la modification des paramètres
+            from django.core.signing import Signer
+            signer = Signer()
+            token_payload = f"{booking.id}:{transaction_reference}:{amount_to_pay}"
+            signature = signer.sign(token_payload)
+
             import time
             query_params = (
                 f"?amount={amount_to_pay}"
@@ -73,6 +78,7 @@ class PaymentService:
                 f"&email={urllib.parse.quote(user.email or 'client@zemy.bj')}"
                 f"&phone={urllib.parse.quote(user.phone or '')}"
                 f"&description={urllib.parse.quote(description)}"
+                f"&sig={urllib.parse.quote(signature)}"
                 f"&_t={int(time.time())}"
             )
             

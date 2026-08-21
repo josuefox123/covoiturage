@@ -99,7 +99,26 @@ def payment_checkout(request):
     email = request.GET.get('email', '')
     phone = request.GET.get('phone', '')
     transaction_id = request.GET.get('transaction_id', '')
+    sig = request.GET.get('sig', '')
     
+    # SEV-030: Signature obligatoire pour charger la page de checkout
+    if not sig:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Signature manquante.")
+
+    from django.core.signing import Signer, BadSignature
+    signer = Signer()
+    try:
+        # Valider que les paramètres critiques n'ont pas été altérés
+        token_payload = f"{custom_id}:{transaction_id}:{amount}"
+        unsigned_val = signer.unsign(sig)
+        if unsigned_val != token_payload:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Paramètres altérés.")
+    except BadSignature:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Signature invalide.")
+        
     context = {
         "merchant_id": settings.FEEXPAY_MERCHANT_ID,
         "api_token": settings.FEEXPAY_API_TOKEN,

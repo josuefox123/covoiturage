@@ -254,6 +254,18 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         result = RidePublicationController.suggest_price(distance_km)
         return Response(result, status=status.HTTP_200_OK)
 
+    def perform_update(self, serializer):
+        from rest_framework.exceptions import PermissionDenied
+        if serializer.instance.driver != self.request.user and not self.request.user.is_staff:
+            raise PermissionDenied("Vous n'êtes pas autorisé à modifier ce trajet.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        from rest_framework.exceptions import PermissionDenied
+        if instance.driver != self.request.user and not self.request.user.is_staff:
+            raise PermissionDenied("Vous n'êtes pas autorisé à supprimer ce trajet.")
+        instance.delete()
+
     def create(self, request, *args, **kwargs):
         is_recurrent = request.data.get('is_recurrent', False)
 

@@ -111,12 +111,17 @@ class FunctionalSearchPaymentTestCase(APITestCase):
         self.assertEqual(res_book.status_code, status.HTTP_201_CREATED)
         booking_id = res_book.json()["id"]
 
-        # 2b. Le conducteur accepte la demande (statut passe à pending_payment)
+        # 2b. Le conducteur accepte la demande
         self.client.force_authenticate(user=self.driver1)
         res_accept = self.client.post(f"/api/bookings/{booking_id}/accept/", format="json")
         self.assertEqual(res_accept.status_code, status.HTTP_200_OK)
 
-        # 3. Le passager initie le paiement (statut pending_payment)
+        # 2c. Le passager doit accepter la proposition (nouvelle règle de flux systématique)
+        self.client.force_authenticate(user=self.passenger)
+        res_pass_accept = self.client.post(f"/api/bookings/{booking_id}/passenger_accept/", format="json")
+        self.assertEqual(res_pass_accept.status_code, status.HTTP_200_OK)
+
+        # 3. Le passager initie le paiement (statut passe à pending_payment après acceptation passager)
         self.client.force_authenticate(user=self.passenger)
         res_pay = self.client.post("/api/payments/initiate/", {
             "booking_id": booking_id

@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const restoreSession = async () => {
       try {
         const savedToken = await SecureStore.getItemAsync(STORAGE_TOKEN_KEY);
-        const savedUser = await AsyncStorage.getItem(STORAGE_USER_KEY);
+        const savedUser = await SecureStore.getItemAsync(STORAGE_USER_KEY);
         if (savedToken && savedUser) {
           setToken(savedToken);
           const parsedUser = JSON.parse(savedUser);
@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .then(async (freshUser) => {
                 if (freshUser) {
                   setUser(freshUser);
-                  await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(freshUser));
+                  await SecureStore.setItemAsync(STORAGE_USER_KEY, JSON.stringify(freshUser));
                 }
               })
               .catch(() => {});
@@ -166,7 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.user);
       try {
         await SecureStore.setItemAsync(STORAGE_TOKEN_KEY, data.access);
-        await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
+        await SecureStore.setItemAsync(STORAGE_USER_KEY, JSON.stringify(data.user));
       } catch (e) {}
     } catch (error) {
       throw error;
@@ -186,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.user);
       try {
         await SecureStore.setItemAsync(STORAGE_TOKEN_KEY, data.access);
-        await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user));
+        await SecureStore.setItemAsync(STORAGE_USER_KEY, JSON.stringify(data.user));
       } catch (e) {}
     } catch (error) {
       throw error;
@@ -201,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setHasStartedVerificationState(false);
     try {
       await SecureStore.deleteItemAsync(STORAGE_TOKEN_KEY);
-      await AsyncStorage.removeItem(STORAGE_USER_KEY);
+      await SecureStore.deleteItemAsync(STORAGE_USER_KEY);
       await AsyncStorage.removeItem('@zemy_started_verification');
     } catch (e) {
     }
@@ -239,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newUser = { ...prev, ...updates };
       if (JSON.stringify(prev) === JSON.stringify(newUser)) return prev;
       
-      AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser)).catch(() => {});
+      SecureStore.setItemAsync(STORAGE_USER_KEY, JSON.stringify(newUser)).catch(() => {});
       return newUser;
     });
   }, []);

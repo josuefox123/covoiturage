@@ -220,7 +220,11 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = '__all__'
-        read_only_fields = ['passenger']
+        read_only_fields = [
+            'passenger', 'status', 'payment_status', 'transaction_id',
+            'custom_price', 'driver_counter_price', 'pickup_surcharge',
+            'dropoff_surcharge'
+        ]
 
     @extend_schema_field(int)
     def get_portion_price(self, obj):

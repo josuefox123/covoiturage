@@ -122,6 +122,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
 
         # Notification au conducteur : nouvelle demande de reservation
+        from api.services.pricing_service import PricingService
+        pricing_res = PricingService.compute_for_booking(booking)
+
         create_and_send_notification(
             user=booking.ride.driver,
             title="Nouvelle demande de reservation",
@@ -137,6 +140,11 @@ class BookingViewSet(viewsets.ModelViewSet):
                 'arrival_location': arr_loc,
                 'seats_booked': str(booking.seats_booked),
                 'total_amount': str(booking.total_amount),
+                'driver_price': str(pricing_res.driver_price),
+                'commission': str(pricing_res.commission),
+                'total_to_pay': str(pricing_res.total_to_pay),
+                'pickup_surcharge': str(booking.pickup_surcharge or 0),
+                'dropoff_surcharge': str(booking.dropoff_surcharge or 0),
                 'negotiation_message': booking.negotiation_message or '',
                 'created_at': booking.created_at.isoformat()
             }
@@ -200,19 +208,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                     data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
                 )
             
-            elif new_status == 'confirmed':
-                create_and_send_notification(
-                    user=passenger,
-                    title="Réservation confirmée",
-                    message=f"Votre réservation de {booking.seats_booked} place(s) pour le trajet {dep_loc} -> {arr_loc} est confirmée !",
-                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
-                )
-                create_and_send_notification(
-                    user=passenger,
-                    title="Paiement confirmé",
-                    message=f"Le paiement pour votre réservation sur le trajet {dep_loc} -> {arr_loc} a été validé avec succès.",
-                    data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'ride_id': str(booking.ride.id), 'screen': 'trips'}
-                )
+
             
             elif new_status == 'completed':
                 create_and_send_notification(
@@ -317,6 +313,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.status == 'completed':
             return Response({"status": "Réservation déjà terminée."})
             
+        # SEV-012: Empêcher de terminer une réservation non commencée ou non payée
+        if booking.status not in ['started', 'confirmed']:
+            return Response({"error": f"Impossible de terminer le trajet à partir du statut : {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
+            
         booking.status = 'completed'
         booking.save()
         
@@ -357,29 +357,15 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({"error": "Ce trajet est terminé. Le paiement n'est plus possible."}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            import urllib.parse
-            amount_to_pay = max(100, int(booking.amount_paid_online))
-            dep_loc = booking.departure_location or booking.ride.departure_location or ''
-            arr_loc = booking.arrival_location or booking.ride.arrival_location or ''
-            description = f"Commission Zemy - Trajet {dep_loc} -> {arr_loc}"
+            from api.payments.services import PaymentService
+            payment, query_params = PaymentService.initiate_payment(booking.id, request.user)
             
-            import time
-            path = (
-                f"/api/payments/checkout/"
-                f"?amount={amount_to_pay}"
-                f"&custom_id={booking.id}"
-                f"&fullname={urllib.parse.quote(booking.passenger.full_name or 'Client Zemy')}"
-                f"&email={urllib.parse.quote(booking.passenger.email or 'client@zemy.bj')}"
-                f"&phone={urllib.parse.quote(booking.passenger.phone or '')}"
-                f"&description={urllib.parse.quote(description)}"
-                f"&_t={int(time.time())}"
-            )
-            url = request.build_absolute_uri(path)
+            url = request.build_absolute_uri(f"/api/payments/checkout/{query_params}")
             
             return Response({
                 "url": url, 
                 "booking_id": str(booking.id),
-                "amount": amount_to_pay
+                "amount": payment.amount
             })
             
         except Exception as e:
@@ -405,6 +391,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         if new_pickup_surcharge is not None:
             try:
                 val = int(new_pickup_surcharge)
+                if val < 0:
+                    return Response({"error": "Le surcoût de départ proposé ne peut pas être négatif."}, status=status.HTTP_400_BAD_REQUEST)
+                if val > 20000:
+                    return Response({"error": "Le surcoût de départ proposé dépasse la limite autorisée (20 000 FCFA)."}, status=status.HTTP_400_BAD_REQUEST)
                 if val != (booking.pickup_surcharge or 0):
                     booking.pickup_surcharge = val
                     has_changes = True
@@ -414,6 +404,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         if new_dropoff_surcharge is not None:
             try:
                 val = int(new_dropoff_surcharge)
+                if val < 0:
+                    return Response({"error": "Le surcoût d'arrivée proposé ne peut pas être négatif."}, status=status.HTTP_400_BAD_REQUEST)
+                if val > 20000:
+                    return Response({"error": "Le surcoût d'arrivée proposé dépasse la limite autorisée (20 000 FCFA)."}, status=status.HTTP_400_BAD_REQUEST)
                 if val != (booking.dropoff_surcharge or 0):
                     booking.dropoff_surcharge = val
                     has_changes = True
@@ -424,7 +418,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         price_val = request.data.get('price') or request.data.get('custom_price') or request.data.get('driver_counter_price')
         if price_val is not None:
             try:
-                booking.driver_counter_price = int(price_val)
+                price_int = int(price_val)
+                if price_int < 100:
+                    return Response({"error": "Le prix proposé doit être supérieur ou égal à 100 FCFA."}, status=status.HTTP_400_BAD_REQUEST)
+                if price_int > 100000:
+                    return Response({"error": "Le prix proposé dépasse la limite maximale autorisée (100 000 FCFA)."}, status=status.HTTP_400_BAD_REQUEST)
+                booking.driver_counter_price = price_int
                 has_changes = True
             except ValueError:
                 return Response({"error": "Le prix proposé est invalide."}, status=status.HTTP_400_BAD_REQUEST)
@@ -433,16 +432,11 @@ class BookingViewSet(viewsets.ModelViewSet):
                 booking.custom_price = booking.passenger_proposed_price
                 has_changes = True
 
-        if has_changes:
-            booking.status = 'pending_passenger'
-            # On met à jour driver_counter_price pour mémoriser qu'il y a négociation
-            booking.driver_counter_price = booking.driver_counter_price or booking.ride.driver_payout
-            title = "Nouvelle offre tarifaire"
-            message = f"Le chauffeur propose un nouveau tarif d'option. Total à payer : {booking.total_amount} FCFA."
-        else:
-            booking.status = 'pending_payment'
-            title = "Demande acceptée par le conducteur"
-            message = f"Votre demande de réservation a été acceptée par le conducteur ! Vous pouvez procéder au paiement."
+        # RÈGLE : Toute acceptation par le conducteur (avec ou sans modification) passe par une validation passager (pending_passenger)
+        booking.status = 'pending_passenger'
+        booking.driver_counter_price = booking.driver_counter_price or booking.ride.driver_payout
+        title = "Demande acceptée par le conducteur"
+        message = f"Le conducteur a validé votre demande. Veuillez confirmer le tarif final de {booking.total_amount} FCFA pour payer."
 
         booking.save()
         
@@ -461,8 +455,11 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.ride.driver != request.user and not request.user.is_staff:
             return Response({"error": "Seul le conducteur de ce trajet peut refuser cette réservation."}, status=status.HTTP_403_FORBIDDEN)
             
-        if booking.status not in ['pending', 'pending_passenger', 'pending_payment']:
-            return Response({"error": f"Impossible de refuser une réservation déjà traitée (statut actuel: {booking.status})."}, status=status.HTTP_400_BAD_REQUEST)
+        if booking.status == 'pending_payment':
+            return Response({"error": "Impossible de rejeter une réservation en cours de paiement."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if booking.status not in ['pending', 'pending_passenger']:
+            return Response({"error": f"Impossible de refuser une réservation au statut actuel: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
             
         booking.status = 'cancelled'
         booking.save()

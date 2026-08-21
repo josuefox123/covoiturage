@@ -197,6 +197,7 @@ export function useNotifications() {
         const speakTypes = [
           'new_booking_request',
           'booking_accepted_passenger',
+          'booking_rejected_passenger',
           'passenger_paid_driver',
           'passenger_refused_offer',
           'leg_seats_freed_driver',
@@ -224,12 +225,19 @@ export function useNotifications() {
             passenger_details: {
               full_name: data.passenger_name || 'Passager',
               phone: data.passenger_phone || ''
+            },
+            pickup_surcharge: parseInt(data.pickup_surcharge || '0'),
+            dropoff_surcharge: parseInt(data.dropoff_surcharge || '0'),
+            pricing_breakdown: {
+              driver_price: parseInt(data.driver_price || '0') || undefined,
+              commission: parseInt(data.commission || '0') || undefined,
+              total_to_pay: parseInt(data.total_to_pay || '0') || undefined,
             }
           });
-        } else if (data?.type === 'booking_accepted_passenger') {
+        } else if (data?.type === 'booking_accepted_passenger' || data?.type === 'booking_rejected_passenger') {
           // Ne pas afficher d'alerte pop-up bloquante OUI/NON globale ici.
-          // La synthèse vocale TTS et le bandeau de push standard suffisent.
-          // L'utilisateur pourra accepter/décliner en ouvrant le trajet.
+          // Mais afficher une alerte d'information visuelle Zemy à l'utilisateur.
+          CustomAlert.alert(title || "Mise à jour de réservation", body || "Votre demande de réservation a été mise à jour.");
           DeviceEventEmitter.emit('refreshRideDetails');
           if (data?.ride_id) {
             rideEventBus.emit({
@@ -260,6 +268,13 @@ export function useNotifications() {
             passenger_details: {
               full_name: data.passenger_name || 'Passager',
               phone: data.passenger_phone || ''
+            },
+            pickup_surcharge: parseInt(data.pickup_surcharge || '0'),
+            dropoff_surcharge: parseInt(data.dropoff_surcharge || '0'),
+            pricing_breakdown: {
+              driver_price: parseInt(data.driver_price || '0') || undefined,
+              commission: parseInt(data.commission || '0') || undefined,
+              total_to_pay: parseInt(data.total_to_pay || '0') || undefined,
             }
           });
         }

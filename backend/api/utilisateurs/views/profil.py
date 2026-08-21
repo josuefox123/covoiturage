@@ -15,8 +15,26 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     ViewSet permettant de gérer les utilisateurs (CRUD).
     """
-    serializer_class = AdminUserSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.user and getattr(self.request.user, 'is_staff', False):
+            return AdminUserSerializer
+        return UserSerializer
+
+    def perform_update(self, serializer):
+        # Pour les utilisateurs non-administrateurs, on bloque la modification de champs de privilège ou de réputation
+        if not getattr(self.request.user, 'is_staff', False):
+            serializer.save(
+                is_staff=serializer.instance.is_staff,
+                is_superuser=serializer.instance.is_superuser,
+                is_verified=serializer.instance.is_verified,
+                is_active=serializer.instance.is_active,
+                is_archived=serializer.instance.is_archived,
+                rating=serializer.instance.rating,
+            )
+        else:
+            serializer.save()
 
     def get_queryset(self):
         user = self.request.user

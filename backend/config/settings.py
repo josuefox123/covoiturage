@@ -57,13 +57,25 @@ load_dotenv()
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure--98u!eo*t)9%$e!qvek7hxkmfk=ilyu43h@uhci3fj!xf+3t3^')
+# SECURITY : la SECRET_KEY ne doit JAMAIS avoir de valeur par défaut en production.
+_secret_key_env = os.getenv('DJANGO_SECRET_KEY', '')
+if not _secret_key_env:
+    import sys
+    if 'test' not in sys.argv and not os.getenv('DJANGO_DEBUG', 'False') == 'True':
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY n'est pas définie. "
+            "Configurez cette variable d'environnement sur le serveur."
+        )
+    # En développement/test, on utilise une clé temporaire
+    _secret_key_env = 'django-dev-insecure-key-must-not-be-used-in-production'
+SECRET_KEY = _secret_key_env
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+# Par défaut DEBUG=False — nécessite DJANGO_DEBUG=True pour activer en dev.
+DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
+# En production, DJANGO_ALLOWED_HOSTS doit être configuré explicitement.
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,zemy.erika-app.com,node239-eu.n0c.com').split(',')
 
 
 # Application definition
@@ -79,6 +91,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # SEV-008: JWT token blacklist
     'corsheaders',
     'channels',  # Django Channels WebSocket
     'drf_spectacular',
@@ -240,12 +253,30 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
-CORS_ALLOW_ALL_ORIGINS = True
+# SEV-004: CORS restreint en production, ouvert uniquement en développement
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = os.getenv(
+        'CORS_ALLOWED_ORIGINS',
+        'https://zemy.erika-app.com'
+    ).split(',')
+    CORS_ALLOW_ALL_ORIGINS = False
 
 # FeexPay Configuration — Paiement entrant (passager)
-FEEXPAY_API_TOKEN = os.getenv('FEEXPAY_API_TOKEN', 'YOUR_FEEXPAY_API_TOKEN')
-FEEXPAY_MERCHANT_ID = os.getenv('FEEXPAY_MERCHANT_ID', 'YOUR_FEEXPAY_MERCHANT_ID')
+FEEXPAY_API_TOKEN = os.getenv('FEEXPAY_API_TOKEN', '')
+FEEXPAY_MERCHANT_ID = os.getenv('FEEXPAY_MERCHANT_ID', '')
 FEEXPAY_MODE = os.getenv('FEEXPAY_MODE', 'SANDBOX')  # 'SANDBOX' ou 'LIVE'
+# SEV-002: Secret pour vérifier la signature des webhooks FeexPay
+FEEXPAY_WEBHOOK_SECRET = os.getenv('FEEXPAY_WEBHOOK_SECRET', '')
+
+# Alerte de sécurité si SANDBOX actif en démarrage
+if FEEXPAY_MODE == 'SANDBOX':
+    import logging as _logging
+    _logging.getLogger('api').warning(
+        "[SECURITE] FEEXPAY_MODE=SANDBOX actif. "
+        "Les paiements ne sont PAS réels. Ne pas utiliser en production."
+    )
 
 # FeexPay Payout Configuration — Reversement conducteur (Mobile Money sortant)
 # Mettre FEEXPAY_PAYOUT_ENABLED=True UNIQUEMENT lorsque l'URL et les credentials Payout
@@ -271,26 +302,42 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # SEV-003: Rate limiting global pour protéger contre le brute force et le DoS
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '200/hour',
+        'user': '2000/hour',
+        # Throttles custom pour les endpoints sensibles
+        'login': '10/minute',
+        'otp': '5/minute',
+        'reset': '5/hour',
+        'payment': '20/minute',
+    }
 }
 
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    # SEV-008: Durée réduite + rotation activée
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),   # 24h (réduit depuis 7j)
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
+    'ROTATE_REFRESH_TOKENS': True,                   # Nouveau token refresh à chaque renouvellement
+    'BLACKLIST_AFTER_ROTATION': True,                # Invalider l'ancien refresh token
+    'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
     'AUDIENCE': None,
-    'ISSUER': None,
+    'ISSUER': 'zemy-api',
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
     'JTI_CLAIM': 'jti',
+    'TOKEN_BLACKLIST_ENABLED': True,
 }
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -465,7 +512,8 @@ LOGGING = {
 # USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc')
+# SEV-001: Supprimer la clé hardcodée — la clé doit venir de l'environnement uniquement
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
 
 # Configuration de Celery & Redis
 CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
