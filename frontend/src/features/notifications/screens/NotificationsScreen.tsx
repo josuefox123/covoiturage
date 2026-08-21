@@ -37,6 +37,72 @@ export default function NotificationsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
 
+  const handleNotificationPress = useCallback((notification: Notification) => {
+    // Helper pour valider la présence d'un ID valide (exclut null, undefined, "null", "undefined", etc.)
+    const isValidId = (id: any) => {
+      if (id === undefined || id === null) return false;
+      const s = String(id).trim().toLowerCase();
+      return s !== '' && s !== 'null' && s !== 'undefined' && s !== '0';
+    };
+
+    // 1. Parser le payload de données du backend
+    let extraData: any = {};
+    if (notification.data) {
+      try {
+        extraData = typeof notification.data === 'string'
+          ? JSON.parse(notification.data)
+          : notification.data;
+      } catch (e) {
+        extraData = {};
+      }
+    }
+
+    const rideId = [notification.ride_id, extraData.ride_id, extraData.rideId, notification.rideId].find(isValidId);
+    const bookingId = [notification.booking_id, extraData.booking_id, extraData.bookingId, notification.bookingId].find(isValidId);
+    const conversationId = [notification.conversation_id, extraData.conversation_id, extraData.conversationId, notification.conversationId].find(isValidId);
+
+    try {
+      // 2. Redirection instantanée si chat ou trajet disponible
+      if (conversationId) {
+        router.push(`/chat/${conversationId}`);
+        return;
+      }
+
+      if (rideId) {
+        const titleLower = (notification.title || '').toLowerCase();
+        const msgLower = (notification.message || '').toLowerCase();
+        const isDriverAction =
+          titleLower.includes('demande') ||
+          titleLower.includes('réservation') ||
+          titleLower.includes('réserve') ||
+          msgLower.includes('a réservé') ||
+          msgLower.includes('veut réserver');
+
+        if (isDriverAction) {
+          router.push(`/ride-management/${rideId}`);
+        } else {
+          router.push(`/ride/${rideId}`);
+        }
+        return;
+      }
+
+      // 3. Redirections fallback de type d'onglet
+      if (notification.type === 'MESSAGE') {
+        router.push('/(tabs)/messages');
+      } else if (notification.type === 'PAYMENT') {
+        router.push('/(tabs)/earnings');
+      } else if (notification.type === 'BOOKING' || notification.type === 'RIDE') {
+        router.push('/(tabs)/trips');
+      } else {
+        // Pour les notifications système ou info pure sans ID de redirection, on affiche la bottom sheet
+        setSelectedNotif(notification);
+      }
+    } catch (err) {
+      console.warn("Navigation failed, falling back to modal:", err);
+      setSelectedNotif(notification);
+    }
+  }, [router]);
+
   // Optimisation via useMemo pour le filtrage et la recherche
   const filteredData = useMemo(() => {
     return filterNotifications(notifications, selectedFilter, searchQuery);
@@ -120,7 +186,7 @@ export default function NotificationsScreen() {
               notification={item}
               onRead={markAsRead}
               onDelete={deleteNotification}
-              onPress={setSelectedNotif}
+              onPress={handleNotificationPress}
             />
           )}
           ListEmptyComponent={<EmptyState filter={selectedFilter} />}

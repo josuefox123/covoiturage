@@ -656,21 +656,6 @@ export function usePublishForm(authCtx: any) {
       CustomAlert.alert('Prix manquant', 'Veuillez entrer un prix valide.');
       return false;
     }
-    // PRIX OBLIGATOIRES PAR TRONÇON : si le conducteur a des points d'arrêt,
-    // chaque tronçon doit avoir un prix > 0 pour que les passagers puissent payer.
-    if (stopovers && stopovers.length > 0) {
-      const numLegs = stopovers.length + 1;
-      for (let i = 0; i < numLegs; i++) {
-        const legPrice = legPrices && legPrices.length > i ? legPrices[i] : 0;
-        if (!legPrice || legPrice <= 0) {
-          CustomAlert.alert(
-            'Prix des tronçons obligatoires',
-            `Vous avez ajouté des points d'arrêt. Veuillez définir un prix > 0 pour chaque tronçon (tronçon ${i + 1} est à 0).`
-          );
-          return false;
-        }
-      }
-    }
     return true;
   };
 
@@ -683,14 +668,10 @@ export function usePublishForm(authCtx: any) {
         CustomAlert.alert('Itinéraire manquant', 'Veuillez patienter pendant le calcul de l\'itinéraire.');
         return;
       }
-      setStopoverSubStep(1);
+      setStopoverSubStep(2);
       goToStep(2);
     } else if (formStep === 2) {
-      if (stopoverSubStep === 1) {
-        setStopoverSubStep(2);
-      } else {
-        goToStep(3);
-      }
+      goToStep(3);
     } else if (formStep === 3) {
       if (!validateStep2()) return;
       goToStep(4);
@@ -704,11 +685,7 @@ export function usePublishForm(authCtx: any) {
   const handleBack = () => {
     Keyboard.dismiss();
     if (formStep === 2) {
-      if (stopoverSubStep === 2) {
-        setStopoverSubStep(1);
-      } else {
-        goToStep(1);
-      }
+      goToStep(1);
     } else if (formStep > 1) {
       goToStep(formStep - 1);
     } else {

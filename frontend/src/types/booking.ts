@@ -42,4 +42,6 @@ export interface Booking {
   custom_price?: number;
   departure_waypoint_order?: number | null;
   arrival_waypoint_order?: number | null;
+  pricing_breakdown?: any;
+  driver_payout?: number;
 }

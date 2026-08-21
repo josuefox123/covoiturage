@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DeviceEventEmitter } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
 import { notificationService } from '../services/notification.service';
 import { Notification } from '../types/notification';
@@ -53,6 +54,10 @@ export function useNotificationQueries() {
 
       return { previousData };
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      DeviceEventEmitter.emit('refreshBadges');
+    },
     onError: (err, id, context) => {
       // Revert in case of error
       if (context?.previousData) {
@@ -65,6 +70,7 @@ export function useNotificationQueries() {
     mutationFn: () => notificationService.markAllAsRead(authFetch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      DeviceEventEmitter.emit('refreshBadges');
     }
   });
 
@@ -86,6 +92,10 @@ export function useNotificationQueries() {
       });
 
       return { previousData };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      DeviceEventEmitter.emit('refreshBadges');
     },
     onError: (err, id, context) => {
       if (context?.previousData) {

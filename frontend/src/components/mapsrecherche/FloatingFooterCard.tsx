@@ -128,7 +128,12 @@ export default function FloatingFooterCard({
                 <Text style={styles.sheetLocationTitle} numberOfLines={1}>
                   {selectedLocation?.name || 'Déplacez la carte pour choisir'}
                 </Text>
-                {selectedLocation?.address ? (
+                {/* Note personnalisée — affichée en temps réel */}
+                {customLocationName.trim().length > 0 ? (
+                  <Text style={styles.sheetLocationNote} numberOfLines={1}>
+                    {customLocationName.trim()}
+                  </Text>
+                ) : selectedLocation?.address ? (
                   <Text style={styles.sheetLocationSubtitle} numberOfLines={1}>
                     {selectedLocation.address}
                   </Text>
@@ -142,19 +147,20 @@ export default function FloatingFooterCard({
         </View>
       </View>
 
+      {/* Saisie précision — sous le titre, toujours visible */}
+      <Animated.View style={[styles.customNoteInputRow, { borderColor: animatedBorderColor, borderWidth: animatedBorderWidth }]}>
+        <Ionicons name="pencil" size={14} color="#6B7280" />
+        <TextInput
+          style={styles.customNoteInput}
+          placeholder="Ajouter un nom précis pour la position"
+          placeholderTextColor="#9CA3AF"
+          value={customLocationName}
+          onChangeText={setCustomLocationName}
+        />
+      </Animated.View>
+
       {/* Scrollable sheet body content */}
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-        {/* Saisie précision optionnelle */}
-        <Animated.View style={[styles.customNoteInputRow, { borderColor: animatedBorderColor, borderWidth: animatedBorderWidth }]}>
-          <Ionicons name="pencil" size={16} color="#6B7280" />
-          <TextInput
-            style={styles.customNoteInput}
-            placeholder="Ajouter un nom précis pour la position"
-            placeholderTextColor="#9CA3AF"
-            value={customLocationName}
-            onChangeText={setCustomLocationName}
-          />
-        </Animated.View>
 
         {/* Bouton de confirmation principal */}
         <TouchableOpacity
@@ -233,7 +239,7 @@ const styles = StyleSheet.create({
   bottomSheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   locationIconCircle: {
     width: 36,
@@ -253,6 +259,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  sheetLocationNote: {
+    fontSize: 12,
+    color: '#0066FF',
+    fontWeight: '600',
+    marginTop: 2,
+  },
   loadingAddrText: {
     fontSize: 12,
     color: '#0066FF',
@@ -264,19 +276,19 @@ const styles = StyleSheet.create({
   customNoteInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F1F5FF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
-    marginBottom: 16,
-    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 36,
+    marginBottom: 14,
+    gap: 6,
   },
   customNoteInput: {
     flex: 1,
-    fontSize: 14,
-    color: '#1F2937',
+    fontSize: 12,
+    color: '#374151',
     fontWeight: '500',
   },
   confirmLocationBtn: {

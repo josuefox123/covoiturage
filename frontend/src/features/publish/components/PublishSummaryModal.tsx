@@ -1,7 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+
 import { AppBottomSheet } from '../../../../src/components/AppBottomSheet';
 import { theme } from '../../../../src/styles/theme';
 
@@ -38,8 +46,10 @@ interface PublishSummaryModalProps {
 const formatDuration = (totalMin: number): string => {
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
+
   if (h === 0) return `${m} min`;
   if (m === 0) return `${h}h`;
+
   return `${h}h${m.toString().padStart(2, '0')}`;
 };
 
@@ -70,24 +80,50 @@ export function PublishSummaryModal({
   stopsAllowed,
   description,
   loading,
-  onConfirm
+  onConfirm,
 }: PublishSummaryModalProps) {
   const priceNum = parseInt(price, 10) || 0;
+
   const calcCommission = (driverPayout: number) => {
     if (!financialSettings) {
       const pct = 10;
       const minC = 100;
+
       let commission = Math.floor(driverPayout * (pct / 100));
-      if (commission < minC) commission = minC;
+
+      if (commission < minC) {
+        commission = minC;
+      }
+
       return commission;
     }
-    if (!financialSettings.is_commission_active) return 0;
-    const pct = financialSettings.commission_percentage !== undefined ? financialSettings.commission_percentage : 10;
-    const minC = financialSettings.min_commission !== undefined ? financialSettings.min_commission : 100;
+
+    if (!financialSettings.is_commission_active) {
+      return 0;
+    }
+
+    const pct =
+      financialSettings.commission_percentage !== undefined
+        ? financialSettings.commission_percentage
+        : 10;
+
+    const minC =
+      financialSettings.min_commission !== undefined
+        ? financialSettings.min_commission
+        : 100;
+
     const maxC = financialSettings.max_commission;
+
     let commission = Math.floor(driverPayout * (pct / 100));
-    if (commission < minC) commission = minC;
-    if (maxC && commission > maxC) commission = maxC;
+
+    if (commission < minC) {
+      commission = minC;
+    }
+
+    if (maxC && commission > maxC) {
+      commission = maxC;
+    }
+
     return commission;
   };
 
@@ -95,235 +131,1419 @@ export function PublishSummaryModal({
   const totalPassenger = priceNum + commission;
   const driverPayout = priceNum;
 
+  const parseLoc = (locStr: string) => {
+    if (!locStr) {
+      return {
+        name: '',
+        note: '',
+      };
+    }
+
+    const parts = locStr.split('|||');
+
+    return {
+      name: parts[0],
+      note: parts[1] || '',
+    };
+  };
+
+  const parsedDep = parseLoc(departure);
+  const parsedArr = parseLoc(arrival);
+
+  const totalDuration =
+    (estimation?.durationMin || 0) +
+    stopovers.reduce(
+      (sum, s) => sum + (Number(s.stopDurationMin) || 0),
+      0
+    );
+
+  const preferenceCount = [
+    music,
+    chatty,
+    airCond,
+    luggageAllowed,
+    drivingRelay,
+    petsAllowed,
+    !smoking,
+    stopsAllowed,
+  ].filter(Boolean).length;
+
+  const renderChip = (
+    icon: keyof typeof Ionicons.glyphMap,
+    label: string
+  ) => (
+    <View style={styles.preferenceChip} key={label}>
+      <View style={styles.preferenceChipIcon}>
+        <Ionicons
+          name={icon}
+          size={13}
+          color={theme.colors.primary}
+        />
+      </View>
+
+      <Text style={styles.preferenceChipText}>{label}</Text>
+    </View>
+  );
+
   return (
     <AppBottomSheet
       visible={visible}
       onClose={onClose}
-      snapPoints={['85%', '95%']}
+      snapPoints={['88%', '96%']}
       initialIndex={0}
     >
-      <View style={styles.summaryModalContainer}>
-        <Text style={styles.summaryModalTitle}>Récapitulatif de votre trajet</Text>
-        <Text style={styles.summaryModalSubtitle}>Vérifiez les détails avant la publication officielle</Text>
+      <View style={styles.container}>
 
-        {/* 1. Itinéraire */}
-        <View style={styles.summarySectionCard}>
-          <View style={styles.summarySectionHeader}>
-            <Ionicons name="map-outline" size={18} color={theme.colors.primary} />
-            <Text style={styles.summarySectionTitle}>ITINÉRAIRE</Text>
-          </View>
+        {/* ───────────────── HEADER ───────────────── */}
 
-          <View style={styles.summaryRouteBox}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={styles.dotGreen} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontWeight: '600' }}>DÉPART</Text>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>{departure}</Text>
-              </View>
+        <View style={styles.header}>
+          <View style={styles.handle} />
+
+          <View style={styles.headerTopRow}>
+            <View style={styles.headerIcon}>
+              <Ionicons
+                name="checkmark"
+                size={19}
+                color={theme.colors.primary}
+              />
             </View>
 
-            {stopovers.length > 0 && (
-              <View style={{ marginVertical: 8, paddingLeft: 18 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.primary, marginBottom: 4 }}>
-                  {stopovers.length} ville(s) / point(s) d'arrêt :
-                </Text>
-                {stopovers.map((s, idx) => (
-                  <Text key={s.id} style={{ fontSize: 12, color: theme.colors.text, marginLeft: 8 }}>
-                    • {s.name || `Étape ${idx + 1}`} ({s.stopDurationMin} min d'arrêt)
-                  </Text>
-                ))}
-              </View>
-            )}
+            <View style={styles.headerTexts}>
+              <Text style={styles.title}>
+                Prêt à publier ?
+              </Text>
 
-            <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 8 }} />
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={styles.dotRed} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontWeight: '600' }}>ARRIVÉE</Text>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>{arrival}</Text>
-              </View>
-            </View>
-
-            {estimation && (
-              <View style={styles.summaryRouteMetrics}>
-                <Text style={styles.summaryMetricText}>{estimation.distanceKm} km</Text>
-                <Text style={styles.summaryMetricText}>
-                  {formatDuration(estimation.durationMin + stopovers.reduce((sum, s) => sum + (Number(s.stopDurationMin) || 0), 0))}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* 2. Date & Places */}
-        <View style={styles.summarySectionCard}>
-          <View style={styles.summarySectionHeader}>
-            <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} />
-            <Text style={styles.summarySectionTitle}>DATE & PLACES</Text>
-          </View>
-
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryGridItem}>
-              <Text style={styles.summaryGridLabel}>Date de départ</Text>
-              <Text style={styles.summaryGridValue}>
-                {selectedDateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} à {time}
+              <Text style={styles.subtitle}>
+                Vérifiez une dernière fois votre trajet
               </Text>
             </View>
-            <View style={styles.summaryGridItem}>
-              <Text style={styles.summaryGridLabel}>Places disponibles</Text>
-              <Text style={styles.summaryGridValue}>{seats} place(s)</Text>
-            </View>
-          </View>
 
-          {isRecurrent && (
-            <View style={styles.summaryRecurrentBadge}>
-              <Ionicons name="repeat-outline" size={14} color={theme.colors.primary} />
-              <Text style={styles.summaryRecurrentText}>
-                Trajet récurrent : {getEstimatedRidesCount()} départ(s) programmé(s)
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* 3. Tarification & Payout */}
-        <View style={styles.summarySectionCard}>
-          <View style={styles.summarySectionHeader}>
-            <Ionicons name="cash-outline" size={18} color="#059669" />
-            <Text style={[styles.summarySectionTitle, { color: '#059669' }]}>TARIFICATION</Text>
-          </View>
-
-          <View style={styles.commissionCard}>
-            <View style={styles.commissionRow}>
-              <Text style={styles.commissionLabel}>Vous recevrez par place</Text>
-              <Text style={styles.commissionValue}>{driverPayout.toLocaleString()} FCFA</Text>
-            </View>
-            <View style={styles.commissionRow}>
-              <Text style={styles.commissionLabelSub}>Frais de service Zemy ({financialSettings?.commission_percentage ?? 10}%)</Text>
-              <Text style={styles.commissionValueSub}>+{commission.toLocaleString()} FCFA</Text>
-            </View>
-            <View style={styles.commissionDivider} />
-            <View style={styles.commissionRow}>
-              <Text style={styles.commissionLabelTotal}>Le passager paiera par place</Text>
-              <Text style={styles.commissionValueTotal}>{totalPassenger.toLocaleString()} FCFA</Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryTotalCard}>
-            <View style={styles.summaryTotalHeader}>
-              <Ionicons name="wallet-outline" size={18} color="#059669" />
-              <Text style={styles.summaryTotalTitle}>GAIN TOTAL POTENTIEL ({seats} place{seats > 1 ? 's' : ''})</Text>
-            </View>
-            <Text style={styles.summaryTotalAmount}>{(driverPayout * seats).toLocaleString()} FCFA</Text>
-          </View>
-        </View>
-
-        {/* 4. Préférences */}
-        <View style={styles.summarySectionCard}>
-          <View style={styles.summarySectionHeader}>
-            <Ionicons name="options-outline" size={18} color={theme.colors.primary} />
-            <Text style={styles.summarySectionTitle}>PRÉFÉRENCES</Text>
-          </View>
-
-          <View style={styles.summaryBadgesRow}>
-            {music && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Musique autorisée</Text></View>}
-            {chatty && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Discussion appréciée</Text></View>}
-            {airCond && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Climatisation</Text></View>}
-            {luggageAllowed && (
-              <View style={styles.summaryChip}>
-                <Text style={styles.summaryChipText}>
-                  Bagages: {luggageSize === 'petit' ? 'Petit' : luggageSize === 'moyen' ? 'Moyen' : 'Grand'} ({luggageMaxWeightKg || 15}kg {luggageType === 'per_passenger' ? '/passager' : 'au total'})
-                </Text>
-              </View>
-            )}
-            {drivingRelay && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Relais conduite accepté</Text></View>}
-            {petsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Animaux acceptés</Text></View>}
-            {!smoking && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Non-fumeur</Text></View>}
-            {stopsAllowed && <View style={styles.summaryChip}><Text style={styles.summaryChipText}>Pauses acceptées</Text></View>}
-          </View>
-
-          {description.trim() ? (
-            <View style={{ marginTop: 10, backgroundColor: '#F8FAFC', padding: 10, borderRadius: 10 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textMuted }}>NOTE PASSAGERS :</Text>
-              <Text style={{ fontSize: 12, color: theme.colors.text, marginTop: 2, fontStyle: 'italic' }}>"{description.trim()}"</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Action buttons */}
-        <View style={styles.summaryActionsRow}>
-          <TouchableOpacity
-            style={styles.summaryEditBtn}
-            onPress={onClose}
-          >
-            <Ionicons name="create-outline" size={18} color={theme.colors.text} />
-            <Text style={styles.summaryEditBtnText}>Modifier</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.summaryConfirmBtn}
-            onPress={onConfirm}
-            disabled={loading}
-          >
-            <LinearGradient
-              colors={[theme.colors.primary, theme.colors.primaryDark]}
-              style={styles.summaryConfirmGradient}
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              activeOpacity={0.75}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                  <Text style={styles.summaryConfirmBtnText}>Confirmer & Publier</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              <Ionicons
+                name="close"
+                size={20}
+                color={theme.colors.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+
+          {/* ───────────────── ROUTE ───────────────── */}
+
+          <View style={styles.sectionCard}>
+
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <Ionicons
+                  name="navigate-outline"
+                  size={17}
+                  color={theme.colors.primary}
+                />
+              </View>
+
+              <View>
+                <Text style={styles.sectionTitle}>
+                  Votre itinéraire
+                </Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  Parcours du trajet
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.routeCard}>
+
+              {/* Départ */}
+
+              <View style={styles.routeRow}>
+
+                <View style={styles.routeIndicatorColumn}>
+                  <View style={styles.departureDot} />
+
+                  {(stopovers.length > 0 || parsedArr.name) && (
+                    <View style={styles.routeLine} />
+                  )}
+                </View>
+
+                <View style={styles.routeContent}>
+                  <Text style={styles.routeLabel}>
+                    DÉPART
+                  </Text>
+
+                  <Text
+                    style={styles.routeName}
+                    numberOfLines={2}
+                  >
+                    {parsedDep.name}
+                  </Text>
+
+                  {parsedDep.note ? (
+                    <View style={styles.locationNote}>
+                      <Ionicons
+                        name="location-outline"
+                        size={12}
+                        color={theme.colors.primary}
+                      />
+
+                      <Text style={styles.locationNoteText}>
+                        {parsedDep.note}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Arrêts */}
+
+              {stopovers.length > 0 && (
+                <View style={styles.stopoversContainer}>
+
+                  <View style={styles.stopoversHeader}>
+                    <Ionicons
+                      name="ellipsis-horizontal-circle-outline"
+                      size={15}
+                      color={theme.colors.primary}
+                    />
+
+                    <Text style={styles.stopoversTitle}>
+                      {stopovers.length} arrêt{stopovers.length > 1 ? 's' : ''}
+                    </Text>
+                  </View>
+
+                  {stopovers.map((stop, index) => {
+                    const parsedStop = parseLoc(stop.name);
+
+                    return (
+                      <View
+                        key={stop.id ?? index}
+                        style={styles.stopRow}
+                      >
+                        <View style={styles.stopNumber}>
+                          <Text style={styles.stopNumberText}>
+                            {index + 1}
+                          </Text>
+                        </View>
+
+                        <View style={styles.stopInfo}>
+                          <Text
+                            style={styles.stopName}
+                            numberOfLines={2}
+                          >
+                            {parsedStop.name ||
+                              `Étape ${index + 1}`}
+                          </Text>
+
+                          <View style={styles.stopMeta}>
+                            <Ionicons
+                              name="time-outline"
+                              size={11}
+                              color={theme.colors.textMuted}
+                            />
+
+                            <Text style={styles.stopDuration}>
+                              {stop.stopDurationMin} min d'arrêt
+                            </Text>
+                          </View>
+
+                          {parsedStop.note ? (
+                            <Text style={styles.stopNote}>
+                              {parsedStop.note}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Arrivée */}
+
+              <View style={styles.routeRow}>
+
+                <View style={styles.routeIndicatorColumn}>
+                  <View style={styles.arrivalDot} />
+                </View>
+
+                <View style={styles.routeContent}>
+                  <Text style={styles.routeLabel}>
+                    ARRIVÉE
+                  </Text>
+
+                  <Text
+                    style={styles.routeName}
+                    numberOfLines={2}
+                  >
+                    {parsedArr.name}
+                  </Text>
+
+                  {parsedArr.note ? (
+                    <View style={styles.locationNote}>
+                      <Ionicons
+                        name="location-outline"
+                        size={12}
+                        color={theme.colors.primary}
+                      />
+
+                      <Text style={styles.locationNoteText}>
+                        {parsedArr.note}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Metrics */}
+
+              {estimation && (
+                <View style={styles.metricsContainer}>
+
+                  <View style={styles.metricItem}>
+                    <View style={styles.metricIcon}>
+                      <Ionicons
+                        name="navigate-outline"
+                        size={15}
+                        color={theme.colors.primary}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.metricLabel}>
+                        DISTANCE
+                      </Text>
+
+                      <Text style={styles.metricValue}>
+                        {estimation.distanceKm} km
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.metricDivider} />
+
+                  <View style={styles.metricItem}>
+                    <View style={styles.metricIcon}>
+                      <Ionicons
+                        name="time-outline"
+                        size={15}
+                        color={theme.colors.primary}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.metricLabel}>
+                        DURÉE
+                      </Text>
+
+                      <Text style={styles.metricValue}>
+                        {formatDuration(totalDuration)}
+                      </Text>
+                    </View>
+                  </View>
+
+                </View>
+              )}
+
+            </View>
+          </View>
+
+          {/* ───────────────── DATE ───────────────── */}
+
+          <View style={styles.sectionCard}>
+
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={17}
+                  color={theme.colors.primary}
+                />
+              </View>
+
+              <View>
+                <Text style={styles.sectionTitle}>
+                  Départ
+                </Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  Date et disponibilité
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.infoGrid}>
+              <View style={styles.infoBox}>
+                <Text style={styles.infoLabel}>DATE</Text>
+                <Text style={styles.infoValue}>
+                  {selectedDateObj.toLocaleDateString('fr-FR', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                  })}
+                </Text>
+              </View>
+
+              <View style={styles.infoDivider} />
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoLabel}>HEURE</Text>
+                <Text style={styles.infoValue}>{time}</Text>
+              </View>
+
+              <View style={styles.infoDivider} />
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoLabel}>PLACES</Text>
+                <Text style={styles.infoValue}>
+                  {seats} place{seats > 1 ? 's' : ''}
+                </Text>
+              </View>
+            </View>
+
+            {isRecurrent && (
+              <View style={styles.recurrentCard}>
+                <View style={styles.recurrentIcon}>
+                  <Ionicons
+                    name="repeat"
+                    size={16}
+                    color={theme.colors.primary}
+                  />
+                </View>
+
+                <View style={styles.recurrentContent}>
+                  <Text style={styles.recurrentTitle}>
+                    Trajet récurrent
+                  </Text>
+
+                  <Text style={styles.recurrentText}>
+                    {getEstimatedRidesCount()} départ{getEstimatedRidesCount() > 1 ? 's' : ''} seront programmés
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* ───────────────── TARIFICATION ───────────────── */}
+
+          <View style={styles.sectionCard}>
+
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <Ionicons
+                  name="wallet-outline"
+                  size={17}
+                  color="#059669"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.sectionTitle}>
+                  Tarification
+                </Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  Répartition du prix par place
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.priceCard}>
+
+              <View style={styles.priceRow}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.priceMainLabel}>
+                    Votre rémunération
+                  </Text>
+
+                  <Text style={styles.priceHint}>
+                    Montant que vous recevez
+                  </Text>
+                </View>
+
+                <Text style={styles.priceMainValue}>
+                  {driverPayout.toLocaleString()} FCFA
+                </Text>
+              </View>
+
+              <View style={styles.priceRow}>
+                <Text style={styles.priceSecondaryLabel}>
+                  Frais de service Zemy ({financialSettings?.commission_percentage ?? 10}%)
+                </Text>
+
+                <Text style={styles.priceSecondaryValue}>
+                  +{commission.toLocaleString()} FCFA
+                </Text>
+              </View>
+
+              <View style={styles.priceDivider} />
+
+              <View style={styles.passengerPriceRow}>
+                <View style={styles.passengerPriceIcon}>
+                  <Ionicons
+                    name="person-outline"
+                    size={16}
+                    color={theme.colors.primary}
+                  />
+                </View>
+
+                <View style={styles.passengerPriceContent}>
+                  <Text style={styles.passengerPriceLabel}>
+                    Prix payé par le passager
+                  </Text>
+
+                  <Text style={styles.passengerPriceValue}>
+                    {totalPassenger.toLocaleString()} FCFA
+                  </Text>
+                </View>
+              </View>
+
+            </View>
+
+            {/* Gain total */}
+
+            <LinearGradient
+              colors={['#ECFDF5', '#F0FDF4']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.totalEarningCard}
+            >
+              <View style={styles.totalEarningIcon}>
+                <Ionicons
+                  name="trending-up"
+                  size={20}
+                  color="#047857"
+                />
+              </View>
+
+              <View style={styles.totalEarningContent}>
+                <Text style={styles.totalEarningLabel}>
+                  GAIN TOTAL POTENTIEL
+                </Text>
+
+                <Text style={styles.totalEarningSeats}>
+                  {seats} place{seats > 1 ? 's' : ''} disponible{seats > 1 ? 's' : ''}
+                </Text>
+              </View>
+
+              <Text style={styles.totalEarningAmount}>
+                {(driverPayout * seats).toLocaleString()} FCFA
+              </Text>
+            </LinearGradient>
+
+          </View>
+
+          {/* ───────────────── PREFERENCES ───────────────── */}
+
+          <View style={styles.sectionCard}>
+
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <Ionicons
+                  name="options-outline"
+                  size={17}
+                  color={theme.colors.primary}
+                />
+              </View>
+
+              <View style={styles.preferenceHeaderContent}>
+                <View>
+                  <Text style={styles.sectionTitle}>
+                    Préférences
+                  </Text>
+
+                  <Text style={styles.sectionSubtitle}>
+                    Informations visibles par les passagers
+                  </Text>
+                </View>
+
+                <View style={styles.preferenceCount}>
+                  <Text style={styles.preferenceCountText}>
+                    {preferenceCount}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.preferencesContainer}>
+
+              {music &&
+                renderChip(
+                  'musical-notes-outline',
+                  'Musique'
+                )}
+
+              {chatty &&
+                renderChip(
+                  'chatbubbles-outline',
+                  'Discussion'
+                )}
+
+              {airCond &&
+                renderChip(
+                  'snow-outline',
+                  'Clim'
+                )}
+
+              {luggageAllowed &&
+                renderChip(
+                  'briefcase-outline',
+                  `Bagages ${luggageSize === 'petit' ? 'petits' : luggageSize === 'moyen' ? 'moyens' : 'grands'}`
+                )}
+
+              {drivingRelay &&
+                renderChip(
+                  'car-sport-outline',
+                  'Relais'
+                )}
+
+              {petsAllowed &&
+                renderChip(
+                  'paw-outline',
+                  'Animaux'
+                )}
+
+              {!smoking &&
+                renderChip(
+                  'ban-outline',
+                  'Non-fumeur'
+                )}
+
+              {stopsAllowed &&
+                renderChip(
+                  'pause-circle-outline',
+                  'Pauses'
+                )}
+
+              {preferenceCount === 0 && (
+                <View style={styles.emptyPreference}>
+                  <Ionicons
+                    name="options-outline"
+                    size={18}
+                    color={theme.colors.textMuted}
+                  />
+
+                  <Text style={styles.emptyPreferenceText}>
+                    Aucune préférence particulière
+                  </Text>
+                </View>
+              )}
+
+            </View>
+
+            {/* Description */}
+
+            {description.trim() ? (
+              <View style={styles.descriptionCard}>
+
+                <View style={styles.descriptionHeader}>
+                  <Ionicons
+                    name="chatbox-ellipses-outline"
+                    size={15}
+                    color={theme.colors.primary}
+                  />
+
+                  <Text style={styles.descriptionTitle}>
+                    Message aux passagers
+                  </Text>
+                </View>
+
+                <Text style={styles.descriptionText}>
+                  “{description.trim()}”
+                </Text>
+
+              </View>
+            ) : null}
+
+          </View>
+
+          {/* ───────────────── ACTIONS ───────────────── */}
+
+          <View style={styles.actionsContainer}>
+
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={onClose}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              <Ionicons
+                name="create-outline"
+                size={20}
+                color={theme.colors.text}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.publishButton}
+              onPress={onConfirm}
+              disabled={loading}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={[
+                  theme.colors.primary,
+                  theme.colors.primaryDark || '#1A4FC8',
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.publishGradient}
+              >
+                {loading ? (
+                  <>
+                    <ActivityIndicator
+                      color="#FFFFFF"
+                      size="small"
+                    />
+
+                    <Text style={styles.publishText}>
+                      Publication...
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.publishIcon}>
+                      <Ionicons
+                        name="checkmark"
+                        size={15}
+                        color={theme.colors.primary}
+                      />
+                    </View>
+
+                    <Text style={styles.publishText}>
+                      Confirmer & publier
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+          </View>
+
+          <View style={styles.bottomSafeSpace} />
+
+        </ScrollView>
       </View>
     </AppBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  summaryModalContainer: { paddingBottom: 50 },
-  summaryModalTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.text, textAlign: 'center' },
-  summaryModalSubtitle: { fontSize: 12, color: theme.colors.textMuted, textAlign: 'center', marginBottom: 16 },
-  summarySectionCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
-  summarySectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  summarySectionTitle: { fontSize: 11, fontWeight: '800', color: theme.colors.primary, letterSpacing: 0.5 },
-  summaryRouteBox: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12 },
-  dotGreen: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#DCFCE7' },
-  dotRed: { width: 12, height: 12, borderRadius: 6, backgroundColor: theme.colors.primary, borderWidth: 2, borderColor: `${theme.colors.primary}30` },
-  summaryRouteMetrics: { flexDirection: 'row', gap: 16, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
-  summaryMetricText: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
-  summaryGrid: { flexDirection: 'row', gap: 12 },
-  summaryGridItem: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10 },
-  summaryGridLabel: { fontSize: 10, fontWeight: '600', color: theme.colors.textMuted, textTransform: 'uppercase' },
-  summaryGridValue: { fontSize: 13, fontWeight: '700', color: theme.colors.text, marginTop: 2 },
-  summaryRecurrentBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8, marginTop: 8 },
-  summaryRecurrentText: { fontSize: 12, fontWeight: '700', color: theme.colors.primary },
-  summaryPriceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  summaryTotalCard: { backgroundColor: '#ECFDF5', borderRadius: 14, padding: 12, marginTop: 8, borderWidth: 1.5, borderColor: '#A7F3D0' },
-  summaryTotalHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  summaryTotalTitle: { fontSize: 11, fontWeight: '800', color: '#065F46', letterSpacing: 0.5, flex: 1 },
-  summaryTotalAmount: { fontSize: 22, fontWeight: '900', color: '#047857' },
-  summaryBadgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  summaryChip: { backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  summaryChipText: { fontSize: 11, fontWeight: '600', color: '#334155' },
-  summaryActionsRow: { flexDirection: 'row', gap: 12, marginTop: 10, marginBottom: 20 },
-  summaryEditBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' },
-  summaryEditBtnText: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
-  summaryConfirmBtn: { flex: 1, borderRadius: 14, overflow: 'hidden' },
-  summaryConfirmGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
-  summaryConfirmBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
-  commissionCard: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16, width: '100%' },
-  commissionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  commissionLabel: { flex: 1, marginRight: 8, fontSize: 14, fontWeight: '600', color: theme.colors.text },
-  commissionValue: { fontSize: 15, fontWeight: '800', color: theme.colors.text },
-  commissionLabelSub: { flex: 1, marginRight: 8, fontSize: 12, color: theme.colors.textLight },
-  commissionValueSub: { fontSize: 13, color: theme.colors.textLight, fontWeight: '600' },
-  commissionDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 8 },
-  commissionLabelTotal: { flex: 1, marginRight: 8, fontSize: 15, fontWeight: '800', color: theme.colors.primary },
-  commissionValueTotal: { fontSize: 18, fontWeight: '900', color: theme.colors.primary }
+
+  /* ───────────────── GLOBAL ───────────────── */
+
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F9FC',
+  },
+
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 30,
+  },
+
+  bottomSafeSpace: {
+    height: 10,
+  },
+
+  /* ───────────────── HEADER ───────────────── */
+
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 18,
+    paddingTop: 5,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF2F7',
+  },
+
+  handle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 17,
+  },
+
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  headerTexts: {
+    flex: 1,
+  },
+
+  title: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: theme.colors.text,
+    letterSpacing: -0.3,
+  },
+
+  subtitle: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    marginTop: 3,
+  },
+
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* ───────────────── SECTION ───────────────── */
+
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginTop: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E9EEF5',
+    shadowColor: '#0F172A',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.035,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
+  sectionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.text,
+  },
+
+  sectionSubtitle: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+
+  /* ───────────────── ROUTE ───────────────── */
+
+  routeCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 17,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#EDF1F5',
+  },
+
+  routeRow: {
+    flexDirection: 'row',
+  },
+
+  routeIndicatorColumn: {
+    width: 28,
+    alignItems: 'center',
+  },
+
+  departureDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#22C55E',
+    borderWidth: 4,
+    borderColor: '#DCFCE7',
+  },
+
+  arrivalDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    borderWidth: 4,
+    borderColor: '#FEE2E2',
+  },
+
+  routeLine: {
+    width: 2,
+    flex: 1,
+    minHeight: 35,
+    backgroundColor: '#CBD5E1',
+    marginVertical: 3,
+  },
+
+  routeContent: {
+    flex: 1,
+    paddingLeft: 8,
+    paddingBottom: 4,
+  },
+
+  routeLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: theme.colors.textMuted,
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+
+  routeName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: theme.colors.text,
+    lineHeight: 20,
+  },
+
+  locationNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+
+  locationNoteText: {
+    flex: 1,
+    fontSize: 11,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+
+  /* ───────────────── STOPS ───────────────── */
+
+  stopoversContainer: {
+    marginLeft: 28,
+    marginVertical: 10,
+    paddingLeft: 13,
+    borderLeftWidth: 1,
+    borderLeftColor: '#CBD5E1',
+  },
+
+  stopoversHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 8,
+  },
+
+  stopoversTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+
+  stopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+
+  stopNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#E8EEF9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+
+  stopNumberText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+
+  stopInfo: {
+    flex: 1,
+  },
+
+  stopName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+
+  stopMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+  },
+
+  stopDuration: {
+    fontSize: 10,
+    color: theme.colors.textMuted,
+  },
+
+  stopNote: {
+    fontSize: 10,
+    color: theme.colors.primary,
+    marginTop: 2,
+  },
+
+  /* ───────────────── METRICS ───────────────── */
+
+  metricsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 13,
+    paddingTop: 13,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
+
+  metricIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  metricDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 8,
+  },
+
+  metricLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: theme.colors.textMuted,
+    letterSpacing: 0.7,
+  },
+
+  metricValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: theme.colors.text,
+    marginTop: 1,
+  },
+
+  /* ───────────────── INFO GRID ───────────────── */
+
+  infoGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
+  },
+
+  infoBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  infoDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#E2E8F0',
+  },
+
+  infoLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: theme.colors.textMuted,
+    letterSpacing: 0.7,
+    marginBottom: 4,
+  },
+
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.text,
+    textTransform: 'capitalize',
+  },
+
+  /* ───────────────── RECURRENT ───────────────── */
+
+  recurrentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF4FF',
+    borderRadius: 13,
+    padding: 11,
+    marginTop: 9,
+  },
+
+  recurrentIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  recurrentContent: {
+    flex: 1,
+  },
+
+  recurrentTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+
+  recurrentText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+
+  /* ───────────────── PRICING ───────────────── */
+
+  priceCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E8EDF3',
+  },
+
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 11,
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+
+  priceMainLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+
+  priceHint: {
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+
+  priceMainValue: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#059669',
+  },
+
+  priceSecondaryLabel: {
+    flex: 1,
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+
+  priceSecondaryValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+  },
+
+  priceDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 5,
+  },
+
+  passengerPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+
+  passengerPriceIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 9,
+  },
+
+  passengerPriceContent: {
+    flex: 1,
+    minWidth: 150,
+  },
+
+  passengerPriceLabel: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+
+  passengerPriceValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: theme.colors.primary,
+    marginTop: 1,
+  },
+
+  totalEarningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 16,
+    padding: 13,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  totalEarningIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  totalEarningContent: {
+    flex: 1,
+    minWidth: 120,
+  },
+
+  totalEarningLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#065F46',
+    letterSpacing: 0.6,
+  },
+
+  totalEarningSeats: {
+    fontSize: 10,
+    color: '#047857',
+    marginTop: 2,
+  },
+
+  totalEarningAmount: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#047857',
+  },
+
+  /* ───────────────── PREFERENCES ───────────────── */
+
+  preferenceHeaderContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  preferenceCount: {
+    minWidth: 26,
+    height: 26,
+    paddingHorizontal: 7,
+    borderRadius: 13,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  preferenceCountText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: theme.colors.primary,
+  },
+
+  preferencesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+
+  preferenceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 11,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+
+  preferenceChipIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 7,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 5,
+  },
+
+  preferenceChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#334155',
+  },
+
+  emptyPreference: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 10,
+  },
+
+  emptyPreferenceText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+
+  /* ───────────────── DESCRIPTION ───────────────── */
+
+  descriptionCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 13,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+
+  descriptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+
+  descriptionTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+
+  descriptionText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.colors.text,
+    fontStyle: 'italic',
+  },
+
+  /* ───────────────── ACTIONS ───────────────── */
+
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 16,
+    width: '100%',
+  },
+
+  editButton: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#DCE3EC',
+  },
+
+  publishButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: theme.colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+
+  publishGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+
+  publishIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  publishText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
 });

@@ -25,10 +25,7 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def list(self, request, *args, **kwargs):
-        dep_lat_str = request.query_params.get('departure_latitude')
-        dep_lon_str = request.query_params.get('departure_longitude')
-        arr_lat_str = request.query_params.get('arrival_latitude')
-        arr_lon_str = request.query_params.get('arrival_longitude')
+        search_mode = request.query_params.get('search_mode')
         date_str = request.query_params.get('date')
         seats_str = request.query_params.get('seats', '1')
 
@@ -36,14 +33,31 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         arr_place_id = request.query_params.get('arrival_place_id')
         time_filter = request.query_params.get('time')
 
-        has_gps_search = (dep_lat_str and dep_lon_str) or (arr_lat_str and arr_lon_str)
+        if search_mode == 'nearby':
+            dep_lat_str = request.query_params.get('latitude') or request.query_params.get('departure_latitude')
+            dep_lon_str = request.query_params.get('longitude') or request.query_params.get('departure_longitude')
+            arr_lat_str = None
+            arr_lon_str = None
+            radius_str = request.query_params.get('radius', '20.0')
+            try:
+                radius = float(radius_str)
+            except (TypeError, ValueError):
+                radius = 20.0
+        else:
+            dep_lat_str = request.query_params.get('departure_latitude')
+            dep_lon_str = request.query_params.get('departure_longitude')
+            arr_lat_str = request.query_params.get('arrival_latitude')
+            arr_lon_str = request.query_params.get('arrival_longitude')
+            radius = None
+
+        has_gps_search = (dep_lat_str and dep_lon_str) or (arr_lat_str and arr_lon_str) or (search_mode == 'nearby')
 
         if has_gps_search and date_str:
             try:
-                dep_lat = float(dep_lat_str) if (dep_lat_str and dep_lon_str) else None
-                dep_lon = float(dep_lon_str) if (dep_lat_str and dep_lon_str) else None
-                arr_lat = float(arr_lat_str) if (arr_lat_str and arr_lon_str) else None
-                arr_lon = float(arr_lon_str) if (arr_lat_str and arr_lon_str) else None
+                dep_lat = float(dep_lat_str) if dep_lat_str else None
+                dep_lon = float(dep_lon_str) if dep_lon_str else None
+                arr_lat = float(arr_lat_str) if arr_lat_str else None
+                arr_lon = float(arr_lon_str) if arr_lon_str else None
                 seats = int(seats_str)
             except ValueError:
                 return Response({"error": "Paramètres géographiques ou nombre de places invalides."}, status=status.HTTP_400_BAD_REQUEST)
@@ -53,7 +67,9 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
                 dep_lat, dep_lon, arr_lat, arr_lon, date_str, seats,
                 departure_place_id=dep_place_id,
                 arrival_place_id=arr_place_id,
-                time_filter=time_filter
+                time_filter=time_filter,
+                search_mode=search_mode,
+                radius=radius
             )
 
             serialized_directs = []

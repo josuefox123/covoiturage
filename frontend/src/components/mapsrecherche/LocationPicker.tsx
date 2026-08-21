@@ -29,6 +29,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DEFAULT_LAT = 6.3703;
 const DEFAULT_LON = 2.3912;
 const RECENT_LOCATIONS_KEY = '@zemy_recent_locations';
+const GOOGLE_MAPS_KEY = 'AIzaSyDeQDN8_mfUVNcb37Tg1FsiMaBoCuYOgrc';
 
 const DEFAULT_POPULAR_BENIN: LocationData[] = [
   { name: 'Cotonou', city: 'Cotonou', address: 'Littoral, Bénin', latitude: 6.3703, longitude: 2.3912 },
@@ -294,20 +295,32 @@ export default function LocationPicker({
     setIsLoadingAddress(true);
 
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-      const res = await fetch(url, { signal: abortRef.current.signal, headers: { 'User-Agent': 'ZemyMobile/1.0' } });
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${GOOGLE_MAPS_KEY}&language=fr`;
+      const res = await fetch(url, { signal: abortRef.current.signal });
       const data = await res.json();
-      if (data && data.display_name) {
+      if (data && data.results && data.results.length > 0) {
         lastReverseRef.current = { lat, lon };
-        const address = data.address;
-        const name = address.road || address.suburb || address.neighbourhood || address.city || 'Lieu ciblé';
+        const result = data.results[0];
+        
+        let city = '';
+        let road = '';
+        for (const comp of result.address_components || []) {
+          if (comp.types.includes('locality')) {
+            city = comp.long_name;
+          }
+          if (comp.types.includes('route')) {
+            road = comp.long_name;
+          }
+        }
+        
+        const name = road || city || 'Lieu ciblé';
         const formatted: LocationData = {
           latitude: lat,
           longitude: lon,
           name,
-          address: data.display_name,
-          city: address.city || address.town || address.village || '',
-          country: address.country || '',
+          address: result.formatted_address,
+          city: city,
+          country: 'Bénin',
         };
         setSelectedLocation(formatted);
         setCustomLocationName('');
@@ -329,11 +342,20 @@ export default function LocationPicker({
     const version = ++searchVersionRef.current;
 
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=bj&limit=8`;
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:bj&key=${GOOGLE_MAPS_KEY}&language=fr`;
       const res = await fetch(url, { signal: searchAbort.current.signal });
       const data = await res.json();
       if (version === searchVersionRef.current) {
-        setSearchResults(data);
+        const predictions = data.predictions || [];
+        const formatted = predictions.map((p: any) => ({
+          place_id: p.place_id,
+          name: p.structured_formatting?.main_text || p.description,
+          display_name: p.description,
+          address: {
+            city: p.structured_formatting?.secondary_text || '',
+          }
+        }));
+        setSearchResults(formatted);
       }
     } catch (e) {
     } finally {
@@ -359,9 +381,28 @@ export default function LocationPicker({
     setIsSearchFocused(false);
   };
 
-  const handleSelectSearchResult = (item: any) => {
-    const lat = Number(item.lat);
-    const lon = Number(item.lon);
+  const handleSelectSearchResult = async (item: any) => {
+    let lat = Number(item.lat);
+    let lon = Number(item.lon);
+    
+    if (item.place_id && (isNaN(lat) || isNaN(lon))) {
+      try {
+        const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${item.place_id}&key=${GOOGLE_MAPS_KEY}`;
+        const res = await fetch(detailsUrl);
+        const detailsData = await res.json();
+        const geom = detailsData.result?.geometry?.location;
+        if (geom) {
+          lat = geom.lat;
+          lon = geom.lng;
+        }
+      } catch (e) {
+        Alert.alert("Erreur", "Impossible de récupérer les coordonnées de ce lieu.");
+        return;
+      }
+    }
+
+    if (isNaN(lat) || isNaN(lon)) return;
+
     const parts = (item.display_name || '').split(',');
     const name = item.name || parts[0] || 'Lieu sélectionné';
     const loc: LocationData = {
@@ -379,7 +420,12 @@ export default function LocationPicker({
 
   const handleConfirmLocation = () => {
     if (selectedLocation) {
-      const confirmed = { ...selectedLocation, name: customLocationName || selectedLocation.name };
+      const confirmed = {
+        ...selectedLocation,
+        // Garde le nom original de la position
+        // La note personnalisée est stockée séparément
+        note: customLocationName.trim() || undefined,
+      };
       saveRecentLocation(confirmed);
       onLocationSelected(confirmed);
     }

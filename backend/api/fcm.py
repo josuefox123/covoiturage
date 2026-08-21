@@ -242,11 +242,17 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
     """
     try:
         from .models import Notification
+        notif_type = None
+        if data and isinstance(data, dict):
+            notif_type = data.get('type') or data.get('screen')
+
         Notification.objects.create(
             user=user,
             title=title,
             message=message,
-            is_read=False
+            is_read=False,
+            type=notif_type,
+            data=data
         )
     except Exception as e:
         logger.error(f"Erreur création Notification en BD: {e}")

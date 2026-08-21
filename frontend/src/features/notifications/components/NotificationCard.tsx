@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Notification } from '../types/notification';
 import { theme } from '../../../styles/theme';
@@ -42,14 +42,24 @@ export const NotificationCard = ({ notification, onRead, onDelete, onPress }: Pr
   };
 
   return (
-      <Pressable 
+    <View style={styles.cardContainer}>
+      <TouchableOpacity 
         style={[styles.card, !notification.is_read && styles.cardUnread]}
         onPress={() => {
-          if (!notification.is_read) onRead(notification.id);
+          // Déclencher d'abord la navigation/action principale
           onPress(notification);
+          
+          // Retarder la mutation "marquer comme lu" de 50ms pour éviter de couper 
+          // le thread tactile et le processus de navigation par un re-render immédiat
+          if (!notification.is_read) {
+            setTimeout(() => {
+              onRead(notification.id);
+            }, 50);
+          }
         }}
         onLongPress={handleLongPress}
         delayLongPress={400}
+        activeOpacity={0.88}
       >
         {!notification.is_read && <View style={styles.unreadDot} />}
         
@@ -62,28 +72,37 @@ export const NotificationCard = ({ notification, onRead, onDelete, onPress }: Pr
             <Text style={[styles.title, !notification.is_read && styles.textBold]} numberOfLines={1}>
               {notification.title}
             </Text>
-            <View style={styles.rightHeader}>
-              <Text style={styles.time}>{formatTimeAgo(notification.created_at)}</Text>
-              <TouchableOpacity onPress={handleDeletePress} style={styles.trashBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="trash-outline" size={18} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.time}>{formatTimeAgo(notification.created_at)}</Text>
           </View>
           <Text style={[styles.message, !notification.is_read && styles.textBold]} numberOfLines={2}>
             {notification.message}
           </Text>
         </View>
-      </Pressable>
+      </TouchableOpacity>
+
+      {/* Bouton de suppression indépendant en position absolue (pas imbriqué !) */}
+      <TouchableOpacity 
+        onPress={handleDeletePress} 
+        style={styles.deleteOverlayBtn}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="trash-outline" size={16} color="#EF4444" />
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  cardContainer: {
+    position: 'relative',
+    marginBottom: theme.spacing.md,
+  },
   card: {
     flexDirection: 'row',
     padding: theme.spacing.md,
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    marginBottom: theme.spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
@@ -91,6 +110,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.02)',
+    paddingRight: 44, // Évite que le texte passe sous le bouton de suppression
   },
   cardUnread: {
     backgroundColor: '#F8FAFC',
@@ -123,6 +143,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+    paddingRight: 8,
   },
   title: {
     fontSize: 15,
@@ -132,26 +153,31 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   time: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.colors.textMuted,
     fontFamily: 'Inter-Regular',
   },
   message: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textMuted,
     fontFamily: 'Inter-Regular',
-    lineHeight: 20,
+    lineHeight: 18,
+    marginTop: 2,
   },
   textBold: {
     fontFamily: 'Inter-Bold',
     color: theme.colors.text,
   },
-  rightHeader: {
-    flexDirection: 'row',
+  deleteOverlayBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFF1F2',
     alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
-  trashBtn: {
-    marginLeft: 8,
-  },
-
 });

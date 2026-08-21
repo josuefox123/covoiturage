@@ -602,10 +602,7 @@ export default function PublishScreen() {
                     {form.loading ? (
                       <ActivityIndicator color={theme.colors.white} size="small" />
                     ) : (
-                      <>
-                        <Ionicons name="rocket-outline" size={22} color={theme.colors.white} />
                         <Text style={styles.publishBtnText}>Publier le trajet</Text>
-                      </>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -635,25 +632,28 @@ export default function PublishScreen() {
           }
           onLocationSelected={(loc: any) => {
             const cords = { lat: loc.latitude, lon: loc.longitude };
+            const fullNameWithNote = loc.name + (loc.note ? `|||${loc.note}` : '');
             let newDep = form.departure;
             let newArr = form.arrival;
 
             if (form.pickingLocationFor === 'departure') {
-              form.setDeparture(loc.name);
+              form.setDeparture(fullNameWithNote);
               form.setDepartureCords(cords);
-              newDep = loc.name;
+              newDep = fullNameWithNote;
             } else if (form.pickingLocationFor === 'arrival') {
-              form.setArrival(loc.name);
+              form.setArrival(fullNameWithNote);
               form.setArrivalCords(cords);
-              newArr = loc.name;
+              newArr = fullNameWithNote;
             } else if (form.pickingLocationFor === 'new_custom') {
-              form.addStopover(loc.name, cords, 15);
+              form.addStopover(fullNameWithNote, cords, 15);
             } else if (form.pickingLocationFor) {
-              form.updateStopover(form.pickingLocationFor, { name: loc.name, coords: cords });
+              form.updateStopover(form.pickingLocationFor, { name: fullNameWithNote, coords: cords });
             }
 
             if (newDep && newArr && !form.description) {
-              form.setDescription(`Départ de ${newDep} et arrivée à ${newArr}`);
+              const cleanDep = newDep.split('|||')[0];
+              const cleanArr = newArr.split('|||')[0];
+              form.setDescription(`Départ de ${cleanDep} et arrivée à ${cleanArr}`);
             }
             form.setPickingLocationFor(null);
           }}

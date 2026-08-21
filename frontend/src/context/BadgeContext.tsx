@@ -20,7 +20,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, DeviceEventEmitter } from 'react-native';
 import { useAuth } from './AuthContext';
 
 /** Statuts de réservation qui nécessitent une action immédiate du passager */
@@ -140,9 +140,13 @@ export function BadgeProvider({ children }: { children: React.ReactNode }) {
       appStateRef.current = next;
     });
 
+    // Écouteur d'événements pour le rafraîchissement manuel instantané
+    const badgeSub = DeviceEventEmitter.addListener('refreshBadges', fetchBadges);
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       sub.remove();
+      badgeSub.remove();
     };
   }, [token, fetchBadges]);
 

@@ -19,6 +19,7 @@ interface HeaderProps {
   onNotifPress: () => void;
   onProfilePress?: () => void;
   scrollY: Animated.Value;
+  notifCount?: number;
 }
 
 export default function Header({
@@ -27,6 +28,7 @@ export default function Header({
   onNotifPress,
   onProfilePress,
   scrollY,
+  notifCount,
 }: HeaderProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-20)).current;
@@ -81,7 +83,13 @@ export default function Header({
         <View style={styles.actions}>
           <TouchableOpacity style={styles.iconBtn} onPress={onNotifPress} activeOpacity={0.8}>
             <Ionicons name="notifications-outline" size={22} color="#fff" />
-            <View style={styles.notifDot} />
+            {notifCount !== undefined && notifCount > 0 ? (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {notifCount > 99 ? '99+' : notifCount}
+                </Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
           {onProfilePress && (
             <TouchableOpacity style={styles.profileBtn} onPress={onProfilePress} activeOpacity={0.8}>
@@ -169,16 +177,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  notifDot: {
+  notifBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 2,
+    right: 2,
     backgroundColor: '#FF3B30',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
     borderWidth: 1.5,
     borderColor: '#0066FF',
+  },
+  notifBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    lineHeight: 12,
+    textAlign: 'center',
   },
   avatar: {
     width: 40,

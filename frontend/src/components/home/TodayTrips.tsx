@@ -24,6 +24,15 @@ function TripCard({ item, onPress }: { item: Ride; onPress: () => void }) {
   const driver = item.driver_details;
   const avatarUrl = driver?.avatar ? getMediaUrl(driver.avatar) : undefined;
 
+  const parseLoc = (locStr: string | undefined | null) => {
+    if (!locStr) return { name: '', note: '' };
+    const parts = locStr.split('|||');
+    return { name: parts[0], note: parts[1] || '' };
+  };
+
+  const parsedDep = parseLoc(item.departure_location);
+  const parsedArr = parseLoc(item.arrival_location);
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
       {/* Driver */}
@@ -55,15 +64,25 @@ function TripCard({ item, onPress }: { item: Ride; onPress: () => void }) {
         </View>
         <View style={styles.routeDetails}>
           <View style={styles.routePoint}>
-            <Text style={styles.routeCity} numberOfLines={1}>{item.departure_location}</Text>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={styles.routeCity} numberOfLines={1}>{parsedDep.name}</Text>
+              {parsedDep.note ? (
+                <Text style={styles.routeNote} numberOfLines={1}>{parsedDep.note}</Text>
+              ) : null}
+            </View>
             {item.departure_time ? (
               <Text style={styles.routeTime}>
                 {item.departure_time.substring(0, 5)}
               </Text>
             ) : null}
           </View>
-          <View style={[styles.routePoint, { marginTop: 14 }]}>
-            <Text style={styles.routeCity} numberOfLines={1}>{item.arrival_location}</Text>
+          <View style={[styles.routePoint, { marginTop: 10 }]}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={styles.routeCity} numberOfLines={1}>{parsedArr.name}</Text>
+              {parsedArr.note ? (
+                <Text style={styles.routeNote} numberOfLines={1}>{parsedArr.note}</Text>
+              ) : null}
+            </View>
             {item.departure_date ? (
               <Text style={styles.routeDate}>
                 {new Date(item.departure_date).toLocaleDateString('fr-FR', {
@@ -217,6 +236,7 @@ const styles = StyleSheet.create({
   routeDetails: { flex: 1, justifyContent: 'space-between' },
   routePoint: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   routeCity: { fontSize: 14, fontWeight: '600', color: '#111827', flex: 1, marginRight: 8 },
+  routeNote: { fontSize: 11, color: PRIMARY, fontWeight: '600', marginTop: 2, width: '100%' },
   routeTime: { fontSize: 13, fontWeight: '700', color: PRIMARY },
   routeDate: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
   footer: {

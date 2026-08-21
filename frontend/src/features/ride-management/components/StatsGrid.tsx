@@ -13,7 +13,7 @@ export function StatsGrid({ ride, totalRevenue, seatsBooked }: StatsGridProps) {
     <View style={styles.statsGrid}>
       <View style={styles.statBox}>
         <Text style={styles.statLabel}>Prix unitaire</Text>
-        <Text style={styles.statValue}>{ride.price_per_seat} FCFA</Text>
+        <Text style={styles.statValue}>{ride.driver_payout || 0} FCFA</Text>
       </View>
       <View style={styles.statBox}>
         <Text style={styles.statLabel}>Distance</Text>

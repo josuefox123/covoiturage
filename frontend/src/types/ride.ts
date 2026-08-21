@@ -22,6 +22,8 @@ export interface Ride {
   departure_date: string;
   price_per_seat: number;
   original_price_per_seat?: number;
+  driver_payout?: number;
+  zemy_commission?: number;
   seats_available: number;
   total_seats: number;
   status: string;

@@ -20,7 +20,7 @@ import { RideMap } from '@/src/features/ride/components/RideMap';
 import { PassengerCard } from '@/src/features/ride/components/PassengerCard';
 import { BookingConfirmModal } from '@/src/features/ride/modals/BookingConfirmModal';
 import { BookingSuccessModal } from '@/src/features/ride/modals/BookingSuccessModal';
-// import { PassengerNegotiationModal } from '@/src/features/ride/modals/PassengerNegotiationModal'; // NÉGOCIATION DÉSACTIVÉE
+import { PassengerNegotiationModal } from '@/src/features/ride/modals/PassengerNegotiationModal';
 
 // ─── Nouveaux composants extraits ────────────────────────────────────────────
 import { EcranChargement, FadeInCard, TitreSection } from '@/src/features/ride/composants/AnimationsFade';
@@ -63,12 +63,24 @@ export default function RideDetailScreen() {
     authFetch, user, createBooking
   );
 
-  const depLocation = ride?.departure_location || departure || myBooking?.departure_location;
-  const destLocation = ride?.arrival_location || destination || myBooking?.arrival_location;
+  const parseLoc = (locStr: string | undefined | null) => {
+    if (!locStr) return { name: '', note: '' };
+    const parts = locStr.split('|||');
+    return { name: parts[0], note: parts[1] || '' };
+  };
+
+  const depLocationRaw = departure || myBooking?.departure_location || ride?.departure_location;
+  const destLocationRaw = destination || myBooking?.arrival_location || ride?.arrival_location;
+
+  const parsedDep = parseLoc(depLocationRaw);
+  const parsedArr = parseLoc(destLocationRaw);
+
+  const depLocation = parsedDep.name;
+  const destLocation = parsedArr.name;
 
   const [showBookModal, setShowBookModal] = useState(false);
   const [showSuccModal, setShowSuccModal] = useState(false);
-  // const [showNegModal, setShowNegModal] = useState(false); // NÉGOCIATION DÉSACTIVÉE
+  const [showNegModal, setShowNegModal] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   if (loading || !ride) return <EcranChargement />;
@@ -81,15 +93,28 @@ export default function RideDetailScreen() {
   const rideAction = getRideAction(bookingState);
   const extractCity = (locStr: string | undefined): string => {
     if (!locStr) return '';
-    const parts = locStr.replace(/\//g, ',').split(',').map((p) => p.trim());
+    const cleanLoc = locStr.split('|||')[0];
+    const parts = cleanLoc.replace(/\//g, ',').split(',').map((p) => p.trim());
     const ignore = new Set(['bénin', 'benin', 'togo', 'nigeria', 'ghana', 'burkina', 'france']);
     const cleanParts = parts.filter((p) => p && !ignore.has(p.toLowerCase()));
     return cleanParts.length ? cleanParts[cleanParts.length - 1].toLowerCase() : (parts[0] || '').toLowerCase();
   };
 
-  const isIntermediatePickup = false;
-  const isIntermediateDropoff = false;
-  const isMid = false;
+  const isIntermediatePickup = (() => {
+    if (!depLocation || !ride) return false;
+    const searchDepCity = extractCity(depLocation);
+    const rideDepCity = extractCity(ride.departure_location);
+    return !!(searchDepCity && rideDepCity && searchDepCity !== rideDepCity);
+  })();
+
+  const isIntermediateDropoff = (() => {
+    if (!destLocation || !ride) return false;
+    const searchDestCity = extractCity(destLocation);
+    const rideDestCity = extractCity(ride.arrival_location);
+    return !!(searchDestCity && rideDestCity && searchDestCity !== rideDestCity);
+  })();
+
+  const isMid = isIntermediatePickup || isIntermediateDropoff;
 
   const getArrival = (): string => {
     if (!ride) return '--:--';
@@ -128,8 +153,8 @@ export default function RideDetailScreen() {
     b.payment_status !== 'pending' && ['confirmed', 'active', 'completed'].includes(b.status)
   );
 
-  const depShort = ride.departure_location.split(',')[0];
-  const arrShort = ride.arrival_location.split(',')[0];
+  const depShort = parseLoc(departure || ride.departure_location).name.split(',')[0];
+  const arrShort = parseLoc(destination || ride.arrival_location).name.split(',')[0];
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   const handleBooking = () => {
@@ -167,7 +192,9 @@ export default function RideDetailScreen() {
   const handleShare = async () => {
     if (!ride) return;
     try {
-      await Share.share({ message: `Zemy: ${ride.departure_location.split(',')[0]} → ${ride.arrival_location.split(',')[0]} ${new Date(ride.departure_date).toLocaleDateString('fr-FR')} ${ride.departure_time?.substring(0, 5)}` });
+      const cleanDep = parseLoc(ride.departure_location).name;
+      const cleanArr = parseLoc(ride.arrival_location).name;
+      await Share.share({ message: `Zemy: ${cleanDep.split(',')[0]} → ${cleanArr.split(',')[0]} ${new Date(ride.departure_date).toLocaleDateString('fr-FR')} ${ride.departure_time?.substring(0, 5)}` });
     } catch { }
   };
 
@@ -197,12 +224,12 @@ export default function RideDetailScreen() {
         <View style={ss.hero}>
           <RideMap
             ride={ride}
-            passenger_dep_lat={undefined}
-            passenger_dep_lon={undefined}
-            passenger_arr_lat={undefined}
-            passenger_arr_lon={undefined}
-            departure={undefined}
-            destination={undefined}
+            passenger_dep_lat={passenger_dep_lat}
+            passenger_dep_lon={passenger_dep_lon}
+            passenger_arr_lat={passenger_arr_lat}
+            passenger_arr_lon={passenger_arr_lon}
+            departure={departure}
+            destination={destination}
           />
 
           {/* Badge statut */}
@@ -323,6 +350,9 @@ export default function RideDetailScreen() {
                       <View style={[ss.ptDot, { backgroundColor: C.success }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 15, fontWeight: '800', color: C.text }}>{depLocation.split(',')[0]}</Text>
+                        {parsedDep.note ? (
+                          <Text style={{ fontSize: 12, color: C.primary, fontWeight: '600', marginTop: 2 }}>{parsedDep.note}</Text>
+                        ) : null}
                         <Text style={{ fontSize: 11, color: C.textSec, marginTop: 2 }}>
                           Votre embarquement{bookingState?.estimated_departure_time ? ` · ~${bookingState.estimated_departure_time}` : ''}
                         </Text>
@@ -340,6 +370,9 @@ export default function RideDetailScreen() {
                       <View style={[ss.ptDot, { backgroundColor: C.error }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 15, fontWeight: '800', color: C.text }}>{destLocation.split(',')[0]}</Text>
+                        {parsedArr.note ? (
+                          <Text style={{ fontSize: 12, color: C.primary, fontWeight: '600', marginTop: 2 }}>{parsedArr.note}</Text>
+                        ) : null}
                         <Text style={{ fontSize: 11, color: C.textSec, marginTop: 2 }}>Votre dépose</Text>
                       </View>
                     </View>
@@ -347,14 +380,14 @@ export default function RideDetailScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border }}>
                     <Text style={{ fontSize: 13, color: C.textSec, fontWeight: '600' }}>Tarif estimé</Text>
                     <Text style={{ fontSize: 16, fontWeight: '800', color: C.primary }}>
-                      {ride.price_per_seat?.toLocaleString()} FCFA
+                      {isMid ? 'À confirmer par le conducteur' : `${(bookingState?.price ?? ride.price_per_seat)?.toLocaleString()} FCFA`}
                     </Text>
                   </View>
                   {approachDist && (
                     <View style={ss.infoBox}>
                       <Ionicons name="information-circle-outline" size={16} color={C.primary} />
                       <Text style={ss.infoTxt}>
-                        Le conducteur débute à {ride.departure_location.split(',')[0]}. Vous le rejoindrez à {depLocation.split(',')[0]} (~{approachDist.toFixed(1)} km).
+                        Le conducteur débute à {parseLoc(ride.departure_location).name.split(',')[0]}. Vous le rejoindrez à {depLocation.split(',')[0]} (~{approachDist.toFixed(1)} km).
                       </Text>
                     </View>
                   )}
@@ -385,10 +418,10 @@ export default function RideDetailScreen() {
                   </Text>
                   <Text style={ss.warnTxt}>
                     {isIntermediatePickup && isIntermediateDropoff
-                      ? `Votre trajet correspond à des arrêts intermédiaires sur l'itinéraire global du conducteur (${(ride.departure_location || '').split(',')[0]} ➔ ${(ride.arrival_location || '').split(',')[0]}).`
+                      ? `Votre trajet correspond à des arrêts intermédiaires sur l'itinéraire global du conducteur (${parseLoc(ride.departure_location).name.split(',')[0]} ➔ ${parseLoc(ride.arrival_location).name.split(',')[0]}).`
                       : isIntermediatePickup
-                        ? `Le lieu de départ recherché (${(depLocation || '').split(',')[0]}) n'est pas le départ initial du chauffeur (Départ initial : ${(ride.departure_location || '').split(',')[0]}).`
-                        : `Le lieu d'arrivée recherché (${(destLocation || '').split(',')[0]}) n'est pas le terminus final du chauffeur (Terminus : ${(ride.arrival_location || '').split(',')[0]}).`}
+                        ? `Le lieu de départ recherché (${depLocation.split(',')[0]}) n'est pas le départ initial du chauffeur (Départ initial : ${parseLoc(ride.departure_location).name.split(',')[0]}).`
+                        : `Le lieu d'arrivée recherché (${destLocation.split(',')[0]}) n'est pas le terminus final du chauffeur (Terminus : ${parseLoc(ride.arrival_location).name.split(',')[0]}).`}
                   </Text>
                 </View>
               </View>
@@ -451,7 +484,7 @@ export default function RideDetailScreen() {
           onBooking={handleBooking}
           onRetryPayment={handleRetryPayment}
           onCancel={handleCancel}
-          onShowNegModal={() => {}} // NÉGOCIATION DÉSACTIVÉE
+          onShowNegModal={() => setShowNegModal(true)}
         />
       </PiedDePageTrajet>
 
@@ -459,13 +492,20 @@ export default function RideDetailScreen() {
       <BookingConfirmModal
         visible={showBookModal}
         ride={ride}
-        departure={ride?.departure_location}
-        destination={ride?.arrival_location}
+        departure={depLocation}
+        destination={destLocation}
         bookingLoading={bookingLoading}
-        pricePerSeat={bookingState?.price ?? ride?.price_per_seat}
+        pricePerSeat={
+          // Si segment intermédiaire : prix calculé par le backend pour ce tronçon
+          (dep_waypoint_order !== undefined && arr_waypoint_order !== undefined)
+            ? (bookingState?.price ?? ride?.price_per_seat)
+            // Si trajet complet : toujours le prix officiel enregistré en base après publication
+            : ride?.price_per_seat
+        }
+        pricingBreakdown={bookingState?.pricing_breakdown}
         onClose={() => setShowBookModal(false)}
-        onConfirm={async (seats, customPrice, msg) => {
-          const ok = await performBooking(seats, customPrice, msg);
+        onConfirm={async (seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra) => {
+          const ok = await performBooking(seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
           if (ok) { setShowBookModal(false); } // La redirection vers /payment est gérée dans performBooking
         }}
 
@@ -475,7 +515,6 @@ export default function RideDetailScreen() {
         driverName={ride.driver_details?.full_name || 'Inconnu'}
         onClose={() => { setShowSuccModal(false); fetchRide(); }}
       />
-      {/* NÉGOCIATION DÉSACTIVÉE — PassengerNegotiationModal commenté
       <PassengerNegotiationModal
         visible={showNegModal}
         myBooking={myBooking}
@@ -491,7 +530,6 @@ export default function RideDetailScreen() {
           if (myBooking) { const s = await handlePassengerReject(myBooking.id); if (s) setShowNegModal(false); }
         }}
       />
-      */}
     </SafeAreaView>
   );
 }

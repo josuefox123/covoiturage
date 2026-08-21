@@ -131,7 +131,11 @@ export class RideSessionManager {
     customPrice?: number,
     message?: string,
     searchedDeparture?: string,
-    searchedDestination?: string
+    searchedDestination?: string,
+    pickupLocationExtra?: string,
+    pickupSurcharge?: number,
+    dropoffLocationExtra?: string,
+    dropoffSurcharge?: number
   ): Promise<string | null> {
     if (!this.currentSession || !authFetch) return null;
 
@@ -168,7 +172,11 @@ export class RideSessionManager {
         customPrice,
         message,
         departureWaypointOrder: seg.departureWaypointOrder,
-        arrivalWaypointOrder: seg.arrivalWaypointOrder
+        arrivalWaypointOrder: seg.arrivalWaypointOrder,
+        pickupLocationExtra,
+        pickupSurcharge,
+        dropoffLocationExtra,
+        dropoffSurcharge
       });
 
       if (res && res.id) {
@@ -357,7 +365,7 @@ export class RideSessionManager {
     };
 
     // Negotiation breakdown
-    const pricePerSeat = ride?.driver_payout || 0;
+    const pricePerSeat = ride?.price_per_seat || 0;
     const hasNegotiation = Boolean(
       bookingState?.driver_counter_price ||
         bookingState?.passenger_proposed_price ||
@@ -417,7 +425,10 @@ export class RideSessionManager {
             departure_location: bookingState?.departure_location,
             arrival_location: bookingState?.arrival_location,
             seats_booked: bookingState?.seats_booked || 1,
-            pricing_breakdown: bookingState?.pricing_breakdown
+            pricing_breakdown: bookingState?.pricing_breakdown,
+            driver_counter_price: bookingState?.negotiation?.driver_counter_price,
+            passenger_proposed_price: bookingState?.negotiation?.passenger_proposed_price,
+            custom_price: bookingState?.negotiation?.custom_price
           } as any)
         : null,
       bookingStateRaw: bookingState,

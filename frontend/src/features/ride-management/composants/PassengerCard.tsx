@@ -75,7 +75,7 @@ export function PassengerCard({
             </View>
           )}
           <Text style={{ fontSize: 12, color: C.primary, fontWeight: '700' }}>
-            {((booking.amount_paid_online || 0)).toLocaleString()} FCFA
+            {((booking.driver_payout || 0)).toLocaleString()} FCFA
           </Text>
         </View>
       </View>

@@ -1,18 +1,5 @@
-/**
- * ==============================================================
- * Fichier :
- * RideSearchCard.tsx
- *
- * Description :
- * Composant ou logique de l'application Zemy.
- *
- * Projet :
- * Zemy
- * ==============================================================
- */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../theme';
 import { Ride } from '../../types/ride';
@@ -54,12 +41,6 @@ const formatFullDate = (dateString: string | undefined) => {
   }
 };
 
-/**
- * Composant RideSearchCard.
- *
- * Responsabilités :
- * - Affichage et gestion de l'état lié à RideSearchCard.
- */
 export default function RideSearchCard({
   ride,
   onPress,
@@ -101,12 +82,7 @@ export default function RideSearchCard({
   };
 
   const getDisplayPrice = () => {
-    const isSegment = searchedDeparture && searchedDestination && (ride.price_per_seat !== ride.original_price_per_seat);
-    if (isSegment) {
-      const comm = calcCommission(ride.price_per_seat);
-      return ride.price_per_seat + comm;
-    }
-    return ride.original_price_per_seat ?? ride.price_per_seat;
+    return ride.price_per_seat;
   };
 
   const price = getDisplayPrice().toLocaleString() || '0';
@@ -117,7 +93,6 @@ export default function RideSearchCard({
   // Déterminer si le départ recherché est un arrêt intermédiaire dans une autre ville
   let displayDeparture = ride.departure_location || 'Départ';
   let isIntermediatePickup = false;
-  /* Commenté pour afficher le trajet initial du conducteur au lieu de la recherche
   if (searchedDeparture) {
     const searchDepCity = extractCity(searchedDeparture);
     const rideDepCity = extractCity(ride.departure_location);
@@ -126,12 +101,10 @@ export default function RideSearchCard({
       isIntermediatePickup = true;
     }
   }
-  */
 
   // Déterminer si l'arrivée recherchée est un arrêt intermédiaire dans une autre ville
   let displayArrival = ride.arrival_location || 'Arrivée';
   let isIntermediateDropoff = false;
-  /* Commenté pour afficher le trajet initial du conducteur au lieu de la recherche
   if (searchedDestination) {
     const searchDestCity = extractCity(searchedDestination);
     const rideDestCity = extractCity(ride.arrival_location);
@@ -140,7 +113,6 @@ export default function RideSearchCard({
       isIntermediateDropoff = true;
     }
   }
-  */
 
   const isSegment = !!(ride.price_per_seat && ride.original_price_per_seat && ride.price_per_seat !== ride.original_price_per_seat);
   // Trajet intermédiaire : la ville recherchée diffère de la ville de départ/arrivée du conducteur
@@ -154,6 +126,15 @@ export default function RideSearchCard({
   const getDurationText = () => getDurationTextHelper(ride.duration_min);
   const arrivalTime = getArrivalTime();
   const durationText = getDurationText();
+  
+  const parseLoc = (locStr: string | undefined | null) => {
+    if (!locStr) return { name: '', note: '' };
+    const parts = locStr.split('|||');
+    return { name: parts[0], note: parts[1] || '' };
+  };
+
+  const parsedDep = parseLoc(displayDeparture);
+  const parsedArr = parseLoc(displayArrival);
 
   return (
     <Animated.View
@@ -170,30 +151,55 @@ export default function RideSearchCard({
           {/* Main Row : Timeline à gauche, Prix à droite */}
           <View style={styles.mainRow}>
             <View style={styles.routeContainer}>
-              {/* Colonne des heures et durées */}
-              <View style={styles.timeColumn}>
+              
+              {/* Departure Point Row */}
+              <View style={styles.routePointRow}>
                 <Text style={styles.timeText}>{departureTime}</Text>
-                {durationText ? <Text style={styles.durationText}>{durationText}</Text> : <View style={{ height: 20 }} />}
+                <View style={styles.indicatorContainer}>
+                  <View style={[styles.timelineDot, { borderColor: PRIMARY_COLOR }]} />
+                  <View style={[styles.timelineLine, { backgroundColor: PRIMARY_COLOR }]} />
+                </View>
+                <View style={styles.cityTextContainer}>
+                  <Text style={styles.cityText} numberOfLines={1}>
+                    {parsedDep.name}
+                  </Text>
+                  {parsedDep.note ? (
+                    <Text style={styles.noteText} numberOfLines={1}>
+                      {parsedDep.note}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* Middle Connection Row */}
+              <View style={styles.durationRow}>
+                <View style={styles.timePlaceholder} />
+                <View style={styles.indicatorContainer}>
+                  <View style={[styles.timelineLine, { backgroundColor: PRIMARY_COLOR, height: 16 }]} />
+                </View>
+                <View style={styles.durationTextContainer}>
+                  {durationText ? <Text style={styles.durationText}>{durationText}</Text> : null}
+                </View>
+              </View>
+
+              {/* Arrival Point Row */}
+              <View style={styles.routePointRow}>
                 <Text style={styles.timeText}>{arrivalTime}</Text>
+                <View style={styles.indicatorContainer}>
+                  <View style={[styles.timelineDot, { borderColor: '#10B981' }]} />
+                </View>
+                <View style={styles.cityTextContainer}>
+                  <Text style={styles.cityText} numberOfLines={1}>
+                    {parsedArr.name}
+                  </Text>
+                  {parsedArr.note ? (
+                    <Text style={styles.noteText} numberOfLines={1}>
+                      {parsedArr.note}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
 
-              {/* Colonne de la ligne de timeline */}
-              <View style={styles.timelineColumn}>
-                <View style={[styles.timelineDot, { borderColor: PRIMARY_COLOR }]} />
-                <View style={[styles.timelineLine, { backgroundColor: PRIMARY_COLOR }]} />
-                <View style={[styles.timelineDot, { borderColor: '#10B981' }]} />
-              </View>
-
-              {/* Colonne des villes */}
-              <View style={styles.cityColumn}>
-                <Text style={styles.cityText} numberOfLines={1}>
-                  {displayDeparture}
-                </Text>
-                <View style={{ height: 18 }} />
-                <Text style={styles.cityText} numberOfLines={1}>
-                  {displayArrival}
-                </Text>
-              </View>
             </View>
 
             {/* Zone de prix */}
@@ -221,8 +227,6 @@ export default function RideSearchCard({
               {formatFullDate(ride.departure_date)}
             </Text>
           </View>
-
-
 
           {/* Séparateur horizontal */}
           <View style={styles.divider} />
@@ -341,30 +345,22 @@ const styles = StyleSheet.create({
   },
   routeContainer: {
     flex: 1,
-    flexDirection: 'row',
   },
-  timeColumn: {
-    width: 48,
+  routePointRow: {
+    flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingVertical: 2,
   },
   timeText: {
-    fontSize: 15,
+    width: 48,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0F172A',
+    paddingTop: 1,
   },
-  durationText: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '500',
-    marginVertical: 4,
-  },
-  timelineColumn: {
-    width: 16,
+  indicatorContainer: {
+    width: 20,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
+    alignSelf: 'stretch',
   },
   timelineDot: {
     width: 8,
@@ -372,24 +368,46 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 2,
     backgroundColor: '#FFFFFF',
+    marginTop: 5,
   },
   timelineLine: {
     width: 2,
     flex: 1,
-    marginVertical: 2,
     borderRadius: 1,
   },
-  cityColumn: {
+  cityTextContainer: {
     flex: 1,
-    paddingLeft: 10,
-    justifyContent: 'space-between',
-    paddingVertical: 1,
+    paddingLeft: 8,
+    paddingBottom: 4,
   },
   cityText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#0F172A',
     lineHeight: 18,
+  },
+  noteText: {
+    fontSize: 11,
+    color: PRIMARY_COLOR,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 18,
+  },
+  timePlaceholder: {
+    width: 48,
+  },
+  durationTextContainer: {
+    flex: 1,
+    paddingLeft: 8,
+  },
+  durationText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '500',
   },
   priceContainer: {
     alignItems: 'flex-end',

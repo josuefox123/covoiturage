@@ -91,7 +91,7 @@ export function HeroCard({ ride }: HeroCardProps) {
           <View style={styles.heroMetaDivider} />
           <View style={styles.heroMetaItem}>
             <Ionicons name="wallet-outline" size={15} color="rgba(255,255,255,0.8)" />
-            <Text style={styles.heroMetaTxt}>{ride.price_per_seat?.toLocaleString()} F</Text>
+            <Text style={styles.heroMetaTxt}>{(ride.driver_payout || 0).toLocaleString()} F</Text>
           </View>
         </View>
       </LinearGradient>

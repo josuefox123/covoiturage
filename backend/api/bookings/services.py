@@ -10,7 +10,9 @@ class BookingService:
                        departure_latitude=None, departure_longitude=None,
                        arrival_latitude=None, arrival_longitude=None,
                        passenger_proposed_price=None, negotiation_message=None,
-                       departure_waypoint_order=None, arrival_waypoint_order=None):
+                       departure_waypoint_order=None, arrival_waypoint_order=None,
+                       pickup_location_extra=None, pickup_surcharge=0,
+                       dropoff_location_extra=None, dropoff_surcharge=0):
         """
         Crée une réservation sécurisée à l'état initial 'pending'.
         Aucune place n'est décrémentée à ce stade.
@@ -173,9 +175,7 @@ class BookingService:
             if not resolved_arrival_location:
                 resolved_arrival_location = ride.arrival_location
 
-            initial_status = 'pending_payment'
-            if passenger_proposed_price is not None or negotiation_message:
-                initial_status = 'pending'
+            initial_status = 'pending'
 
             # Créer la réservation à l'état initial
             booking = Booking.objects.create(
@@ -193,7 +193,11 @@ class BookingService:
                 departure_waypoint_order=dep_order,
                 arrival_waypoint_order=arr_order,
                 passenger_proposed_price=passenger_proposed_price,
-                negotiation_message=negotiation_message
+                negotiation_message=negotiation_message,
+                pickup_location_extra=pickup_location_extra,
+                pickup_surcharge=pickup_surcharge or 0,
+                dropoff_location_extra=dropoff_location_extra,
+                dropoff_surcharge=dropoff_surcharge or 0
             )
             
             # Planifier la tâche d'expiration automatique avec délai intelligent

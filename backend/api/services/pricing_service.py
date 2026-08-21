@@ -72,35 +72,54 @@ class PricingService:
 
     @staticmethod
     def compute_for_booking(booking) -> 'PricingResult':
-        # Si pas de prix négocié, on utilise directement les valeurs enregistrées sur le trajet
+        # 1. Calculer le tarif de base (sans les surcharges d'option)
         if not booking.custom_price and not booking.driver_counter_price and not booking.passenger_proposed_price:
             ride = booking.ride
             seats = booking.seats_booked
             if booking.departure_waypoint_order is not None and booking.arrival_waypoint_order is not None:
-                return PricingService.compute_for_segment(
+                base_result = PricingService.compute_for_segment(
                     ride,
                     booking.departure_waypoint_order,
                     booking.arrival_waypoint_order,
                     seats
                 )
+            else:
+                base_result = PricingResult(
+                    driver_price=ride.driver_payout,
+                    commission=ride.zemy_commission,
+                    total_to_pay=ride.price_per_seat * seats,
+                    driver_amount=ride.driver_payout * seats,
+                    zemy_amount=ride.zemy_commission * seats,
+                    seats=seats,
+                    segment_distance_m=0,
+                    segment_distance_km=0.0
+                )
+        else:
+            driver_price = (
+                booking.custom_price
+                or booking.driver_counter_price
+                or booking.passenger_proposed_price
+            )
+            base_result = PricingService.compute(driver_price=int(driver_price), seats=booking.seats_booked)
+
+        # 2. Ajouter les surcharges d'options (sans frais Zemy)
+        pickup_surcharge = getattr(booking, 'pickup_surcharge', 0) or 0
+        dropoff_surcharge = getattr(booking, 'dropoff_surcharge', 0) or 0
+        total_surcharge = pickup_surcharge + dropoff_surcharge
+
+        if total_surcharge > 0:
             return PricingResult(
-                driver_price=ride.driver_payout,
-                commission=ride.zemy_commission,
-                total_to_pay=ride.price_per_seat * seats,
-                driver_amount=ride.driver_payout * seats,
-                zemy_amount=ride.zemy_commission * seats,
-                seats=seats,
-                segment_distance_m=0,
-                segment_distance_km=0.0
+                driver_price=base_result.driver_price,
+                commission=base_result.commission,
+                total_to_pay=base_result.total_to_pay + total_surcharge,
+                driver_amount=base_result.driver_amount + total_surcharge,
+                zemy_amount=base_result.zemy_amount,
+                seats=base_result.seats,
+                segment_distance_m=base_result.segment_distance_m,
+                segment_distance_km=base_result.segment_distance_km
             )
 
-        # Si prix négocié, on considère que le prix proposé est le gain conducteur et on rajoute la commission
-        driver_price = (
-            booking.custom_price
-            or booking.driver_counter_price
-            or booking.passenger_proposed_price
-        )
-        return PricingService.compute(driver_price=int(driver_price), seats=booking.seats_booked)
+        return base_result
 
     @staticmethod
     def compute_for_segment(ride, dep_waypoint_order: int, arr_waypoint_order: int, seats: int = 1) -> 'PricingResult':

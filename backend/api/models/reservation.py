@@ -58,6 +58,10 @@ class Booking(models.Model):
     passenger_proposed_price = models.IntegerField(blank=True, null=True, verbose_name="Prix proposé par le passager")
     driver_counter_price = models.IntegerField(blank=True, null=True, verbose_name="Contre-proposition du chauffeur")
     negotiation_message = models.TextField(blank=True, null=True, verbose_name="Message de négociation")
+    pickup_location_extra = models.CharField(max_length=255, blank=True, null=True, verbose_name="Lieu de depart personnalise")
+    pickup_surcharge = models.IntegerField(default=0, verbose_name="Surcout depart personnalise")
+    dropoff_location_extra = models.CharField(max_length=255, blank=True, null=True, verbose_name="Lieu d'arrivee personnalise")
+    dropoff_surcharge = models.IntegerField(default=0, verbose_name="Surcout arrivee personnalise")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

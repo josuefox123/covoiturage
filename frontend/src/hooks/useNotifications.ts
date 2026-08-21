@@ -308,6 +308,7 @@ export function useNotifications() {
             lastSeenNotifId.current = latest.id;
           } else if (latest.id !== lastSeenNotifId.current && !latest.is_read) {
             lastSeenNotifId.current = latest.id;
+            DeviceEventEmitter.emit('refreshBadges');
             
             let dataObj: any = {};
             if (latest.data) {

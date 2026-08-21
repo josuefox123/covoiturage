@@ -62,6 +62,11 @@ export default function SearchResultsScreen() {
     departure_longitude?: string;
     arrival_latitude?: string;
     arrival_longitude?: string;
+    nearby?: string;
+    search_mode?: string;
+    latitude?: string;
+    longitude?: string;
+    radius?: string;
   }>();
 
   const departure   = raw.departure   || '';
@@ -73,6 +78,9 @@ export default function SearchResultsScreen() {
   const departure_longitude = raw.departure_longitude || '';
   const arrival_latitude    = raw.arrival_latitude    || '';
   const arrival_longitude   = raw.arrival_longitude   || '';
+
+  const isNearbySearch = raw.nearby === 'true' || raw.search_mode === 'nearby';
+  const [radius, setRadius] = useState<number>(parseInt(raw.radius || '20', 10));
 
   const [rides,      setRides]      = useState<Ride[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
@@ -92,16 +100,27 @@ export default function SearchResultsScreen() {
     try {
       setError(null);
       const qp: string[] = [];
-      if (departure)   qp.push(`departure=${encodeURIComponent(departure)}`);
-      if (destination) qp.push(`destination=${encodeURIComponent(destination)}`);
-      if (vehicleType && vehicleType !== 'covoiturage') qp.push(`vehicle_type=${encodeURIComponent(vehicleType)}`);
-      if (date)        qp.push(`date=${date}`);
-      if (passengers > 1) qp.push(`seats=${passengers}`);
       
-      if (departure_latitude)  qp.push(`departure_latitude=${departure_latitude}`);
-      if (departure_longitude) qp.push(`departure_longitude=${departure_longitude}`);
-      if (arrival_latitude)    qp.push(`arrival_latitude=${arrival_latitude}`);
-      if (arrival_longitude)   qp.push(`arrival_longitude=${arrival_longitude}`);
+      if (isNearbySearch) {
+        qp.push(`search_mode=nearby`);
+        if (raw.latitude) qp.push(`latitude=${raw.latitude}`);
+        if (raw.longitude) qp.push(`longitude=${raw.longitude}`);
+        qp.push(`radius=${radius}`);
+        if (vehicleType && vehicleType !== 'covoiturage') qp.push(`vehicle_type=${encodeURIComponent(vehicleType)}`);
+        if (date)        qp.push(`date=${date}`);
+        if (passengers > 1) qp.push(`seats=${passengers}`);
+      } else {
+        if (departure)   qp.push(`departure=${encodeURIComponent(departure)}`);
+        if (destination) qp.push(`destination=${encodeURIComponent(destination)}`);
+        if (vehicleType && vehicleType !== 'covoiturage') qp.push(`vehicle_type=${encodeURIComponent(vehicleType)}`);
+        if (date)        qp.push(`date=${date}`);
+        if (passengers > 1) qp.push(`seats=${passengers}`);
+        
+        if (departure_latitude)  qp.push(`departure_latitude=${departure_latitude}`);
+        if (departure_longitude) qp.push(`departure_longitude=${departure_longitude}`);
+        if (arrival_latitude)    qp.push(`arrival_latitude=${arrival_latitude}`);
+        if (arrival_longitude)   qp.push(`arrival_longitude=${arrival_longitude}`);
+      }
 
       const qs   = qp.length ? `?${qp.join('&')}` : '';
       const data = await authFetch(`/rides/${qs}`);
@@ -147,6 +166,7 @@ export default function SearchResultsScreen() {
       setRefreshing(false);
     }
   }, [
+    isNearbySearch, raw.latitude, raw.longitude, radius,
     departure, destination, vehicleType, date, passengers, authFetch,
     departure_latitude, departure_longitude, arrival_latitude, arrival_longitude
   ]);
@@ -227,11 +247,17 @@ export default function SearchResultsScreen() {
 
         <View style={styles.headerMid}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {departure && destination
+            {isNearbySearch
+              ? 'Trajets autour de moi'
+              : departure && destination
               ? `${departure} → ${destination}`
               : departure || destination || 'Tous les trajets'}
           </Text>
-          <Text style={styles.headerSub} numberOfLines={1}>{headerSub}</Text>
+          <Text style={styles.headerSub} numberOfLines={1}>
+            {isNearbySearch
+              ? `Rayon : ${radius} km · ${headerSub}`
+              : headerSub}
+          </Text>
         </View>
 
         <TouchableOpacity
@@ -288,6 +314,47 @@ export default function SearchResultsScreen() {
           })}
         </ScrollView>
       </View>
+ 
+      {/* ── Sélecteur de rayon pour recherche de proximité ── */}
+      {isNearbySearch && (
+        <View style={styles.radiusCard}>
+          <View style={styles.radiusHeader}>
+            <View>
+              <Text style={styles.radiusTitle}>Autour de moi</Text>
+              <Text style={styles.radiusSubtitle}>Élargissez votre zone de recherche</Text>
+            </View>
+            <View style={styles.locationBadge}>
+              <Ionicons name="navigate" size={14} color="#0066FF" />
+              <Text style={styles.locationBadgeText}>GPS</Text>
+            </View>
+          </View>
+          <View style={styles.radiusOptions}>
+            {[5, 10, 20, 30, 50].map((value) => {
+              const active = radius === value;
+              return (
+                <TouchableOpacity
+                  key={value}
+                  style={[
+                    styles.radiusOption,
+                    active && styles.radiusOptionActive,
+                  ]}
+                  onPress={() => setRadius(value)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.radiusOptionText,
+                      active && styles.radiusOptionTextActive,
+                    ]}
+                  >
+                    {value} km
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       {/* ── Body ── */}
       {loading ? (
@@ -543,6 +610,69 @@ const styles = StyleSheet.create({
   modalDriver: { fontSize: 12, color: '#6B7280', marginBottom: 12 },
   modalBookBtn: { backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   modalBookBtnTxt: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  modalEscaleInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 14, paddingHorizontal: 16 },
-  modalEscaleText: { fontSize: 13, color: '#0284C7' }
+  modalEscaleText: { fontSize: 13, color: '#0284C7' },
+  modalEscaleInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#F0F9FF', borderRadius: 12, marginVertical: 12 },
+  radiusCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  radiusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  radiusTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  radiusSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  locationBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0066FF',
+  },
+  radiusOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  radiusOption: {
+    flex: 1,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  radiusOptionActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+  },
+  radiusOptionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  radiusOptionTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  }
 });

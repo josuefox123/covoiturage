@@ -16,6 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Ride } from '../../../../src/types';
 import { theme } from '../../../../src/styles/theme';
 
+interface PricingBreakdown {
+  driver_price?: number;
+  commission?: number;
+  total_to_pay?: number;
+}
+
 interface BookingConfirmModalProps {
   visible: boolean;
   ride: Ride;
@@ -23,11 +29,16 @@ interface BookingConfirmModalProps {
   destination?: string;
   bookingLoading: boolean;
   pricePerSeat?: number;
+  pricingBreakdown?: PricingBreakdown;
   onClose: () => void;
   onConfirm: (
     seats: number,
     customPrice?: number,
-    message?: string
+    message?: string,
+    pickupLocation?: string,
+    pickupSurcharge?: number,
+    dropoffLocation?: string,
+    dropoffSurcharge?: number
   ) => void;
 }
 
@@ -38,22 +49,69 @@ export function BookingConfirmModal({
   destination,
   bookingLoading,
   pricePerSeat,
+  pricingBreakdown,
   onClose,
   onConfirm,
 }: BookingConfirmModalProps) {
   const [seatsToBook, setSeatsToBook] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  const [proposeCustomPrice, setProposeCustomPrice] = useState(false);
-  const [proposedPriceText, setProposedPriceText] = useState('');
+  // Option lieu de départ personnalisé
+  const [customPickupEnabled, setCustomPickupEnabled] = useState(false);
+  const [customPickupText, setCustomPickupText] = useState('');
+  const [customPickupSurcharge, setCustomPickupSurcharge] = useState('');
+
+  // Option lieu d'arrivée personnalisé
+  const [customDropoffEnabled, setCustomDropoffEnabled] = useState(false);
+  const [customDropoffText, setCustomDropoffText] = useState('');
+  const [customDropoffSurcharge, setCustomDropoffSurcharge] = useState('');
+
   const [passengerMessageText, setPassengerMessageText] = useState('');
 
   const displayPrice = pricePerSeat ?? ride?.price_per_seat ?? 0;
   const availableSeats = Math.max(0, ride?.seats_available ?? 0);
 
+  const { driverPayoutPerSeat, zemyFeePerSeat } = useMemo(() => {
+    // Si on a le pricingBreakdown du segment/réservation résolu par le backend
+    if (pricingBreakdown) {
+      return {
+        driverPayoutPerSeat: pricingBreakdown.driver_price ?? 0,
+        zemyFeePerSeat: pricingBreakdown.commission ?? 0,
+      };
+    }
+
+    const rawDriverPayout = (ride as any)?.driver_payout ?? 0;
+
+    // Si on connaît le gain conducteur (driver_payout), la commission est la différence
+    // car price_per_seat = driver_payout + zemy_commission (invariant backend)
+    if (rawDriverPayout > 0 && displayPrice > 0) {
+      const fee = Math.max(0, displayPrice - rawDriverPayout);
+      return {
+        driverPayoutPerSeat: rawDriverPayout,
+        zemyFeePerSeat: fee,
+      };
+    }
+
+    // Fallback : estimation à ~10% si driver_payout non disponible
+    const pct = 10;
+    const fee = Math.round(displayPrice * (pct / (100 + pct)));
+    return {
+      driverPayoutPerSeat: displayPrice - fee,
+      zemyFeePerSeat: fee,
+    };
+  }, [pricingBreakdown, ride, displayPrice]);
+
+  // Surcoût lieu de départ/arrivée (sans frais Zemy)
+  const pickupSurchargeAmount = customPickupEnabled && customPickupSurcharge
+    ? Math.max(0, parseInt(customPickupSurcharge.replace(/\D/g, ''), 10) || 0)
+    : 0;
+  const dropoffSurchargeAmount = customDropoffEnabled && customDropoffSurcharge
+    ? Math.max(0, parseInt(customDropoffSurcharge.replace(/\D/g, ''), 10) || 0)
+    : 0;
+
   const totalToPay = useMemo(
-    () => displayPrice * seatsToBook,
-    [displayPrice, seatsToBook]
+    () => (displayPrice * seatsToBook) + pickupSurchargeAmount + dropoffSurchargeAmount,
+    [displayPrice, seatsToBook, pickupSurchargeAmount, dropoffSurchargeAmount]
   );
 
   const departureText = departure || ride?.departure_location || 'Départ';
@@ -63,8 +121,12 @@ export function BookingConfirmModal({
     if (!visible) {
       setSubmitting(false);
       setSeatsToBook(1);
-      setProposeCustomPrice(false);
-      setProposedPriceText('');
+      setCustomPickupEnabled(false);
+      setCustomPickupText('');
+      setCustomPickupSurcharge('');
+      setCustomDropoffEnabled(false);
+      setCustomDropoffText('');
+      setCustomDropoffSurcharge('');
       setPassengerMessageText('');
     }
   }, [visible]);
@@ -90,20 +152,25 @@ export function BookingConfirmModal({
     if (submitting || bookingLoading) return;
     if (availableSeats <= 0) return;
 
-    const customPrice =
-      proposeCustomPrice && proposedPriceText.trim()
-        ? parseInt(proposedPriceText.replace(/\D/g, ''), 10)
-        : undefined;
-
-    if (proposeCustomPrice && (!customPrice || customPrice <= 0)) {
-      return;
-    }
+    // Construire les extras de localisation
+    const pickupLoc = customPickupEnabled && customPickupText.trim()
+      ? customPickupText.trim()
+      : undefined;
+    const pickupExtra = customPickupEnabled && pickupSurchargeAmount > 0
+      ? pickupSurchargeAmount
+      : undefined;
+    const dropoffLoc = customDropoffEnabled && customDropoffText.trim()
+      ? customDropoffText.trim()
+      : undefined;
+    const dropoffExtra = customDropoffEnabled && dropoffSurchargeAmount > 0
+      ? dropoffSurchargeAmount
+      : undefined;
 
     const message = passengerMessageText.trim() || undefined;
 
     setSubmitting(true);
     try {
-      await onConfirm(seatsToBook, customPrice, message);
+      await onConfirm(seatsToBook, undefined, message, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
     } catch (error) {
       setSubmitting(false);
     }
@@ -337,21 +404,21 @@ export function BookingConfirmModal({
                 <View style={styles.priceRows}>
                   <View style={styles.priceRow}>
                     <Text style={styles.priceLabel}>
-                      Prix par place
+                      Prix du trajet ({seatsToBook} place{seatsToBook > 1 ? 's' : ''})
                     </Text>
 
                     <Text style={styles.priceValue}>
-                      {displayPrice.toLocaleString()} FCFA
+                      {(driverPayoutPerSeat * seatsToBook).toLocaleString()} FCFA
                     </Text>
                   </View>
 
                   <View style={styles.priceRow}>
                     <Text style={styles.priceLabel}>
-                      Places
+                      Frais de service Zemy
                     </Text>
 
                     <Text style={styles.priceValue}>
-                      × {seatsToBook}
+                      {(zemyFeePerSeat * seatsToBook).toLocaleString()} FCFA
                     </Text>
                   </View>
                 </View>
@@ -365,7 +432,8 @@ export function BookingConfirmModal({
                     </Text>
 
                     <Text style={styles.totalHint}>
-                      Frais de service inclus
+                      Frais Zemy inclus
+                      {(pickupSurchargeAmount > 0 || dropoffSurchargeAmount > 0) && ' · Surcoûts inclus'}
                     </Text>
                   </View>
 
@@ -375,169 +443,186 @@ export function BookingConfirmModal({
                 </View>
               </View>
 
-              {/* NEGOCIATION */}
+              {/* OPTIONS DE LOCALISATION */}
               <View style={styles.section}>
                 <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionLabel}>
-                    PROPOSITION DE PRIX
-                  </Text>
-
+                  <Text style={styles.sectionLabel}>OPTIONS DE TRAJET</Text>
                   <View style={styles.optionalBadge}>
-                    <Text style={styles.optionalText}>
-                      OPTIONNEL
-                    </Text>
+                    <Text style={styles.optionalText}>OPTIONNEL</Text>
                   </View>
                 </View>
-
                 <Text style={styles.helperText}>
-                  Vous pouvez proposer un autre montant au
-                  chauffeur.
+                  Demandez à être pris ou déposé à un endroit précis.
+                  Le surcoût s'ajoute au prix sans frais Zemy.
                 </Text>
 
-                <View style={styles.choiceContainer}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      setProposeCustomPrice(false);
-                      setProposedPriceText('');
-                    }}
-                    style={[
-                      styles.choiceButton,
-                      !proposeCustomPrice &&
-                        styles.choiceButtonActive,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radio,
-                        !proposeCustomPrice &&
-                          styles.radioActive,
-                      ]}
-                    >
-                      {!proposeCustomPrice && (
-                        <View style={styles.radioDot} />
-                      )}
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.choiceText,
-                        !proposeCustomPrice &&
-                          styles.choiceTextActive,
-                      ]}
-                    >
-                      Prix affiché
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() =>
-                      setProposeCustomPrice(true)
+                {/* OPTION 1: Lieu de départ personnalisé */}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setCustomPickupEnabled(prev => !prev);
+                    if (customPickupEnabled) {
+                      setCustomPickupText('');
+                      setCustomPickupSurcharge('');
                     }
-                    style={[
-                      styles.choiceButton,
-                      proposeCustomPrice &&
-                        styles.choiceButtonActive,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.radio,
-                        proposeCustomPrice &&
-                          styles.radioActive,
-                      ]}
-                    >
-                      {proposeCustomPrice && (
-                        <View style={styles.radioDot} />
-                      )}
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.choiceText,
-                        proposeCustomPrice &&
-                          styles.choiceTextActive,
-                      ]}
-                    >
-                      Proposer un prix
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {proposeCustomPrice && (
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.inputLabel}>
-                      Votre proposition par place
-                    </Text>
-
-                    <View style={styles.inputContainer}>
+                  }}
+                  style={[
+                    styles.locationOptionCard,
+                    customPickupEnabled && styles.locationOptionCardActive,
+                  ]}
+                >
+                  <View style={styles.locationOptionHeader}>
+                    <View style={[styles.locationOptionIcon, customPickupEnabled && styles.locationOptionIconActive]}>
                       <Ionicons
-                        name="cash-outline"
-                        size={20}
-                        color={theme.colors.textLight}
+                        name="location"
+                        size={17}
+                        color={customPickupEnabled ? theme.colors.white : theme.colors.primary}
                       />
-
-                      <TextInput
-                        style={styles.priceInput}
-                        keyboardType="numeric"
-                        placeholder="Ex. 1 500"
-                        placeholderTextColor={theme.colors.textMuted}
-                        value={proposedPriceText}
-                        onChangeText={(text) =>
-                          setProposedPriceText(
-                            text.replace(/\D/g, '')
-                          )
-                        }
-                      />
-
-                      <Text style={styles.currency}>
-                        FCFA
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.locationOptionTitle, customPickupEnabled && styles.locationOptionTitleActive]}>
+                        Point de départ personnalisé
+                      </Text>
+                      <Text style={styles.locationOptionSubtitle}>
+                        Indiquer un lieu de prise en charge précis
                       </Text>
                     </View>
+                    <View style={[styles.locationToggle, customPickupEnabled && styles.locationToggleActive]}>
+                      <Ionicons
+                        name={customPickupEnabled ? 'checkmark' : 'add'}
+                        size={15}
+                        color={customPickupEnabled ? theme.colors.white : theme.colors.primary}
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {customPickupEnabled && (
+                  <View style={styles.locationInputsBlock}>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.inputLabel}>Adresse ou lieu de prise en charge</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="navigate-outline" size={18} color={theme.colors.textLight} />
+                        <TextInput
+                          style={styles.priceInput}
+                          placeholder="Ex. Marché Dantokpa, Bâtiment Bleu..."
+                          placeholderTextColor={theme.colors.textMuted}
+                          value={customPickupText}
+                          onChangeText={setCustomPickupText}
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.inputLabel}>Surcoût à ajouter (FCFA)</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="add-circle-outline" size={18} color={theme.colors.textLight} />
+                        <TextInput
+                          style={styles.priceInput}
+                          keyboardType="numeric"
+                          placeholder="Ex. 500"
+                          placeholderTextColor={theme.colors.textMuted}
+                          value={customPickupSurcharge}
+                          onChangeText={t => setCustomPickupSurcharge(t.replace(/\D/g, ''))}
+                        />
+                        <Text style={styles.currency}>FCFA</Text>
+                      </View>
+                    </View>
+                    {pickupSurchargeAmount > 0 && (
+                      <View style={styles.surchargePreview}>
+                        <Ionicons name="information-circle-outline" size={14} color={theme.colors.primary} />
+                        <Text style={styles.surchargePreviewText}>
+                          +{pickupSurchargeAmount.toLocaleString()} FCFA ajoutés sans frais Zemy
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* OPTION 2: Lieu d'arrivée personnalisé */}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setCustomDropoffEnabled(prev => !prev);
+                    if (customDropoffEnabled) {
+                      setCustomDropoffText('');
+                      setCustomDropoffSurcharge('');
+                    }
+                  }}
+                  style={[
+                    styles.locationOptionCard,
+                    customDropoffEnabled && styles.locationOptionCardActive,
+                    { marginTop: 10 },
+                  ]}
+                >
+                  <View style={styles.locationOptionHeader}>
+                    <View style={[styles.locationOptionIcon, customDropoffEnabled && styles.locationOptionIconActive, { backgroundColor: customDropoffEnabled ? '#7C3AED' : '#EDE9FE' }]}>
+                      <Ionicons
+                        name="flag"
+                        size={17}
+                        color={customDropoffEnabled ? theme.colors.white : '#7C3AED'}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.locationOptionTitle, customDropoffEnabled && styles.locationOptionTitleActive]}>
+                        Point d'arrivée personnalisé
+                      </Text>
+                      <Text style={styles.locationOptionSubtitle}>
+                        Indiquer un lieu de dépose précis
+                      </Text>
+                    </View>
+                    <View style={[styles.locationToggle, customDropoffEnabled && styles.locationToggleActive, customDropoffEnabled && { backgroundColor: '#7C3AED' }]}>
+                      <Ionicons
+                        name={customDropoffEnabled ? 'checkmark' : 'add'}
+                        size={15}
+                        color={customDropoffEnabled ? theme.colors.white : '#7C3AED'}
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {customDropoffEnabled && (
+                  <View style={styles.locationInputsBlock}>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.inputLabel}>Adresse ou lieu de dépose</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="flag-outline" size={18} color={theme.colors.textLight} />
+                        <TextInput
+                          style={styles.priceInput}
+                          placeholder="Ex. Université d'Abomey-Calavi, Portail 2..."
+                          placeholderTextColor={theme.colors.textMuted}
+                          value={customDropoffText}
+                          onChangeText={setCustomDropoffText}
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.inputLabel}>Surcoût à ajouter (FCFA)</Text>
+                      <View style={styles.inputContainer}>
+                        <Ionicons name="add-circle-outline" size={18} color={theme.colors.textLight} />
+                        <TextInput
+                          style={styles.priceInput}
+                          keyboardType="numeric"
+                          placeholder="Ex. 500"
+                          placeholderTextColor={theme.colors.textMuted}
+                          value={customDropoffSurcharge}
+                          onChangeText={t => setCustomDropoffSurcharge(t.replace(/\D/g, ''))}
+                        />
+                        <Text style={styles.currency}>FCFA</Text>
+                      </View>
+                    </View>
+                    {dropoffSurchargeAmount > 0 && (
+                      <View style={styles.surchargePreview}>
+                        <Ionicons name="information-circle-outline" size={14} color="#7C3AED" />
+                        <Text style={[styles.surchargePreviewText, { color: '#7C3AED' }]}>
+                          +{dropoffSurchargeAmount.toLocaleString()} FCFA ajoutés sans frais Zemy
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
 
-              {/* MESSAGE */}
-              <View style={styles.section}>
-                <View style={styles.sectionTitleRow}>
-                  <Text style={styles.sectionLabel}>
-                    MESSAGE AU CHAUFFEUR
-                  </Text>
 
-                  <View style={styles.optionalBadge}>
-                    <Text style={styles.optionalText}>
-                      OPTIONNEL
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.messageContainer}>
-                  <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={19}
-                    color={theme.colors.textLight}
-                    style={styles.messageIcon}
-                  />
-
-                  <TextInput
-                    style={styles.messageInput}
-                    placeholder="Ex. Je serai à l'heure au point de départ..."
-                    placeholderTextColor={theme.colors.textMuted}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                    value={passengerMessageText}
-                    onChangeText={setPassengerMessageText}
-                    maxLength={300}
-                  />
-                </View>
-
-                <Text style={styles.characterCount}>
-                  {passengerMessageText.length}/300
-                </Text>
-              </View>
 
               {/* SECURITE */}
               <View style={styles.securityNotice}>
@@ -1062,6 +1147,96 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: theme.colors.textLight,
+  },
+
+  // Styles pour les cartes d'options de localisation
+  locationOptionCard: {
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.white,
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 6,
+  },
+
+  locationOptionCardActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primaryLight,
+  },
+
+  locationOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  locationOptionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: theme.colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  locationOptionIconActive: {
+    backgroundColor: theme.colors.primary,
+  },
+
+  locationOptionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginBottom: 2,
+  },
+
+  locationOptionTitleActive: {
+    color: theme.colors.primary,
+  },
+
+  locationOptionSubtitle: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+
+  locationToggle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  locationToggleActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+
+  locationInputsBlock: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+
+  surchargePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.primaryLight,
+    borderRadius: 10,
+  },
+
+  surchargePreviewText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    flex: 1,
   },
 
   messageContainer: {

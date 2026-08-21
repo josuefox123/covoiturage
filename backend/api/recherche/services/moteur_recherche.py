@@ -16,7 +16,9 @@ class SearchService:
         seats_requested: int = 1,
         departure_place_id: Optional[str] = None,
         arrival_place_id: Optional[str] = None,
-        time_filter: Optional[str] = None
+        time_filter: Optional[str] = None,
+        search_mode: Optional[str] = None,
+        radius: Optional[float] = None
     ) -> Dict[str, List[Any]]:
         """
         Recherche de trajets directe ou avec correspondances le long des corridors géographiques.
@@ -31,5 +33,7 @@ class SearchService:
             seats_requested=seats_requested,
             departure_place_id=departure_place_id,
             arrival_place_id=arrival_place_id,
-            time_filter=time_filter
+            time_filter=time_filter,
+            search_mode=search_mode,
+            radius=radius
         )

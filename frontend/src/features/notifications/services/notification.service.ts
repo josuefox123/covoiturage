@@ -31,12 +31,12 @@ export const notificationService = {
   },
 
   markAsRead: async (authFetch: any, id: number): Promise<void> => {
-    await authFetch(`/notifications/${id}/read/`, { method: 'POST' });
+    await authFetch(`/notifications/${id}/read/`, { method: 'POST', body: JSON.stringify({}) });
   },
 
   markAllAsRead: async (authFetch: any): Promise<void> => {
     // Si l'endpoint existe sur le backend, sinon on pourrait mapper
-    await authFetch('/notifications/read-all/', { method: 'POST' });
+    await authFetch('/notifications/mark-read/', { method: 'POST', body: JSON.stringify({}) });
   },
 
   deleteNotification: async (authFetch: any, id: number): Promise<void> => {

@@ -7,6 +7,7 @@ export interface LocationData {
   country?: string;
   distanceText?: string;
   distKm?: number;
+  note?: string;
 }
 
 export interface LocationPickerProps {

@@ -76,6 +76,15 @@ export function PassengerNegotiationModal({
                 </Text>
               </View>
 
+              {Boolean(myBooking?.pricing_breakdown?.zemy_amount) && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, color: '#6B7280' }}>Frais Zemy :</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#1F2937' }}>
+                    +{myBooking?.pricing_breakdown?.zemy_amount?.toLocaleString()} FCFA
+                  </Text>
+                </View>
+              )}
+
               <View style={{ height: 1, backgroundColor: '#FDE68A', marginVertical: 4 }} />
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

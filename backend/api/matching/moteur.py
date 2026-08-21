@@ -15,6 +15,15 @@ from .connections import ConnectionMatcher
 
 logger = logging.getLogger(__name__)
 
+def haversine_distance(lat1, lon1, lat2, lon2):
+    from math import radians, sin, cos, sqrt, atan2
+    R = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+
 class MatchingEngine:
     """Moteur de recherche et de matching de trajets intelligent."""
 
@@ -31,7 +40,9 @@ class MatchingEngine:
         seats_requested: int = 1,
         departure_place_id: Optional[str] = None,
         arrival_place_id: Optional[str] = None,
-        time_filter: Optional[str] = None
+        time_filter: Optional[str] = None,
+        search_mode: Optional[str] = None,
+        radius: Optional[float] = None
     ) -> Dict[str, List[Any]]:
         """
         Recherche de trajets directe ou avec correspondances le long des corridors géographiques.
@@ -51,6 +62,10 @@ class MatchingEngine:
             cache_key += f"_{arrival_place_id}"
         if time_filter:
             cache_key += f"_{time_filter}"
+        if search_mode:
+            cache_key += f"_{search_mode}"
+        if radius:
+            cache_key += f"_{radius}"
 
         cached_res = cache.get(cache_key)
         if cached_res:
@@ -94,6 +109,22 @@ class MatchingEngine:
             except Exception:
                 pass
 
+        # Filtrage géographique initial pour la recherche autour de moi
+        if search_mode == 'nearby' and departure_lat is not None and departure_lon is not None:
+            if radius is None:
+                radius = 20.0
+            nearby_candidates = []
+            for ride in candidate_rides:
+                if ride.departure_latitude is not None and ride.departure_longitude is not None:
+                    dist = haversine_distance(
+                        departure_lat, departure_lon,
+                        float(ride.departure_latitude), float(ride.departure_longitude)
+                    )
+                    if dist <= radius:
+                        ride.nearby_distance_km = round(dist, 1)
+                        nearby_candidates.append(ride)
+            candidate_rides = nearby_candidates
+
         direct_matches = []
         for ride in candidate_rides:
             result = cls.match_ride(
@@ -101,15 +132,21 @@ class MatchingEngine:
                 seats_requested
             )
             if result:
+                # Si on a calculé la distance, on la transmet au dictionnaire de résultats
+                if hasattr(ride, 'nearby_distance_km'):
+                    result['walk_distance_origin_km'] = ride.nearby_distance_km
                 direct_matches.append(result)
 
         # Tri et classement par pertinence
         direct_matches = SearchRanker.rank_matches(direct_matches)
 
-        # Récupération des correspondances (trajets intermédiaires)
-        connection_matches = ConnectionMatcher.find_connection_matches(
-            departure_lat, departure_lon, arrival_lat, arrival_lon, target_date, seats_requested
-        )
+        # Pas de correspondances intermédiaires pour la recherche de proximité
+        if search_mode == 'nearby':
+            connection_matches = []
+        else:
+            connection_matches = ConnectionMatcher.find_connection_matches(
+                departure_lat, departure_lon, arrival_lat, arrival_lon, target_date, seats_requested
+            )
 
         results = {
             'directs': direct_matches,

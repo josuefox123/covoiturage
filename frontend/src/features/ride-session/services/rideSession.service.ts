@@ -47,6 +47,10 @@ export class RideSessionService {
       message?: string;
       departureWaypointOrder?: number;
       arrivalWaypointOrder?: number;
+      pickupLocationExtra?: string;
+      pickupSurcharge?: number;
+      dropoffLocationExtra?: string;
+      dropoffSurcharge?: number;
     }
   ): Promise<any> {
     return authFetch('/bookings/', {
@@ -59,7 +63,11 @@ export class RideSessionService {
         passenger_proposed_price: params.customPrice,
         negotiation_message: params.message,
         departure_waypoint_order: params.departureWaypointOrder,
-        arrival_waypoint_order: params.arrivalWaypointOrder
+        arrival_waypoint_order: params.arrivalWaypointOrder,
+        pickup_location_extra: params.pickupLocationExtra,
+        pickup_surcharge: params.pickupSurcharge,
+        dropoff_location_extra: params.dropoffLocationExtra,
+        dropoff_surcharge: params.dropoffSurcharge
       })
     });
   }

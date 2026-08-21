@@ -35,11 +35,13 @@ interface SearchCardProps {
   onChange: (p: Partial<SearchParams>) => void;
   onSearch: () => void;
   onPickLocation: (type: 'departure' | 'arrival') => void;
+  departureNote?: string;
+  arrivalNote?: string;
 }
 const formatDate = (d: Date) =>
   d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 
-export default function SearchCard({ params, onChange, onSearch, onPickLocation }: SearchCardProps) {
+export default function SearchCard({ params, onChange, onSearch, onPickLocation, departureNote, arrivalNote }: SearchCardProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const btnScale = useRef(new Animated.Value(1)).current;
 
@@ -70,6 +72,21 @@ export default function SearchCard({ params, onChange, onSearch, onPickLocation 
   const increasePassengers = () => {
     if (params.passengers < 8) onChange({ passengers: params.passengers + 1 });
   };
+
+  const parseLocString = (str: string) => {
+    if (!str) return { name: '', note: '' };
+    const parts = str.split('|||');
+    return { name: parts[0], note: parts[1] || '' };
+  };
+
+  const parsedDeparture = parseLocString(params.departure);
+  const parsedDestination = parseLocString(params.destination);
+
+  const displayDepartureName = parsedDeparture.name;
+  const displayDepartureNote = parsedDeparture.note || departureNote;
+
+  const displayDestinationName = parsedDestination.name;
+  const displayDestinationNote = parsedDestination.note || arrivalNote;
 
   return (
     <>
@@ -115,9 +132,12 @@ export default function SearchCard({ params, onChange, onSearch, onPickLocation 
           <View style={styles.dotFrom} />
           <View style={styles.inputContent}>
             <Text style={styles.inputLabel}>Départ</Text>
-            <Text style={params.departure ? styles.inputValue : styles.inputPlaceholder}>
-              {params.departure || "D'où partez-vous ?"}
+            <Text style={displayDepartureName ? styles.inputValue : styles.inputPlaceholder}>
+              {displayDepartureName || "D'où partez-vous ?"}
             </Text>
+            {displayDepartureName && displayDepartureNote ? (
+              <Text style={styles.inputNote}>{displayDepartureNote}</Text>
+            ) : null}
           </View>
           {params.departure ? (
             <TouchableOpacity
@@ -148,9 +168,12 @@ export default function SearchCard({ params, onChange, onSearch, onPickLocation 
           <View style={styles.dotTo} />
           <View style={styles.inputContent}>
             <Text style={styles.inputLabel}>Destination</Text>
-            <Text style={params.destination ? styles.inputValue : styles.inputPlaceholder}>
-              {params.destination || 'Où allez-vous ?'}
+            <Text style={displayDestinationName ? styles.inputValue : styles.inputPlaceholder}>
+              {displayDestinationName || 'Où allez-vous ?'}
             </Text>
+            {displayDestinationName && displayDestinationNote ? (
+              <Text style={styles.inputNote}>{displayDestinationNote}</Text>
+            ) : null}
           </View>
           {params.destination ? (
             <TouchableOpacity
@@ -325,6 +348,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#9CA3AF',
+  },
+  inputNote: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0066FF',
+    marginTop: 2,
   },
   swapRow: {
     flexDirection: 'row',

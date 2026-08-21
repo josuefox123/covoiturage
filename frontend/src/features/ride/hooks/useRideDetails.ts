@@ -142,20 +142,48 @@ export function useRideDetails(
     }
   };
 
-  const performBooking = async (seatsToBook: number, customPrice?: number, message?: string) => {
-    const bookingId = await executeBooking(seatsToBook, customPrice, message, ride?.departure_location, ride?.arrival_location);
+  const performBooking = async (
+    seatsToBook: number,
+    customPrice?: number,
+    message?: string,
+    pickupLocation?: string,
+    pickupSurcharge?: number,
+    dropoffLocation?: string,
+    dropoffSurcharge?: number
+  ) => {
+    // Composer le message enrichi avec les options de localisation
+    const parts: string[] = [];
+    if (message) parts.push(message);
+    if (pickupLocation) {
+      const extra = pickupSurcharge && pickupSurcharge > 0
+        ? ` (+${pickupSurcharge.toLocaleString()} FCFA)`
+        : '';
+      parts.push('Départ personnalisé : ' + pickupLocation + extra);
+    }
+    if (dropoffLocation) {
+      const extra = dropoffSurcharge && dropoffSurcharge > 0
+        ? ` (+${dropoffSurcharge.toLocaleString()} FCFA)`
+        : '';
+      parts.push(`Arrivée personnalisée : ${dropoffLocation}${extra}`);
+    }
+    const enrichedMessage = parts.length > 0 ? parts.join('\n') : undefined;
+
+    const bookingId = await executeBooking(
+      seatsToBook,
+      customPrice,
+      enrichedMessage,
+      departure || ride?.departure_location,
+      destination || ride?.arrival_location,
+      pickupLocation,
+      pickupSurcharge,
+      dropoffLocation,
+      dropoffSurcharge
+    );
     if (bookingId) {
-      // PAIEMENT DIRECT — rediriger immédiatement vers l'écran de paiement
-      // sans attendre la validation du conducteur (négociation désactivée)
-      const pricePerSeat = customPrice ?? ride?.price_per_seat ?? 0;
-      const amount = pricePerSeat * seatsToBook;
-      router.push({
-        pathname: '/payment',
-        params: {
-          booking_id: String(bookingId),
-          amount: String(amount),
-        }
-      });
+      CustomAlert.alert(
+        'Demande envoyée ✓',
+        'Votre demande de réservation a été envoyée au conducteur. Vous serez notifié(e) dès qu\'il répond.'
+      );
       return true;
     } else {
       CustomAlert.alert('Erreur', error || "Impossible de créer la réservation. Veuillez réessayer.");

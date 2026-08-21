@@ -202,7 +202,7 @@ export default function RideManagementScreen() {
   );
   const totalRevenue = bookings
     .filter((b: any) => b.payment_status !== 'pending' && ['confirmed', 'active', 'started', 'completed'].includes(b.status))
-    .reduce((sum: number, b: any) => sum + ((ride.price_per_seat || 0) * (b.seats_booked || 1)), 0);
+    .reduce((sum: number, b: any) => sum + ((b.driver_payout || ride.driver_payout || 0) * (b.seats_booked || 1)), 0);
   const seatsBooked = ride.total_seats - ride.seats_available;
 
   return (
@@ -248,10 +248,10 @@ export default function RideManagementScreen() {
               <PendingBookingCard
                 key={booking.id}
                 booking={booking}
-                ridePrice={ride.price_per_seat}
+                ridePrice={ride.driver_payout || 0}
                 onAccept={() => {
                   setEditingBooking(booking);
-                  const ip = booking.portion_price ? Math.round(booking.portion_price / booking.seats_booked) : (ride?.price_per_seat || 0);
+                  const ip = booking.driver_payout ? Math.round(booking.driver_payout / booking.seats_booked) : (ride?.driver_payout || 0);
                   setCustomPriceText(String(ip));
                 }}
                 onReject={() => handleRejectBooking(booking.id)}
