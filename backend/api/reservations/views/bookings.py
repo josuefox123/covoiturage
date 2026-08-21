@@ -396,20 +396,48 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.status not in ['pending', 'pending_driver']:
             return Response({"error": f"Impossible d'accepter une réservation au statut actuel: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
             
+        # Récupérer les nouveaux surcoûts modifiés par le conducteur
+        new_pickup_surcharge = request.data.get('pickup_surcharge')
+        new_dropoff_surcharge = request.data.get('dropoff_surcharge')
+        
+        has_changes = False
+        if new_pickup_surcharge is not None:
+            try:
+                val = int(new_pickup_surcharge)
+                if val != (booking.pickup_surcharge or 0):
+                    booking.pickup_surcharge = val
+                    has_changes = True
+            except ValueError:
+                return Response({"error": "Le surcoût de départ proposé est invalide."}, status=status.HTTP_400_BAD_REQUEST)
+                
+        if new_dropoff_surcharge is not None:
+            try:
+                val = int(new_dropoff_surcharge)
+                if val != (booking.dropoff_surcharge or 0):
+                    booking.dropoff_surcharge = val
+                    has_changes = True
+            except ValueError:
+                return Response({"error": "Le surcoût d'arrivée proposé est invalide."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Si le conducteur a également soumis un prix de base personnalisé unitaire (rare dans le nouveau flux, mais supporté)
         price_val = request.data.get('price') or request.data.get('custom_price') or request.data.get('driver_counter_price')
         if price_val is not None:
             try:
                 booking.driver_counter_price = int(price_val)
+                has_changes = True
             except ValueError:
                 return Response({"error": "Le prix proposé est invalide."}, status=status.HTTP_400_BAD_REQUEST)
         else:
             if booking.passenger_proposed_price is not None:
                 booking.custom_price = booking.passenger_proposed_price
+                has_changes = True
 
-        if booking.driver_counter_price is not None:
+        if has_changes:
             booking.status = 'pending_passenger'
+            # On met à jour driver_counter_price pour mémoriser qu'il y a négociation
+            booking.driver_counter_price = booking.driver_counter_price or booking.ride.driver_payout
             title = "Nouvelle offre tarifaire"
-            message = f"Le chauffeur propose un tarif de {booking.total_amount} FCFA. Veuillez valider."
+            message = f"Le chauffeur propose un nouveau tarif d'option. Total à payer : {booking.total_amount} FCFA."
         else:
             booking.status = 'pending_payment'
             title = "Demande acceptée par le conducteur"

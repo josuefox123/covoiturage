@@ -23,6 +23,18 @@ interface BookingData {
   total_amount: number;
   created_at: string;
   negotiation_message?: string;
+  pricing_breakdown?: {
+    driver_price?: number;
+    commission?: number;
+    total_to_pay?: number;
+    driver_amount?: number;
+    zemy_amount?: number;
+    seats?: number;
+  };
+  pickup_surcharge?: number;
+  dropoff_surcharge?: number;
+  pickup_location_extra?: string;
+  dropoff_location_extra?: string;
 }
 
 export default function BookingRequestModal() {
@@ -127,10 +139,8 @@ export default function BookingRequestModal() {
       if (currentBooking) {
         activeBookingId.current = currentBooking.id;
         
-        const defaultPricePerSeat = currentBooking.seats_booked > 0 
-          ? Math.round(currentBooking.total_amount / currentBooking.seats_booked) 
-          : currentBooking.total_amount;
-        setPricePerSeatInput(String(defaultPricePerSeat));
+        const defaultSurcharge = currentBooking.pickup_surcharge || currentBooking.dropoff_surcharge || 0;
+        setPricePerSeatInput(String(defaultSurcharge));
 
         if (booking?.id !== currentBooking.id) {
           setBooking(currentBooking);
@@ -150,10 +160,8 @@ export default function BookingRequestModal() {
       if (targetBooking) {
         setBooking(targetBooking);
         activeBookingId.current = targetBooking.id;
-        const defaultPricePerSeat = targetBooking.seats_booked > 0 
-          ? Math.round(targetBooking.total_amount / targetBooking.seats_booked) 
-          : targetBooking.total_amount;
-        setPricePerSeatInput(String(defaultPricePerSeat));
+        const defaultSurcharge = targetBooking.pickup_surcharge || targetBooking.dropoff_surcharge || 0;
+        setPricePerSeatInput(String(defaultSurcharge));
         const passengerName = targetBooking.passenger_details?.full_name || 'un passager';
         startAlerts(passengerName, targetBooking.departure_location, targetBooking.arrival_location);
         initTimer(targetBooking.created_at);
@@ -169,10 +177,8 @@ export default function BookingRequestModal() {
       if (targetBooking) {
         setBooking(targetBooking);
         activeBookingId.current = targetBooking.id;
-        const defaultPricePerSeat = targetBooking.seats_booked > 0 
-          ? Math.round(targetBooking.total_amount / targetBooking.seats_booked) 
-          : targetBooking.total_amount;
-        setPricePerSeatInput(String(defaultPricePerSeat));
+        const defaultSurcharge = targetBooking.pickup_surcharge || targetBooking.dropoff_surcharge || 0;
+        setPricePerSeatInput(String(defaultSurcharge));
         const passengerName = targetBooking.passenger_details?.full_name || 'un passager';
         startAlerts(passengerName, targetBooking.departure_location, targetBooking.arrival_location);
         initTimer(targetBooking.created_at);
@@ -196,9 +202,17 @@ export default function BookingRequestModal() {
     if (!booking) return;
     setLoading(true);
     try {
-      const bodyPayload = statusType === 'accept' && customPrice !== undefined && !isNaN(customPrice)
-        ? JSON.stringify({ custom_price: customPrice })
-        : undefined;
+      const payload: any = {};
+      if (customPrice !== undefined && !isNaN(customPrice)) {
+        if (booking.pickup_location_extra) {
+          payload.pickup_surcharge = customPrice;
+        } else if (booking.dropoff_location_extra) {
+          payload.dropoff_surcharge = customPrice;
+        } else {
+          payload.pickup_surcharge = customPrice;
+        }
+      }
+      const bodyPayload = statusType === 'accept' ? JSON.stringify(payload) : undefined;
       const response = await authFetch(`/bookings/${booking.id}/${statusType}/`, {
         method: 'POST',
         body: bodyPayload
@@ -218,10 +232,8 @@ export default function BookingRequestModal() {
         setBooking(nextBooking);
         activeBookingId.current = nextBooking.id;
         
-        const defaultPricePerSeat = nextBooking.seats_booked > 0 
-          ? Math.round(nextBooking.total_amount / nextBooking.seats_booked) 
-          : nextBooking.total_amount;
-        setPricePerSeatInput(String(defaultPricePerSeat));
+        const defaultSurcharge = nextBooking.pickup_surcharge || nextBooking.dropoff_surcharge || 0;
+        setPricePerSeatInput(String(defaultSurcharge));
         
         const passengerName = nextBooking.passenger_details?.full_name || 'un passager';
         startAlerts(passengerName, nextBooking.departure_location, nextBooking.arrival_location);
@@ -260,10 +272,14 @@ export default function BookingRequestModal() {
             departure_location: b.departure_location || b.ride?.departure_location || '',
             arrival_location: b.arrival_location || b.ride?.arrival_location || '',
             seats_booked: b.seats_booked,
-            // Le conducteur voit le prix conducteur (sans commission Zemy)
             total_amount: b.pricing_breakdown?.driver_price ?? b.passenger_proposed_price ?? b.portion_price ?? b.total_amount,
             created_at: b.created_at,
             negotiation_message: b.negotiation_message || '',
+            pricing_breakdown: b.pricing_breakdown,
+            pickup_surcharge: b.pickup_surcharge,
+            dropoff_surcharge: b.dropoff_surcharge,
+            pickup_location_extra: b.pickup_location_extra,
+            dropoff_location_extra: b.dropoff_location_extra,
           }));
 
           if (isMounted) {
@@ -383,21 +399,27 @@ export default function BookingRequestModal() {
                   <Text style={styles.detailValue}>{booking.seats_booked}</Text>
                 </View>
                 <View style={[styles.detailBox, { flex: 2, alignItems: 'center' }]}>
-                  <Text style={styles.detailLabel}>Prix par place (FCFA)</Text>
+                  <Text style={styles.detailLabel}>Transport (FCFA)</Text>
+                  <Text style={[styles.detailValue, { color: '#475569', fontWeight: '800', marginTop: 6 }]}>
+                    {(booking.pricing_breakdown?.driver_price ?? 100).toLocaleString()}
+                  </Text>
+                </View>
+                <View style={[styles.detailBox, { flex: 2.2, alignItems: 'center' }]}>
+                  <Text style={styles.detailLabel}>Option (+ FCFA)</Text>
                   <TextInput
                     style={{
                       fontSize: 16,
                       fontWeight: '800',
-                      color: '#0066FF',
+                      color: '#D97706',
                       textAlign: 'center',
                       borderWidth: 1.5,
-                      borderColor: '#CBD5E1',
+                      borderColor: '#F59E0B',
                       borderRadius: 10,
                       paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      minWidth: 100,
+                      paddingVertical: 4,
+                      minWidth: 90,
                       marginTop: 4,
-                      backgroundColor: '#FFFFFF'
+                      backgroundColor: '#FFFBEB'
                     }}
                     keyboardType="numeric"
                     value={pricePerSeatInput}
@@ -407,8 +429,11 @@ export default function BookingRequestModal() {
               </View>
 
               <View style={{ marginTop: 12, alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '600' }}>
-                  Total proposé : {((parseInt(pricePerSeatInput) || 0) * booking.seats_booked).toLocaleString()} FCFA
+                <Text style={{ fontSize: 13, color: '#1E293B', fontWeight: '700' }}>
+                  Total proposé : {(((booking.pricing_breakdown?.driver_price ?? 100) + (parseInt(pricePerSeatInput) || 0)) * booking.seats_booked).toLocaleString()} FCFA
+                </Text>
+                <Text style={{ fontSize: 10, color: '#64748B', fontStyle: 'italic', marginTop: 2 }}>
+                  (Le surcoût d'option est modifiable par vos soins)
                 </Text>
               </View>
             </View>
