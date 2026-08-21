@@ -455,6 +455,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.passenger != request.user and not request.user.is_staff:
             return Response({"error": "Seul le passager de cette réservation peut l'accepter."}, status=status.HTTP_403_FORBIDDEN)
             
+        if booking.ride.status in ['completed', 'cancelled']:
+            return Response({"error": "Le trajet est déjà terminé ou annulé. Impossible d'accepter la proposition."}, status=status.HTTP_400_BAD_REQUEST)
+
         if booking.status != 'pending_passenger':
             return Response({"error": f"Statut invalide pour acceptation passager: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
             
@@ -478,6 +481,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.passenger != request.user and not request.user.is_staff:
             return Response({"error": "Seul le passager de cette réservation peut la refuser."}, status=status.HTTP_403_FORBIDDEN)
             
+        if booking.ride.status in ['completed', 'cancelled']:
+            return Response({"error": "Le trajet est déjà terminé ou annulé. Impossible de refuser la proposition."}, status=status.HTTP_400_BAD_REQUEST)
+
         if booking.status not in ['pending', 'pending_passenger', 'pending_payment']:
             return Response({"error": f"Statut invalide pour refus passager: {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
             

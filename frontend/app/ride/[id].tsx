@@ -84,10 +84,10 @@ export default function RideDetailScreen() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (myBooking?.status === 'pending_passenger') {
+    if (myBooking?.status === 'pending_passenger' && ride?.status !== 'completed' && ride?.status !== 'cancelled') {
       setShowNegModal(true);
     }
-  }, [myBooking?.status]);
+  }, [myBooking?.status, ride?.status]);
 
   if (loading || !ride) return <EcranChargement />;
 
@@ -405,10 +405,12 @@ export default function RideDetailScreen() {
             </FadeInCard>
           )}
 
-          {/* Carte Billet */}
-          <FadeInCard delay={200}>
-            <CarteBillet myBooking={myBooking} ride={ride} />
-          </FadeInCard>
+          {/* Carte Billet (uniquement si payé) */}
+          {myBooking && (myBooking.payment_status === 'paid' || myBooking.payment_status === 'escrow') ? (
+            <FadeInCard delay={200}>
+              <CarteBillet myBooking={myBooking} ride={ride} />
+            </FadeInCard>
+          ) : null}
 
           {/* Carte Itinéraire */}
           <FadeInCard delay={240}>
