@@ -36,12 +36,17 @@ export class ResolveurMission {
       bookingArr.split(',')[0].trim().toLowerCase() !== rideArr.split(',')[0].trim().toLowerCase()
     );
 
-    const bookingStatus = String(booking?.status || '').toLowerCase();
-    let montant: number | string = booking?.price || ride.price_per_seat || 0;
-    if (isPassager && booking && isIntermediaire) {
-      if (['pending', 'pending_driver', 'waiting_driver'].includes(bookingStatus)) {
-        montant = 'À confirmer';
+    let montant: number | string = 0;
+    if (isPassager) {
+      const bookingStatus = String(booking?.status || '').toLowerCase();
+      montant = booking?.price || ride.price_per_seat || 0;
+      if (booking && isIntermediaire) {
+        if (['pending', 'pending_driver', 'waiting_driver'].includes(bookingStatus)) {
+          montant = 'À confirmer';
+        }
       }
+    } else {
+      montant = ride.driver_payout || ride.price_per_seat || 0;
     }
 
     const data: DonneesMission = {

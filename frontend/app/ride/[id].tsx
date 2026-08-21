@@ -2,7 +2,7 @@
  * Zemy — Écran Détail Trajet Passager
  * Refactorisé : composants extraits dans src/features/ride/composants/
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity,
   ActivityIndicator, Linking, Animated, Share,
@@ -155,6 +155,12 @@ export default function RideDetailScreen() {
 
   const depShort = parseLoc(departure || ride.departure_location).name.split(',')[0];
   const arrShort = parseLoc(destination || ride.arrival_location).name.split(',')[0];
+
+  useEffect(() => {
+    if (myBooking?.status === 'pending_passenger') {
+      setShowNegModal(true);
+    }
+  }, [myBooking?.status]);
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   const handleBooking = () => {

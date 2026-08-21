@@ -249,11 +249,7 @@ export default function RideManagementScreen() {
                 key={booking.id}
                 booking={booking}
                 ridePrice={ride.driver_payout || 0}
-                onAccept={() => {
-                  setEditingBooking(booking);
-                  const ip = booking.driver_payout ? Math.round(booking.driver_payout / booking.seats_booked) : (ride?.driver_payout || 0);
-                  setCustomPriceText(String(ip));
-                }}
+                onAccept={() => handleAcceptBooking(booking.id)}
                 onReject={() => handleRejectBooking(booking.id)}
               />
             ))}
