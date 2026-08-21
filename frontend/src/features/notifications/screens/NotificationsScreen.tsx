@@ -69,14 +69,11 @@ export default function NotificationsScreen() {
       }
 
       if (rideId) {
-        const titleLower = (notification.title || '').toLowerCase();
-        const msgLower = (notification.message || '').toLowerCase();
+        const screen = extraData.screen || notification.screen;
+        const type = extraData.type || notification.type;
         const isDriverAction =
-          titleLower.includes('demande') ||
-          titleLower.includes('réservation') ||
-          titleLower.includes('réserve') ||
-          msgLower.includes('a réservé') ||
-          msgLower.includes('veut réserver');
+          screen === 'rides' ||
+          ['new_booking_request', 'passenger_accepted_offer', 'passenger_refused_offer', 'passenger_paid_driver'].includes(type);
 
         if (isDriverAction) {
           router.push(`/ride-management/${rideId}`);
