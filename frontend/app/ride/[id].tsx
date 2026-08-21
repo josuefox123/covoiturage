@@ -83,6 +83,12 @@ export default function RideDetailScreen() {
   const [showNegModal, setShowNegModal] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
+  useEffect(() => {
+    if (myBooking?.status === 'pending_passenger') {
+      setShowNegModal(true);
+    }
+  }, [myBooking?.status]);
+
   if (loading || !ride) return <EcranChargement />;
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -156,11 +162,7 @@ export default function RideDetailScreen() {
   const depShort = parseLoc(departure || ride.departure_location).name.split(',')[0];
   const arrShort = parseLoc(destination || ride.arrival_location).name.split(',')[0];
 
-  useEffect(() => {
-    if (myBooking?.status === 'pending_passenger') {
-      setShowNegModal(true);
-    }
-  }, [myBooking?.status]);
+
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   const handleBooking = () => {
