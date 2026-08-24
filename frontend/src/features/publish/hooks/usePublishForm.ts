@@ -668,10 +668,14 @@ export function usePublishForm(authCtx: any) {
         CustomAlert.alert('Itinéraire manquant', 'Veuillez patienter pendant le calcul de l\'itinéraire.');
         return;
       }
-      setStopoverSubStep(2);
+      setStopoverSubStep(1);
       goToStep(2);
     } else if (formStep === 2) {
-      goToStep(3);
+      if (stopoverSubStep === 1) {
+        setStopoverSubStep(2);
+      } else {
+        goToStep(3);
+      }
     } else if (formStep === 3) {
       if (!validateStep2()) return;
       goToStep(4);
@@ -685,7 +689,11 @@ export function usePublishForm(authCtx: any) {
   const handleBack = () => {
     Keyboard.dismiss();
     if (formStep === 2) {
-      goToStep(1);
+      if (stopoverSubStep === 2) {
+        setStopoverSubStep(1);
+      } else {
+        goToStep(1);
+      }
     } else if (formStep > 1) {
       goToStep(formStep - 1);
     } else {
