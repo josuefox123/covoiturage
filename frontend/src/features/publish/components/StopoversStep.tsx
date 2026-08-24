@@ -108,6 +108,251 @@ export function StopoversStep({
   estimation,
 }: StopoversStepProps) {
 
+  /**
+   * ============================================================
+   * SOUS-ÉTAPE 1
+   * PROPOSITIONS D'ARRÊTS
+   *
+   * IMPORTANT :
+   * Les propositions ne sont PAS sélectionnées automatiquement.
+   * L'utilisateur doit explicitement les cocher.
+   * ============================================================
+   */
+  if (subStep === 1) {
+    return (
+      <View>
+        <Text style={styles.stepTitle}>
+          Ajoutez des étapes à votre trajet
+        </Text>
+
+        <Text style={styles.stepSubtitle}>
+          Zemy vous propose des villes intéressantes sur votre
+          itinéraire. Sélectionnez uniquement les arrêts que vous
+          souhaitez réellement desservir.
+        </Text>
+
+        {/* Récapitulatif trajet */}
+        <View style={styles.recapContainer}>
+          <View style={styles.recapRow}>
+            <Ionicons
+              name="location-outline"
+              size={18}
+              color={theme.colors.primary}
+            />
+
+            <View style={styles.recapTextContainer}>
+              <Text style={styles.recapLabel}>Départ</Text>
+              <Text style={styles.recapText} numberOfLines={1}>
+                {departure || 'Non défini'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.recapArrow}>
+            <Ionicons
+              name="arrow-down"
+              size={16}
+              color="#CBD5E1"
+            />
+          </View>
+
+          <View style={styles.recapRow}>
+            <Ionicons
+              name="flag-outline"
+              size={18}
+              color={theme.colors.primary}
+            />
+
+            <View style={styles.recapTextContainer}>
+              <Text style={styles.recapLabel}>Arrivée</Text>
+              <Text style={styles.recapText} numberOfLines={1}>
+                {arrival || 'Non défini'}
+              </Text>
+            </View>
+          </View>
+
+          {googleRoutes[selectedRouteIndex] && (
+            <View style={styles.routeInfo}>
+              <Ionicons
+                name="navigate-outline"
+                size={15}
+                color={theme.colors.primary}
+              />
+
+              <Text style={styles.routeInfoText} numberOfLines={1}>
+                {googleRoutes[selectedRouteIndex].summary ||
+                  'Itinéraire sélectionné'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Titre propositions */}
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>
+              Arrêts proposés
+            </Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Aucun arrêt n'est sélectionné automatiquement
+            </Text>
+          </View>
+
+          {detectedStopovers.length > 0 && (
+            <View style={styles.proposalBadge}>
+              <Text style={styles.proposalBadgeText}>
+                {detectedStopovers.length}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {detectedStopovers.length > 0 ? (
+          <View style={styles.checklistCard}>
+            {detectedStopovers.map((s, index) => {
+              const checked = !!s.checked;
+
+              return (
+                <View
+                  key={s.id}
+                  style={[
+                    styles.proposalItem,
+                    checked && styles.proposalItemActive,
+                  ]}
+                >
+                  {/* Zone sélection */}
+                  <TouchableOpacity
+                    style={styles.proposalMain}
+                    onPress={() => toggleStopoverCheck(s.id)}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.checkboxSquare,
+                        checked && styles.checkboxSquareActive,
+                      ]}
+                    >
+                      {checked && (
+                        <Ionicons
+                          name="checkmark"
+                          size={15}
+                          color="#FFFFFF"
+                        />
+                      )}
+                    </View>
+
+                    <View style={styles.proposalContent}>
+                      <View style={styles.proposalTitleRow}>
+                        <Text
+                          style={styles.checklistText}
+                          numberOfLines={1}
+                        >
+                          {s.name}
+                        </Text>
+
+                        <View style={styles.proposalNumber}>
+                          <Text style={styles.proposalNumberText}>
+                            {index + 1}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.proposalHint}>
+                        {checked
+                          ? 'Arrêt sélectionné'
+                          : 'Appuyez pour sélectionner'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Choix position précise */}
+                  <TouchableOpacity
+                    style={styles.positionButton}
+                    onPress={() => {
+                      if (onPickPositionForStopover) {
+                        onPickPositionForStopover(s.id);
+                      } else {
+                        onPickLocationForStopover(s.id);
+                      }
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons
+                      name={
+                        hasPosition(s)
+                          ? 'navigate'
+                          : 'location-outline'
+                      }
+                      size={17}
+                      color={theme.colors.primary}
+                    />
+
+                    <Text style={styles.positionButtonText}>
+                      {hasPosition(s)
+                        ? 'Position définie'
+                        : 'Choisir la position'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.emptyStopoversCard}>
+            <View style={styles.emptyIcon}>
+              <Ionicons
+                name="map-outline"
+                size={28}
+                color={theme.colors.textMuted}
+              />
+            </View>
+
+            <Text style={styles.emptyStopoversTitle}>
+              Aucun arrêt proposé
+            </Text>
+
+            <Text style={styles.emptyStopoversText}>
+              Aucun point intermédiaire intéressant n'a été détecté
+              sur cet itinéraire.
+            </Text>
+          </View>
+        )}
+
+        {/* Ajout manuel */}
+        <TouchableOpacity
+          style={styles.addStopoverButton}
+          onPress={onAddStopoverPress}
+          activeOpacity={0.8}
+        >
+          <View style={styles.addStopoverIcon}>
+            <Ionicons
+              name="add"
+              size={20}
+              color={theme.colors.primary}
+            />
+          </View>
+
+          <View style={styles.addStopoverContent}>
+            <Text style={styles.addStopoverTitle}>
+              Ajouter un arrêt personnalisé
+            </Text>
+
+            <Text style={styles.addStopoverSubtitle}>
+              Choisir une ville ou une position précise
+            </Text>
+          </View>
+
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color="#94A3B8"
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   const selectedStopovers = stopovers.filter(
     (stopover) => stopover.checked !== false
   );
