@@ -238,20 +238,11 @@ export function usePublishForm(authCtx: any) {
       if (data && data.suggested_price) {
         setPriceSuggestion(data);
       } else {
-        throw new Error();
+        setPriceSuggestion(null);
       }
-    } catch (_) {
-      const baseRate = 30;
-      const calculatedPrice = Math.max(1000, Math.round((distanceKm * baseRate) / 100) * 100);
-      const minPrice = Math.max(500, Math.round((calculatedPrice * 0.8) / 100) * 100);
-      const maxPrice = Math.round((calculatedPrice * 1.2) / 100) * 100;
-      setPriceSuggestion({
-        suggested_price: calculatedPrice,
-        min_price: minPrice,
-        max_price: maxPrice,
-        price_per_km: baseRate,
-        margin_percent: 20,
-      });
+    } catch (e) {
+      console.error('[fetchPriceSuggestion] Erreur backend :', e);
+      setPriceSuggestion(null);
     } finally {
       setPriceLoading(false);
     }
