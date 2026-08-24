@@ -119,6 +119,21 @@ Zemy
                 />
                 <span class="absolute right-4 top-3 text-textLight">FCFA</span>
               </div>
+              
+              <!-- Presets rapides de prix par km -->
+              <div class="flex flex-wrap gap-1.5 mt-1.5">
+                <button
+                  v-for="p in [10, 15, 20, 25, 30, 40, 50, 100]"
+                  :key="p"
+                  type="button"
+                  @click="settings.price_per_km = p"
+                  class="px-2.5 py-1 text-xs font-semibold rounded-lg transition-all border border-border"
+                  :class="settings.price_per_km === p ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-textMuted hover:bg-gray-50'"
+                >
+                  {{ p }} F
+                </button>
+              </div>
+
               <p class="text-xs text-textMuted">Valeur utilisée pour recommander un prix au conducteur lors de la publication d'un trajet.</p>
             </div>
 
@@ -134,6 +149,21 @@ Zemy
                 />
                 <span class="absolute right-4 top-3 text-textLight">%</span>
               </div>
+
+              <!-- Presets rapides de marges de prix -->
+              <div class="flex flex-wrap gap-1.5 mt-1.5">
+                <button
+                  v-for="m in [10, 15, 20, 25, 30]"
+                  :key="m"
+                  type="button"
+                  @click="settings.price_margin_percent = m"
+                  class="px-2.5 py-1 text-xs font-semibold rounded-lg transition-all border border-border"
+                  :class="settings.price_margin_percent === m ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-textMuted hover:bg-gray-50'"
+                >
+                  {{ m }}%
+                </button>
+              </div>
+
               <p class="text-xs text-textMuted">Marge autorisée au-dessus et en-dessous du prix suggéré (min / max).</p>
             </div>
           </div>
