@@ -98,3 +98,34 @@ Ce document récapitule l'organisation de vos dépôts Git pour ce projet. Le pr
   - **Correction du crash de rendu de texte brut** : Résolution du plantage lié à l'affichage conditionnel d'un `0` numérique non-encapsulé dans un composant `<Text>`.
   - **Bouton de Demande de Remboursement** : Ajout de l'accès au remboursement pour les réservations annulées dans l'historique de paiement.
 
+---
+
+### 📅 Mise à jour du 24 Août 2026
+
+#### 🖥️ Dashboard (Interface d'Administration)
+- **Refonte de la page Paramètres Financiers en onglets professionnels :**
+  - Réorganisation complète de `financial-settings/index.vue` en **3 onglets distincts** :
+    - **Commissions Trajets** : Toggle + 3 cartes (Pourcentage, Minimum, Maximum) avec boutons presets + simulateur en temps réel.
+    - **Commissions Colis** : Même structure indépendante pour les colis.
+    - **Prix Conseillé** : Champs `price_per_km` et `price_margin_percent` avec presets + **slider de prévisualisation dynamique** (Min / Conseillé / Max calculés en live pour N km).
+  - Indicateurs de statut (point vert / gris) sur les onglets selon l'état du toggle.
+  - Bouton Sauvegarder amélioré avec icône floppy-disk + spinner de chargement.
+- **Ajout des boutons presets rapides** pour les prix recommandés par km.
+- **Ajout du champ marge de prix autorisée (%)** dans les paramètres financiers.
+
+#### 📱 Frontend Mobile (React Native / Expo)
+- **Délégation exclusive du prix conseillé au backend :** Suppression de l'algorithme de calcul local dans `usePublishForm.ts`. L'app utilise désormais exclusivement les valeurs `FinancialSettings` du backend.
+- **Affichage du prix réorganisé :** Si un trajet a des arrêts, les portions de prix sont affichées en premier ; sinon, saisie du prix global directement.
+- **Suppression des numérotations d'index** superflues dans les listes d'arrêts (`StopoversStep`, `PublishSummaryModal`), remplacées par des puces simples.
+- **Boutons Up/Down de réordonnancement** des arrêts intégrés dans la sous-étape 1 (checklist des propositions) avec bandeau explicatif NB.
+
+#### 🔗 Commits de référence (dépôt principal `covoiturage`)
+| Hash | Description |
+|------|-------------|
+| `c3a6b0c` | Refonte dashboard: page paramètres financiers en onglets |
+| `c8f96f4` | Ajout boutons presets rapides pour prix recommandés |
+| `b806854` | Ajout champ marge de prix autorisée (%) |
+| `8058d67` | Délégation exclusive de la suggestion de prix au backend |
+| `4a21486` | Affichage portions de prix d'abord si trajet avec arrêts |
+| `1ff9a02` | Suppression numérotations superflues dans les listes d'arrêts |
+| `f2de281` | Intégration boutons Up/Down dans sous-étape 1 |
