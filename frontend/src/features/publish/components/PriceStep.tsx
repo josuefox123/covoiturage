@@ -462,64 +462,9 @@ export function PriceStep({
         </View>
       ) : null}
 
-      {/* PRIX GLOBAL */}
-      <View style={styles.priceInputCard}>
-        <View style={styles.priceHeader}>
-          <View>
-            <Text style={styles.priceInputLabel}>
-              VOTRE GAIN PAR PLACE
-            </Text>
-
-            <Text style={styles.priceHint}>
-              Montant reçu par le conducteur
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => {
-              setLocalPriceText('0');
-              updateOverallPrice('0');
-            }}
-          >
-            <Text style={styles.clearText}>
-              Effacer
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View
-          style={[
-            styles.priceInputWrapper,
-            priceInputFocused &&
-              styles.priceInputWrapperFocused,
-          ]}
-        >
-          <TextInput
-            style={styles.simplePriceInput}
-            value={localPriceText}
-            onChangeText={handleGlobalPriceChange}
-            keyboardType="numeric"
-            placeholder="Ex : 5000"
-            placeholderTextColor="#94A3B8"
-            selectTextOnFocus
-            maxLength={8}
-            autoFocus={false}
-            onFocus={() =>
-              setPriceInputFocused(true)
-            }
-            onBlur={() =>
-              setPriceInputFocused(false)
-            }
-          />
-
-          <Text style={styles.currencyText}>
-            FCFA
-          </Text>
-        </View>
-      </View>
-
-      {/* PARCOURS RÉEL */}
-      {cleanLegs.length > 0 && (
+      {/* PRIX GLOBAL / PORTIONS */}
+      {cleanLegs.length > 1 ? (
+        /* Case: Trajet avec arrêts - Portions d'abord */
         <View style={styles.segmentsSection}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionIcon}>
@@ -532,12 +477,11 @@ export function PriceStep({
 
             <View style={{ flex: 1 }}>
               <Text style={styles.sectionTitle}>
-                Prix par trajet
+                Prix par portion de trajet
               </Text>
 
               <Text style={styles.sectionSubtitle}>
-                Chaque portion suit l'ordre réel de votre
-                itinéraire.
+                Définissez le prix pour chaque portion. Le prix total du voyage sera calculé automatiquement.
               </Text>
             </View>
           </View>
@@ -585,8 +529,7 @@ export function PriceStep({
 
           <View style={styles.segmentPricesList}>
             {cleanLegs.map((leg, idx) => {
-              const legPrice =
-                safeLegPrices[idx] || 0;
+              const legPrice = safeLegPrices[idx] || 0;
 
               return (
                 <View
@@ -595,129 +538,60 @@ export function PriceStep({
                 >
                   <View style={styles.segmentLeft}>
                     <View style={styles.segmentTimeline}>
-                      <View
-                        style={styles.segmentDotStart}
-                      />
-
-                      <View
-                        style={styles.segmentLine}
-                      />
-
-                      <View
-                        style={styles.segmentDotEnd}
-                      />
+                      <View style={styles.segmentDotStart} />
+                      <View style={styles.segmentLine} />
+                      <View style={styles.segmentDotEnd} />
                     </View>
 
-                    <View
-                      style={styles.segmentAddresses}
-                    >
-                      <Text
-                        style={styles.segmentCityText}
-                        numberOfLines={1}
-                      >
+                    <View style={styles.segmentAddresses}>
+                      <Text style={styles.segmentCityText} numberOfLines={1}>
                         {leg.startName}
                       </Text>
 
-                      <View
-                        style={styles.segmentArrowRow}
-                      >
+                      <View style={styles.segmentArrowRow}>
                         <Ionicons
                           name="arrow-forward"
                           size={13}
-                          color={
-                            theme.colors.primary
-                          }
+                          color={theme.colors.primary}
                         />
 
-                        <Text
-                          style={
-                            styles.segmentDestination
-                          }
-                          numberOfLines={1}
-                        >
+                        <Text style={styles.segmentDestination} numberOfLines={1}>
                           {leg.endName}
                         </Text>
                       </View>
 
-                      <Text
-                        style={
-                          styles.segmentDistance
-                        }
-                      >
-                        {formatDistance(
-                          leg.distanceKm
-                        )}
+                      <Text style={styles.segmentDistance}>
+                        {formatDistance(leg.distanceKm)}
                       </Text>
                     </View>
                   </View>
 
                   {/* PRIX AU FRANC PRÈS */}
-                  <View
-                    style={styles.segmentPriceBox}
-                  >
+                  <View style={styles.segmentPriceBox}>
                     <TouchableOpacity
-                      style={
-                        styles.legPriceAdjustBtn
-                      }
-                      onPress={() =>
-                        changeLegPrice(
-                          idx,
-                          -1
-                        )
-                      }
+                      style={styles.legPriceAdjustBtn}
+                      onPress={() => changeLegPrice(idx, -100)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons
-                        name="remove"
-                        size={16}
-                        color={
-                          theme.colors.primary
-                        }
-                      />
+                      <Ionicons name="remove" size={16} color={theme.colors.primary} />
                     </TouchableOpacity>
 
                     <TextInput
                       value={String(legPrice)}
-                      onChangeText={value =>
-                        setLegPriceDirectly(
-                          idx,
-                          value
-                        )
-                      }
+                      onChangeText={value => setLegPriceDirectly(idx, value)}
                       keyboardType="numeric"
-                      style={
-                        styles.legPriceInput
-                      }
+                      style={styles.legPriceInput}
                       selectTextOnFocus
                     />
 
-                    <Text
-                      style={
-                        styles.legPriceCurrency
-                      }
-                    >
-                      F
-                    </Text>
+                    <Text style={styles.legPriceCurrency}>F</Text>
 
                     <TouchableOpacity
-                      style={
-                        styles.legPriceAdjustBtn
-                      }
-                      onPress={() =>
-                        changeLegPrice(
-                          idx,
-                          1
-                        )
-                      }
+                      style={styles.legPriceAdjustBtn}
+                      onPress={() => changeLegPrice(idx, 100)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons
-                        name="add"
-                        size={16}
-                        color={
-                          theme.colors.primary
-                        }
-                      />
+                      <Ionicons name="add" size={16} color={theme.colors.primary} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -736,50 +610,62 @@ export function PriceStep({
             </View>
 
             <View style={{ flex: 1 }}>
-              <Text
-                style={styles.totalSegmentSummaryText}
-              >
-                Total des portions
+              <Text style={styles.totalSegmentSummaryText}>
+                Prix total du voyage (somme des portions)
               </Text>
 
-              <Text
-                style={styles.totalSegmentSummaryAmount}
-              >
-                {totalLegPrices.toLocaleString(
-                  'fr-FR'
-                )}{' '}
-                FCFA
+              <Text style={styles.totalSegmentSummaryAmount}>
+                {totalLegPrices.toLocaleString('fr-FR')} FCFA
               </Text>
             </View>
           </View>
+        </View>
+      ) : (
+        /* Case: Trajet direct sans arrêts */
+        <View style={styles.priceInputCard}>
+          <View style={styles.priceHeader}>
+            <View>
+              <Text style={styles.priceInputLabel}>
+                VOTRE GAIN PAR PLACE
+              </Text>
 
-          {priceNum !== totalLegPrices && (
-            <View style={styles.warningCard}>
-              <Ionicons
-                name="information-circle-outline"
-                size={18}
-                color="#B45309"
-              />
-
-              <Text style={styles.warningText}>
-                Le prix global est de{' '}
-                <Text style={{ fontWeight: '800' }}>
-                  {priceNum.toLocaleString(
-                    'fr-FR'
-                  )}{' '}
-                  F
-                </Text>
-                , tandis que les portions totalisent{' '}
-                <Text style={{ fontWeight: '800' }}>
-                  {totalLegPrices.toLocaleString(
-                    'fr-FR'
-                  )}{' '}
-                  F
-                </Text>
-                .
+              <Text style={styles.priceHint}>
+                Montant reçu par le conducteur
               </Text>
             </View>
-          )}
+
+            <TouchableOpacity
+              onPress={() => {
+                setLocalPriceText('0');
+                updateOverallPrice('0');
+              }}
+            >
+              <Text style={styles.clearText}>Effacer</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View
+            style={[
+              styles.priceInputWrapper,
+              priceInputFocused && styles.priceInputWrapperFocused,
+            ]}
+          >
+            <TextInput
+              style={styles.simplePriceInput}
+              value={localPriceText}
+              onChangeText={handleGlobalPriceChange}
+              keyboardType="numeric"
+              placeholder="Ex : 5000"
+              placeholderTextColor="#94A3B8"
+              selectTextOnFocus
+              maxLength={8}
+              autoFocus={false}
+              onFocus={() => setPriceInputFocused(true)}
+              onBlur={() => setPriceInputFocused(false)}
+            />
+
+            <Text style={styles.currencyText}>FCFA</Text>
+          </View>
         </View>
       )}
 
