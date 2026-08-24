@@ -626,12 +626,15 @@ export function usePublishForm(authCtx: any) {
     setStopovers((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const reorderStopovers = useCallback((fromIndex: number, toIndex: number) => {
+  const reorderStopovers = useCallback((id: string, direction: 'up' | 'down') => {
     setStopovers((prev) => {
-      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) return prev;
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx === -1) return prev;
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
       const result = [...prev];
-      const [removed] = result.splice(fromIndex, 1);
-      result.splice(toIndex, 0, removed);
+      const [removed] = result.splice(idx, 1);
+      result.splice(targetIdx, 0, removed);
       return result;
     });
   }, []);

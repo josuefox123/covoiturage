@@ -59,7 +59,7 @@ interface StopoversStepProps {
   onRemoveStopover?: (id: string) => void;
 
   // Réordonner les arrêts
-  reorderStopovers?: (fromIndex: number, toIndex: number) => void;
+  reorderStopovers?: (id: string, direction: 'up' | 'down') => void;
 
   estimationLoading: boolean;
   estimation: any;
@@ -377,6 +377,21 @@ export function StopoversStep({
         définissez le temps nécessaire sur place.
       </Text>
 
+      {/* NB Card */}
+      {selectedStopovers.length > 1 && (
+        <View style={styles.nbCard}>
+          <Ionicons
+            name="information-circle-outline"
+            size={18}
+            color="#D97706"
+          />
+
+          <Text style={styles.nbText}>
+            <Text style={{ fontWeight: '800' }}>NB :</Text> Vous pouvez réordonner les étapes de votre trajet. Utilisez les flèches <Text style={{ fontWeight: '800' }}>↑</Text> et <Text style={{ fontWeight: '800' }}>↓</Text> à côté de chaque arrêt pour réorganiser l'ordre de passage.
+          </Text>
+        </View>
+      )}
+
       {/* Timeline */}
       <View style={styles.timelineContainer}>
         <View style={styles.timelineTrack} />
@@ -440,7 +455,7 @@ export function StopoversStep({
                     <View style={styles.reorderControls}>
                       {idx > 0 && (
                         <TouchableOpacity
-                          onPress={() => reorderStopovers(idx, idx - 1)}
+                          onPress={() => reorderStopovers(s.id, 'up')}
                           style={styles.reorderBtn}
                           activeOpacity={0.7}
                         >
@@ -449,7 +464,7 @@ export function StopoversStep({
                       )}
                       {idx < selectedStopovers.length - 1 && (
                         <TouchableOpacity
-                          onPress={() => reorderStopovers(idx, idx + 1)}
+                          onPress={() => reorderStopovers(s.id, 'down')}
                           style={styles.reorderBtn}
                           activeOpacity={0.7}
                         >
@@ -828,6 +843,26 @@ const styles = StyleSheet.create({
     color: theme.colors.textLight,
     marginBottom: 20,
     lineHeight: 21,
+  },
+
+  nbCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
+  },
+
+  nbText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#B45309',
+    lineHeight: 17,
   },
 
   recapContainer: {
