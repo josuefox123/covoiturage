@@ -135,6 +135,19 @@ export function StopoversStep({
           souhaitez réellement desservir.
         </Text>
 
+        {/* NB Card */}
+        <View style={styles.nbCard}>
+          <Ionicons
+            name="information-circle-outline"
+            size={18}
+            color="#D97706"
+          />
+
+          <Text style={styles.nbText}>
+            <Text style={{ fontWeight: '800' }}>NB :</Text> Cochez les arrêts proposés que vous souhaitez desservir. À l'étape suivante, vous pourrez réorganiser leur ordre à l'aide des flèches <Text style={{ fontWeight: '800' }}>↑</Text> et <Text style={{ fontWeight: '800' }}>↓</Text>.
+          </Text>
+        </View>
+
         {/* Récapitulatif trajet */}
         <View style={styles.recapContainer}>
           <View style={styles.recapRow}>
@@ -268,6 +281,36 @@ export function StopoversStep({
                           : 'Appuyez pour sélectionner'}
                       </Text>
                     </View>
+
+                    {/* Up/Down buttons pour les propositions cochées */}
+                    {checked && reorderStopovers && detectedStopovers.length > 1 && (
+                      <View style={styles.reorderControls}>
+                        {index > 0 && (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              reorderStopovers(s.id, 'up');
+                            }}
+                            style={styles.reorderBtn}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="arrow-up" size={13} color={theme.colors.primary} />
+                          </TouchableOpacity>
+                        )}
+                        {index < detectedStopovers.length - 1 && (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              reorderStopovers(s.id, 'down');
+                            }}
+                            style={styles.reorderBtn}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="arrow-down" size={13} color={theme.colors.primary} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
                   </TouchableOpacity>
 
                   {/* Choix position précise */}
@@ -376,21 +419,6 @@ export function StopoversStep({
         Vérifiez chaque arrêt, choisissez sa position précise et
         définissez le temps nécessaire sur place.
       </Text>
-
-      {/* NB Card */}
-      {selectedStopovers.length > 1 && (
-        <View style={styles.nbCard}>
-          <Ionicons
-            name="information-circle-outline"
-            size={18}
-            color="#D97706"
-          />
-
-          <Text style={styles.nbText}>
-            <Text style={{ fontWeight: '800' }}>NB :</Text> Vous pouvez réordonner les étapes de votre trajet. Utilisez les flèches <Text style={{ fontWeight: '800' }}>↑</Text> et <Text style={{ fontWeight: '800' }}>↓</Text> à côté de chaque arrêt pour réorganiser l'ordre de passage.
-          </Text>
-        </View>
-      )}
 
       {/* Timeline */}
       <View style={styles.timelineContainer}>

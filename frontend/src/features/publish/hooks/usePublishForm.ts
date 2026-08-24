@@ -627,16 +627,41 @@ export function usePublishForm(authCtx: any) {
   };
 
   const reorderStopovers = useCallback((id: string, direction: 'up' | 'down') => {
-    setStopovers((prev) => {
-      const idx = prev.findIndex((s) => s.id === id);
-      if (idx === -1) return prev;
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
-      const result = [...prev];
-      const [removed] = result.splice(idx, 1);
-      result.splice(targetIdx, 0, removed);
-      return result;
-    });
+    if (id.startsWith('stopover_')) {
+      setDetectedStopovers((prev) => {
+        const idx = prev.findIndex((s) => s.id === id);
+        if (idx === -1) return prev;
+        const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+        
+        const result = [...prev];
+        const [removed] = result.splice(idx, 1);
+        result.splice(targetIdx, 0, removed);
+        
+        // Synchroniser l'ordre de stopovers pour correspondre à detectedStopovers
+        setStopovers((prevStops) => {
+          const sorted = [...prevStops].sort((a, b) => {
+            const ia = result.findIndex((r) => r.name.toLowerCase() === a.name.toLowerCase());
+            const ib = result.findIndex((r) => r.name.toLowerCase() === b.name.toLowerCase());
+            return ia - ib;
+          });
+          return sorted;
+        });
+        
+        return result;
+      });
+    } else {
+      setStopovers((prev) => {
+        const idx = prev.findIndex((s) => s.id === id);
+        if (idx === -1) return prev;
+        const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+        const result = [...prev];
+        const [removed] = result.splice(idx, 1);
+        result.splice(targetIdx, 0, removed);
+        return result;
+      });
+    }
   }, []);
 
   const validateStep1 = () => {
