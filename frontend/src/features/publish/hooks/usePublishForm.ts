@@ -626,6 +626,16 @@ export function usePublishForm(authCtx: any) {
     setStopovers((prev) => prev.filter((s) => s.id !== id));
   };
 
+  const reorderStopovers = useCallback((fromIndex: number, toIndex: number) => {
+    setStopovers((prev) => {
+      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) return prev;
+      const result = [...prev];
+      const [removed] = result.splice(fromIndex, 1);
+      result.splice(toIndex, 0, removed);
+      return result;
+    });
+  }, []);
+
   const validateStep1 = () => {
     if (!departure.trim() || !arrival.trim()) {
       CustomAlert.alert('Champs manquants', 'Veuillez sélectionner un lieu de départ et d\'arrivée.');
@@ -1005,6 +1015,7 @@ export function usePublishForm(authCtx: any) {
     addStopover,
     updateStopover,
     removeStopover,
+    reorderStopovers,
     handleNext,
     handleBack,
     handlePublishPress,

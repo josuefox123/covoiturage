@@ -58,6 +58,9 @@ interface StopoversStepProps {
   // Optionnel : suppression d'un arrêt
   onRemoveStopover?: (id: string) => void;
 
+  // Réordonner les arrêts
+  reorderStopovers?: (fromIndex: number, toIndex: number) => void;
+
   estimationLoading: boolean;
   estimation: any;
 }
@@ -100,6 +103,7 @@ export function StopoversStep({
   stopovers,
   toggleStopoverCheck,
   updateStopover,
+  reorderStopovers,
   onAddStopoverPress,
   onPickLocationForStopover,
   onPickPositionForStopover,
@@ -430,6 +434,30 @@ export function StopoversStep({
                       </Text>
                     </View>
                   </View>
+
+                  {/* Boutons de réordonnancement (Up/Down) */}
+                  {reorderStopovers && selectedStopovers.length > 1 && (
+                    <View style={styles.reorderControls}>
+                      {idx > 0 && (
+                        <TouchableOpacity
+                          onPress={() => reorderStopovers(idx, idx - 1)}
+                          style={styles.reorderBtn}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="arrow-up" size={13} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      )}
+                      {idx < selectedStopovers.length - 1 && (
+                        <TouchableOpacity
+                          onPress={() => reorderStopovers(idx, idx + 1)}
+                          style={styles.reorderBtn}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="arrow-down" size={13} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
 
                   {/* Durée */}
                   <View style={styles.timelineDurationContainer}>
@@ -1146,6 +1174,24 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
+  },
+
+  reorderControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginRight: 4,
+  },
+
+  reorderBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   stopoverTitleContainer: {

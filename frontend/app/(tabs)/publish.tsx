@@ -360,6 +360,7 @@ export default function PublishScreen() {
             stopovers={form.stopovers}
             toggleStopoverCheck={form.toggleStopoverCheck}
             updateStopover={form.updateStopover}
+            reorderStopovers={form.reorderStopovers}
             onAddStopoverPress={() => form.setPickingLocationFor('new_custom')}
             onPickLocationForStopover={form.setPickingLocationFor}
             estimationLoading={form.estimationLoading}
