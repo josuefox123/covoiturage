@@ -329,9 +329,7 @@ export function PublishSummaryModal({
                         style={styles.stopRow}
                       >
                         <View style={styles.stopNumber}>
-                          <Text style={styles.stopNumberText}>
-                            {index + 1}
-                          </Text>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary }} />
                         </View>
 
                         <View style={styles.stopInfo}>
@@ -340,7 +338,7 @@ export function PublishSummaryModal({
                             numberOfLines={2}
                           >
                             {parsedStop.name ||
-                              `Étape ${index + 1}`}
+                              'Étape'}
                           </Text>
 
                           <View style={styles.stopMeta}>

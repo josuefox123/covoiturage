@@ -267,12 +267,6 @@ export function StopoversStep({
                         >
                           {s.name}
                         </Text>
-
-                        <View style={styles.proposalNumber}>
-                          <Text style={styles.proposalNumberText}>
-                            {index + 1}
-                          </Text>
-                        </View>
                       </View>
 
                       <Text style={styles.proposalHint}>
@@ -473,7 +467,7 @@ export function StopoversStep({
 
                     <View style={styles.stopoverBadge}>
                       <Text style={styles.stopoverBadgeText}>
-                        ARRÊT {idx + 1}
+                        ARRÊT
                       </Text>
                     </View>
                   </View>
