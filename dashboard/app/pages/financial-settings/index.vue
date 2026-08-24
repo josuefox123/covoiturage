@@ -106,19 +106,36 @@ Zemy
 
         <!-- ESTIMATION PRIX (TRAJETS) -->
         <h2 class="text-lg font-bold text-text">Recommandation de Prix (Trajets)</h2>
-        <div class="bg-gray-50 rounded-xl border border-gray-100 p-6 space-y-4">
-          <div class="space-y-2 max-w-sm">
-            <label class="block text-sm font-semibold text-text">Prix par kilomètre (FCFA/km)</label>
-            <div class="relative">
-              <input
-                v-model="settings.price_per_km"
-                type="number"
-                min="0"
-                class="w-full bg-white border border-border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-              />
-              <span class="absolute right-4 top-3 text-textLight">FCFA</span>
+        <div class="bg-gray-50 rounded-xl border border-gray-100 p-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-text">Prix par kilomètre (FCFA/km)</label>
+              <div class="relative">
+                <input
+                  v-model="settings.price_per_km"
+                  type="number"
+                  min="0"
+                  class="w-full bg-white border border-border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+                <span class="absolute right-4 top-3 text-textLight">FCFA</span>
+              </div>
+              <p class="text-xs text-textMuted">Valeur utilisée pour recommander un prix au conducteur lors de la publication d'un trajet.</p>
             </div>
-            <p class="text-xs text-textMuted">Valeur utilisée pour recommander un prix au conducteur lors de la publication d'un trajet.</p>
+
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-text">Marge de prix autorisée (%)</label>
+              <div class="relative">
+                <input
+                  v-model="settings.price_margin_percent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  class="w-full bg-white border border-border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+                <span class="absolute right-4 top-3 text-textLight">%</span>
+              </div>
+              <p class="text-xs text-textMuted">Marge autorisée au-dessus et en-dessous du prix suggéré (min / max).</p>
+            </div>
           </div>
         </div>
 
@@ -238,6 +255,7 @@ interface FinSettings {
   min_parcel_commission: number;
   max_parcel_commission: number | null;
   price_per_km: number;
+  price_margin_percent: number;
 }
 
 const settings = ref<FinSettings | null>(null)
@@ -260,7 +278,8 @@ onMounted(async () => {
         parcel_commission_percentage: 8,
         min_parcel_commission: 100,
         max_parcel_commission: null,
-        price_per_km: 30
+        price_per_km: 30,
+        price_margin_percent: 20
       }
     } else {
       error.value = "Impossible de charger les paramètres financiers."
