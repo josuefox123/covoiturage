@@ -45,6 +45,22 @@ class RidePublicationController:
         serializer = serializer_class(data=data)
         serializer.is_valid(raise_exception=True)
 
+        # Validation temporelle globale du chauffeur/véhicule
+        departure_date = serializer.validated_data.get('departure_date')
+        departure_time = serializer.validated_data.get('departure_time')
+        duration_min = serializer.validated_data.get('duration_min')
+        vehicle = serializer.validated_data.get('vehicle')
+        vehicle_id = vehicle.id if vehicle else None
+
+        from ...trajets.views.helpers import validate_driver_and_vehicle
+        validate_driver_and_vehicle(
+            driver=user,
+            vehicle_id=vehicle_id,
+            departure_date=departure_date,
+            departure_time=departure_time,
+            duration_min=duration_min
+        )
+
         ride = serializer.save(
             driver=user,
             zemy_commission=zemy_commission,

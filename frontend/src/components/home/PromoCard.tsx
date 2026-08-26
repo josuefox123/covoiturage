@@ -105,10 +105,10 @@ export default function PromoCard() {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 20, marginBottom: 24 },
+  container: { marginBottom: 16 },
   promoImage: { width: '100%', height: 140, borderRadius: 20 },
   card: {
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 22,
     flexDirection: 'row',
     alignItems: 'center',

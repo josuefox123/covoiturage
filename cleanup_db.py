@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 import os, sys, paramiko
 
 def load_secrets():
@@ -25,14 +25,29 @@ sys.path.insert(0, '/home/ewnhmjym/zemy/backend')
 import os, django
 os.environ['DJANGO_SETTINGS_MODULE'] = 'config.settings'
 django.setup()
-from api.models import (Ride, RideLeg, RideWaypoint, RideSeries, DirectionsCache, SearchAlert, Booking, Payment, Transaction, RefundRequest, DriverPayout, Conversation, Message, ModerationLog, Notification, Parcel, SupportTicket, AuditLog, Promotion)
-steps = [('DriverPayout',DriverPayout),('RefundRequest',RefundRequest),('Transaction',Transaction),('Payment',Payment),('Booking',Booking),('ModerationLog',ModerationLog),('Message',Message),('Conversation',Conversation),('Notification',Notification),('Parcel',Parcel),('SupportTicket',SupportTicket),('AuditLog',AuditLog),('Promotion',Promotion),('RideWaypoint',RideWaypoint),('RideLeg',RideLeg),('DirectionsCache',DirectionsCache),('SearchAlert',SearchAlert),('Ride',Ride),('RideSeries',RideSeries)]
-for name, model in steps:
-    count = model.objects.count()
-    model.objects.all().delete()
-    print(f'  [OK] {name}: {count} supprime(s)')
-from api.models import User, Vehicle
-print(f'Users conserves: {User.objects.count()} | Vehicles: {Vehicle.objects.count()}')
+
+print('=== NETTOYAGE BASE DE DONNEES (SERVEUR) ===')
+
+from api.models.utilisateur import User
+
+total_avant = User.objects.count()
+admins = list(User.objects.filter(is_staff=True).values_list('email', flat=True))
+print(f'Utilisateurs avant : {total_avant}')
+print(f'Admins a garder : {admins}')
+
+# Suppression en cascade de tous les non-admins
+# (trajets, reservations, messages, notifications... tout part avec)
+result = User.objects.filter(is_staff=False).delete()
+print('\\nObjets supprimes (cascade) :')
+for model_name, count in sorted(result[1].items(), key=lambda x: -x[1]):
+    if count > 0:
+        print(f'  {model_name}: {count}')
+
+print(f'\\nUtilisateurs restants : {User.objects.count()}')
+for u in User.objects.all():
+    print(f'  -> {u.email} | staff={u.is_staff} | superuser={u.is_superuser}')
+
+print('=== DONE ===')
 """
 
 client = paramiko.SSHClient()

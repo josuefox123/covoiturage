@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================
  * Fichier :
  * register.tsx
@@ -209,7 +209,7 @@ export default function RegisterScreen() {
       if (result === null) {
         setEmailAvailability('error');
       } else {
-        setEmailAvailability(result.email_available ? 'available' : 'taken');
+        setEmailAvailability(result?.available ? 'available' : 'taken');
       }
     }, DEBOUNCE_DELAY);
   };
@@ -235,7 +235,7 @@ export default function RegisterScreen() {
       if (result === null) {
         setPhoneAvailability('error');
       } else {
-        setPhoneAvailability(result.phone_available ? 'available' : 'taken');
+        setPhoneAvailability(result?.available ? 'available' : 'taken');
       }
     }, DEBOUNCE_DELAY);
   };
@@ -317,6 +317,10 @@ export default function RegisterScreen() {
     }
 
     // Bloquer si email ou téléphone déjà pris (selon la vérification en temps réel)
+      if (emailAvailability === 'checking' || emailAvailability === 'idle') {
+        setAlertConfig({ visible: true, title: "Vérification en cours", message: "Attendez la fin de vérification de l'email.", type: "warning" });
+        return;
+      }
     if (emailAvailability === 'taken') {
       setAlertConfig({
         visible: true,
@@ -327,6 +331,10 @@ export default function RegisterScreen() {
       return;
     }
 
+      if (phoneAvailability === 'checking' || phoneAvailability === 'idle') {
+        setAlertConfig({ visible: true, title: "Vérification en cours", message: "Attendez la fin de vérification du numéro.", type: "warning" });
+        return;
+      }
     if (phoneAvailability === 'taken') {
       setAlertConfig({
         visible: true,
@@ -734,10 +742,10 @@ export default function RegisterScreen() {
             <TouchableOpacity
               style={[
                 styles.registerButton,
-                (!isFormValid || loading || emailAvailability === 'taken' || phoneAvailability === 'taken') && styles.disabledButton,
+                (!isFormValid || loading || emailAvailability === 'checking' || emailAvailability === 'taken' || phoneAvailability === 'checking' || phoneAvailability === 'taken') && styles.disabledButton,
               ]}
               onPress={handleRegister}
-              disabled={loading || !isFormValid || emailAvailability === 'taken' || phoneAvailability === 'taken'}
+              disabled={loading || !isFormValid || emailAvailability === 'checking' || emailAvailability === 'taken' || phoneAvailability === 'checking' || phoneAvailability === 'taken'}
               activeOpacity={0.8}
             >
               {loading ? (

@@ -62,7 +62,15 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
     if current_ride_id:
         overlap_q &= ~Q(id=current_ride_id)
 
+    # Filter rides specifically for this driver or this vehicle to optimize DB query
+    # and strictly prevent conflicts with other users' rides.
+    if vehicle_id:
+        overlap_q &= (Q(driver=driver) | Q(vehicle_id=vehicle_id))
+    else:
+        overlap_q &= Q(driver=driver)
+
     active_rides = Ride.objects.filter(overlap_q)
+    driver_id = driver.id if hasattr(driver, 'id') else driver
 
     for ride in active_rides:
         r_start = datetime.combine(ride.departure_date, ride.departure_time)
@@ -72,7 +80,7 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
         is_overlapping = (start_dt < r_end) and (end_dt > r_start)
 
         if is_overlapping:
-            if ride.driver == driver:
+            if str(ride.driver_id) == str(driver_id):
                 raise ValidationError({
                     "error": f"Vous avez déjà un trajet prévu ({ride.departure_location} -> {ride.arrival_location}) sur cette plage horaire ({r_start.strftime('%H:%M')} - {r_end.strftime('%H:%M')})."
                 })

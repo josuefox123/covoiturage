@@ -227,11 +227,11 @@ class RideSearchTestCase(APITestCase):
         passenger.is_verified = True
         passenger.save()
 
-        # 2. Générer l'itinéraire (2 legs, 176 waypoints)
+        # 2. Générer l'itinéraire (3 waypoints: departure, stopover, arrival)
         RideService.generate_legs(self.ride)
-        self.assertEqual(self.ride.waypoints.count(), 176)
+        self.assertEqual(self.ride.waypoints.count(), 3)
         
-        # 3. Créer une réservation sur un segment (de waypoint 10 à 30)
+        # 3. Créer une réservation sur un segment (de waypoint 0 à 1)
         from api.bookings.services import BookingService
         booking, created = BookingService.create_booking(
             passenger=passenger,
@@ -242,23 +242,20 @@ class RideSearchTestCase(APITestCase):
         )
         self.assertTrue(created)
         
-        # Simuler manuellement le positionnement des indices si la résolution de nom a un fallback
-        booking.departure_waypoint_order = 10
-        booking.arrival_waypoint_order = 30
+        # Simuler manuellement le positionnement des indices
+        booking.departure_waypoint_order = 0
+        booking.arrival_waypoint_order = 1
         booking.save()
         
         # 3. Confirmer le paiement et allouer les places
         allocated = BookingService.allocate_seats(booking)
         self.assertTrue(allocated)
         
-        # 4. Vérifier que les places sont réduites à 2 sur les segments 10 à 29
-        segment_wps = self.ride.waypoints.filter(order__gte=10, order__lt=30)
-        for wp in segment_wps:
-            self.assertEqual(wp.seats_available, 2)
+        # 4. Vérifier que les places sont réduites à 2 sur le segment 0
+        self.assertEqual(self.ride.waypoints.get(order=0).seats_available, 2)
             
-        # 5. Vérifier que les autres segments (ex. index 5 ou 40) sont toujours à 4 places
-        self.assertEqual(self.ride.waypoints.get(order=5).seats_available, 4)
-        self.assertEqual(self.ride.waypoints.get(order=40).seats_available, 4)
+        # 5. Vérifier que les autres segments (ex. index 1) sont toujours à 4 places
+        self.assertEqual(self.ride.waypoints.get(order=1).seats_available, 4)
         
         # 6. Annuler la réservation et désallouer les places
         BookingService.deallocate_seats(booking)

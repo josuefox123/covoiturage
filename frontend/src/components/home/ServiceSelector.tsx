@@ -141,8 +141,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   card: {
     flex: 1,
