@@ -91,3 +91,10 @@ deploy_dashboard.py
 force_restart_daphne.py
 deploy_secrets.env
 
+
+# ===========================
+# Custom Agents & Tools
+# ===========================
+.agents/
+
+
