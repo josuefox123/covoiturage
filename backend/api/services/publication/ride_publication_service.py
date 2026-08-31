@@ -22,7 +22,7 @@ class RidePublicationService:
     """Service d'orchestration pour la publication d'un trajet et l'enrichissement de son itinéraire."""
 
     @staticmethod
-    def generate_legs(ride: Ride) -> None:
+    def generate_legs(ride: Ride, precalculated_route=None) -> None:
         """
         Génère et sauvegarde les segments (RideLeg) et les points de passage (RideWaypoint)
         pour un trajet.
@@ -39,16 +39,19 @@ class RidePublicationService:
         arr_lon = ride.arrival_longitude or 0.0
 
         # 1. Résolution de l'itinéraire via l'Orchestrateur (Google -> OSRM -> Haversine)
-        polyline, google_legs_raw, route_resolved = RoutesOrchestrator.get_route(
-            origin_lat=dep_lat,
-            origin_lon=dep_lon,
-            dest_lat=arr_lat,
-            dest_lon=arr_lon,
-            stopovers=stopovers,
-            origin_place_id=ride.departure_place_id or '',
-            dest_place_id=ride.arrival_place_id or '',
-            default_duration_min=ride.duration_min or 120
-        )
+        if precalculated_route is not None:
+            polyline, google_legs_raw, route_resolved = precalculated_route
+        else:
+            polyline, google_legs_raw, route_resolved = RoutesOrchestrator.get_route(
+                origin_lat=dep_lat,
+                origin_lon=dep_lon,
+                dest_lat=arr_lat,
+                dest_lon=arr_lon,
+                stopovers=stopovers,
+                origin_place_id=ride.departure_place_id or '',
+                dest_place_id=ride.arrival_place_id or '',
+                default_duration_min=ride.duration_min or 120
+            )
 
         # 4. Calcul de l'avancement cumulé sur la polyline
         polyline_stats = []
@@ -306,5 +309,9 @@ class RidePublicationService:
 
         # 9. Transaction atomique pour l'insertion via les services de niveau inférieur
         with transaction.atomic():
+            ride.distance_km = round(total_actual_dist_m / 1000.0, 2)
+            ride.duration_min = int(total_actual_duration_sec / 60.0)
+            ride.save(update_fields=['distance_km', 'duration_min'])
+
             legs_list = RideLegService.generate_legs(ride, nodes, legs_data, base_datetime)
             RideWaypointService.generate_waypoints(ride, candidates, legs_list)

@@ -18,6 +18,9 @@ class ReglesPublicationDomain:
         if end_date < start_date:
             return "La date de fin ne peut pas être antérieure à la date de début."
             
+        if (end_date - start_date).days > 90:
+            return "La période de récurrence ne peut pas dépasser 90 jours."
+
         if repeat_type == 'weekly' and not week_days:
             return "Veuillez sélectionner au moins un jour pour la récurrence."
             

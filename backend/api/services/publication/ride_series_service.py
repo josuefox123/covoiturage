@@ -81,6 +81,24 @@ class RideSeriesService:
             start_date, end_date, repeat_type, week_days
         )
 
+        # 4. Résoudre l'itinéraire Google Directions une seule fois pour toute la série (hors transaction)
+        precalculated_route = None
+        if target_dates:
+            from ...cartographie.routes import RoutesOrchestrator
+            try:
+                precalculated_route = RoutesOrchestrator.get_route(
+                    origin_lat=dep_lat or 0.0,
+                    origin_lon=dep_lon or 0.0,
+                    dest_lat=arr_lat or 0.0,
+                    dest_lon=arr_lon or 0.0,
+                    stopovers=None,
+                    origin_place_id='',
+                    dest_place_id='',
+                    default_duration_min=duration_min or 120
+                )
+            except Exception as e:
+                logger.warning(f"Erreur pré-calcul itinéraire récurrence : {e}")
+
         with transaction.atomic():
             # Validation temporelle globale du chauffeur/véhicule
             validate_driver_and_vehicle(
@@ -171,7 +189,7 @@ class RideSeriesService:
                 )
 
                 try:
-                    RidePublicationService.generate_legs(ride_obj)
+                    RidePublicationService.generate_legs(ride_obj, precalculated_route=precalculated_route)
                 except Exception as e:
                     logger.error(f"Erreur legs trajet récurrent {ride_obj.id}: {e}")
 

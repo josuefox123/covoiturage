@@ -30,12 +30,24 @@ def check_availability(request):
 def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_time, duration_min, current_ride_id=None):
     """
     Valide les règles métier d'un conducteur et son véhicule :
-    1. Compte vérifié pour publier un trajet (si c'est imposé, sinon warning log).
-    2. Le conducteur n'a pas déjà un autre trajet actif/started sur la même plage horaire.
-    3. Le véhicule sélectionné n'est pas déjà assigné à un autre trajet sur cette même plage.
+    1. Propriété du véhicule par le conducteur (IDOR Check).
+    2. Compte vérifié pour publier un trajet (si c'est imposé, sinon warning log).
+    3. Le conducteur n'a pas déjà un autre trajet actif/started sur la même plage horaire.
+    4. Le véhicule sélectionné n'est pas déjà assigné à un autre trajet sur cette même plage.
     """
     from rest_framework.exceptions import ValidationError
     from datetime import datetime, timedelta
+
+    driver_id = driver.id if hasattr(driver, 'id') else driver
+
+    if vehicle_id:
+        from ...models.utilisateur import Vehicle
+        try:
+            vehicle = Vehicle.objects.get(id=vehicle_id)
+            if vehicle.owner_id != driver_id:
+                raise ValidationError({"error": "Le véhicule sélectionné ne vous appartient pas."})
+        except Vehicle.DoesNotExist:
+            raise ValidationError({"error": "Le véhicule sélectionné est introuvable."})
 
     if not departure_date or not departure_time:
         raise ValidationError({"error": "La date et l'heure de départ sont obligatoires."})

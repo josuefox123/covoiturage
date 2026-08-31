@@ -509,7 +509,7 @@ LOGGING = {
 }
 
 
-# USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # SEV-001: Supprimer la clé hardcodée — la clé doit venir de l'environnement uniquement

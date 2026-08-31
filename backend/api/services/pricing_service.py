@@ -153,6 +153,10 @@ class PricingService:
                 passenger_price = driver_price
                 
             commission = passenger_price - driver_price
+
+            if commission < 50 and ride.zemy_commission > 0:
+                commission = 50
+                driver_price = max(50, passenger_price - 50)
             
             return PricingResult(
                 driver_price=driver_price,
@@ -192,6 +196,10 @@ class PricingService:
                 passenger_price = driver_price
                 
             commission = passenger_price - driver_price
+
+            if commission < 50 and ride.zemy_commission > 0:
+                commission = 50
+                driver_price = max(50, passenger_price - 50)
             
             return PricingResult(
                 driver_price=driver_price,
