@@ -1,3 +1,16 @@
+/**
+ * ==============================================================
+ * Fichier :
+ * LoginScreen/index.tsx
+ *
+ * Description :
+ * Écran de connexion premium pour l'application Zemy.
+ *
+ * Projet :
+ * Zemy
+ * ==============================================================
+ */
+
 import React, { useRef, useEffect, useCallback } from 'react';
 import {
   Text,
@@ -6,7 +19,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
   ActivityIndicator,
   Animated,
   ScrollView,
@@ -36,80 +48,85 @@ export default function LoginScreen() {
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
-  const formSlideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const cardSlide = useRef(new Animated.Value(40)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
+  const footerOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Initial animations
     Animated.sequence([
+      // 1. Logo pop-in
       Animated.parallel([
         Animated.spring(logoScale, {
           toValue: 1,
-          friction: 6,
-          tension: 80,
+          friction: 7,
+          tension: 70,
           useNativeDriver: true,
         }),
         Animated.timing(logoOpacity, {
           toValue: 1,
-          duration: 400,
+          duration: 350,
           useNativeDriver: true,
         }),
       ]),
+      // 2. Header slides up
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 500,
+          duration: 380,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 450,
+          duration: 380,
           useNativeDriver: true,
         }),
       ]),
-      Animated.timing(formSlideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
+      // 3. Card slides up
+      Animated.parallel([
+        Animated.timing(cardSlide, {
+          toValue: 0,
+          duration: 320,
+          useNativeDriver: true,
+        }),
+        Animated.timing(footerOpacity, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+      ]),
     ]).start();
   }, []);
 
   const handleIdentifierFocus = useCallback(() => {
     form.setIdentifierFocused(true);
-
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({
-          y: 180,
-          animated: true,
-        });
-      }, 150);
-    });
   }, [form.setIdentifierFocused]);
 
   const handlePasswordFocus = useCallback(() => {
     form.setPasswordFocused(true);
-
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({
-          y: 300,
-          animated: true,
-        });
-      }, 150);
-    });
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 200, animated: true });
+    }, 200);
   }, [form.setPasswordFocused]);
 
   const handlePressIn = useCallback(() => {
-    Animated.spring(buttonScale, { toValue: 0.96, friction: 5, tension: 120, useNativeDriver: true }).start();
+    Animated.spring(buttonScale, {
+      toValue: 0.97,
+      friction: 8,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
   }, [buttonScale]);
 
   const handlePressOut = useCallback(() => {
-    Animated.spring(buttonScale, { toValue: 1, friction: 5, tension: 120, useNativeDriver: true }).start();
+    Animated.spring(buttonScale, {
+      toValue: 1,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
   }, [buttonScale]);
 
   const dismissKeyboard = useCallback(() => {
@@ -120,305 +137,355 @@ export default function LoginScreen() {
 
   const handleForgotPassword = useCallback(() => {
     Keyboard.dismiss();
-    const emailParam = form.identifier && form.identifier.includes('@') ? form.identifier : '';
-    router.push({ pathname: '/(auth)/forgot-password', params: { email: emailParam } });
+    const emailParam =
+      form.identifier && form.identifier.includes('@') ? form.identifier : '';
+    router.push({
+      pathname: '/(auth)/forgot-password',
+      params: { email: emailParam },
+    });
   }, [form.identifier, router]);
+
+  const isButtonDisabled = form.loading || !form.identifier || !form.password;
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={styles.keyboardWrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <TouchableWithoutFeedback onPress={dismissKeyboard}>
-        <SafeAreaView style={styles.container}>
-          <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <StatusBar style="dark" translucent backgroundColor="transparent" />
 
-          <ScrollView
-            ref={scrollViewRef}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            bounces={false}
-          >
-            {/* ═══════════════════════════════════════════════
-                EN-TÊTE PREMIUM
-            ═══════════════════════════════════════════════ */}
-            <View style={styles.headerSection}>
-              {/* Bouton retour */}
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => {
-                  if (router.canGoBack()) {
-                    router.back();
-                  } else {
-                    router.replace('/');
-                  }
-                }}
-                activeOpacity={0.7}
-                accessibilityLabel="Retour"
-              >
-                <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
-              </TouchableOpacity>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          onScrollBeginDrag={dismissKeyboard}
+        >
+          {/* ─── HEADER ─────────────────────────────────────────── */}
+          <View style={styles.headerSection}>
+            {/* Bouton retour */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/');
+                }
+              }}
+              activeOpacity={0.75}
+              accessibilityLabel="Retour à l'écran précédent"
+              accessibilityRole="button"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="arrow-back" size={18} color={theme.colors.text} />
+            </TouchableOpacity>
 
-              {/* Logo + Identité de marque */}
-              <Animated.View
-                style={[
-                  styles.brandContainer,
-                  { opacity: logoOpacity, transform: [{ scale: logoScale }] },
-                ]}
-              >
-                <View style={styles.logoWrapper}>
-                  <Image
-                    source={require('../../../../../assets/images/logozemy.png')}
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                    accessibilityLabel="Logo Zemy"
-                  />
-                </View>
-
-                <Text style={styles.brandTagline}>Transport & covoiturage</Text>
-              </Animated.View>
-
-              {/* Titre de bienvenue */}
-              <Animated.View
-                style={[
-                  styles.welcomeContainer,
-                  { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-                ]}
-              >
-                <View style={styles.welcomeRow}>
-                  <Text style={styles.welcomeTitle}>
-                    <Text style={styles.welcomeHighlight}>Bienvenue</Text>
-                  </Text>
-                </View>
-                <Text style={styles.welcomeSubtitle}>
-                  Connectez-vous pour accéder à votre espace
-                </Text>
-              </Animated.View>
-            </View>
-
-            {/* ═══════════════════════════════════════════════
-                CARTE DE CONNEXION PREMIUM
-            ═══════════════════════════════════════════════ */}
+            {/* Logo + identité */}
             <Animated.View
               style={[
-                styles.card,
-                { opacity: fadeAnim, transform: [{ translateY: formSlideAnim }] },
+                styles.brandContainer,
+                { opacity: logoOpacity, transform: [{ scale: logoScale }] },
               ]}
             >
-              {/* ─── Champ Numéro de téléphone Premium ─── */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Numéro de téléphone</Text>
-
-                <View
-                  style={[
-                    styles.phoneInputContainer,
-                    form.identifierFocused && styles.phoneInputContainerFocused,
-                  ]}
-                >
-                  {/* Sélecteur de pays */}
-                  <TouchableOpacity
-                    style={styles.countrySelector}
-                    onPress={() => form.setShowCountryPicker(true)}
-                    activeOpacity={0.7}
-                    accessibilityLabel="Choisir le pays"
-                    accessibilityRole="button"
-                  >
-                    <CountryPicker
-                      countryCode={form.countryCode}
-                      withFlag
-                      withCallingCode
-                      withFilter
-                      withAlphaFilter
-                      withEmoji
-                      onSelect={form.handleCountrySelect}
-                      visible={form.showCountryPicker}
-                      onClose={() => form.setShowCountryPicker(false)}
-                      preferredCountries={['BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA', 'NG']}
-                      containerButtonStyle={styles.pickerButtonStyle}
-                    />
-                    <Ionicons name="chevron-down" size={10} color={theme.colors.textMuted} />
-                  </TouchableOpacity>
-
-                  {/* Divider vertical */}
-                  <View style={styles.phoneDivider} />
-
-                  {/* Indicatif */}
-                  <Text style={styles.phoneCallingCode}>+{form.callingCode}</Text>
-
-                  {/* Champ numéro */}
-                  <TextInput
-                    ref={phoneInputRef}
-                    style={styles.phoneTextInput}
-                    placeholder="ex: 01 95 95 95 95"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={form.identifier}
-                    onChangeText={(value) => {
-                      const cleaned = value.replace(/[^\d\s]/g, '');
-                      form.setIdentifier(cleaned);
-                    }}
-                    onFocus={handleIdentifierFocus}
-                    onBlur={() => form.setIdentifierFocused(false)}
-                    autoCapitalize="none"
-                    keyboardType="phone-pad"
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordInputRef.current?.focus()}
-                    blurOnSubmit={false}
-                    autoComplete="tel"
-                    textContentType="telephoneNumber"
-                    accessibilityLabel="Numéro de téléphone"
-                  />
-
-                  {form.identifier.length > 0 && (
-                    <TouchableOpacity
-                      onPress={() => form.setIdentifier('')}
-                      style={styles.clearBtn}
-                      accessibilityLabel="Effacer"
-                    >
-                      <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {form.phoneFormatHint && (
-                  <View style={styles.hintRow}>
-                    <Ionicons name="information-circle-outline" size={12} color={theme.colors.primary} />
-                    <Text style={styles.hintText}>{form.phoneFormatHint}</Text>
-                  </View>
-                )}
+              <View style={styles.logoWrapper}>
+                <Image
+                  source={require('../../../../../assets/images/logozemy.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                  accessibilityLabel="Logo Zemy"
+                />
               </View>
+              <Text style={styles.brandTagline}>Transport &amp; covoiturage</Text>
+            </Animated.View>
 
-              {/* ─── Champ Mot de passe ─── */}
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <Text style={styles.fieldLabel}>Mot de passe</Text>
-                  <TouchableOpacity onPress={handleForgotPassword} accessibilityRole="button">
-                    <Text style={styles.forgotLink}>Oublié ?</Text>
-                  </TouchableOpacity>
-                </View>
+            {/* Titre de bienvenue */}
+            <Animated.View
+              style={[
+                styles.welcomeContainer,
+                { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+              ]}
+            >
+              <Text style={styles.welcomeTitle}>Bienvenue</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Connectez-vous pour accéder à votre espace
+              </Text>
+            </Animated.View>
+          </View>
 
-                <View
-                  style={[
-                    styles.inputBox,
-                    form.passwordFocused && styles.inputBoxFocused,
-                  ]}
+          {/* ─── CARTE DE CONNEXION ──────────────────────────────── */}
+          <Animated.View
+            style={[
+              styles.card,
+              { opacity: fadeAnim, transform: [{ translateY: cardSlide }] },
+            ]}
+          >
+            {/* ─── Champ téléphone ─── */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Numéro de téléphone</Text>
+
+              <View
+                style={[
+                  styles.phoneInputContainer,
+                  form.identifierFocused && styles.inputFocused,
+                ]}
+              >
+                {/* Sélecteur pays */}
+                <TouchableOpacity
+                  style={styles.countrySelector}
+                  onPress={() => form.setShowCountryPicker(true)}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Choisir le pays"
+                  accessibilityRole="button"
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 >
-                  <View style={styles.inputLeadingIcon}>
-                    <Ionicons
-                      name="lock-closed-outline"
-                      size={18}
-                      color={form.passwordFocused ? theme.colors.primary : theme.colors.textMuted}
-                    />
-                  </View>
-                  <TextInput
-                    ref={passwordInputRef}
-                    style={styles.textInput}
-                    placeholder="Votre mot de passe"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={form.password}
-                    onChangeText={form.setPassword}
-                    onFocus={handlePasswordFocus}
-                    onBlur={() => form.setPasswordFocused(false)}
-                    secureTextEntry={!form.showPassword}
-                    returnKeyType="done"
-                    onSubmitEditing={form.handleLogin}
-                    autoComplete="password"
-                    textContentType="password"
-                    accessibilityLabel="Mot de passe"
+                  <CountryPicker
+                    countryCode={form.countryCode}
+                    withFlag
+                    withCallingCode
+                    withFilter
+                    withAlphaFilter
+                    withEmoji
+                    onSelect={form.handleCountrySelect}
+                    visible={form.showCountryPicker}
+                    onClose={() => form.setShowCountryPicker(false)}
+                    preferredCountries={[
+                      'BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA', 'NG',
+                    ]}
+                    containerButtonStyle={styles.pickerButtonStyle}
                   />
+                  <Ionicons
+                    name="chevron-down"
+                    size={11}
+                    color={theme.colors.textMuted}
+                  />
+                </TouchableOpacity>
+
+                {/* Séparateur */}
+                <View style={styles.phoneDivider} />
+
+                {/* Indicatif */}
+                <Text style={styles.phoneCallingCode}>+{form.callingCode}</Text>
+
+                {/* Champ numéro */}
+                <TextInput
+                  ref={phoneInputRef}
+                  style={styles.phoneTextInput}
+                  placeholder="01 23 45 67 89"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={form.identifier}
+                  onChangeText={(value) => {
+                    const cleaned = value.replace(/[^\d\s]/g, '');
+                    form.setIdentifier(cleaned);
+                  }}
+                  onFocus={handleIdentifierFocus}
+                  onBlur={() => form.setIdentifierFocused(false)}
+                  autoCapitalize="none"
+                  keyboardType="phone-pad"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  accessibilityLabel="Numéro de téléphone"
+                  accessibilityHint="Entrez votre numéro sans l'indicatif pays"
+                />
+
+                {/* Bouton effacer */}
+                {form.identifier.length > 0 && (
                   <TouchableOpacity
-                    onPress={() => form.setShowPassword(!form.showPassword)}
-                    style={styles.eyeBtn}
-                    accessibilityLabel={form.showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                    onPress={() => form.setIdentifier('')}
+                    style={styles.clearBtn}
+                    accessibilityLabel="Effacer le numéro"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <Ionicons
-                      name={form.showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={18}
+                      name="close-circle"
+                      size={17}
                       color={theme.colors.textMuted}
                     />
                   </TouchableOpacity>
-                </View>
+                )}
               </View>
 
-              {/* ─── Bouton Connexion ─── */}
-              <Animated.View style={{ transform: [{ scale: buttonScale }], marginTop: 4 }}>
-                <TouchableOpacity
-                  onPress={form.handleLogin}
-                  disabled={form.loading || !form.identifier || !form.password}
-                  onPressIn={handlePressIn}
-                  onPressOut={handlePressOut}
-                  activeOpacity={0.92}
-                  accessibilityRole="button"
-                  accessibilityLabel="Se connecter"
-                >
-                  <LinearGradient
-                    colors={
-                      !form.identifier || !form.password || form.loading
-                        ? [theme.colors.grayLight, theme.colors.grayLight]
-                        : [theme.colors.primary, theme.colors.primaryDark || '#1A4FC8']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.loginBtn}
-                  >
-                    {form.loading ? (
-                      <View style={styles.loadingRow}>
-                        <ActivityIndicator color="#fff" size="small" />
-                        <Text style={styles.loginBtnText}>Connexion en cours...</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.loginBtnContent}>
-                        <Text
-                          style={[
-                            styles.loginBtnText,
-                            (!form.identifier || !form.password) && { color: theme.colors.textMuted },
-                          ]}
-                        >
-                          Se connecter
-                        </Text>
-                        {form.identifier && form.password && (
-                          <Ionicons name="arrow-forward" size={18} color="#fff" />
-                        )}
-                      </View>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            </Animated.View>
+              {/* Hint format */}
+              {form.phoneFormatHint && (
+                <View style={styles.hintRow}>
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={12}
+                    color={theme.colors.primary}
+                  />
+                  <Text style={styles.hintText}>{form.phoneFormatHint}</Text>
+                </View>
+              )}
+            </View>
 
-            {/* ═══════════════════════════════════════════════
-                FOOTER – Lien inscription
-            ═══════════════════════════════════════════════ */}
-            <Animated.View
-              style={[styles.footer, { opacity: fadeAnim }]}
-            >
-              <Text style={styles.footerText}>Pas encore de compte ?</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/(auth)/register')}
-                activeOpacity={0.7}
-                style={styles.registerBtn}
-                accessibilityRole="button"
-                accessibilityLabel="S'inscrire"
+            {/* ─── Champ mot de passe ─── */}
+            <View style={styles.fieldGroup}>
+              <View style={styles.fieldLabelRow}>
+                <Text style={styles.fieldLabel}>Mot de passe</Text>
+                <TouchableOpacity
+                  onPress={handleForgotPassword}
+                  accessibilityRole="button"
+                  accessibilityLabel="Mot de passe oublié"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.forgotLink}>Mot de passe oublié ?</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={[
+                  styles.inputBox,
+                  form.passwordFocused && styles.inputFocused,
+                ]}
               >
-                <Text style={styles.registerBtnText}>Créer un compte</Text>
-                <Ionicons name="arrow-forward" size={13} color={theme.colors.primary} />
+                <View style={styles.inputLeadingIcon}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={17}
+                    color={
+                      form.passwordFocused
+                        ? theme.colors.primary
+                        : theme.colors.textMuted
+                    }
+                  />
+                </View>
+                <TextInput
+                  ref={passwordInputRef}
+                  style={styles.textInput}
+                  placeholder="Votre mot de passe"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={form.password}
+                  onChangeText={form.setPassword}
+                  onFocus={handlePasswordFocus}
+                  onBlur={() => form.setPasswordFocused(false)}
+                  secureTextEntry={!form.showPassword}
+                  returnKeyType="done"
+                  onSubmitEditing={form.handleLogin}
+                  autoComplete="password"
+                  textContentType="password"
+                  accessibilityLabel="Mot de passe"
+                  accessibilityHint="Entrez votre mot de passe"
+                />
+                <TouchableOpacity
+                  onPress={() => form.setShowPassword(!form.showPassword)}
+                  style={styles.eyeBtn}
+                  accessibilityLabel={
+                    form.showPassword
+                      ? 'Masquer le mot de passe'
+                      : 'Afficher le mot de passe'
+                  }
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name={form.showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={theme.colors.textMuted}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ─── Bouton Connexion ─── */}
+            <Animated.View
+              style={[
+                styles.loginBtnWrap,
+                { transform: [{ scale: buttonScale }] },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={form.handleLogin}
+                disabled={isButtonDisabled}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                activeOpacity={0.92}
+                accessibilityRole="button"
+                accessibilityLabel="Se connecter"
+                accessibilityHint={
+                  isButtonDisabled
+                    ? 'Remplissez tous les champs pour continuer'
+                    : 'Appuyez pour vous connecter'
+                }
+              >
+                <LinearGradient
+                  colors={
+                    isButtonDisabled
+                      ? [theme.colors.grayLight, theme.colors.grayLight]
+                      : [theme.colors.primary, theme.colors.primaryDark]
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.loginBtn}
+                >
+                  {form.loading ? (
+                    <View style={styles.loadingRow}>
+                      <ActivityIndicator color="#fff" size="small" />
+                      <Text style={styles.loginBtnText}>Connexion en cours...</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.loginBtnContent}>
+                      <Text
+                        style={[
+                          styles.loginBtnText,
+                          isButtonDisabled && { color: theme.colors.textMuted },
+                        ]}
+                      >
+                        Se connecter
+                      </Text>
+                      {!isButtonDisabled && (
+                        <Ionicons name="arrow-forward" size={17} color="#fff" />
+                      )}
+                    </View>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Espace clavier */}
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
+            {/* ─── Badge de sécurité ─── */}
+            <View style={styles.securityBadge}>
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={13}
+                color={theme.colors.secondary}
+              />
+              <Text style={styles.securityText}>Connexion sécurisée</Text>
+            </View>
+          </Animated.View>
 
-          <CustomAlert
-            visible={form.alertConfig.visible}
-            title={form.alertConfig.title}
-            message={form.alertConfig.message}
-            type={form.alertConfig.type as any}
-            onClose={() => form.setAlertConfig({ ...form.alertConfig, visible: false })}
-          />
-        </SafeAreaView>
-      </TouchableWithoutFeedback>
+          {/* ─── FOOTER – Inscription ────────────────────────────── */}
+          <Animated.View style={[styles.footer, { opacity: footerOpacity }]}>
+            <Text style={styles.footerText}>Pas encore de compte ?</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/register')}
+              activeOpacity={0.75}
+              style={styles.registerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Créer un compte"
+            >
+              <Text style={styles.registerBtnText}>Créer un compte</Text>
+              <Ionicons name="arrow-forward" size={14} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </Animated.View>
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+
+        {/* Alert */}
+        <CustomAlert
+          visible={form.alertConfig.visible}
+          title={form.alertConfig.title}
+          message={form.alertConfig.message}
+          type={form.alertConfig.type as any}
+          onClose={() =>
+            form.setAlertConfig({ ...form.alertConfig, visible: false })
+          }
+        />
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }

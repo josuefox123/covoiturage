@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ==============================================================
  * Fichier :
  * register.tsx
@@ -317,10 +317,10 @@ export default function RegisterScreen() {
     }
 
     // Bloquer si email ou téléphone déjà pris (selon la vérification en temps réel)
-      if (emailAvailability === 'checking' || emailAvailability === 'idle') {
-        setAlertConfig({ visible: true, title: "Vérification en cours", message: "Attendez la fin de vérification de l'email.", type: "warning" });
-        return;
-      }
+    if (emailAvailability === 'checking' || emailAvailability === 'idle') {
+      setAlertConfig({ visible: true, title: "Vérification en cours", message: "Attendez la fin de vérification de l'email.", type: "warning" });
+      return;
+    }
     if (emailAvailability === 'taken') {
       setAlertConfig({
         visible: true,
@@ -331,10 +331,10 @@ export default function RegisterScreen() {
       return;
     }
 
-      if (phoneAvailability === 'checking' || phoneAvailability === 'idle') {
-        setAlertConfig({ visible: true, title: "Vérification en cours", message: "Attendez la fin de vérification du numéro.", type: "warning" });
-        return;
-      }
+    if (phoneAvailability === 'checking' || phoneAvailability === 'idle') {
+      setAlertConfig({ visible: true, title: "Vérification en cours", message: "Attendez la fin de vérification du numéro.", type: "warning" });
+      return;
+    }
     if (phoneAvailability === 'taken') {
       setAlertConfig({
         visible: true,
