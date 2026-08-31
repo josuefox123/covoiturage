@@ -184,23 +184,6 @@ export default function LoginScreen() {
               <Ionicons name="arrow-back" size={18} color={theme.colors.text} />
             </TouchableOpacity>
 
-            {/* Logo + identité */}
-            <Animated.View
-              style={[
-                styles.brandContainer,
-                { opacity: logoOpacity, transform: [{ scale: logoScale }] },
-              ]}
-            >
-              <View style={styles.logoWrapper}>
-                <Image
-                  source={require('../../../../../assets/images/logozemy.png')}
-                  style={styles.logoImage}
-                  resizeMode="contain"
-                  accessibilityLabel="Logo Zemy"
-                />
-              </View>
-              <Text style={styles.brandTagline}>Transport &amp; covoiturage</Text>
-            </Animated.View>
 
             {/* Titre de bienvenue */}
             <Animated.View
