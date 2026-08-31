@@ -350,21 +350,6 @@ export default function HomeScreen() {
 
         <View style={styles.content}>
 
-          {/* ------------------------------------------------
-              TITRE
-          ------------------------------------------------ */}
-
-          <View style={styles.heroSection}>
-
-            <Text style={styles.heroEyebrow}>VOTRE PROCHAIN TRAJET</Text>
-
-            <Text style={styles.heroTitle}>
-              Où souhaitez-vous{' '}
-              <Text style={styles.heroTitleAccent}>aller aujourd'hui ?</Text>
-            </Text>
-
-          </View>
-
           {/* =================================================
               SELECTEUR SERVICE
           ================================================= */}
@@ -462,24 +447,24 @@ export default function HomeScreen() {
 
           initialLocation={
             pickingFor === 'departure' &&
-            searchParams.departure &&
-            coords.departure_lat !== undefined &&
-            coords.departure_lon !== undefined
+              searchParams.departure &&
+              coords.departure_lat !== undefined &&
+              coords.departure_lon !== undefined
               ? {
-                  latitude: coords.departure_lat,
-                  longitude: coords.departure_lon,
-                  name: searchParams.departure,
-                }
+                latitude: coords.departure_lat,
+                longitude: coords.departure_lon,
+                name: searchParams.departure,
+              }
               : pickingFor === 'arrival' &&
                 searchParams.destination &&
                 coords.arrival_lat !== undefined &&
                 coords.arrival_lon !== undefined
-              ? {
+                ? {
                   latitude: coords.arrival_lat,
                   longitude: coords.arrival_lon,
                   name: searchParams.destination,
                 }
-              : undefined
+                : undefined
           }
 
           onLocationSelected={(loc) => {
