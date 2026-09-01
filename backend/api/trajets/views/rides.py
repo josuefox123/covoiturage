@@ -136,6 +136,8 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
+        from .helpers import auto_complete_past_rides
+        auto_complete_past_rides()
         queryset = super().get_queryset().select_related('driver', 'vehicle').prefetch_related('driver__vehicles')
         query_params = self.request.query_params if hasattr(self.request, 'query_params') else self.request.GET
         departure = query_params.get('departure')

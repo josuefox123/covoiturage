@@ -18,6 +18,41 @@ def get_query_params(request):
     return getattr(request, 'query_params', None) or request.GET
 
 
+def auto_complete_past_rides():
+    """
+    Auto-clôture (status='completed') les trajets actifs ou démarrés dont la date de départ
+    est dépassée depuis plus de 24 heures.
+    Met également à jour les réservations confirmées de ces trajets en 'completed'.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    from ...models.trajet import Ride
+    from ...models.reservation import Booking
+
+    now = timezone.now()
+    cutoff_date = (now - timedelta(hours=24)).date()
+
+    expired_rides = Ride.objects.filter(
+        status__in=['active', 'started'],
+        departure_date__lt=cutoff_date
+    )
+
+    count = 0
+    for ride in expired_rides:
+        ride.status = 'completed'
+        ride.save(update_fields=['status'])
+        Booking.objects.filter(
+            ride=ride,
+            status__in=['confirmed', 'active', 'started', 'pending_payment']
+        ).update(status='completed')
+        count += 1
+
+    if count > 0:
+        import logging
+        logging.getLogger(__name__).info(f"[AUTO-COMPLETE] {count} ancien(s) trajet(s) dépassé(s) auto-clôturés.")
+    return count
+
+
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def check_availability(request):
@@ -56,6 +91,9 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
 
     # Statuts qui constituent un vrai conflit horaire
     ACTIVE_STATUSES = ['active', 'started']
+
+    # Purge et auto-clôture automatique des anciens trajets dépassés (>24h)
+    auto_complete_past_rides()
 
     driver_id = getattr(driver, 'id', driver)
     if not driver_id:

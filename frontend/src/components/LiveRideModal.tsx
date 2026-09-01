@@ -221,7 +221,8 @@ const isItTimeForLiveRide = (dateStr: string, timeStr: string): boolean => {
   const departureDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
   const now = new Date();
   const tenMinutesBefore = new Date(departureDate.getTime() - 10 * 60 * 1000);
-  return now.getTime() >= tenMinutesBefore.getTime();
+  const twentyFourHoursAfter = new Date(departureDate.getTime() + 24 * 60 * 60 * 1000);
+  return now.getTime() >= tenMinutesBefore.getTime() && now.getTime() <= twentyFourHoursAfter.getTime();
 };
 
 // ============================================================
