@@ -36,6 +36,7 @@ export function VehicleModal({
   vehicleId,
   onSaveSuccess,
 }: VehicleModalProps) {
+  const [activeVehicleId, setActiveVehicleId] = useState<string | null>(vehicleId);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [brand, setBrand] = useState('');
@@ -66,7 +67,8 @@ export function VehicleModal({
       try {
         const data = await authFetch('/vehicles/');
         if (data && data.length > 0) {
-          const vehicle = data[0];
+          const vehicle = vehicleId ? (data.find((v: any) => v.id === vehicleId) || data[0]) : data[0];
+          setActiveVehicleId(vehicle.id);
           const parts = (vehicle.brand_model || '').split(' ');
           setBrand(parts[0] || '');
           setModel(parts.slice(1).join(' ') || '');
@@ -77,6 +79,7 @@ export function VehicleModal({
           setLicenseExpiration(vehicle.license_expiration || '');
           setDriverLicensePhoto(vehicle.driver_license_photo || null);
         } else {
+          setActiveVehicleId(null);
           setBrand('');
           setModel('');
           setColor('');
@@ -168,13 +171,14 @@ export function VehicleModal({
     }
 
     try {
-      if (vehicleId) {
-        await authFetch(`/vehicles/${vehicleId}/`, {
+      const targetId = vehicleId || activeVehicleId;
+      if (targetId) {
+        await authFetch(`/vehicles/${targetId}/`, {
           method: 'PATCH',
           body: formData,
         });
         CustomAlert.alert('Succès', 'Véhicule mis à jour !');
-        onSaveSuccess({ id: vehicleId, brand: brand.trim(), model: model.trim(), plate: plate.trim() });
+        onSaveSuccess({ id: targetId, brand: brand.trim(), model: model.trim(), plate: plate.trim() });
       } else {
         const res = await authFetch('/vehicles/', {
           method: 'POST',

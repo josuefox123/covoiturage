@@ -901,14 +901,17 @@ export function usePublishForm(authCtx: any) {
       formData.append('driver_license_photo', { uri: driverLicensePhoto, name: filename, type } as any);
     }
     try {
-      const res = await authFetch('/vehicles/', { method: 'POST', body: formData });
+      const targetVehicleId = vehicleId;
+      const method = targetVehicleId ? 'PATCH' : 'POST';
+      const url = targetVehicleId ? `/vehicles/${targetVehicleId}/` : '/vehicles/';
+      const res = await authFetch(url, { method, body: formData });
       if (res && res.id) {
         setVehicleId(res.id);
       }
       setHasVehicle(true);
       setProfileStep('preferences');
     } catch (e: any) {
-      CustomAlert.alert('Erreur', e.message || 'Impossible d\'ajouter le véhicule.');
+      CustomAlert.alert('Erreur', e.message || 'Impossible d\'enregistrer le véhicule.');
     } finally { setIsSavingProfile(false); }
   };
 
