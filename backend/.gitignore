@@ -1,19 +1,39 @@
-# Python
+# Python & Pycache
 __pycache__/
 *.py[cod]
 *$py.class
 
+# Tests & Temporary Files
+tests/
+api/tests/
+scratch/
+test_*.py
+*_test.py
+
+# Secrets & Credentials
+*firebase-adminsdk*.json
+*service-account*.json
+.env
+.env.*
+deploy_secrets.env
+*.zip
+
+# Deployment
+deploy*
+*.zip
+
 # Django
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
+*.sqlite3
+*.sqlite3-journal
 
 # Environments
 venv/
 ENV/
 env/
-.env
 
-# Media
+# Media & Static
 media/
+staticfiles/
+static/
