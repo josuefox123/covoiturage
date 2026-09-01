@@ -70,8 +70,9 @@ export default function ProfileScreen() {
   const fetchVehicle = async () => {
     try {
       const data = await authFetch('/vehicles/');
-      if (data && data.length > 0) {
-        const vehicle = data[0];
+      const list = Array.isArray(data) ? data : (data?.results || []);
+      if (list.length > 0) {
+        const vehicle = list[0];
         setVehicleId(vehicle.id);
         const parts = (vehicle.brand_model || '').split(' ');
         setBrand(parts[0] || '');

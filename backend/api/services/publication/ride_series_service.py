@@ -123,6 +123,8 @@ class RideSeriesService:
             vehicle_obj = None
             if vehicle_id:
                 vehicle_obj = Vehicle.objects.filter(id=vehicle_id).first()
+            if not vehicle_obj:
+                vehicle_obj = Vehicle.objects.filter(owner=driver).first()
 
             # Création de la série via Repository
             series = RideSeriesRepository.create_series(

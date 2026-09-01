@@ -69,8 +69,9 @@ export function VehicleModal({
     const fetchVehicle = async () => {
       try {
         const data = await authFetch('/vehicles/');
-        if (data && data.length > 0) {
-          const vehicle = vehicleId ? (data.find((v: any) => v.id === vehicleId) || data[0]) : data[0];
+        const list = Array.isArray(data) ? data : (data?.results || []);
+        if (list.length > 0) {
+          const vehicle = vehicleId ? (list.find((v: any) => v.id === vehicleId) || list[0]) : list[0];
           setActiveVehicleId(vehicle.id);
           const parts = (vehicle.brand_model || '').split(' ');
           setBrand(parts[0] || '');
