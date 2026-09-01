@@ -46,6 +46,7 @@ export default function HomeScreen() {
 
   const {
     user,
+    userLocation,
     refreshUser,
     hasStartedVerification,
     setHasStartedVerification,
@@ -218,39 +219,60 @@ export default function HomeScreen() {
 
     try {
       setNearbyLoading(true);
+      const startTime = Date.now();
 
-      const {
-        status: existingStatus,
-      } = await Location.getForegroundPermissionsAsync();
+      let latitude = userLocation?.latitude ?? null;
+      let longitude = userLocation?.longitude ?? null;
 
-      let permissionStatus = existingStatus;
+      if (latitude === null || longitude === null) {
+        const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+        let permissionStatus = existingStatus;
 
-      if (existingStatus !== Location.PermissionStatus.GRANTED) {
-        const permission =
-          await Location.requestForegroundPermissionsAsync();
-        permissionStatus = permission.status;
+        if (existingStatus !== Location.PermissionStatus.GRANTED) {
+          const permission = await Location.requestForegroundPermissionsAsync();
+          permissionStatus = permission.status;
+        }
+
+        if (permissionStatus === Location.PermissionStatus.GRANTED) {
+          // 1. Tenter d'abord la dernière position connue (instantané)
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown) {
+            latitude = lastKnown.coords.latitude;
+            longitude = lastKnown.coords.longitude;
+          } else {
+            // 2. Sinon, récupérer la position avec un timeout court (1.5s)
+            const posPromise = Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Low,
+            });
+            const timeoutPromise = new Promise<null>((resolve) =>
+              setTimeout(() => resolve(null), 1500)
+            );
+            const result: any = await Promise.race([posPromise, timeoutPromise]);
+            if (result?.coords) {
+              latitude = result.coords.latitude;
+              longitude = result.coords.longitude;
+            }
+          }
+        }
       }
 
-      if (permissionStatus !== Location.PermissionStatus.GRANTED) {
-        CustomAlert.alert(
-          'Localisation nécessaire',
-          'Autorisez la localisation pour rechercher les trajets disponibles autour de vous.'
-        );
-        return;
+      // Position de repli par défaut (Cotonou) si le GPS est inaccessible
+      if (latitude === null || longitude === null) {
+        latitude = 6.3654;
+        longitude = 2.4183;
       }
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const latitude = location.coords.latitude;
-      const longitude = location.coords.longitude;
 
       setCoords((previous) => ({
         ...previous,
-        departure_lat: latitude,
-        departure_lon: longitude,
+        departure_lat: latitude!,
+        departure_lon: longitude!,
       }));
+
+      // Assurer un temps de chargement fluide et maîtrisé d'environ 1.6s
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1600) {
+        await new Promise((resolve) => setTimeout(resolve, 1600 - elapsed));
+      }
 
       router.push({
         pathname: '/search-results',
@@ -277,6 +299,7 @@ export default function HomeScreen() {
     }
   }, [
     nearbyLoading,
+    userLocation,
     router,
     searchParams.vehicleType,
     searchParams.date,
