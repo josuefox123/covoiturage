@@ -1,4 +1,4 @@
-﻿"""
+"""
 Zemy — Modeles Parametres applicatifs : AppBranding, MobileSettings, Promotion, PopularPlace, AuditLog
 """
 from django.db import models
@@ -59,7 +59,7 @@ class Promotion(models.Model):
         verbose_name_plural = "Promotions"
 
     def __str__(self):
-        return self.title
+        return self.title or "Promotion"
 
 class MobileSettings(models.Model):
     """

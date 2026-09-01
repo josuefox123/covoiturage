@@ -79,6 +79,14 @@ class BookingService:
             except Ride.DoesNotExist:
                 raise ValidationError({"error": "Trajet introuvable."})
 
+            # BUG-005 FIX : Recharger les données depuis la DB après le verrou.
+            # Sans ce refresh, le cache ORM (instance en mémoire) peut avoir
+            # une valeur périmée de seats_available si une autre transaction
+            # concurrente a modifié la valeur entre la création de l'objet et
+            # l'acquisition du lock. Le verrou garantit qu'on est seul à lire
+            # la valeur fraiche à ce moment.
+            ride.refresh_from_db()
+
             if ride.driver == passenger:
                 raise ValidationError({"error": "Vous ne pouvez pas réserver votre propre trajet."})
                 
@@ -88,7 +96,7 @@ class BookingService:
             if ride.status in ['started', 'completed', 'cancelled']:
                 raise ValidationError({"error": "Ce trajet n'est plus disponible pour la réservation."})
 
-            # Vérifier s'il reste assez de places globalement
+            # Vérifier s'il reste assez de places globalement (valeur fraiche post-lock)
             if ride.seats_available < seats_booked:
                 raise ValidationError({"error": "Nombre de places disponibles insuffisant."})
 

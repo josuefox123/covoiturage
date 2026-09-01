@@ -25,5 +25,7 @@ class Notification(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Notification {self.title} to {self.user.email if self.user else 'All'}"
+        title = self.title or 'Notification'
+        recipient = (getattr(self.user, 'email', None) or getattr(self.user, 'phone', None)) if self.user else 'All'
+        return f"Notification {title} to {recipient}"
 

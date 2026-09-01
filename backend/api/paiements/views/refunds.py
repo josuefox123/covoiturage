@@ -17,13 +17,13 @@ class RefundRequestViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff:
+        if getattr(user, 'is_staff', False):
             return self.queryset
         return self.queryset.filter(Q(passenger=user) | Q(driver=user))
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
-        if not request.user.is_staff:
+        if not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
         
         refund = self.get_object()
@@ -45,7 +45,7 @@ class RefundRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
-        if not request.user.is_staff:
+        if not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
         
         refund = self.get_object()

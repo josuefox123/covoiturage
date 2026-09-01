@@ -131,7 +131,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
         Génère l'URL de paiement WebView pour FeexPay.
         """
         parcel = self.get_object()
-        if parcel.sender_user != request.user and not request.user.is_staff:
+        if parcel.sender_user != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
         if parcel.payment_status in ['escrow', 'paid']:
@@ -175,7 +175,7 @@ class ParcelViewSet(viewsets.ModelViewSet):
         if not qr_data or qr_data != parcel.qr_code_data:
             return Response({"error": "QR Code invalide."}, status=status.HTTP_400_BAD_REQUEST)
             
-        if request.user != parcel.ride.driver and not request.user.is_staff:
+        if request.user != parcel.ride.driver and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
         if action_type == 'pickup':

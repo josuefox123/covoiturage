@@ -37,6 +37,9 @@ class RidePublicationController:
     @classmethod
     def publish_ride(cls, user, data: Dict[str, Any], serializer_class) -> Dict[str, Any]:
         """Publie un trajet simple (non récurrent)."""
+        from django.db import transaction
+        from ...models.utilisateur import User as UserModel
+
         driver_payout = int(data.get('driver_payout', 0))
         zemy_commission = cls.calculate_commission(driver_payout)
         price_per_seat = driver_payout + zemy_commission
@@ -53,20 +56,27 @@ class RidePublicationController:
         vehicle_id = vehicle.id if vehicle else None
 
         from ...trajets.views.helpers import validate_driver_and_vehicle
-        validate_driver_and_vehicle(
-            driver=user,
-            vehicle_id=vehicle_id,
-            departure_date=departure_date,
-            departure_time=departure_time,
-            duration_min=duration_min
-        )
 
-        ride = serializer.save(
-            driver=user,
-            zemy_commission=zemy_commission,
-            price_per_seat=price_per_seat,
-            parcels_available=data.get('max_parcels', 0)
-        )
+        # ─── Bloc atomique sérialisé — empêche la double publication concurrente ───
+        with transaction.atomic():
+            # select_for_update() sérialise les requêtes pour le même conducteur.
+            # Si deux requêtes arrivent simultanément, la seconde attend la fin de la première.
+            UserModel.objects.select_for_update().get(id=user.id)
+
+            validate_driver_and_vehicle(
+                driver=user,
+                vehicle_id=vehicle_id,
+                departure_date=departure_date,
+                departure_time=departure_time,
+                duration_min=duration_min
+            )
+
+            ride = serializer.save(
+                driver=user,
+                zemy_commission=zemy_commission,
+                price_per_seat=price_per_seat,
+                parcels_available=data.get('max_parcels', 0)
+            )
 
         try:
             RidePublicationService.generate_legs(ride)
@@ -74,6 +84,7 @@ class RidePublicationController:
             logger.error(f"Erreur lors de la génération automatique des tronçons : {e}")
 
         return serializer.data
+
 
     @classmethod
     def publish_recurrent_rides(cls, user, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -113,12 +124,12 @@ class RidePublicationController:
             luggage_allowed=bool(data.get('luggage_allowed', True)),
             stops_allowed=bool(data.get('stops_allowed', True)),
             description=str(data.get('description') or ''),
-            distance_km=float(data.get('distance_km')) if data.get('distance_km') else None,
-            duration_min=int(data.get('duration_min')) if data.get('duration_min') else None,
-            dep_lat=float(data.get('departure_latitude')) if data.get('departure_latitude') else None,
-            dep_lon=float(data.get('departure_longitude')) if data.get('departure_longitude') else None,
-            arr_lat=float(data.get('arrival_latitude')) if data.get('arrival_latitude') else None,
-            arr_lon=float(data.get('arrival_longitude')) if data.get('arrival_longitude') else None
+            distance_km=float(data['distance_km']) if data.get('distance_km') is not None else None,
+            duration_min=int(data['duration_min']) if data.get('duration_min') is not None else None,
+            dep_lat=float(data['departure_latitude']) if data.get('departure_latitude') is not None else None,
+            dep_lon=float(data['departure_longitude']) if data.get('departure_longitude') is not None else None,
+            arr_lat=float(data['arrival_latitude']) if data.get('arrival_latitude') is not None else None,
+            arr_lon=float(data['arrival_longitude']) if data.get('arrival_longitude') is not None else None
         )
 
         return {"message": f"{created_count} trajets générés avec succès."}

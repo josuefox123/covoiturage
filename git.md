@@ -129,3 +129,26 @@ Ce document récapitule l'organisation de vos dépôts Git pour ce projet. Le pr
 | `4a21486` | Affichage portions de prix d'abord si trajet avec arrêts |
 | `1ff9a02` | Suppression numérotations superflues dans les listes d'arrêts |
 | `f2de281` | Intégration boutons Up/Down dans sous-étape 1 |
+
+---
+
+### 📅 Mise à jour du 1er Septembre 2026
+
+#### ⚙️ Backend (API & Sécurité Django)
+- **Sécurisation `is_staff` et `query_params` :**
+  - Standardisation de `getattr(request.user, 'is_staff', False)` sur l'ensemble des vues et contrôleurs pour éviter le crash `AttributeError: 'AbstractBaseUser' has no attribute 'is_staff'` lors d'accès bruts.
+  - Création du helper centralisé `get_query_params(request)` dans `helpers.py` pour supporter de manière transparente `rest_framework.request.Request` (`request.query_params`) et `django.http.HttpRequest` (`request.GET`).
+- **Correction des exceptions `NoneType.title` et typage ReportLab :**
+  - Sécurisation des accès aux objets `Promotion` et `Notification` dans `settings.py` et `notifications.py`.
+  - Sécurisation des méthodes `__str__` dans `parametres.py` et `notification.py` pour garanties de chaînes non-nulles.
+  - Correction de l'export Excel `export_excel` dans `transactions.py` prémunissant contre `wb.active` nul.
+  - Correction du paramètre `borderPadding` de ReportLab (`borderPadding=8`) et utilisation d'un tampon binaire `io.BytesIO` pour `SimpleDocTemplate` au lieu de l'instance `HttpResponse`.
+- **Validation des conflits de trajets et parsing des heures :**
+  - Traitement robuste des heures de départ avec suppression d'espaces et support multi-formats (`HH:MM`, `HH:MM:SS`, `%H:%M:%S.%f`).
+  - Validation temporelle anti-conflits (`validate_driver_and_vehicle`) réservée aux seuls trajets `active` et `started` (les trajets `completed` et `cancelled` ne bloquent plus).
+  - Transtypage des identifiants `str(vehicle.owner_id) != str(driver_id)` pour prévenir les erreurs de permissions IDOR sur les véhicules.
+- **Tarification négociée et commissions :**
+  - Prise en compte explicite de `custom_price = 0` dans `PricingService` (utilisation de `is_not_none` au lieu de `or`).
+  - Respect strict du toggle `is_commission_active = False` dans `FinancialSettings.load()`, retournant une commission de `0 FCFA` sans forcer 10% par défaut.
+- **Suite de tests automatisés :**
+  - Écriture et validation à 100% de 18 tests unitaires de non-régression dans `test_audit_comprehensive.py`.

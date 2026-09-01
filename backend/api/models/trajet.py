@@ -148,6 +148,25 @@ class Ride(models.Model):
     class Meta:
         verbose_name = "Trajet"
         verbose_name_plural = "Trajets"
+        constraints = [
+            # DB-001 FIX : Contrainte UNIQUE conditionnelle au niveau PostgreSQL.
+            # Empêche la double publication d'un trajet à la même date/heure pour
+            # le même conducteur, même si le code Python échouàit à l'intercepter.
+            # S'applique uniquement aux statuts actifs (active, started) —
+            # les trajets annulés/terminés ne bloquent pas.
+            models.UniqueConstraint(
+                fields=['driver', 'departure_date', 'departure_time'],
+                condition=models.Q(status__in=['active', 'started']),
+                name='unique_active_ride_per_driver_datetime'
+            ),
+            # DB-002 FIX : Contrainte CHECK — seats_available ne peut pas être négatif.
+            # Fournit une protection DB robuste contre tout bug de décrémentation.
+            # NB : Django 6+ utilise condition= au lieu de check=
+            models.CheckConstraint(
+                condition=models.Q(seats_available__gte=0),
+                name='ride_seats_available_non_negative'
+            ),
+        ]
 
     def __str__(self):
         return f"Trajet {self.departure_location} -> {self.arrival_location}"

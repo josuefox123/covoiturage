@@ -61,7 +61,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return Notification.objects.none()
-        if user.is_staff:
+        if getattr(user, 'is_staff', False):
             # Admins voient toutes les notifications
             return Notification.objects.all().order_by('-created_at')
         # Clients voient uniquement leurs propres notifications (pas les globales user=None)
@@ -69,23 +69,25 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         notif = serializer.save()
-        title = notif.title or "Nouvelle notification"
-        message = notif.message or ""
+        title = getattr(notif, 'title', None) or "Nouvelle notification"
+        message = getattr(notif, 'message', None) or ""
+        notif_id = getattr(notif, 'id', '')
+        user = getattr(notif, 'user', None)
         
-        if notif.user:
+        if user:
             # Envoi Push direct à l'utilisateur ciblé
             send_fcm_to_user(
-                user=notif.user,
+                user=user,
                 title=title,
                 body=message,
-                data={'screen': 'notifications', 'notif_id': str(notif.id)}
+                data={'screen': 'notifications', 'notif_id': str(notif_id)}
             )
         else:
             # Envoi Push broadcast à tous les utilisateurs
             send_fcm_to_all_users(
                 title=title,
                 body=message,
-                data={'screen': 'notifications', 'notif_id': str(notif.id)}
+                data={'screen': 'notifications', 'notif_id': str(notif_id)}
             )
 
     @action(detail=False, methods=['post'], url_path='mark-read')

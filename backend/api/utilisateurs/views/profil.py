@@ -41,7 +41,8 @@ class UserViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and getattr(user, 'is_staff', False):
             if self.action == 'list':
                 qs = User.objects.filter(is_archived=False)
-                is_staff_param = self.request.query_params.get('is_staff')
+                query_params = getattr(self.request, 'query_params', None) or getattr(self.request, 'GET', {})
+                is_staff_param = query_params.get('is_staff')
                 if is_staff_param == 'true':
                     qs = qs.filter(is_staff=True)
                 elif is_staff_param == 'false':
@@ -229,17 +230,19 @@ class UserPreferenceViewSet(viewsets.ModelViewSet):
     """
     queryset = UserPreference.objects.all()
     serializer_class = UserPreferenceSerializer
+    # BUG-011 FIX : permission_classes explicite pour éviter l'héritage des defaults DRF.
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return UserPreference.objects.filter(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        user_id = request.data.get('user')
-        if not user_id:
-            return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+        # BUG-008 FIX : IDOR — Ne jamais accepter le user_id du frontend.
+        # On force l'utilisateur connecté comme propriétaire de la préférence.
+        # Avant ce fix, n'importe qui pouvait envoyer user_id=<UUID_autre> et
+        # modifier les préférences d'un autre utilisateur.
         pref, created = UserPreference.objects.update_or_create(
-            user_id=user_id,
+            user=request.user,  # ← Forcé depuis le token JWT, pas depuis le body
             defaults={
                 'music': request.data.get('music', True),
                 'smoking': request.data.get('smoking', False),
@@ -252,6 +255,7 @@ class UserPreferenceViewSet(viewsets.ModelViewSet):
         )
         serializer = self.get_serializer(pref)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
 
 @extend_schema(request=dict, responses={200: dict}, tags=['Notifications'])
 @api_view(['POST'])

@@ -125,12 +125,18 @@ class RidePublicationService:
         final_stopovers = []
         if stopovers:
             for s in stopovers:
-                final_stopovers.append({
-                    'name': s.get('name', ''),
-                    'latitude': float(s.get('latitude')),
-                    'longitude': float(s.get('longitude')),
-                    'is_driver': True
-                })
+                lat = s.get('latitude')
+                lon = s.get('longitude')
+                if lat is not None and lon is not None:
+                    try:
+                        final_stopovers.append({
+                            'name': s.get('name', ''),
+                            'latitude': float(lat),
+                            'longitude': float(lon),
+                            'is_driver': True
+                        })
+                    except (ValueError, TypeError):
+                        pass
         else:
             for ac in auto_stopovers:
                 final_stopovers.append({

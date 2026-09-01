@@ -111,18 +111,20 @@ class PromotionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         promotion = serializer.save()
         # Notifier tous les utilisateurs de la nouvelle promotion
+        promo_title = getattr(promotion, 'title', '') or "Nouvelle promotion"
         send_fcm_to_all_users(
             title="Nouvelle promotion disponible !",
-            body=promotion.title,
+            body=promo_title,
             data={'type': 'new_promotion', 'screen': 'home'},
         )
 
     def perform_update(self, serializer):
         promotion = serializer.save()
-        if promotion.is_active:
+        if promotion and getattr(promotion, 'is_active', False):
+            promo_title = getattr(promotion, 'title', '') or "Promotion"
             send_fcm_to_all_users(
                 title="🔄 Promotion mise à jour",
-                body=promotion.title,
+                body=promo_title,
                 data={'type': 'promotion_updated', 'screen': 'home'},
             )
 

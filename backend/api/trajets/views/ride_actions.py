@@ -24,7 +24,7 @@ class RideActionsMixin:
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel_ride(self, request, pk=None):
         ride = self.get_object()
-        if ride.driver != request.user and not request.user.is_staff:
+        if ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
         
         if ride.status == 'cancelled':
@@ -80,7 +80,7 @@ class RideActionsMixin:
     @action(detail=True, methods=['post'], url_path='complete')
     def complete_ride(self, request, pk=None):
         ride = self.get_object()
-        if ride.driver != request.user and not request.user.is_staff:
+        if ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
         
         if ride.status == 'completed':
@@ -137,7 +137,7 @@ class RideActionsMixin:
     @action(detail=True, methods=['post'], url_path='start')
     def start_ride(self, request, pk=None):
         ride = self.get_object()
-        if ride.driver != request.user and not request.user.is_staff:
+        if ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             is_passenger = ride.bookings.filter(passenger=request.user, status__in=['pending', 'confirmed', 'active']).exists()
             if not is_passenger:
                 return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
@@ -174,7 +174,7 @@ class RideActionsMixin:
     @action(detail=True, methods=['post'], url_path='next_leg')
     def next_leg(self, request, pk=None):
         ride = self.get_object()
-        if ride.driver != request.user and not request.user.is_staff:
+        if ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
 
         if ride.status not in ['active', 'started']:

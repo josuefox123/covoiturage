@@ -171,7 +171,9 @@ class VehicleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vehicle
         fields = '__all__'
-
+        # BUG-009 FIX : 'owner' en lecture seule pour éviter le Mass Assignment.
+        # La valeur est définie dans VehicleViewSet.perform_create() via request.user.
+        read_only_fields = ['owner']
 
 
 class RideSerializer(serializers.ModelSerializer):
@@ -418,9 +420,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ['full_name', 'email', 'phone', 'password', 'country']
         
     def create(self, validated_data):
+        # BUG-010 FIX : email doit être None (pas "") pour respecter la contrainte
+        # UNIQUE nullable. Deux comptes sans email produisaient un IntegrityError
+        # car email="" est traité comme une valeur en double par PostgreSQL.
         user = User.objects.create_user(
             phone=validated_data['phone'],
-            email=validated_data.get('email', ''),
+            email=validated_data.get('email') or None,
             full_name=validated_data.get('full_name', ''),
             country=validated_data.get('country', 'BJ'),
             password=validated_data['password']

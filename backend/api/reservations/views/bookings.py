@@ -227,7 +227,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.passenger != request.user and booking.ride.driver != request.user and not request.user.is_staff:
+        if booking.passenger != request.user and booking.ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
         from api.services.booking_service import BookingService
@@ -238,7 +238,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='state')
     def booking_state(self, request, pk=None):
         booking = self.get_object()
-        if booking.passenger != request.user and booking.ride.driver != request.user and not request.user.is_staff:
+        if booking.passenger != request.user and booking.ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
 
         ride = booking.ride
@@ -286,7 +286,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='board')
     def board_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.ride.driver != request.user and not request.user.is_staff:
+        if booking.ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Seul le conducteur de ce trajet peut valider l'embarquement."}, status=status.HTTP_403_FORBIDDEN)
             
         if booking.status not in ['confirmed']:
@@ -307,7 +307,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='complete')
     def complete_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.passenger != request.user and not request.user.is_staff:
+        if booking.passenger != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
         if booking.status == 'completed':
@@ -344,7 +344,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='pay')
     def pay_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.passenger != request.user and not request.user.is_staff:
+        if booking.passenger != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
             
         if booking.payment_status in ['escrow', 'paid']:
@@ -374,7 +374,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='accept')
     def accept_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.ride.driver != request.user and not request.user.is_staff:
+        if booking.ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Seul le conducteur de ce trajet peut accepter cette réservation."}, status=status.HTTP_403_FORBIDDEN)
             
         if booking.status == 'pending_payment':
@@ -452,7 +452,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='reject')
     def reject_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.ride.driver != request.user and not request.user.is_staff:
+        if booking.ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Seul le conducteur de ce trajet peut refuser cette réservation."}, status=status.HTTP_403_FORBIDDEN)
             
         if booking.status == 'pending_payment':
@@ -478,7 +478,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='passenger_accept')
     def passenger_accept(self, request, pk=None):
         booking = self.get_object()
-        if booking.passenger != request.user and not request.user.is_staff:
+        if booking.passenger != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Seul le passager de cette réservation peut l'accepter."}, status=status.HTTP_403_FORBIDDEN)
             
         if booking.ride.status in ['completed', 'cancelled']:
@@ -504,7 +504,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='passenger_reject')
     def passenger_reject(self, request, pk=None):
         booking = self.get_object()
-        if booking.passenger != request.user and not request.user.is_staff:
+        if booking.passenger != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Seul le passager de cette réservation peut la refuser."}, status=status.HTTP_403_FORBIDDEN)
             
         if booking.ride.status in ['completed', 'cancelled']:

@@ -16,7 +16,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff:
+        if getattr(user, 'is_staff', False):
             return self.queryset
         return self.queryset.filter(user=user)
 
@@ -31,10 +31,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = self.queryset.select_related('user', 'booking', 'parcel')
         
-        status_filter = self.request.query_params.get('status')
-        provider_filter = self.request.query_params.get('provider')
-        user_phone = self.request.query_params.get('user_phone')
-        search = self.request.query_params.get('search')
+        query_params = getattr(self.request, 'query_params', None) or getattr(self.request, 'GET', {})
+        status_filter = query_params.get('status')
+        provider_filter = query_params.get('provider')
+        user_phone = query_params.get('user_phone')
+        search = query_params.get('search')
         
         if status_filter:
             queryset = queryset.filter(status=status_filter)
@@ -59,7 +60,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
         payments = self.get_queryset()
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Paiements Zemy"
+        if ws is not None:
+            ws.title = "Paiements Zemy"
+        else:
+            ws = wb.create_sheet(title="Paiements Zemy")
         
         headers = ["ID Transaction", "Date", "Utilisateur", "Téléphone", "Montant (FCFA)", "Service", "Statut", "Fournisseur"]
         ws.append(headers)
@@ -84,6 +88,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='export-pdf')
     def export_pdf(self, request):
+        import io
         from reportlab.lib.pagesizes import letter
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -91,10 +96,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
         from django.http import HttpResponse
         
         payments = self.get_queryset()
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename=paiements_zemy.pdf'
+        buffer = io.BytesIO()
         
-        doc = SimpleDocTemplate(response, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
         elements = []
         
         styles = getSampleStyleSheet()
@@ -139,6 +143,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
         
         elements.append(t)
         doc.build(elements)
+        
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=paiements_zemy.pdf'
         return response
 
     @action(detail=False, methods=['get'], url_path='my-history', permission_classes=[permissions.IsAuthenticated])
@@ -164,7 +171,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         except Payment.DoesNotExist:
             return Response({"error": "Paiement introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
-        if payment.user != request.user and not request.user.is_staff:
+        if payment.user != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
 
         if payment.status != 'SUCCESS':
@@ -195,7 +202,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         status_style = ParagraphStyle('Status', fontSize=14, textColor=PRIMARY_DARK,
                                        fontName='Helvetica-Bold', alignment=1, spaceAfter=12,
-                                       backColor=LIGHT_BG, borderPadding=(8, 14, 8, 14))
+                                       backColor=LIGHT_BG, borderPadding=8)
         elements.append(Paragraph("✓ PAIEMENT CONFIRMÉ", status_style))
         elements.append(Spacer(1, 8*mm))
 

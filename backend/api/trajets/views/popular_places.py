@@ -10,7 +10,8 @@ class PopularPlaceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        search = self.request.query_params.get('search')
+        query_params = getattr(self.request, 'query_params', None) or getattr(self.request, 'GET', {})
+        search = query_params.get('search')
         if search:
             queryset = queryset.filter(
                 Q(name__icontains=search) | Q(city__icontains=search)

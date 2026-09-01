@@ -12,6 +12,7 @@ from ...models.utilisateur import Vehicle
 from ...serializers import RideSerializer
 from .ride_actions import RideActionsMixin
 from ...controllers.rides.ride_publication_controller import RidePublicationController
+from .helpers import get_query_params
 
 class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
     """
@@ -25,29 +26,35 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def list(self, request, *args, **kwargs):
-        search_mode = request.query_params.get('search_mode')
-        date_str = request.query_params.get('date')
-        seats_str = request.query_params.get('seats', '1')
+        qp = get_query_params(request)
+        search_mode = qp.get('search_mode')
+        date_str = qp.get('date')
+        seats_str = qp.get('seats', '1')
 
-        dep_place_id = request.query_params.get('departure_place_id')
-        arr_place_id = request.query_params.get('arrival_place_id')
-        time_filter = request.query_params.get('time')
+        dep_place_id = qp.get('departure_place_id')
+        arr_place_id = qp.get('arrival_place_id')
+        time_filter = qp.get('time')
 
         if search_mode == 'nearby':
-            dep_lat_str = request.query_params.get('latitude') or request.query_params.get('departure_latitude')
-            dep_lon_str = request.query_params.get('longitude') or request.query_params.get('departure_longitude')
+            dep_lat_str = qp.get('latitude') or qp.get('departure_latitude')
+            dep_lon_str = qp.get('longitude') or qp.get('departure_longitude')
             arr_lat_str = None
             arr_lon_str = None
-            radius_str = request.query_params.get('radius', '20.0')
+            radius_str = qp.get('radius', '20.0')
             try:
-                radius = float(radius_str)
+                # BUG-012 FIX : Borner le radius dans l'intervalle [1, 50] km.
+                # Un client malveillant ou bugé pourrait envoyer radius=99999,
+                # déclenchant un scan complet de la table trajets (DoS/data leak).
+                MAX_RADIUS_KM = 50.0
+                MIN_RADIUS_KM = 1.0
+                radius = max(MIN_RADIUS_KM, min(float(radius_str), MAX_RADIUS_KM))
             except (TypeError, ValueError):
                 radius = 20.0
         else:
-            dep_lat_str = request.query_params.get('departure_latitude')
-            dep_lon_str = request.query_params.get('departure_longitude')
-            arr_lat_str = request.query_params.get('arrival_latitude')
-            arr_lon_str = request.query_params.get('arrival_longitude')
+            dep_lat_str = qp.get('departure_latitude')
+            dep_lon_str = qp.get('departure_longitude')
+            arr_lat_str = qp.get('arrival_latitude')
+            arr_lon_str = qp.get('arrival_longitude')
             radius = None
 
         has_gps_search = (dep_lat_str and dep_lon_str) or (arr_lat_str and arr_lon_str) or (search_mode == 'nearby')
@@ -256,13 +263,13 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         from rest_framework.exceptions import PermissionDenied
-        if serializer.instance.driver != self.request.user and not self.request.user.is_staff:
+        if serializer.instance.driver != self.request.user and not getattr(self.request.user, 'is_staff', False):
             raise PermissionDenied("Vous n'êtes pas autorisé à modifier ce trajet.")
         serializer.save()
 
     def perform_destroy(self, instance):
         from rest_framework.exceptions import PermissionDenied
-        if instance.driver != self.request.user and not self.request.user.is_staff:
+        if instance.driver != self.request.user and not getattr(self.request.user, 'is_staff', False):
             raise PermissionDenied("Vous n'êtes pas autorisé à supprimer ce trajet.")
         instance.delete()
 
@@ -290,7 +297,7 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         except Ride.DoesNotExist:
             return Response({"error": "Trajet introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
-        if ride.driver != request.user and not request.user.is_staff:
+        if ride.driver != request.user and not getattr(request.user, 'is_staff', False):
             return Response({"error": "Non autorisé."}, status=status.HTTP_403_FORBIDDEN)
 
         lat = request.data.get('driver_latitude')
@@ -311,8 +318,8 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='booking-state')
     def ride_booking_state(self, request, pk=None):
         ride = self.get_object()
-        dep_order = request.query_params.get('departure_order')
-        arr_order = request.query_params.get('arrival_order')
+        dep_order = get_query_params(request).get('departure_order')
+        arr_order = get_query_params(request).get('arrival_order')
 
         from api.bookings.booking_state_service import BookingStateService
         state = BookingStateService.get_state(request.user, ride, dep_order, arr_order)

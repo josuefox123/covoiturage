@@ -68,13 +68,17 @@ class RideSeriesService:
         # 2. Parsing de l'heure
         departure_time_val = departure_time
         if isinstance(departure_time_val, str):
-            try:
-                departure_time_val = datetime.strptime(departure_time_val, "%H:%M:%S").time()
-            except ValueError:
+            parsed_time = None
+            for fmt in ("%H:%M:%S", "%H:%M"):
                 try:
-                    departure_time_val = datetime.strptime(departure_time_val, "%H:%M").time()
+                    parsed_time = datetime.strptime(departure_time_val.strip(), fmt).time()
+                    break
                 except ValueError:
-                    pass
+                    continue
+            if parsed_time is None:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"error": "Format d'heure de départ invalide (attendu HH:MM ou HH:MM:SS)."})
+            departure_time_val = parsed_time
 
         # 3. Calcul des dates cibles via le Domain
         target_dates = ReglesPublicationDomain.determiner_jours_recurrence(
@@ -100,6 +104,13 @@ class RideSeriesService:
                 logger.warning(f"Erreur pré-calcul itinéraire récurrence : {e}")
 
         with transaction.atomic():
+            # BUG-013 FIX : Verrouiller le conducteur pour sérialiser les publications
+            # concurrentes. Avant ce fix, la validation (ci-dessous) pouvait être
+            # exécutée par deux requêtes simultanées qui passaient toutes les deux
+            # la vérification de conflit avant que l'une des deux ait créé les trajets.
+            from ...models.utilisateur import User as UserModel
+            UserModel.objects.select_for_update().get(id=driver.id)
+
             # Validation temporelle globale du chauffeur/véhicule
             validate_driver_and_vehicle(
                 driver=driver,

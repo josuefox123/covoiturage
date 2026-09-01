@@ -51,7 +51,7 @@ class PricingService:
         if driver_price < 0:
             driver_price = 0
         try:
-            settings = FinancialSettings.objects.first()
+            settings = FinancialSettings.load()
         except Exception:
             settings = None
         commission = PricingService._apply_commission_rules(driver_price, settings)
@@ -72,37 +72,54 @@ class PricingService:
 
     @staticmethod
     def compute_for_booking(booking) -> 'PricingResult':
-        # 1. Calculer le tarif de base (sans les surcharges d'option)
-        if not booking.custom_price and not booking.driver_counter_price and not booking.passenger_proposed_price:
-            ride = booking.ride
-            seats = booking.seats_booked
-            if booking.departure_waypoint_order is not None and booking.arrival_waypoint_order is not None:
-                base_result = PricingService.compute_for_segment(
-                    ride,
-                    booking.departure_waypoint_order,
-                    booking.arrival_waypoint_order,
-                    seats
-                )
-            else:
-                base_result = PricingResult(
-                    driver_price=ride.driver_payout,
-                    commission=ride.zemy_commission,
-                    total_to_pay=ride.price_per_seat * seats,
-                    driver_amount=ride.driver_payout * seats,
-                    zemy_amount=ride.zemy_commission * seats,
-                    seats=seats,
-                    segment_distance_m=0,
-                    segment_distance_km=0.0
-                )
-        else:
-            driver_price = (
-                booking.custom_price
-                or booking.driver_counter_price
-                or booking.passenger_proposed_price
-            )
-            base_result = PricingService.compute(driver_price=int(driver_price), seats=booking.seats_booked)
+        """
+        Calcule le prix RÉEL d'une réservation.
 
-        # 2. Ajouter les surcharges d'options (sans frais Zemy)
+        RÈGLE FONDAMENTALE (priorité décroissante) :
+          1. custom_price      ← prix final accepté des deux côtés
+          2. driver_counter_price ← contre-proposition du conducteur
+          3. passenger_proposed_price ← proposition initiale du passager
+          4. Tarif standard du segment (waypoints) ou fallback (prix de base du trajet)
+
+        IMPORTANT : On utilise `is not None` au lieu de `or` pour éviter
+        le problème des valeurs falsy (ex : price = 0 serait ignoré avec `or`).
+        """
+        ride = booking.ride
+        seats = booking.seats_booked
+
+        # ─── 1. Prix négocié (priorité absolue) ───────────────────────────────
+        negotiated_price = None
+        if booking.custom_price is not None:
+            negotiated_price = booking.custom_price
+        elif booking.driver_counter_price is not None:
+            negotiated_price = booking.driver_counter_price
+        elif booking.passenger_proposed_price is not None:
+            negotiated_price = booking.passenger_proposed_price
+
+        if negotiated_price is not None:
+            base_result = PricingService.compute(driver_price=int(negotiated_price), seats=seats)
+        # ─── 2. Tarif calculé par segment de waypoints ────────────────────────
+        elif booking.departure_waypoint_order is not None and booking.arrival_waypoint_order is not None:
+            base_result = PricingService.compute_for_segment(
+                ride,
+                booking.departure_waypoint_order,
+                booking.arrival_waypoint_order,
+                seats
+            )
+        # ─── 3. Fallback : prix de base du trajet complet ─────────────────────
+        else:
+            base_result = PricingResult(
+                driver_price=ride.driver_payout,
+                commission=ride.zemy_commission,
+                total_to_pay=ride.price_per_seat * seats,
+                driver_amount=ride.driver_payout * seats,
+                zemy_amount=ride.zemy_commission * seats,
+                seats=seats,
+                segment_distance_m=0,
+                segment_distance_km=0.0
+            )
+
+        # ─── 4. Ajouter les surcharges d'options (sans frais Zemy) ───────────
         pickup_surcharge = getattr(booking, 'pickup_surcharge', 0) or 0
         dropoff_surcharge = getattr(booking, 'dropoff_surcharge', 0) or 0
         total_surcharge = pickup_surcharge + dropoff_surcharge
@@ -120,6 +137,7 @@ class PricingService:
             )
 
         return base_result
+
 
     @staticmethod
     def compute_for_segment(ride, dep_waypoint_order: int, arr_waypoint_order: int, seats: int = 1) -> 'PricingResult':
@@ -216,16 +234,21 @@ class PricingService:
             return PricingService._fallback(ride, seats)
 
     @staticmethod
-    def _apply_commission_rules(driver_price: int, settings) -> int:
+    def _apply_commission_rules(driver_price: int, settings=None) -> int:
         try:
-            if settings and settings.is_commission_active:
-                commission = int(driver_price * settings.commission_percentage / 100)
-                commission = max(commission, settings.min_commission)
-                if settings.max_commission:
-                    commission = min(commission, settings.max_commission)
-                return commission
-        except Exception:
-            pass
+            if settings is None:
+                settings = FinancialSettings.load()
+            if settings:
+                from ..calculs.calcul_commission import calculer_commission_zemy
+                return calculer_commission_zemy(
+                    driver_payout=driver_price,
+                    is_commission_active=settings.is_commission_active,
+                    commission_percentage=settings.commission_percentage,
+                    min_commission=settings.min_commission,
+                    max_commission=settings.max_commission
+                )
+        except Exception as e:
+            logger.error(f"Erreur lors de l'application des règles de commission: {e}")
         return max(100, int(driver_price * 0.10))
 
     @staticmethod
