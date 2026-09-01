@@ -90,6 +90,8 @@ deploy_backend.py
 deploy_dashboard.py
 force_restart_daphne.py
 deploy_secrets.env
+*.zip
+backend.zip
 
 
 # ===========================
