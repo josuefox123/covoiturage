@@ -28,6 +28,9 @@ interface VehicleModalProps {
   onSaveSuccess: (updatedData: { id: string; brand: string; model: string; plate: string }) => void;
 }
 
+/**
+ * VehicleModal - Composant de gestion du véhicule et du permis de conduire
+ */
 export function VehicleModal({
   visible,
   onClose,

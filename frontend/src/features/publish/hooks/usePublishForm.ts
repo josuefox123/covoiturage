@@ -207,7 +207,7 @@ export function usePublishForm(authCtx: any) {
   }, [user, authFetch]);
 
   useEffect(() => {
-    if (user && user.is_verified) {
+    if (user) {
       checkVehicle();
     } else {
       setCheckingVehicle(false);

@@ -52,8 +52,13 @@ class RidePublicationController:
         departure_date = serializer.validated_data.get('departure_date')
         departure_time = serializer.validated_data.get('departure_time')
         duration_min = serializer.validated_data.get('duration_min')
+        from ...models.utilisateur import Vehicle
         vehicle = serializer.validated_data.get('vehicle')
-        vehicle_id = vehicle.id if vehicle else None
+        if not vehicle:
+            vehicle = Vehicle.objects.filter(owner=user).first()
+            if vehicle:
+                serializer.validated_data['vehicle'] = vehicle
+        vehicle_id = getattr(vehicle, 'id', vehicle)
 
         from ...trajets.views.helpers import validate_driver_and_vehicle
 
@@ -73,6 +78,7 @@ class RidePublicationController:
 
             ride = serializer.save(
                 driver=user,
+                vehicle=vehicle,
                 zemy_commission=zemy_commission,
                 price_per_seat=price_per_seat,
                 parcels_available=data.get('max_parcels', 0)

@@ -57,17 +57,28 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
     # Statuts qui constituent un vrai conflit horaire
     ACTIVE_STATUSES = ['active', 'started']
 
-    driver_id = driver.id if hasattr(driver, 'id') else driver
+    driver_id = getattr(driver, 'id', driver)
+    if not driver_id:
+        raise ValidationError({"error": "Utilisateur non authentifié."})
 
-    # ─── 1. Vérification propriété du véhicule ───────────────────────────────
-    if vehicle_id:
-        from ...models.utilisateur import Vehicle
+    # ─── 1. Vérification obligatoire d'un véhicule enregistré ───────────────
+    from ...models.utilisateur import Vehicle
+    driver_vehicles = Vehicle.objects.filter(owner_id=driver_id)
+    if not driver_vehicles.exists():
+        raise ValidationError({"error": "Vous devez obligatoirement enregistrer un véhicule dans votre profil avant de pouvoir publier un trajet."})
+
+    target_vehicle_id = getattr(vehicle_id, 'id', vehicle_id)
+
+    if target_vehicle_id:
         try:
-            vehicle = Vehicle.objects.get(id=vehicle_id)
-            if str(vehicle.owner_id) != str(driver_id):
+            vehicle_obj = Vehicle.objects.get(id=target_vehicle_id)
+            if str(vehicle_obj.owner_id) != str(driver_id):
                 raise ValidationError({"error": "Le véhicule sélectionné ne vous appartient pas."})
         except Vehicle.DoesNotExist:
             raise ValidationError({"error": "Le véhicule sélectionné est introuvable."})
+    else:
+        first_v = driver_vehicles.first()
+        target_vehicle_id = first_v.id if first_v else None
 
     # ─── 2. Validation date/heure obligatoires ────────────────────────────────
     if not departure_date or not departure_time:
