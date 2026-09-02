@@ -13,7 +13,7 @@
  */
 export const useApi = () => {
   const config = useRuntimeConfig()
-  const baseURL: string = (config.public.apiBase as string) || 'https://zemy.erika-app.com/api'
+  const baseURL: string = (config.public.apiBase as string) || 'https://zemybackend.sinustic.com/api'
   const authCookie = useCookie('admin_token')
 
   const fetchApi = <T = any>(endpoint: string, options: Record<string, any> = {}) => {

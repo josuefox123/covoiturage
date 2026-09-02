@@ -30,8 +30,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
-      apiUrl: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemy.erika-app.com/api',
+      apiBase: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemybackend.sinustic.com/api',
+      apiUrl: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemybackend.sinustic.com/api',
     },
   },
 

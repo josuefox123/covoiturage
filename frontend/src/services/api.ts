@@ -37,7 +37,7 @@ const getBaseUrl = () => {
   }
   
   // Fallback to production by default if no env var is found
-  return 'https://zemy.erika-app.com/api';
+  return 'https://zemybackend.sinustic.com/api';
 };
 
 export const API_URL = getBaseUrl();
