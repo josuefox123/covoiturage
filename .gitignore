@@ -21,9 +21,10 @@ force_restart_daphne.py
 backend.zip
 
 # ===========================
-# Tests & Temporary Scratch Files
+# Database & Temporary Scratch Files
 # ===========================
 scratch/
+database/*.sql
 api/tests/
 tests/
 test_*.py
