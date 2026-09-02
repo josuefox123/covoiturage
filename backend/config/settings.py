@@ -98,6 +98,11 @@ INSTALLED_APPS = [
     'api',
 ]
 
+# N'ajouter daphne que si pas en mode test/CI
+import os
+if os.environ.get('DJANGO_ENV') != 'ci':
+    INSTALLED_APPS.insert(0, 'daphne')
+
 # Application ASGI (Channels)
 ASGI_APPLICATION = 'config.asgi.application'
 

@@ -1,0 +1,58 @@
+stages:
+  - test
+  - deploy
+
+# ✅ Tests avec SQLite (pas besoin de PostgreSQL pour les tests)
+test-backend:
+  stage: test
+  image: python:3.12
+  variables:
+    DEBUG: "True"
+    DJANGO_ENV: "ci"
+  cache:
+    key: pip-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cache/pip/
+  before_script:
+    - pip install --cache-dir .cache/pip -r requirements.txt --quiet
+  script:
+    - python manage.py test api/ --verbosity=2
+  only:
+    - main
+    - merge_requests
+
+# 🚀 Déploiement sur VPS — automatique après les tests
+deploy-backend:
+  stage: deploy
+  image: alpine:latest
+  environment:
+    name: production
+    url: https://zemybackend.sinustic.com/
+  before_script:
+    - apk add --no-cache openssh-client bash
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+    - chmod 600 ~/.ssh/deploy_key
+    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
+  script:
+    - ssh -i ~/.ssh/deploy_key deploy@$VPS_HOST 'bash -s' << 'EOF'
+        set -e
+        echo "📦 Pull du code..."
+        cd /var/www/zemybackend
+        git pull origin main
+        echo "🐍 Activation du venv..."
+        source venv/bin/activate
+        echo "📥 Installation des dépendances..."
+        pip install -r requirements.txt --quiet
+        echo "🗄️ Migrations..."
+        python manage.py migrate --no-input
+        echo "📁 Fichiers statiques..."
+        python manage.py collectstatic --no-input
+        echo "🔄 Redémarrage Gunicorn..."
+        sudo systemctl restart zemybackend-gunicorn
+        echo "✅ Déploiement backend terminé !"
+      EOF
+  only:
+    - main
+  needs:
+    - test-backend
