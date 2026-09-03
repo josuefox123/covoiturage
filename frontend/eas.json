@@ -15,10 +15,18 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://zemybackend.sinustic.com/api",
+        "EAS_BUILD_NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://zemybackend.sinustic.com/api",
+        "EAS_BUILD_NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
     }
   },
   "submit": {

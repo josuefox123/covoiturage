@@ -25,6 +25,8 @@ backend.zip
 # ===========================
 scratch/
 database/*.sql
+seed_local_data.py
+backend/seed_local_data.py
 api/tests/
 tests/
 test_*.py
