@@ -3,13 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Tests & Temporary Files
-tests/
-api/tests/
+# Temporary Scratch Files
 scratch/
-seed_local_data.py
-test_*.py
-*_test.py
 
 # Secrets & Credentials
 *firebase-adminsdk*.json

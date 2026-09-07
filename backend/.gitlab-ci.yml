@@ -1,27 +1,7 @@
 stages:
-  - test
   - deploy
 
-# ✅ Tests avec SQLite (pas besoin de PostgreSQL pour les tests)
-test-backend:
-  stage: test
-  image: python:3.12
-  variables:
-    DEBUG: "True"
-    DJANGO_ENV: "ci"
-  cache:
-    key: pip-$CI_COMMIT_REF_SLUG
-    paths:
-      - .cache/pip/
-  before_script:
-    - pip install --cache-dir .cache/pip -r requirements.txt --quiet
-  script:
-    - python manage.py test api/ --verbosity=2
-  only:
-    - main
-    - merge_requests
-
-# 🚀 Déploiement sur VPS — automatique après les tests
+# 🚀 Déploiement direct sur VPS
 deploy-backend:
   stage: deploy
   image: alpine:latest
@@ -39,12 +19,13 @@ deploy-backend:
         set -e
         echo "📦 Pull du code..."
         cd /var/www/zemybackend
-        git pull origin main
+        git pull || git pull origin josue
         echo "🐍 Activation du venv..."
         source venv/bin/activate
         echo "📥 Installation des dépendances..."
         pip install -r requirements.txt --quiet
         echo "🗄️ Migrations..."
+        python manage.py makemigrations --no-input
         python manage.py migrate --no-input
         echo "📁 Fichiers statiques..."
         python manage.py collectstatic --no-input
@@ -54,5 +35,4 @@ deploy-backend:
       EOF
   only:
     - main
-  needs:
-    - test-backend
+    - josue

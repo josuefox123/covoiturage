@@ -47,7 +47,7 @@ def load_dotenv():
                         v = v.strip()
                         if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
                             v = v[1:-1]
-                        os.environ[k] = v
+                        os.environ.setdefault(k, v)
         except Exception as e:
             print(f"Error loading .env file: {e}")
 
@@ -75,14 +75,14 @@ SECRET_KEY = _secret_key_env
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 # En production, DJANGO_ALLOWED_HOSTS doit être configuré explicitement.
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,zemy.erika-app.com,node239-eu.n0c.com').split(',')
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,zemybackend.sinustic.com,zemy.erika-app.com,sinustic.com').split(',')
 
 
 # Application definition
 
 INSTALLED_APPS = [
     'daphne',  # ASGI server — doit être en premier
-    'jazzmin',
+    #'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -261,7 +261,7 @@ if DEBUG:
 else:
     CORS_ALLOWED_ORIGINS = os.getenv(
         'CORS_ALLOWED_ORIGINS',
-        'https://zemy.erika-app.com'
+        'https://zemybackend.sinustic.com,https://zemy.erika-app.com'
     ).split(',')
     CORS_ALLOW_ALL_ORIGINS = False
 
@@ -347,7 +347,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Trusted origins for CSRF (Nuxt dashboard)
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001'
+    'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,https://zemybackend.sinustic.com'
 ).split(',')
 
 JAZZMIN_SETTINGS = {
