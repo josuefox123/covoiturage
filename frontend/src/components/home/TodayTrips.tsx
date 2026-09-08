@@ -3,7 +3,7 @@
  * Affiche les 3 prochains trajets disponibles depuis le backend.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,

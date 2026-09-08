@@ -13,7 +13,7 @@ class HostOverrideMiddleware:
     def __call__(self, request):
         if 'HTTP_X_FORWARDED_FOR' in request.META or 'HTTP_X_REAL_IP' in request.META:
             # On récupère le domaine de production
-            backend_url = os.getenv('BACKEND_URL', 'https://zemy.erika-app.com')
+            backend_url = os.getenv('BACKEND_URL', 'https://zemybackend.sinustic.com')
             backend_domain = backend_url.replace('https://', '').replace('http://', '').strip('/')
             
             # Forcer le host et HTTPS pour que request.build_absolute_uri() utilise zemy.erika-app.com

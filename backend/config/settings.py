@@ -75,7 +75,7 @@ SECRET_KEY = _secret_key_env
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 # En production, DJANGO_ALLOWED_HOSTS doit être configuré explicitement.
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,zemybackend.sinustic.com,zemy.erika-app.com,sinustic.com').split(',')
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,zemy.erika-app.com').split(',')
 
 
 # Application definition
@@ -261,7 +261,7 @@ if DEBUG:
 else:
     CORS_ALLOWED_ORIGINS = os.getenv(
         'CORS_ALLOWED_ORIGINS',
-        'https://zemybackend.sinustic.com,https://zemy.erika-app.com'
+        'https://zemy.erika-app.com'
     ).split(',')
     CORS_ALLOW_ALL_ORIGINS = False
 
@@ -347,6 +347,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Trusted origins for CSRF (Nuxt dashboard)
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
+    
     'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,https://zemybackend.sinustic.com'
 ).split(',')
 

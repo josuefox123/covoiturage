@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { rideSynchronizer } from '../manager/RideSynchronizer';
 import { rideSessionManager } from '../manager/RideSessionManager';
 import { SegmentIdentifier } from '../types/rideSession.types';

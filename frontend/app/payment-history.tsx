@@ -33,7 +33,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE = 'https://zemybackend.sinustic.com/api';
+import { API_URL } from '../src/services/api';
+
+const API_BASE = API_URL;
 
 interface PaymentItem {
   id: string;

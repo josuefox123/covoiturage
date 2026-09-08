@@ -11,9 +11,8 @@
  * ==============================================================
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
