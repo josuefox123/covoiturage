@@ -37,6 +37,7 @@ import SearchCard, {
 
 import PromoCard from '../../src/components/home/PromoCard';
 import TodayTrips from '../../src/components/home/TodayTrips';
+import { BusSection } from '../../src/components/home/BusSection';
 import LocationPicker from '../../src/components/LocationPicker';
 import { CustomAlert } from '../../src/utils/CustomAlert';
 
@@ -392,75 +393,81 @@ export default function HomeScreen() {
             onSelect={handleVehicleSelect}
           />
 
-          {/* =================================================
-              RECHERCHE AUTOUR DE MOI
-          ================================================= */}
+          {searchParams.vehicleType === 'bus' ? (
+            <BusSection />
+          ) : (
+            <>
+              {/* =================================================
+                  RECHERCHE AUTOUR DE MOI
+              ================================================= */}
 
-          <TouchableOpacity
-            style={[
-              styles.nearbyCard,
-              nearbyLoading && styles.nearbyCardLoading,
-            ]}
-            activeOpacity={0.88}
-            onPress={handleNearbySearch}
-            disabled={nearbyLoading}
-          >
+              <TouchableOpacity
+                style={[
+                  styles.nearbyCard,
+                  nearbyLoading && styles.nearbyCardLoading,
+                ]}
+                activeOpacity={0.88}
+                onPress={handleNearbySearch}
+                disabled={nearbyLoading}
+              >
 
-            <View style={styles.nearbyIconWrapper}>
-              {nearbyLoading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="navigate" size={18} color="#FFFFFF" />
-              )}
-            </View>
+                <View style={styles.nearbyIconWrapper}>
+                  {nearbyLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="navigate" size={18} color="#FFFFFF" />
+                  )}
+                </View>
 
-            <View style={styles.nearbyContent}>
-              <Text style={styles.nearbyTitle}>
-                {nearbyLoading
-                  ? 'Localisation en cours...'
-                  : 'Rechercher autour de moi'}
-              </Text>
-              <Text style={styles.nearbySubtitle}>
-                Trajets disponibles dans un rayon de 20 km
-              </Text>
-            </View>
+                <View style={styles.nearbyContent}>
+                  <Text style={styles.nearbyTitle}>
+                    {nearbyLoading
+                      ? 'Localisation en cours...'
+                      : 'Rechercher autour de moi'}
+                  </Text>
+                  <Text style={styles.nearbySubtitle}>
+                    Trajets disponibles dans un rayon de 20 km
+                  </Text>
+                </View>
 
-            {!nearbyLoading && (
-              <View style={styles.nearbyArrow}>
-                <Ionicons name="arrow-forward" size={18} color="#0066FF" />
-              </View>
-            )}
+                {!nearbyLoading && (
+                  <View style={styles.nearbyArrow}>
+                    <Ionicons name="arrow-forward" size={18} color="#0066FF" />
+                  </View>
+                )}
 
-          </TouchableOpacity>
+              </TouchableOpacity>
 
-          {/* =================================================
-              RECHERCHE CLASSIQUE
-          ================================================= */}
+              {/* =================================================
+                  RECHERCHE CLASSIQUE
+              ================================================= */}
 
-          <SearchCard
-            params={searchParams}
-            onChange={updateSearch}
-            onSearch={handleSearch}
-            onPickLocation={(type) => setPickingFor(type)}
-            departureNote={coords.departure_note}
-            arrivalNote={coords.arrival_note}
-          />
+              <SearchCard
+                params={searchParams}
+                onChange={updateSearch}
+                onSearch={handleSearch}
+                onPickLocation={(type) => setPickingFor(type)}
+                departureNote={coords.departure_note}
+                arrivalNote={coords.arrival_note}
+              />
 
-          {/* =================================================
-              PROMOTION
-          ================================================= */}
+              {/* =================================================
+                  PROMOTION
+              ================================================= */}
 
-          <PromoCard />
+              <PromoCard />
 
-          {/* =================================================
-              TRAJETS DU JOUR
-          ================================================= */}
+              {/* =================================================
+                  TRAJETS DU JOUR
+              ================================================= */}
 
-          <TodayTrips
-            key={refreshKey}
-            onTripPress={(id) => router.push(`/ride/${id}` as any)}
-            onSeeAll={handleSeeAll}
-          />
+              <TodayTrips
+                key={refreshKey}
+                onTripPress={(id) => router.push(`/ride/${id}` as any)}
+                onSeeAll={handleSeeAll}
+              />
+            </>
+          )}
 
         </View>
 

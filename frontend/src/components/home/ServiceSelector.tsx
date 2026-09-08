@@ -69,14 +69,6 @@ export default function ServiceSelector({ selected, onSelect }: ServiceSelectorP
       }),
     ]).start();
 
-    if (id === 'bus') {
-      CustomAlert.alert(
-        'Bientôt disponible',
-        'Le service de réservation de bus est en cours de développement et sera disponible très prochainement.'
-      );
-      return;
-    }
-
     if (id === 'colis') {
       CustomAlert.alert(
         'Bientôt disponible',
