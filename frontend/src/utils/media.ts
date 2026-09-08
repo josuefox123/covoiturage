@@ -93,7 +93,14 @@ export const appendFileToFormData = async (
 
   // MOBILE PLATFORM (Android / iOS):
   // React Native native networking stack REQUIRES an object with { uri, name, type }
-  let cleanUri = uri;
+  let cleanUri = typeof uri === 'string' ? uri : (uri as any)?.uri || '';
+  if (!cleanUri) return;
+
+  // Décoder les caractères encodés (ex: %2540 -> @ dans Expo Go sur Android)
+  try {
+    cleanUri = decodeURIComponent(cleanUri);
+  } catch (_) {}
+
   if (cleanUri.startsWith('file:')) {
     // Normaliser pour toujours avoir 3 slashes: file:///path/to/file
     cleanUri = 'file:///' + cleanUri.replace(/^file:\/*/, '');
