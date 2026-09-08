@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 
@@ -71,6 +72,7 @@ class VerificationRequestViewSet(viewsets.ModelViewSet):
 @extend_schema(request=dict, responses={200: dict, 400: dict}, tags=['Vérification des comptes'])
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def request_verification(request):
     """
     Le passager soumet une demande de vérification d'identité avec images.

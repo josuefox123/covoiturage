@@ -3,6 +3,7 @@ import { Animated, Keyboard, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { CustomAlert } from '../../../../src/utils/CustomAlert';
+import { appendFileToFormData } from '../../../../src/utils/media';
 
 const BENIN_CITIES_COORDS = [
   { name: 'Allada', lat: 6.6655, lon: 2.1514 },
@@ -860,10 +861,7 @@ export function usePublishForm(authCtx: any) {
       formData.append('full_name', editName);
       if (editEmail) formData.append('email', editEmail);
       if (avatarUri && avatarUri !== user?.avatar) {
-        const filename = avatarUri.split('/').pop() || 'avatar.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        formData.append('avatar', { uri: avatarUri, name: filename, type } as any);
+        await appendFileToFormData(formData, 'avatar', avatarUri, 'avatar.jpg');
       }
       await authFetch(`/users/${user!.id}/`, { method: 'PATCH', body: formData });
       updateUser({ full_name: editName, avatar: avatarUri, email: editEmail });
@@ -895,10 +893,7 @@ export function usePublishForm(authCtx: any) {
       formData.append('license_expiration', licenseExpiration);
     }
     if (vehicleType === 'voiture' && driverLicensePhoto && !driverLicensePhoto.startsWith('http')) {
-      const filename = driverLicensePhoto.split('/').pop() || 'license.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-      formData.append('driver_license_photo', { uri: driverLicensePhoto, name: filename, type } as any);
+      await appendFileToFormData(formData, 'driver_license_photo', driverLicensePhoto, 'license.jpg');
     }
     try {
       const targetVehicleId = vehicleId;

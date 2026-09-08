@@ -41,7 +41,7 @@ export default function MessagesScreen() {
   const [activeFilter, setActiveFilter] = useState('Tous');
 
   // Real-time polling
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [pollInterval, setPollInterval] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchConversations = useCallback(async (isSilent = false) => {
     try {

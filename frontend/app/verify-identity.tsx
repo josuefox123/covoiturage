@@ -30,6 +30,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../src/context/AuthContext';
 import { CustomAlert } from '../src/utils/CustomAlert';
+import { appendFileToFormData } from '../src/utils/media';
 
 const { width } = Dimensions.get('window');
 const PRIMARY = '#2563EB';
@@ -139,21 +140,10 @@ export default function VerifyIdentityScreen() {
     try {
       const formData = new FormData();
 
-      const appendImage = (name: string, uri: string) => {
-        const filename = uri.split('/').pop() || `${name}.jpg`;
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        formData.append(name, {
-          uri,
-          name: filename,
-          type
-        } as any);
-      };
-
-      appendImage('selfie', selfieUri);
-      appendImage('selfie_id', selfieIdUri);
-      appendImage('id_front', idFrontUri);
-      appendImage('id_back', idBackUri);
+      await appendFileToFormData(formData, 'selfie', selfieUri, 'selfie.jpg');
+      await appendFileToFormData(formData, 'selfie_id', selfieIdUri, 'selfie_id.jpg');
+      await appendFileToFormData(formData, 'id_front', idFrontUri, 'id_front.jpg');
+      await appendFileToFormData(formData, 'id_back', idBackUri, 'id_back.jpg');
 
       await authFetch('/auth/request-verification/', {
         method: 'POST',
@@ -190,7 +180,7 @@ export default function VerifyIdentityScreen() {
   if (submitted) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFill} />
         <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
           <Animated.View style={[styles.successCard, { transform: [{ scale: successScale }] }]}>
             <View style={styles.successIconWrapper}>
@@ -228,7 +218,7 @@ export default function VerifyIdentityScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFill} />
 
       {/* ── Glassmorphism Header (Fallback for Android compatibility) ────────────────────── */}
       <View style={styles.headerBlur}>
@@ -770,11 +760,11 @@ const pcStyles = StyleSheet.create({
     backgroundColor: '#111827',
   },
   img: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: '100%',
     height: '100%',
   },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-end', padding: 12 },
+  overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-end', padding: 12 },
   retakeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
   retakeText: { fontSize: 13, color: '#FFFFFF', fontWeight: '600' },
   successBadge: { position: 'absolute', top: 12, right: 12 },

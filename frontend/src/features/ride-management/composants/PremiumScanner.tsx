@@ -67,7 +67,7 @@ export function PremiumScanner({
           ) : (
             <>
               <CameraView
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
                 facing="back"
                 onBarcodeScanned={scanned ? undefined : onScan}
                 barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   scanCloseBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   scanTitle: { color: C.white, fontSize: 18, fontWeight: '700' },
   scanPermBtn: { backgroundColor: C.primary, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 16 },
-  scanOverlay: { ...StyleSheet.absoluteFillObject },
+  scanOverlay: { ...StyleSheet.absoluteFill },
   scanOverlayTop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   scanOverlaySide: { width: 40, backgroundColor: 'rgba(0,0,0,0.6)' },
   scanOverlayBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },

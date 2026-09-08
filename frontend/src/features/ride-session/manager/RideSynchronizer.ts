@@ -7,7 +7,7 @@ import { SegmentIdentifier } from '../types/rideSession.types';
 export class RideSynchronizer {
   private static instance: RideSynchronizer;
   private socketService: BookingWebSocketService | null = null;
-  private pollingInterval: NodeJS.Timeout | null = null;
+  private pollingInterval: ReturnType<typeof setTimeout> | null = null;
   private currentSegment: SegmentIdentifier | null = null;
   private currentAuthFetch: any = null;
   private currentUser: any = null;

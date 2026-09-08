@@ -8,7 +8,7 @@ import {
   Image,
   Animated,
 } from 'react-native';
-import { getMediaUrl } from '../../../../../utils/media';
+import { getMediaUrl, appendFileToFormData } from '../../../../../utils/media';
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -164,14 +164,7 @@ export function VehicleModal({
     }
 
     if (vehicleType === 'voiture' && driverLicensePhoto && !driverLicensePhoto.startsWith('http')) {
-      const filename = driverLicensePhoto.split('/').pop() || 'license.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-      formData.append('driver_license_photo', {
-        uri: driverLicensePhoto,
-        name: filename,
-        type,
-      } as any);
+      await appendFileToFormData(formData, 'driver_license_photo', driverLicensePhoto, 'license.jpg');
     }
 
     try {

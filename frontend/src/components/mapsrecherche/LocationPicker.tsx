@@ -569,7 +569,7 @@ export default function LocationPicker({
 
 const styles = StyleSheet.create({
   overlayContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 99999,
     elevation: 99999,
     backgroundColor: '#FFFFFF',
@@ -582,10 +582,10 @@ const styles = StyleSheet.create({
     bottom: SCREEN_HEIGHT * 0.42,
   },
   mapWebView: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   mapLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',

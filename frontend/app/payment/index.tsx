@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 24 },
     loadingText: { marginTop: 20, fontSize: 16, color: '#0F172A', fontWeight: '600', textAlign: 'center' },
     loadingSubtext: { marginTop: 6, fontSize: 13, color: '#64748B', fontWeight: '400', textAlign: 'center' },
-    webViewLoading: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
+    webViewLoading: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
     errorBox: { marginTop: 24, alignItems: 'center', width: '100%' },
     errorText: { color: '#EF4444', textAlign: 'center', marginBottom: 16, fontSize: 14, fontWeight: '500' },
     retryBtn: { backgroundColor: '#2F80ED', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, shadowColor: '#2F80ED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },

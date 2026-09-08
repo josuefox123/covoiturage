@@ -8,7 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getMediaUrl } from '../../../../../utils/media';
+import { getMediaUrl, appendFileToFormData } from '../../../../../utils/media';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../../../../styles/theme';
@@ -117,14 +117,7 @@ export function PersonalInfoModal({
       if (editEmail) formData.append('email', editEmail);
 
       if (avatarUri && avatarUri !== user?.avatar) {
-        const filename = avatarUri.split('/').pop() || 'avatar.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        formData.append('avatar', {
-          uri: avatarUri,
-          name: filename,
-          type,
-        } as any);
+        await appendFileToFormData(formData, 'avatar', avatarUri, 'avatar.jpg');
       }
 
       await authFetch(`/users/${user.id}/`, {

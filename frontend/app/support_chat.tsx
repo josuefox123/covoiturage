@@ -33,6 +33,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useAuth } from '../src/context/AuthContext';
 import { theme } from '../src/styles/theme';
+import { appendFileToFormData } from '../src/utils/media';
 import { CustomAlert } from '../src/utils/CustomAlert';
 
 interface Message {
@@ -176,7 +177,7 @@ export default function SupportChatScreen() {
       formData.append('conversation', conversation.id);
       formData.append('content', '');
       formData.append('message_type', type);
-      formData.append('attachment', { uri, name, type: mimeType } as any);
+      await appendFileToFormData(formData, 'attachment', uri, name || 'attachment.jpg');
 
       await authFetch('/messages/', {
         method: 'POST',

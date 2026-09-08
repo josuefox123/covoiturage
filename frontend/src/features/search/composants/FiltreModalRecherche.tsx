@@ -111,7 +111,7 @@ export function FiltreModalRecherche({ visible, filters, rides, onClose, onApply
       onRequestClose={onClose}
     >
       <TouchableOpacity
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         activeOpacity={1}
         onPress={onClose}
       >

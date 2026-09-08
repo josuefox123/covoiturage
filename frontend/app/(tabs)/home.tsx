@@ -5,7 +5,7 @@
  * ==============================================================
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -116,6 +116,14 @@ export default function HomeScreen() {
 
   const [showVerifModal, setShowVerifModal] = useState(false);
 
+  // Réagit dès que user ou hasStartedVerification change
+  // (couvre le cas juste après l'inscription où user vient d'être set)
+  React.useEffect(() => {
+    if (shouldShowVerif) {
+      setShowVerifModal(true);
+    }
+  }, [shouldShowVerif]);
+
   // ============================================================
   // SCROLL
   // ============================================================
@@ -127,8 +135,11 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshUser();
-      setShowVerifModal(shouldShowVerif);
       setRefreshKey((key) => key + 1);
+      // Ré-évaluer au retour sur l'écran (ex: après fermeture de verify-identity)
+      if (shouldShowVerif) {
+        setShowVerifModal(true);
+      }
     }, [shouldShowVerif, refreshUser])
   );
 

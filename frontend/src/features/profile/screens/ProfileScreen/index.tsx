@@ -12,7 +12,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { theme } from '../../../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { getMediaUrl } from '../../../../utils/media';
+import { getMediaUrl, appendFileToFormData } from '../../../../utils/media';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../../../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
@@ -144,14 +144,7 @@ export default function ProfileScreen() {
       if (user?.id) {
         try {
           const formData = new FormData();
-          const filename = finalUri.split('/').pop() || 'avatar.jpg';
-          const match = /\.(\w+)$/.exec(filename);
-          const type = match ? `image/${match[1]}` : 'image/jpeg';
-          formData.append('avatar', {
-            uri: finalUri,
-            name: filename,
-            type,
-          } as any);
+          await appendFileToFormData(formData, 'avatar', finalUri, 'avatar.jpg');
 
           const res = await authFetch(`/users/${user.id}/`, {
             method: 'PATCH',

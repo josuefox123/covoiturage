@@ -1,4 +1,3 @@
-import { Router } from 'expo-router';
 import { Mission, TypeActionMission } from '../types/types-mission';
 
 interface CallbacksAction {
@@ -18,7 +17,7 @@ export class GestionnaireActions {
   public static executer(
     typeAction: TypeActionMission,
     mission: Mission,
-    router: Router,
+    router: any,
     callbacks?: CallbacksAction
   ): void {
     const { data } = mission;

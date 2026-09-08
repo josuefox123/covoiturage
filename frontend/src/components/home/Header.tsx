@@ -66,7 +66,7 @@ export default function Header({
         colors={['#0066FF', '#0047B3']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
       />
 
       {/* Decorative circles */}

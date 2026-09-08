@@ -358,7 +358,7 @@ export default function EarningsScreen() {
       {/* ====== MODAL DE RETRAIT PARTIEL/TOTAL ====== */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowModal(false)} />
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowModal(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.handle} />
 

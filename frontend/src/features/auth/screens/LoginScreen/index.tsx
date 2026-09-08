@@ -154,7 +154,7 @@ export default function LoginScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <StatusBar style="dark" translucent backgroundColor="transparent" />
+        <StatusBar style="dark" />
 
         <ScrollView
           ref={scrollViewRef}
