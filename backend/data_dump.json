@@ -1,0 +1,1077 @@
+[
+{
+  "model": "sessions.session",
+  "pk": "wlcynqn9plxql5pni9sgs09d7ampg755",
+  "fields": {
+    "session_data": ".eJxVyz0OgkAQQOG7bC0E9meYsTSxNHoDMuzMZokIBqQy3t1oKLR8yfuepuX1kdt10bntxewNU6qIxBasCIUXcQVShwVwYKcYkFnN7pd1HK86fu29L7dayuON--E8X_I06mkSHQ7b94czL_kja_I1Omg6Z31KgtECVwghxQDCDRFZK8mzQLApkKKQJ3SRHQTyybze_zE_lg:1wUOSt:An5EfgHDo0nDDV-FFx-JOmKtLTkwyJdDvSB37KdijBs",
+    "expire_date": "2026-06-16T12:43:27.459Z"
+  }
+},
+{
+  "model": "api.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$qbEGMwpcquxD0FLYDMB8Gk$0tNPKbchOdCN6JKltleBUIvqLFOVRLpkuFJAK4wicwQ=",
+    "last_login": null,
+    "is_superuser": true,
+    "full_name": null,
+    "email": "admin@zemybackend.sinustic.com",
+    "phone": "+22900000001",
+    "avatar": "",
+    "rating": 0.0,
+    "parcels_completed": 0,
+    "parcel_rating": 0.0,
+    "is_verified": false,
+    "fcm_token": null,
+    "country": "BJ",
+    "created_at": "2026-09-07T17:08:43.437Z",
+    "is_active": true,
+    "is_staff": true,
+    "is_archived": false,
+    "archive_reason": null,
+    "archived_at": null,
+    "archived_by": null,
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$q1bSxSRIvJsNEi28zTtIUK$9VbYV57BPylQSp8DmyLkuTr4swVgyER/wEvEbVdrg8c=",
+    "last_login": "2026-06-02T12:43:27.452Z",
+    "is_superuser": true,
+    "full_name": "admin",
+    "email": "admin@gmail.com",
+    "phone": "0195580423",
+    "avatar": "avatars/6b3dc1fe-1172-41e2-b1bb-3ca2de87d56f.png",
+    "rating": 0.0,
+    "parcels_completed": 0,
+    "parcel_rating": 0.0,
+    "is_verified": true,
+    "fcm_token": null,
+    "country": "BJ",
+    "created_at": "2026-06-02T12:38:01.488Z",
+    "is_active": true,
+    "is_staff": true,
+    "is_archived": false,
+    "archive_reason": null,
+    "archived_at": null,
+    "archived_by": null,
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.userpreference",
+  "pk": "27cd072e-d978-4123-8407-54ace3060db7",
+  "fields": {
+    "user": [
+      "0195580423"
+    ],
+    "music": true,
+    "smoking": false,
+    "chatty": false,
+    "air_conditioner": true,
+    "pets_allowed": false,
+    "luggage_allowed": true,
+    "stops_allowed": true,
+    "notes": null
+  }
+},
+{
+  "model": "api.passwordresetotp",
+  "pk": 17,
+  "fields": {
+    "email": "sjosuetcheke@gmail.com",
+    "code": "549469",
+    "created_at": "2026-06-25T12:48:16.609Z",
+    "attempts": 0,
+    "is_verified": true
+  }
+},
+{
+  "model": "api.passwordresetotp",
+  "pk": 18,
+  "fields": {
+    "email": "foxjosue9@gmail.com",
+    "code": "470799",
+    "created_at": "2026-07-01T10:51:40.702Z",
+    "attempts": 0,
+    "is_verified": false
+  }
+},
+{
+  "model": "api.conversation",
+  "pk": "278e0a4b-54ad-4134-a254-225f97441a03",
+  "fields": {
+    "conversation_type": "support",
+    "ride": null,
+    "participant_1": [
+      "0195580423"
+    ],
+    "participant_2": null,
+    "created_at": "2026-06-08T15:19:21.253Z",
+    "updated_at": "2026-06-10T12:24:23.372Z"
+  }
+},
+{
+  "model": "api.conversation",
+  "pk": "ce2b3b93-e579-483d-9063-6d6abcf5009e",
+  "fields": {
+    "conversation_type": "ride",
+    "ride": null,
+    "participant_1": [
+      "0195580423"
+    ],
+    "participant_2": null,
+    "created_at": "2026-06-09T17:51:35.011Z",
+    "updated_at": "2026-06-09T17:57:05.592Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "1a303398-b0f4-4c60-855e-a3b4477c49e6",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "recu",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-10T11:10:01.897Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "2539f51c-646a-4745-ac3c-84fe5022d66c",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "🚨 PROBLÈME SIGNALÉ 🚨\nTrajet ID: 9253b6b2-d77b-4129-824c-395154505356\n\nDescription: Gghh",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": true,
+    "created_at": "2026-06-10T10:55:43.033Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "264d7673-e113-4387-95d4-43230eeaf626",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "",
+    "message_type": "image",
+    "attachment": "support_attachments/40b893a4-499c-4733-a745-cc22a8bc0eda.jpeg",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:30:39.151Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "2e48aa1b-05ea-43c9-b4fa-44b66c1de714",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "oooo",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:36:59.190Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "38020509-1cd8-49c3-b890-7dc97a69148d",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "",
+    "message_type": "image",
+    "attachment": "support_attachments/d125d9f3-0936-4418-8097-fd55bab9c4eb.jpeg",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-10T12:24:09.080Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "3e146387-9a50-4b87-a89b-76a025d64adb",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "🚨 PROBLÈME SIGNALÉ 🚨\nTrajet ID: 9253b6b2-d77b-4129-824c-395154505356\n\nDescription: Bbbj",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": true,
+    "created_at": "2026-06-10T11:02:31.316Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "6af998fa-19ad-46f0-9338-2a16d5e4badf",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "Oui",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:43:52.923Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "6b083e54-0bec-4245-a902-560bcfb6cc41",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "",
+    "message_type": "image",
+    "attachment": "support_attachments/56409474-ea1c-4591-bf16-0a73a27fce30.jpeg",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-10T12:24:23.356Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "89c0bf59-6ca6-4fb4-bba4-aac3b85f0a58",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "ok",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-10T11:09:43.524Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "963e20db-0d48-4ed9-8dcb-54db69c12296",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "Ok",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:50:20.202Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "9747e232-751d-4514-83dd-85a9b9852efb",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "ok",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:31:13.452Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "a14b76f6-95f5-4504-934f-b784836e178e",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "🚨 PROBLÈME SIGNALÉ 🚨\nTrajet ID: 9253b6b2-d77b-4129-824c-395154505356\n\nDescription: Dkekdkzkd",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-10T10:38:00.079Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "b491e9e2-d30d-4e24-9ee6-9ad018e706a5",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "Ok",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:36:35.041Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "e0254d0b-0c95-48cb-ae49-7353dcccf60c",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "",
+    "message_type": "image",
+    "attachment": "support_attachments/96b594b3-99c0-4da1-8a38-624c9835fae1.jpeg",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:29:58.067Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "e1c273b5-1aec-4a73-b8bd-8e5437802e6d",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "Ma position actuelle",
+    "message_type": "location",
+    "attachment": "",
+    "location_lat": 6.3737008,
+    "location_lng": 2.3910289,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:30:49.418Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "e32ca2e7-6c6b-4fe8-9f14-62971c0ac288",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "ok",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:36:49.325Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "f59fac5a-5b5a-4a1f-a51b-fd33d33fd3f6",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "ok",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:44:06.787Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "fc6f7c5d-241b-4605-b4bb-3345a87db749",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "🚨 PROBLÈME SIGNALÉ 🚨\nTrajet ID: 9253b6b2-d77b-4129-824c-395154505356\n\nDescription: Hhghhj",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": true,
+    "created_at": "2026-06-10T11:02:51.776Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "fcf35d1c-8aa1-43e1-9ae5-f1b4933598c1",
+  "fields": {
+    "conversation": "278e0a4b-54ad-4134-a254-225f97441a03",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "ok",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": false,
+    "is_urgent": false,
+    "created_at": "2026-06-08T15:50:31.194Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": "fecbaab8-5f50-496e-90a3-8d36ac0691a7",
+  "fields": {
+    "conversation": "ce2b3b93-e579-483d-9063-6d6abcf5009e",
+    "sender": [
+      "0195580423"
+    ],
+    "content": "Salut",
+    "message_type": "text",
+    "attachment": "",
+    "location_lat": null,
+    "location_lng": null,
+    "is_read": true,
+    "is_urgent": false,
+    "created_at": "2026-06-09T17:51:55.940Z"
+  }
+},
+{
+  "model": "api.notification",
+  "pk": "89b38d16-d418-4476-b7ff-02abeb0193fa",
+  "fields": {
+    "user": null,
+    "title": "zez",
+    "message": "sfsfsf",
+    "is_read": false,
+    "type": null,
+    "data": null,
+    "created_at": "2026-06-10T12:23:38.063Z"
+  }
+},
+{
+  "model": "api.notification",
+  "pk": "c85e1c5c-726a-46f5-846b-10c357096079",
+  "fields": {
+    "user": null,
+    "title": "rien",
+    "message": "dgdgg",
+    "is_read": false,
+    "type": null,
+    "data": null,
+    "created_at": "2026-06-09T11:42:12.437Z"
+  }
+},
+{
+  "model": "api.financialsettings",
+  "pk": 1,
+  "fields": {
+    "commission_percentage": 10.0,
+    "min_commission": 100,
+    "max_commission": 2000,
+    "is_commission_active": true,
+    "price_per_km": 30,
+    "price_margin_percent": 20,
+    "parcel_commission_percentage": 8.0,
+    "min_parcel_commission": 100,
+    "max_parcel_commission": 2000,
+    "is_parcel_commission_active": true,
+    "updated_at": "2026-06-30T13:29:26.797Z"
+  }
+},
+{
+  "model": "api.supportticket",
+  "pk": "1731aedc-8027-4be4-b36b-6c5a38e184bf",
+  "fields": {
+    "user": null,
+    "name": "Jean Dupont",
+    "email": "jean.dupont@example.com",
+    "subject": "Problème de paiement",
+    "category": "payment",
+    "message": "Bonjour, Mon paiement ne fonctionne pas. (au moins 10 chars)",
+    "status": "new",
+    "ticket_number": "ZMY-20260626-00005",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-26T12:12:55.517Z",
+    "updated_at": "2026-06-26T12:12:55.517Z"
+  }
+},
+{
+  "model": "api.supportticket",
+  "pk": "453dfb8c-fda1-46fa-9c50-081d41ff064e",
+  "fields": {
+    "user": null,
+    "name": "Spammer",
+    "email": "spam.user@example.com",
+    "subject": "Test Rate Limit",
+    "category": "other",
+    "message": "Message de test pour valider le rate limiting (min 10 chars)",
+    "status": "new",
+    "ticket_number": "ZMY-20260626-00003",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-26T12:11:55.435Z",
+    "updated_at": "2026-06-26T12:11:55.435Z"
+  }
+},
+{
+  "model": "api.supportticket",
+  "pk": "49f61c54-323c-4aa0-85ad-448732dc65f9",
+  "fields": {
+    "user": null,
+    "name": "Jean Dupont",
+    "email": "jean.dupont@example.com",
+    "subject": "Problème de paiement",
+    "category": "payment",
+    "message": "Bonjour, Mon paiement ne fonctionne pas. (au moins 10 chars)",
+    "status": "new",
+    "ticket_number": "ZMY-20260626-00001",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-26T12:11:44.603Z",
+    "updated_at": "2026-06-26T12:11:44.603Z"
+  }
+},
+{
+  "model": "api.supportticket",
+  "pk": "59f67fe1-613a-4ee7-a5ac-32799e04f67b",
+  "fields": {
+    "user": null,
+    "name": "HOUEFONDE  Josué",
+    "email": "josue@gmail.com",
+    "subject": "Kjj",
+    "category": "problem_parcel",
+    "message": "Nnknwsndnsndkzkdk",
+    "status": "new",
+    "ticket_number": "ZMY-20260626-00006",
+    "ip_address": "192.168.100.9",
+    "created_at": "2026-06-26T12:15:32.245Z",
+    "updated_at": "2026-06-26T12:15:32.245Z"
+  }
+},
+{
+  "model": "api.supportticket",
+  "pk": "679b98c3-df08-412e-855d-3b05b52e5f0f",
+  "fields": {
+    "user": null,
+    "name": "HOUEFONDE  Josué",
+    "email": "josue@gmail.com",
+    "subject": "Tvkkj",
+    "category": "problem_parcel",
+    "message": "Rghhjhjkjhhjhujj",
+    "status": "new",
+    "ticket_number": "ZMY-20260626-00007",
+    "ip_address": "192.168.100.9",
+    "created_at": "2026-06-26T12:18:11.034Z",
+    "updated_at": "2026-06-26T12:18:11.034Z"
+  }
+},
+{
+  "model": "api.supportticket",
+  "pk": "6c6fdfea-f051-4927-ac31-f820ec84cbfd",
+  "fields": {
+    "user": null,
+    "name": "Spammer",
+    "email": "spam.user@example.com",
+    "subject": "Test Rate Limit",
+    "category": "other",
+    "message": "Message de test pour valider le rate limiting (min 10 chars)",
+    "status": "new",
+    "ticket_number": "ZMY-20260626-00004",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-26T12:12:00.984Z",
+    "updated_at": "2026-06-26T12:12:00.984Z"
+  }
+},
+{
+  "model": "api.supportticket",
+  "pk": "924eb94b-b06e-444b-971d-a4ab2bee86f8",
+  "fields": {
+    "user": null,
+    "name": "Spammer",
+    "email": "spam.user@example.com",
+    "subject": "Test Rate Limit",
+    "category": "other",
+    "message": "Message de test pour valider le rate limiting (min 10 chars)",
+    "status": "new",
+    "ticket_number": "ZMY-20260626-00002",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-26T12:11:50.189Z",
+    "updated_at": "2026-06-26T12:11:50.189Z"
+  }
+},
+{
+  "model": "api.appbranding",
+  "pk": 1,
+  "fields": {
+    "logo": "branding/logoFichier_64x_FVDf0Qm.png",
+    "logo_scale": 1.5,
+    "logo_position_x": 160.55206298828125,
+    "logo_position_y": 241.83333587646484,
+    "animation_type": "bounce",
+    "is_active": true,
+    "updated_at": "2026-06-11T14:01:59.358Z"
+  }
+},
+{
+  "model": "api.promotion",
+  "pk": 4,
+  "fields": {
+    "title": "Sit deserunt accusam",
+    "subtitle": "Voluptatem Neque et",
+    "image": "promotions/ChatGPT_Image_16_juin_2026_14_59_28_olBbLuQ.png",
+    "color": "#cdb8a7",
+    "icon": "pricetag",
+    "is_active": true,
+    "position": 1,
+    "created_at": "2026-06-19T14:35:24.046Z",
+    "updated_at": "2026-06-30T16:07:23.496Z"
+  }
+},
+{
+  "model": "api.mobilesettings",
+  "pk": 1,
+  "fields": {
+    "show_promotions": true,
+    "updated_at": "2026-06-19T12:22:19.040Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "0c6b35db-ce75-41a3-937e-8e364679243e",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "archive",
+    "reason": "",
+    "ip_address": null,
+    "created_at": "2026-06-30T13:46:09.685Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "0ff218ac-a2b9-461c-8287-46d29f4a6bbe",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "restore",
+    "reason": "Restauration du compte utilisateur",
+    "ip_address": null,
+    "created_at": "2026-06-30T13:45:49.466Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "21aa2e0b-232a-4686-baca-1ffbda69ef39",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "permanent_delete",
+    "reason": "Suppression définitive de l'utilisateur : Jean Kobota (Tél: +2290195580423, Email: jean2@gmail.com)",
+    "ip_address": null,
+    "created_at": "2026-06-30T13:49:18.529Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "31aa75ce-70ed-498f-bbad-c729b3e6d7a6",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "USER_ARCHIVED",
+    "reason": "",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-22T14:13:07.148Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "3a2427fc-10b8-4f3e-89ce-537421224c8b",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "USER_ARCHIVED",
+    "reason": "",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-22T18:33:17.069Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "48e2baf0-9e3f-4550-973a-e62f1e3ccffd",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "archive",
+    "reason": "",
+    "ip_address": null,
+    "created_at": "2026-06-30T13:49:01.828Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "72e56b63-b2b5-49db-83d6-e9cdf71bf291",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "USER_ARCHIVED",
+    "reason": "",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-22T18:33:23.016Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "9d8de5ec-9967-473c-9dc7-97d439a9f808",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "permanent_delete",
+    "reason": "Suppression définitive de l'utilisateur : Saka Mouyibath (Tél: +2290162106801, Email: mouyibath@gmail.com)",
+    "ip_address": null,
+    "created_at": "2026-06-30T13:48:28.214Z"
+  }
+},
+{
+  "model": "api.auditlog",
+  "pk": "fade759a-f523-4a86-82d7-fb73bc8713eb",
+  "fields": {
+    "admin_user": [
+      "0195580423"
+    ],
+    "target_user": null,
+    "action": "USER_ARCHIVED",
+    "reason": "",
+    "ip_address": "127.0.0.1",
+    "created_at": "2026-06-22T18:33:29.629Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "04e31303-204f-4b2d-aa11-83b553798093",
+  "fields": {
+    "name": "Godomey",
+    "latitude": 6.3797,
+    "longitude": 2.3353,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.716Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "08c253a0-4921-4728-a509-b95f8bb99e76",
+  "fields": {
+    "name": "Akpakpa",
+    "latitude": 6.3725,
+    "longitude": 2.4578,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.711Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "0d271998-71d2-486d-a52c-981fa31e3032",
+  "fields": {
+    "name": "Houéyiho",
+    "latitude": 6.3711,
+    "longitude": 2.3925,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.710Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "0e5fd05b-effc-438f-a3e3-f0975d2ec5b5",
+  "fields": {
+    "name": "Carrefour IITA",
+    "latitude": 6.4258,
+    "longitude": 2.3387,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.713Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "0ed03d2a-a0c7-498e-a562-b6895fd919ed",
+  "fields": {
+    "name": "Kpota",
+    "latitude": 6.4098,
+    "longitude": 2.3392,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.716Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "0f76966a-30ea-4727-a1d4-25a47cd9240c",
+  "fields": {
+    "name": "Ganhi",
+    "latitude": 6.3575,
+    "longitude": 2.4289,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.707Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "25f7e978-6e23-4a26-b3c2-e3f07ea92def",
+  "fields": {
+    "name": "Abomey-Calavi Centre",
+    "latitude": 6.4478,
+    "longitude": 2.3524,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.717Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "33e291e0-31ad-48dd-a5ad-2b2ac3617d3a",
+  "fields": {
+    "name": "Bidossessi",
+    "latitude": 6.4152,
+    "longitude": 2.3548,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.715Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "3b13aa98-d228-4b45-9485-816d5e8b3465",
+  "fields": {
+    "name": "Marché Dantokpa",
+    "latitude": 6.3678,
+    "longitude": 2.4348,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.707Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "5563076c-0381-4495-97c1-6f6b920defcc",
+  "fields": {
+    "name": "Tokan",
+    "latitude": 6.4531,
+    "longitude": 2.3163,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.713Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "5b3862a5-5c9e-4a30-8194-b4e5ca9d2628",
+  "fields": {
+    "name": "Fidjrossè",
+    "latitude": 6.3592,
+    "longitude": 2.3684,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.709Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "5f5093f8-f082-4075-a28a-8fb9e6bc4ae1",
+  "fields": {
+    "name": "Pk10",
+    "latitude": 6.3794,
+    "longitude": 2.5184,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.712Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "67139219-851e-4751-8b79-6bf2c9eae409",
+  "fields": {
+    "name": "UAC",
+    "latitude": 6.4174,
+    "longitude": 2.3483,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.712Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "69766249-719f-40c7-8f38-84a46e06640e",
+  "fields": {
+    "name": "Étoile Rouge",
+    "latitude": 6.3686,
+    "longitude": 2.4172,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.706Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "7da10d9b-2f91-4448-a814-0f83dab0c279",
+  "fields": {
+    "name": "Arconville",
+    "latitude": 6.4468,
+    "longitude": 2.3444,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.715Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "7f5505a5-3b72-4b00-a230-9774f194674e",
+  "fields": {
+    "name": "Cadjèhoun",
+    "latitude": 6.3558,
+    "longitude": 2.4042,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.708Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "a0dd7add-57ab-4036-ba3d-004257800329",
+  "fields": {
+    "name": "Carrefour Tankpè",
+    "latitude": 6.4385,
+    "longitude": 2.3551,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.714Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "ac37903f-c0f1-4b72-9113-cdccbc74245d",
+  "fields": {
+    "name": "Pk3",
+    "latitude": 6.3776,
+    "longitude": 2.4468,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.711Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "ac3c5031-e6c5-4be9-bdd4-d394bc1b709f",
+  "fields": {
+    "name": "Aéroport de Cotonou",
+    "latitude": 6.3533,
+    "longitude": 2.3854,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.708Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "ae0920db-1a3a-4ed4-bf85-35a688fe3092",
+  "fields": {
+    "name": "Agla",
+    "latitude": 6.3762,
+    "longitude": 2.3721,
+    "city": "Cotonou",
+    "created_at": "2026-06-23T13:27:39.710Z"
+  }
+},
+{
+  "model": "api.popularplace",
+  "pk": "d212c805-4d7a-4c7f-a6bc-3e696bd7bd34",
+  "fields": {
+    "name": "Womey",
+    "latitude": 6.4215,
+    "longitude": 2.3082,
+    "city": "Abomey-Calavi",
+    "created_at": "2026-06-23T13:27:39.714Z"
+  }
+},
+{
+  "model": "token_blacklist.outstandingtoken",
+  "pk": 1,
+  "fields": {
+    "user": [
+      "+22900000001"
+    ],
+    "jti": "6ad1c029e9e149f295944eb01fc2c66b",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5MTM5Mjk4MywiaWF0IjoxNzg4ODAwOTgzLCJqdGkiOiI2YWQxYzAyOWU5ZTE0OWYyOTU5NDRlYjAxZmMyYzY2YiIsInVzZXJfaWQiOiI2Zjg5YzI5Yi0yY2JkLTQ3MjctOGY0MS1mNGRkZTJmMDU2MDkiLCJpc3MiOiJ6ZW15LWFwaSJ9.nQR5NsWNaZX4etTYUIuUbySujTj0tXQO9sdJHjtuJfA",
+    "created_at": "2026-09-07T17:09:43.792Z",
+    "expires_at": "2026-10-07T17:09:43Z"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 1,
+  "fields": {
+    "action_time": "2026-06-02T12:43:02.004Z",
+    "user": [
+      "0195580423"
+    ],
+    "content_type": [
+      "api",
+      "user"
+    ],
+    "object_id": "a9f099d2-ae86-4dd3-89b8-6a5a3e858aae",
+    "object_repr": "0195580423",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Full name\", \"Email\", \"Is verified\"]}}]"
+  }
+}
+]

@@ -16,7 +16,7 @@ class HostOverrideMiddleware:
             backend_url = os.getenv('BACKEND_URL', 'https://zemybackend.sinustic.com')
             backend_domain = backend_url.replace('https://', '').replace('http://', '').strip('/')
             
-            # Forcer le host et HTTPS pour que request.build_absolute_uri() utilise zemy.erika-app.com
+            # Forcer le host et HTTPS pour que request.build_absolute_uri() utilise zemybackend.sinustic.com
             request.META['HTTP_HOST'] = backend_domain
             request.META['wsgi.url_scheme'] = 'https'
             request.META['SERVER_PORT'] = '443'
