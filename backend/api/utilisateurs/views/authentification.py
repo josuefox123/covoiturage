@@ -169,7 +169,8 @@ def send_reset_code(request):
     PasswordResetOTP.objects.create(email=email.lower(), code=code)
     
     try:
-        send_zemy_reset_email(user.full_name or "Utilisateur Zemy", email, code)
+        user_name = getattr(user, 'full_name', '') or getattr(user, 'first_name', '') or "Utilisateur Zemy"
+        send_zemy_reset_email(user_name, email, code)
         return Response({'message': "Code de réinitialisation envoyé avec succès par email si le compte existe."}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'error': "Une erreur est survenue lors de l'envoi de l'e-mail. Veuillez vérifier votre configuration."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

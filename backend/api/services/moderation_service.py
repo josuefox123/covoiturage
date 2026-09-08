@@ -1,6 +1,12 @@
 import re
-import phonenumbers
-from phonenumbers.phonenumberutil import NumberParseException
+try:
+    import phonenumbers
+    from phonenumbers.phonenumberutil import NumberParseException
+    HAS_PHONENUMBERS = True
+except ImportError:
+    phonenumbers = None
+    NumberParseException = Exception
+    HAS_PHONENUMBERS = False
 
 class MessageModerator:
     # Regex for emails
@@ -74,25 +80,27 @@ class MessageModerator:
         potential_phones = re.finditer(cls.POTENTIAL_PHONE_REGEX, original_content)
         for match in potential_phones:
             phone_str = match.group()
-            # Clean up the string for libphonenumber
-            clean_phone = re.sub(r'[\s.-]', '', phone_str)
-            if not clean_phone.startswith('+') and not clean_phone.startswith('00'):
-                # Try parsing with default region
-                try:
-                    parsed = phonenumbers.parse(clean_phone, default_region)
-                    if phonenumbers.is_possible_number(parsed) or phonenumbers.is_valid_number(parsed):
-                        filtered_content = filtered_content.replace(phone_str, cls.MASK)
-                        detected_types.add('phone')
-                except NumberParseException:
-                    pass
+            if HAS_PHONENUMBERS and phonenumbers:
+                clean_phone = re.sub(r'[\s.-]', '', phone_str)
+                if not clean_phone.startswith('+') and not clean_phone.startswith('00'):
+                    try:
+                        parsed = phonenumbers.parse(clean_phone, default_region)
+                        if phonenumbers.is_possible_number(parsed) or phonenumbers.is_valid_number(parsed):
+                            filtered_content = filtered_content.replace(phone_str, cls.MASK)
+                            detected_types.add('phone')
+                    except NumberParseException:
+                        pass
+                else:
+                    try:
+                        parsed = phonenumbers.parse(phone_str, None)
+                        if phonenumbers.is_possible_number(parsed) or phonenumbers.is_valid_number(parsed):
+                            filtered_content = filtered_content.replace(phone_str, cls.MASK)
+                            detected_types.add('phone')
+                    except NumberParseException:
+                        pass
             else:
-                try:
-                    parsed = phonenumbers.parse(phone_str, None)
-                    if phonenumbers.is_possible_number(parsed) or phonenumbers.is_valid_number(parsed):
-                        filtered_content = filtered_content.replace(phone_str, cls.MASK)
-                        detected_types.add('phone')
-                except NumberParseException:
-                    pass
+                filtered_content = filtered_content.replace(phone_str, cls.MASK)
+                detected_types.add('phone')
 
         # 3. Emails
         if re.search(cls.EMAIL_REGEX, filtered_content):

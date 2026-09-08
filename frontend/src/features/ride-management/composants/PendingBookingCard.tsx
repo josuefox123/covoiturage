@@ -29,12 +29,16 @@ export function PendingBookingCard({
   const seatsReq = booking.seats_booked || 1;
   const price = booking.portion_price ? Math.round(booking.portion_price / seatsReq) : ridePrice || 0;
 
+  const isPendingPayment = ['pending_payment', 'pending_passenger', 'payment_processing'].includes(booking.status);
+
   return (
     <Animated.View style={[styles.bookCard, anim]}>
       {/* Badge En attente */}
-      <View style={styles.pendingBadge}>
-        <View style={styles.pendingDot} />
-        <Text style={styles.pendingTxt}>Demande en attente</Text>
+      <View style={[styles.pendingBadge, { backgroundColor: isPendingPayment ? C.primaryLight : C.warningLight }]}>
+        <View style={[styles.pendingDot, { backgroundColor: isPendingPayment ? C.primary : C.warning }]} />
+        <Text style={[styles.pendingTxt, { color: isPendingPayment ? C.primary : C.warning }]}>
+          {isPendingPayment ? 'En attente de paiement' : 'Demande en attente'}
+        </Text>
       </View>
 
       {/* Profil du passager */}
@@ -66,26 +70,33 @@ export function PendingBookingCard({
         </View>
       </View>
 
-      {/* Boutons actions */}
-      <View style={styles.bookBtns}>
-        <TouchableOpacity style={styles.rejectBtn} onPress={onReject} activeOpacity={0.85}>
-          <Ionicons name="close" size={17} color={C.error} />
-          <Text style={styles.rejectTxt}>Refuser</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.acceptBtn} onPress={onAccept} activeOpacity={0.85}>
-          <Ionicons name="checkmark" size={17} color={C.white} />
-          <Text style={styles.acceptTxt}>Accepter</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Action / Statut */}
+      {isPendingPayment ? (
+        <View style={styles.waitingBox}>
+          <Ionicons name="time-outline" size={18} color={C.primary} />
+          <Text style={styles.waitingTxt}>Acceptée • En attente de paiement par le passager</Text>
+        </View>
+      ) : (
+        <View style={styles.bookBtns}>
+          <TouchableOpacity style={styles.rejectBtn} onPress={onReject} activeOpacity={0.85}>
+            <Ionicons name="close" size={17} color={C.error} />
+            <Text style={styles.rejectTxt}>Refuser</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.acceptBtn} onPress={onAccept} activeOpacity={0.85}>
+            <Ionicons name="checkmark" size={17} color={C.white} />
+            <Text style={styles.acceptTxt}>Accepter</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   bookCard: { backgroundColor: C.white, borderRadius: 24, padding: 20, marginBottom: 14, ...SHsm },
-  pendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.warningLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 16 },
-  pendingDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.warning },
-  pendingTxt: { fontSize: 11, fontWeight: '700', color: C.warning, textTransform: 'uppercase', letterSpacing: 0.3 },
+  pendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 16 },
+  pendingDot: { width: 7, height: 7, borderRadius: 3.5 },
+  pendingTxt: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
   paxAvatar: { width: 56, height: 56, borderRadius: 28 },
   paxAvatarPH: { backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
   paxInitials: { fontSize: 20, fontWeight: '800', color: C.primary },
@@ -93,6 +104,8 @@ const styles = StyleSheet.create({
   paxPrice: { fontSize: 18, fontWeight: '900', color: C.primary },
   verifiedBadge: { width: 18, height: 18, borderRadius: 9, backgroundColor: C.success, alignItems: 'center', justifyContent: 'center' },
   miniDot: { width: 7, height: 7, borderRadius: 3.5 },
+  waitingBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.primaryLight, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
+  waitingTxt: { fontSize: 13, fontWeight: '600', color: C.primary, flex: 1 },
   bookBtns: { flexDirection: 'row', gap: 12 },
   rejectBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: C.error + '40', backgroundColor: C.errorLight, borderRadius: 16, paddingVertical: 13 },
   rejectTxt: { fontSize: 14, fontWeight: '700', color: C.error },

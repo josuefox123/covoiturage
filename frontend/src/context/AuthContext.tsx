@@ -114,9 +114,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // On mount: restore saved session
   useEffect(() => {
+    let sessionRestored = false;
+
     // Écouter les erreurs 401 globales pour déconnecter l'utilisateur
+    // Mais uniquement APRÈS que la session ait été restaurée (évite déco au démarrage)
     const handleUnauthorized = () => {
-      logout();
+      if (sessionRestored) {
+        logout();
+      }
     };
     apiEventEmitter.on('unauthorized', handleUnauthorized);
 
@@ -128,23 +133,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(savedToken);
           const parsedUser = JSON.parse(savedUser);
           setUser(parsedUser);
-          
-          // Fetch fresh user data in background without blocking startup
+
+          // Rafraîchir les données user en arrière-plan sans bloquer le démarrage ni risquer de déconnecter
           if (parsedUser && parsedUser.id) {
             fetchApi(`/users/${parsedUser.id}/`, {
-              headers: { 'Authorization': `Bearer ${savedToken}` }
+              headers: { 'Authorization': `Bearer ${savedToken}` },
+              skipUnauthorizedEmit: true, // Ne pas émettre d'événement 401 lors de la vérification en arrière-plan
             })
               .then(async (freshUser) => {
-                if (freshUser) {
+                if (freshUser && freshUser.id) {
                   setUser(freshUser);
                   await SecureStore.setItemAsync(STORAGE_USER_KEY, JSON.stringify(freshUser));
                 }
               })
-              .catch(() => {});
+              .catch(() => {
+                // Conservé : en cas de problème réseau ou token expiré en arrière-plan, la session locale persiste
+              });
           }
         }
       } catch (e) {
       } finally {
+        sessionRestored = true;
         setIsLoading(false);
       }
     };

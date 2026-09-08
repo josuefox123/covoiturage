@@ -30,7 +30,8 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../src/context/AuthContext';
 import { CustomAlert } from '../src/utils/CustomAlert';
-import { appendFileToFormData } from '../src/utils/media';
+import { API_URL } from '../src/services/api';
+import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 const PRIMARY = '#2563EB';
@@ -60,7 +61,7 @@ const STEPS: Step[] = [
  */
 export default function VerifyIdentityScreen() {
   const router = useRouter();
-  const { authFetch, updateUser, setHasStartedVerification, refreshUser } = useAuth();
+  const { setHasStartedVerification, refreshUser } = useAuth();
 
   useEffect(() => {
     setHasStartedVerification(true);
@@ -71,6 +72,7 @@ export default function VerifyIdentityScreen() {
   const [selfieIdUri, setSelfieIdUri] = useState<string | null>(null);
   const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
   const [idBackUri, setIdBackUri] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loadingImage, setLoadingImage] = useState<boolean>(false);
@@ -100,8 +102,9 @@ export default function VerifyIdentityScreen() {
   // ── Image picker helper ────────────────────────────────────────────────────
   const pickImage = async (
     source: 'camera' | 'gallery',
-    setter: (uri: string) => void,
-    isSelfie: boolean = false
+    setUri: (uri: string) => void,
+    _setBase64?: (b64: string) => void, // conservé pour compatibilité API
+    _isSelfie: boolean = false
   ) => {
     const { status: camStatus } = source === 'camera'
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -114,22 +117,29 @@ export default function VerifyIdentityScreen() {
 
     setLoadingImage(true);
     try {
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        allowsEditing: false,
+        quality: 0.35,   // réduit pour accélérer l'upload
+        base64: false,   // pas besoin — on envoie l'URI directement via XHR
+        mediaTypes: ['images'],
+      };
+
       const result = source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.50 })
-        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: false, quality: 0.50, mediaTypes: ['images'] });
+        ? await ImagePicker.launchCameraAsync(pickerOptions)
+        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
       if (!result.canceled && result.assets[0]) {
-        setter(result.assets[0].uri);
+        setUri(result.assets[0].uri);
       }
     } catch (error) {
-      console.error("Error picking image:", error);
-      CustomAlert.alert('Erreur', 'Impossible de capturer ou de charger l\'image.');
+      console.error('Erreur image picker:', error);
+      CustomAlert.alert('Erreur', "Impossible de capturer ou de charger l'image.");
     } finally {
       setLoadingImage(false);
     }
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Submit via XHR multipart (seule méthode fiable sur Android RN) ─────────
   const handleSubmit = async () => {
     if (!selfieUri || !selfieIdUri || !idFrontUri || !idBackUri) {
       CustomAlert.alert('Erreur', 'Veuillez fournir toutes les photos requises.');
@@ -138,23 +148,59 @@ export default function VerifyIdentityScreen() {
 
     setSubmitting(true);
     try {
-      const formData = new FormData();
+      // Récupérer le token JWT
+      const token = await SecureStore.getItemAsync('zemy_access_token');
+      if (!token) throw new Error('Session expirée. Veuillez vous reconnecter.');
 
-      await appendFileToFormData(formData, 'selfie', selfieUri, 'selfie.jpg');
-      await appendFileToFormData(formData, 'selfie_id', selfieIdUri, 'selfie_id.jpg');
-      await appendFileToFormData(formData, 'id_front', idFrontUri, 'id_front.jpg');
-      await appendFileToFormData(formData, 'id_back', idBackUri, 'id_back.jpg');
+      await new Promise<void>((resolve, reject) => {
+        const formData = new FormData();
 
-      await authFetch('/auth/request-verification/', {
-        method: 'POST',
-        body: formData,
+        // Annexer les fichiers via {uri, type, name} — seul format supporté
+        // nativement par le NetworkingModule Android de React Native
+        const attach = (field: string, uri: string) => {
+          (formData as any).append(field, {
+            uri,
+            type: 'image/jpeg',
+            name: `${field}.jpg`,
+          } as any);
+        };
+
+        attach('selfie', selfieUri);
+        attach('selfie_id', selfieIdUri);
+        attach('id_front', idFrontUri);
+        attach('id_back', idBackUri);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_URL}/auth/request-verification/`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        // NE PAS définir Content-Type — le browser/XHR le fera automatiquement
+        // avec le bon boundary multipart
+        xhr.timeout = 60000; // 60 secondes max
+
+        xhr.onload = () => {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(response.error || response.detail || `Erreur serveur (${xhr.status})`));
+            }
+          } catch {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error(`Erreur serveur (${xhr.status})`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Connexion impossible. Vérifiez votre réseau.'));
+        xhr.ontimeout = () => reject(new Error('La requête a expiré. Vérifiez votre connexion.'));
+
+        xhr.send(formData);
       });
-      
+
       await refreshUser();
-      
       setSubmitted(true);
     } catch (e: any) {
-      CustomAlert.alert('Erreur', e?.message || 'Impossible d\'envoyer la demande.');
+      CustomAlert.alert('Erreur', e?.message || "Impossible d'envoyer la demande.");
     } finally {
       setSubmitting(false);
     }
@@ -316,7 +362,7 @@ export default function VerifyIdentityScreen() {
                   uri={selfieUri}
                   placeholder="Prendre un selfie"
                   placeholderIcon="person"
-                  onCamera={() => pickImage('camera', setSelfieUri, true)}
+                  onCamera={() => pickImage('camera', setSelfieUri)}
                   onGallery={() => {}}
                   onContinue={goNext}
                   onView={() => setFullscreenUri(selfieUri)}
@@ -365,7 +411,7 @@ export default function VerifyIdentityScreen() {
                   uri={selfieIdUri}
                   placeholder="Prendre le selfie avec pièce"
                   placeholderIcon="person-add"
-                  onCamera={() => pickImage('camera', setSelfieIdUri, true)}
+                  onCamera={() => pickImage('camera', setSelfieIdUri)}
                   onGallery={() => {}}
                   onContinue={goNext}
                   onView={() => setFullscreenUri(selfieIdUri)}

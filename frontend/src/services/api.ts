@@ -31,16 +31,9 @@ export const apiEventEmitter = {
   }
 };
 
-const getBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  // Fallback to production by default if no env var is found
-  return 'https://zemybackend.sinustic.com/api';
-};
-
-export const API_URL = getBaseUrl();
+// L'URL de l'API est définie de manière unique dans .env / .env.local via EXPO_PUBLIC_API_URL
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://zemybackend.sinustic.com/api';
+console.log('[ZEMY MOBILE] API Target URL:', API_URL);
 
 export class ApiError extends Error {
   status?: number;
@@ -51,10 +44,11 @@ export class ApiError extends Error {
   }
 }
 
-export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
+export const fetchApi = async (endpoint: string, options: RequestInit & { skipUnauthorizedEmit?: boolean } = {}) => {
   const isFormData = options.body && (options.body instanceof FormData || (options.body as any).append !== undefined);
+  const { skipUnauthorizedEmit, ...fetchOptions } = options as any;
   
-  const headers: any = { ...options.headers };
+  const headers: any = { ...fetchOptions.headers };
   
   if (!headers['Content-Type'] && !headers['content-type'] && !isFormData) {
     headers['Content-Type'] = 'application/json';
@@ -67,11 +61,11 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
 
   try {
     const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
+      ...fetchOptions,
       headers,
     });
 
-    if (response.status === 401) {
+    if (response.status === 401 && !skipUnauthorizedEmit) {
       // Émettre un événement pour déconnecter l'utilisateur via le contexte Auth
       apiEventEmitter.emit('unauthorized');
     }

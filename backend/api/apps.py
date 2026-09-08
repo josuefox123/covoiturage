@@ -21,6 +21,14 @@ class ApiConfig(AppConfig):
 
     def ready(self):
         import os
+
+        # Supervision : branchement des signaux Celery (echec de tache, arret worker).
+        try:
+            from .monitoring import signals as monitoring_signals
+            monitoring_signals.install()
+        except Exception:
+            pass
+
         try:
             import api.tasks
         except Exception:

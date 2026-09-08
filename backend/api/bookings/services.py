@@ -102,7 +102,7 @@ class BookingService:
 
             # Trouver les index des waypoints de montée et descente
             wps = list(ride.waypoints.all().order_by('order')) if hasattr(ride, 'waypoints') else []
-            if not wps and hasattr(ride, 'waypoints'):
+            if not wps and hasattr(ride, 'waypoints') and ride.stopovers:
                 from ..services.ride_service import RideService
                 try:
                     RideService.generate_legs(ride)

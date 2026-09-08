@@ -186,8 +186,6 @@ export class RideSessionManager {
           bookingId: res.id,
           timestamp: Date.now()
         });
-        // Charger la session en arrière-plan sans bloquer la redirection immédiate vers le paiement
-        this.loadSession(authFetch, seg, user, { forceRefresh: true });
         return String(res.id); // Retourne l'ID pour redirection paiement direct
       }
     } catch (err: any) {

@@ -38,8 +38,6 @@ export default function RideManagementScreen() {
 
   const {
     ride, bookings, loading, refreshing,
-    editingBooking, customPriceText,
-    setEditingBooking, setCustomPriceText,
     onRefresh, handleAcceptBooking, handleRejectBooking,
     handleChatWithPassenger,
   } = useRideManagement(id as string, authFetch, user);
@@ -249,11 +247,7 @@ export default function RideManagementScreen() {
                 key={booking.id}
                 booking={booking}
                 ridePrice={ride.driver_payout || 0}
-                onAccept={() => {
-                  setEditingBooking(booking);
-                  const ip = booking.custom_price || booking.driver_counter_price || booking.passenger_proposed_price || ride?.driver_payout || 0;
-                  setCustomPriceText(String(ip));
-                }}
+                onAccept={() => handleAcceptBooking(booking.id)}
                 onReject={() => handleRejectBooking(booking.id)}
               />
             ))}
@@ -337,52 +331,6 @@ export default function RideManagementScreen() {
         <VehicleCard ride={ride} />
       </Animated.ScrollView>
 
-
-
-      {/* Modal Ajuster Tarif */}
-      <Modal visible={editingBooking !== null} transparent animationType="slide" onRequestClose={() => setEditingBooking(null)}>
-        <View style={styles.modalBg}>
-          <View style={styles.bottomSheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Ajuster le tarif</Text>
-            <Text style={styles.sheetSub}>
-              Tarif par place pour {editingBooking?.departure_location?.split(',')[0]} → {editingBooking?.arrival_location?.split(',')[0]}
-            </Text>
-            <View style={styles.priceInput}>
-              <TextInput
-                style={styles.priceInputTxt}
-                value={customPriceText}
-                onChangeText={setCustomPriceText}
-                keyboardType="numeric"
-                placeholder="Ex: 1500"
-                placeholderTextColor={C.textLight}
-              />
-              <Text style={styles.priceInputCur}>FCFA / place</Text>
-            </View>
-            <Text style={{ fontSize: 11, color: C.textSec, fontStyle: 'italic', marginTop: 8, marginBottom: 12, textAlign: 'center', paddingHorizontal: 16 }}>
-              Ce tarif est votre gain net par place. Les frais Zemy et éventuels surcoûts d'options seront calculés et ajoutés à la fin au paiement du passager.
-            </Text>
-            <TouchableOpacity
-              style={styles.acceptBtnFull}
-              onPress={() => {
-                const price = parseInt(customPriceText);
-                if (isNaN(price) || price <= 0) {
-                  CustomAlert.alert('Erreur', 'Prix invalide.');
-                  return;
-                }
-                handleAcceptBooking(editingBooking!.id, price);
-              }}
-              activeOpacity={0.9}
-            >
-              <Ionicons name="checkmark-circle" size={19} color={C.white} />
-              <Text style={styles.acceptBtnFullTxt}>Accepter avec ce prix</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtnFull} onPress={() => setEditingBooking(null)} activeOpacity={0.8}>
-              <Text style={styles.cancelBtnFullTxt}>Annuler</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Modal Code Ticket Manuel */}
       <Modal visible={showCodeModal} transparent animationType="slide" onRequestClose={() => { setShowCodeModal(false); setManualCode(''); setSelectedBookingForCode(null); }}>

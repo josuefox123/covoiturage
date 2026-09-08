@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity,
-  ActivityIndicator, Linking, Animated, Share,
+  ActivityIndicator, Linking, Animated, Share, Modal, Easing,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -515,10 +515,12 @@ export default function RideDetailScreen() {
         pricingBreakdown={bookingState?.pricing_breakdown}
         onClose={() => setShowBookModal(false)}
         onConfirm={async (seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra) => {
-          const ok = await performBooking(seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
-          if (ok) { setShowBookModal(false); } // La redirection vers /payment est gérée dans performBooking
+          try {
+            await performBooking(seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
+          } finally {
+            setShowBookModal(false);
+          }
         }}
-
       />
       <BookingSuccessModal
         visible={showSuccModal}
@@ -586,4 +588,58 @@ const ss = StyleSheet.create({
   infoTxt: { fontSize: 12, color: C.primaryDark, flex: 1, lineHeight: 18, fontWeight: '500' },
   warnBox: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: C.warningLight, borderRadius: 12, padding: 12, marginTop: 10 },
   warnTxt: { fontSize: 12, color: '#92400E', flex: 1, lineHeight: 18, fontWeight: '500' },
+  fullScreenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    zIndex: 99999,
+    elevation: 99999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 24,
+  },
+  spinWrapper: {
+    width: 100,
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  spinRingBig: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderTopColor: C.primary,
+    borderRightColor: C.primary,
+  },
+  spinCenterCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  loadingTitleTxt: {
+    fontSize: 21,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  loadingSubTxt: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
+  },
 });

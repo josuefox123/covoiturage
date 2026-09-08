@@ -10,8 +10,6 @@ export function useRideManagement(id: string, authFetch: any, user: any) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
-  const [customPriceText, setCustomPriceText] = useState('');
 
   const statusAnim = useRef(new Animated.Value(1)).current;
 
@@ -71,7 +69,6 @@ export function useRideManagement(id: string, authFetch: any, user: any) {
         body: JSON.stringify(payload)
       });
       CustomAlert.alert('Succès', 'La réservation a été acceptée. Le passager va procéder au paiement.');
-      setEditingBooking(null);
       await loadData(false);
     } catch (error: any) {
       CustomAlert.alert('Erreur', error.message || "Impossible d'accepter la réservation.");
@@ -191,11 +188,7 @@ export function useRideManagement(id: string, authFetch: any, user: any) {
     bookings,
     loading,
     refreshing,
-    editingBooking,
-    customPriceText,
     statusAnim,
-    setEditingBooking,
-    setCustomPriceText,
     onRefresh,
     handleAcceptBooking,
     handleRejectBooking,

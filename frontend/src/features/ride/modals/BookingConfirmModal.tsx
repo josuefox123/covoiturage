@@ -10,6 +10,8 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -67,6 +69,27 @@ export function BookingConfirmModal({
   const [customDropoffSurcharge, setCustomDropoffSurcharge] = useState('');
 
   const [passengerMessageText, setPassengerMessageText] = useState('');
+
+  const spinAnim = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (submitting) {
+      spinAnim.setValue(0);
+      Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    }
+  }, [submitting]);
+
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   const displayPrice = pricePerSeat ?? ride?.price_per_seat ?? 0;
   const availableSeats = Math.max(0, ride?.seats_available ?? 0);
@@ -177,6 +200,23 @@ export function BookingConfirmModal({
   };
 
   const isLoading = submitting || bookingLoading;
+
+  if (submitting) {
+    return (
+      <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.loadingDarkContainer}>
+          <View style={styles.spinWrapperBig}>
+            <Animated.View style={[styles.spinRingBig, { transform: [{ rotate: spin }] }]} />
+            <View style={styles.spinCenterCircle}>
+              <Ionicons name="car-sport" size={32} color={theme.colors.primary} />
+            </View>
+          </View>
+          <Text style={styles.loadingTitleWhite}>Veuillez patienter...</Text>
+          <Text style={styles.loadingSubWhite}>Traitement de votre réservation en cours</Text>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -1330,5 +1370,58 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     marginTop: 13,
     paddingHorizontal: 20,
+  },
+
+  loadingDarkContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  spinWrapperBig: {
+    width: 110,
+    height: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  spinRingBig: {
+    position: 'absolute',
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    borderWidth: 5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderTopColor: theme.colors.primary || '#2563EB',
+    borderRightColor: theme.colors.primary || '#2563EB',
+  },
+  spinCenterCircle: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: theme.colors.primary || '#2563EB',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  loadingTitleWhite: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  loadingSubWhite: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
   },
 });

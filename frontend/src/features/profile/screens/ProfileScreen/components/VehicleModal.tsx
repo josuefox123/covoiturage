@@ -8,11 +8,13 @@ import {
   Image,
   Animated,
 } from 'react-native';
-import { getMediaUrl, appendFileToFormData } from '../../../../../utils/media';
+import { getMediaUrl } from '../../../../../utils/media';
 import { BottomSheetTextInput as TextInput } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
+import { API_URL } from '../../../../../services/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { theme } from '../../../../../styles/theme';
 import { styles } from '../styles';
@@ -56,15 +58,9 @@ export function VehicleModal({
 
   // Fetch vehicle data APRES ouverture (non-bloquant) — la modale s'affiche instantanément
   useEffect(() => {
-    if (!visible || !user) return;
+    if (!visible) return;
 
     setIsLoading(true);
-    // Animation d'apparition du contenu
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 250,
-      useNativeDriver: true,
-    }).start();
 
     const fetchVehicle = async () => {
       try {
@@ -149,41 +145,69 @@ export function VehicleModal({
     }
 
     setIsSaving(true);
-    const brand_model = `${brand.trim()} ${model.trim()}`;
-    
-    const formData = new FormData();
-    formData.append('owner', user!.id);
-    formData.append('brand_model', brand_model);
-    formData.append('color', color);
-    formData.append('license_plate', plate);
-    formData.append('vehicle_type', vehicleType);
-    
-    if (vehicleType === 'voiture') {
-      formData.append('driver_license_number', driverLicense);
-      formData.append('license_expiration', licenseExpiration);
-    }
-
-    if (vehicleType === 'voiture' && driverLicensePhoto && !driverLicensePhoto.startsWith('http')) {
-      await appendFileToFormData(formData, 'driver_license_photo', driverLicensePhoto, 'license.jpg');
-    }
-
     try {
-      const targetId = vehicleId || activeVehicleId;
-      if (targetId) {
-        await authFetch(`/vehicles/${targetId}/`, {
-          method: 'PATCH',
-          body: formData,
-        });
-        CustomAlert.alert('Succès', 'Véhicule mis à jour !');
-        onSaveSuccess({ id: targetId, brand: brand.trim(), model: model.trim(), plate: plate.trim() });
-      } else {
-        const res = await authFetch('/vehicles/', {
-          method: 'POST',
-          body: formData,
-        });
-        CustomAlert.alert('Succès', 'Véhicule ajouté !');
-        onSaveSuccess({ id: res.id, brand: brand.trim(), model: model.trim(), plate: plate.trim() });
+      const token = await SecureStore.getItemAsync('zemy_access_token');
+      if (!token) throw new Error('Session expirée. Veuillez vous reconnecter.');
+
+      const brand_model = `${brand.trim()} ${model.trim()}`;
+      const formData = new FormData();
+      formData.append('brand_model', brand_model);
+      formData.append('color', color.trim());
+      formData.append('license_plate', plate.trim());
+      formData.append('vehicle_type', vehicleType);
+
+      if (vehicleType === 'voiture') {
+        formData.append('driver_license_number', driverLicense.trim());
+        formData.append('license_expiration', licenseExpiration.trim());
+
+        if (driverLicensePhoto && !driverLicensePhoto.startsWith('http')) {
+          let cleanUri = driverLicensePhoto;
+          if (cleanUri.startsWith('/')) cleanUri = `file://${cleanUri}`;
+          (formData as any).append('driver_license_photo', {
+            uri: cleanUri,
+            name: 'license.jpg',
+            type: 'image/jpeg',
+          });
+        }
       }
+
+      const targetId = vehicleId || activeVehicleId;
+      const endpoint = targetId ? `/vehicles/${targetId}/` : '/vehicles/';
+      const method = targetId ? 'PATCH' : 'POST';
+
+      const res = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(method, `${API_URL}${endpoint}`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.timeout = 60000;
+
+        xhr.onload = () => {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(response);
+            } else {
+              reject(new Error(response.error || response.detail || (typeof response === 'object' ? JSON.stringify(response) : `Erreur (${xhr.status})`)));
+            }
+          } catch {
+            if (xhr.status >= 200 && xhr.status < 300) resolve({});
+            else reject(new Error(`Erreur serveur (${xhr.status})`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Connexion impossible. Vérifiez votre réseau.'));
+        xhr.ontimeout = () => reject(new Error('La requête a expiré.'));
+
+        xhr.send(formData);
+      });
+
+      CustomAlert.alert('Succès', targetId ? 'Véhicule mis à jour !' : 'Véhicule ajouté !');
+      onSaveSuccess({
+        id: targetId || res.id,
+        brand: brand.trim(),
+        model: model.trim(),
+        plate: plate.trim(),
+      });
       onClose();
     } catch (e: any) {
       CustomAlert.alert('Erreur', e.message || 'Impossible d\'enregistrer le véhicule.');
@@ -205,7 +229,7 @@ export function VehicleModal({
         )}
       </View>
 
-      <Animated.View style={{ opacity: fadeAnim, paddingBottom: 60 }}>
+      <View style={{ paddingBottom: 60 }}>
         <View style={styles.vehicleIconContainer}>
           <LinearGradient colors={[theme.colors.primaryLight, theme.colors.primary]} style={styles.vehicleIcon}>
             <Ionicons name="car-sport" size={48} color={theme.colors.white} />
@@ -375,7 +399,7 @@ export function VehicleModal({
             )}
           </LinearGradient>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     </AppBottomSheet>
   );
 }

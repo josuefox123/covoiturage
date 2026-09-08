@@ -26,6 +26,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -140,6 +141,8 @@ else:
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'api.middleware.HostOverrideMiddleware',
+    # Supervision : capture des exceptions, des reponses 5xx et des requetes lentes
+    'api.monitoring.middleware.ErrorMonitoringMiddleware',
     'django.middleware.gzip.GZipMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -304,6 +307,8 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Supervision : remontee Slack des erreurs serveur de l'API
+    'EXCEPTION_HANDLER': 'api.monitoring.exception_handler.zemy_exception_handler',
     # SEV-003: Rate limiting global pour protéger contre le brute force et le DoS
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -477,6 +482,61 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Zemy <noreply@zemy.app>')
 if DEBUG and not EMAIL_HOST_USER:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+# ======================================================================
+# MONITORING — Remontee Slack des exceptions, bugs et dysfonctionnements
+# ======================================================================
+# Le webhook est un secret : il se configure UNIQUEMENT via le fichier .env
+# (non versionne). Sans SLACK_WEBHOOK_URL, le monitoring reste inactif et
+# l'application fonctionne normalement.
+SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL', '')
+
+# Interrupteur general. Le monitoring exige aussi une URL de webhook valide.
+MONITORING_ENABLED = os.getenv('MONITORING_ENABLED', 'True') == 'True'
+
+# Identification de la source dans les messages Slack.
+MONITORING_ENVIRONMENT = os.getenv(
+    'MONITORING_ENVIRONMENT', 'development' if DEBUG else 'production'
+)
+MONITORING_SERVICE_NAME = os.getenv('MONITORING_SERVICE_NAME', 'zemy-backend')
+
+# Niveau minimal remonte vers Slack (DEBUG / INFO / WARNING / ERROR / CRITICAL).
+MONITORING_MIN_LEVEL = os.getenv('MONITORING_MIN_LEVEL', 'ERROR')
+
+# Anti-spam : une meme erreur n'est renvoyee qu'une fois par fenetre (secondes),
+# et le canal ne recoit jamais plus de MONITORING_RATE_LIMIT alertes par minute.
+MONITORING_DEDUP_WINDOW = int(os.getenv('MONITORING_DEDUP_WINDOW', '300'))
+MONITORING_RATE_LIMIT = int(os.getenv('MONITORING_RATE_LIMIT', '30'))
+
+# Detection des lenteurs : seuil en millisecondes, 0 pour desactiver.
+MONITORING_SLOW_REQUEST_MS = int(os.getenv('MONITORING_SLOW_REQUEST_MS', '0'))
+
+# Remonter aussi les erreurs 4xx inattendues (bruyant, desactive par defaut).
+MONITORING_NOTIFY_CLIENT_ERRORS = os.getenv('MONITORING_NOTIFY_CLIENT_ERRORS', 'False') == 'True'
+
+# Remonter les nouvelles tentatives de taches Celery (bruyant, desactive par defaut).
+MONITORING_NOTIFY_CELERY_RETRY = os.getenv('MONITORING_NOTIFY_CELERY_RETRY', 'False') == 'True'
+
+# Signaler l'arret d'un worker Celery (se declenche aussi a chaque deploiement).
+MONITORING_NOTIFY_CELERY_SHUTDOWN = os.getenv('MONITORING_NOTIFY_CELERY_SHUTDOWN', 'True') == 'True'
+
+# Reglages fins du transport.
+MONITORING_HTTP_TIMEOUT = int(os.getenv('MONITORING_HTTP_TIMEOUT', '5'))
+MONITORING_QUEUE_SIZE = int(os.getenv('MONITORING_QUEUE_SIZE', '200'))
+MONITORING_TRACEBACK_LIMIT = int(os.getenv('MONITORING_TRACEBACK_LIMIT', '2500'))
+
+# Loggers et chemins exclus des alertes (en plus des exclusions par defaut).
+MONITORING_IGNORED_LOGGERS = tuple(
+    filter(None, os.getenv('MONITORING_IGNORED_LOGGERS', '').split(','))
+)
+MONITORING_IGNORED_PATHS = tuple(
+    filter(None, os.getenv('MONITORING_IGNORED_PATHS', '').split(','))
+)
+
+# Aucune alerte pendant l'execution de la suite de tests.
+if 'test' in sys.argv:
+    MONITORING_ENABLED = False
+
+
 # Configuration de la journalisation (Logging) pour le projet
 LOGGING = {
     'version': 1,
@@ -496,9 +556,16 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        # Relaie vers Slack tout enregistrement de niveau ERROR ou superieur.
+        # Branche uniquement sur le logger racine : les loggers applicatifs
+        # y propagent deja, ce qui evite les alertes en double.
+        'slack': {
+            'class': 'api.monitoring.handlers.SlackLogHandler',
+            'level': MONITORING_MIN_LEVEL,
+        },
     },
     'root': {
-        'handlers': ['console'],
+        'handlers': ['console', 'slack'],
         'level': 'WARNING',
     },
     'loggers': {
@@ -506,6 +573,12 @@ LOGGING = {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
+        },
+        # Le monitoring journalise ses propres pannes sans jamais s'auto-alerter.
+        'api.monitoring': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
         },
     },
 }
@@ -527,8 +600,10 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_COMPRESSION = 'gzip'
+# Conserver la configuration LOGGING de Django dans les workers Celery,
+# sans quoi le handler Slack serait remplace par celui de Celery.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
-import sys
 if 'test' in sys.argv:
     CELERY_TASK_ALWAYS_EAGER = False
     CELERY_BROKER_URL = 'memory://'

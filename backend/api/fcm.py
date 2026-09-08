@@ -257,25 +257,28 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
     except Exception as e:
         logger.error(f"Erreur création Notification en BD: {e}")
         
-    # Diffuser en temps réel via WebSocket au groupe user_<user_id>
-    try:
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
-        channel_layer = get_channel_layer()
-        if channel_layer:
-            async_to_sync(channel_layer.group_send)(
-                f"user_{user.id}",
-                {
-                    "type": "send_realtime_notification",
-                    "notification": {
-                        "title": title,
-                        "message": message,
-                        "data": data or {'screen': 'notifications'}
+    # Diffuser en temps réel via WebSocket au groupe user_<user_id> (Async daemon thread)
+    def _send_ws_async():
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user.id}",
+                    {
+                        "type": "send_realtime_notification",
+                        "notification": {
+                            "title": title,
+                            "message": message,
+                            "data": data or {'screen': 'notifications'}
+                        }
                     }
-                }
-            )
-    except Exception as e:
-        logger.debug(f"WS notification send error: {e}")
+                )
+        except Exception as e:
+            logger.debug(f"WS notification send error: {e}")
+
+    threading.Thread(target=_send_ws_async, daemon=True).start()
 
     # 1. Envoi du Push Notification FCM (Async)
     def _send_push_async():
@@ -316,7 +319,7 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
                     message=email_body,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
-                    fail_silently=False
+                    fail_silently=True
                 )
                 logger.info(f"Email envoyé avec succès à {user.email}")
             except Exception as e:
