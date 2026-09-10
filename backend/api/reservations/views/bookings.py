@@ -166,63 +166,13 @@ class BookingViewSet(viewsets.ModelViewSet):
 
 
     def perform_update(self, serializer):
-        old_instance = self.get_object()
-        old_status = old_instance.status
-        booking = serializer.save()
-        new_status = booking.status
-        
-        if old_status != new_status:
-            ride = booking.ride
-            passenger = booking.passenger
-            driver = ride.driver
-            dep_loc = booking.departure_location or ride.departure_location or ''
-            arr_loc = booking.arrival_location or ride.arrival_location or ''
-            
-            if new_status == 'cancelled' and old_status != 'cancelled':
-                if old_status == 'confirmed':
-                    from api.bookings.services import BookingService
-                    BookingService.deallocate_seats(booking)
-                
-                if old_status in ['confirmed', 'pending_payment', 'pending']:
-                    request_user = self.request.user
-                    if request_user == driver:
-                        create_and_send_notification(
-                            user=passenger,
-                            title="Demande de réservation refusée",
-                            message=f"Le conducteur a décliné votre demande de réservation pour le trajet {dep_loc} -> {arr_loc}.",
-                            data={'type': 'booking_cancelled', 'booking_id': str(booking.id), 'ride_id': str(booking.ride.id), 'screen': 'trips'}
-                        )
-                    else:
-                        create_and_send_notification(
-                            user=driver,
-                            title="Réservation annulée",
-                            message=f"Le passager {passenger.full_name or passenger.phone} a annulé sa réservation sur votre trajet {dep_loc} -> {arr_loc}.",
-                            data={'type': 'booking_cancelled_driver', 'booking_id': str(booking.id), 'ride_id': str(booking.ride.id), 'screen': 'trips'}
-                        )
-            
-            elif new_status == 'pending_payment' and old_status in ['pending', 'pending_driver']:
-                create_and_send_notification(
-                    user=passenger,
-                    title="Demande acceptée par le conducteur",
-                    message=f"Votre demande de réservation pour le trajet {dep_loc} -> {arr_loc} a été acceptée par le conducteur ! Vous pouvez maintenant procéder au paiement.",
-                    data={'type': 'booking_accepted_passenger', 'booking_id': str(booking.id), 'screen': 'trips', 'ride_id': str(booking.ride.id)}
-                )
-            
-
-            
-            elif new_status == 'completed':
-                create_and_send_notification(
-                    user=driver,
-                    title="Passager arrivé",
-                    message=f"Le passager {passenger.full_name or passenger.phone} est bien arrivé à destination.",
-                    data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'ride_id': str(booking.ride.id), 'screen': 'trips'}
-                )
-                create_and_send_notification(
-                    user=passenger,
-                    title="Trajet terminé",
-                    message=f"Votre trajet {dep_loc} -> {arr_loc} est terminé. Merci d'avoir voyagé avec nous !",
-                    data={'type': 'ride_completed', 'booking_id': str(booking.id), 'ride_id': str(booking.ride.id), 'screen': 'trips'}
-                )
+        """
+        BUG2 FIX : La logique de notification a été retirée d'ici.
+        Chaque action dédiée (/accept, /reject, /cancel, /board, /complete)
+        appelle déjà create_and_send_notification() elle-même.
+        Garder la logique ici générait un doublon de notification à chaque PATCH.
+        """
+        serializer.save()
 
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel_booking(self, request, pk=None):
@@ -320,24 +270,24 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.status = 'completed'
         booking.save()
         
+        # BUG3 FIX : Les notifications "trajet terminé" sont envoyées par complete_ride() côté conducteur.
+        # On ne les réenvoie pas ici pour éviter le doublon passager.
+        # Si le passager marque individuellement sa réservation comme terminée (sans que le conducteur
+        # ait terminé le trajet), on envoie uniquement la notification au conducteur.
         ride = booking.ride
         passenger = booking.passenger
         driver = ride.driver
-        
         dep_loc = booking.departure_location or ride.departure_location or ''
         arr_loc = booking.arrival_location or ride.arrival_location or ''
-        create_and_send_notification(
-            user=driver,
-            title="Passager arrivé 🏁",
-            message=f"Le passager {passenger.full_name or passenger.phone} est bien arrivé à destination.",
-            data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
-        )
-        create_and_send_notification(
-            user=passenger,
-            title="Trajet terminé 🏁",
-            message=f"Votre trajet {dep_loc} -> {arr_loc} est terminé. Merci d'avoir voyagé avec nous !",
-            data={'type': 'ride_completed', 'booking_id': str(booking.id), 'screen': 'trips'}
-        )
+        
+        # Notifier le conducteur seulement si le trajet n'est pas déjà terminé (conducteur précédemment)
+        if ride.status not in ['completed']:
+            create_and_send_notification(
+                user=driver,
+                title="Passager arrivé 🏁",
+                message=f"Le passager {passenger.full_name or passenger.phone} est bien arrivé à destination.",
+                data={'type': 'passenger_arrived', 'booking_id': str(booking.id), 'screen': 'trips'}
+            )
         
         return Response({"status": "Réservation terminée avec succès."})
 

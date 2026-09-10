@@ -156,16 +156,12 @@ class RideActionsMixin:
         for booking in bookings:
             b_dep = booking.departure_location or ride.departure_location or ''
             b_arr = booking.arrival_location or ride.arrival_location or ''
+            # BUG4 FIX : fusionner "Conducteur en route" + "Trajet commencé" en une seule notification
+            # (2 push simultanés pour le même événement = bruit inutile)
             create_and_send_notification(
                 user=booking.passenger,
-                title="Conducteur en route",
-                message=f"Le conducteur {ride.driver.full_name or ride.driver.phone} est en route pour le trajet {b_dep} -> {b_arr}.",
-                data={'type': 'driver_en_route', 'booking_id': str(booking.id), 'screen': 'trips'}
-            )
-            create_and_send_notification(
-                user=booking.passenger,
-                title="Trajet commencé",
-                message=f"Le trajet {b_dep} -> {b_arr} a commencé. Voyagez en toute sécurité !",
+                title="Votre trajet a commencé",
+                message=f"Le conducteur {ride.driver.full_name or ride.driver.phone} est en route. Trajet {b_dep} → {b_arr} en cours. Bon voyage !",
                 data={'type': 'ride_started_passenger', 'booking_id': str(booking.id), 'screen': 'trips'}
             )
             

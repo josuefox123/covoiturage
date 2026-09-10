@@ -21,6 +21,9 @@ import logging
 import threading
 import requests
 from firebase_admin import messaging
+# Import direct pour éviter TypeError lors du catch (messaging.UnregisteredError
+# est un attribut dynamique et n'hérite pas de BaseException quand mocké)
+from firebase_admin.messaging import UnregisteredError as FCMUnregisteredError
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +110,7 @@ def send_fcm_notification(token: str, title: str, body: str, data: dict | None =
         response = messaging.send(message)
         logger.info(f"FCM envoyé avec succès: {response}")
         return True
-    except messaging.UnregisteredError:
+    except FCMUnregisteredError:
         logger.warning(f"FCM token invalide/expiré: {token[:20]}...")
         return False
     except Exception as e:
@@ -298,32 +301,47 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
     if getattr(user, 'email', None):
         def _send_email_async():
             try:
+                import re
                 from django.core.mail import send_mail
                 from django.conf import settings
-                
+
+                # Validation basique du format email avant tentative d'envoi
+                email_regex = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                if not email_regex.match(user.email):
+                    logger.warning(f"Adresse email invalide (format), envoi ignoré : {user.email}")
+                    return
+
                 clean_title = strip_emojis(title)
                 clean_message = strip_emojis(message)
-                
+
                 if not clean_title:
                     clean_title = "Notification Zemy"
-                    
+
                 email_body = (
                     f"Bonjour {user.full_name or 'Utilisateur'},\n\n"
                     f"{clean_message}\n\n"
                     f"Cordialement,\n"
                     f"L'équipe Zemy"
                 )
-                
+
                 send_mail(
                     subject=clean_title,
                     message=email_body,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
-                    fail_silently=True
+                    fail_silently=False  # On veut capturer les vraies erreurs
                 )
                 logger.info(f"Email envoyé avec succès à {user.email}")
             except Exception as e:
-                logger.error(f"Erreur envoi email à {user.email}: {e}")
-                
+                error_str = str(e)
+                # Erreur permanente : boîte inexistante (550) — pas une erreur critique
+                if '550' in error_str or 'Mailbox does not exist' in error_str or 'does not exist' in error_str.lower():
+                    logger.warning(
+                        f"Envoi email impossible — adresse inexistante ou rejetée : {user.email}. "
+                        f"Vérifier l'adresse en BDD. Détail : {e}"
+                    )
+                else:
+                    logger.error(f"Erreur envoi email à {user.email}: {e}")
+
         threading.Thread(target=_send_email_async, daemon=True).start()
 

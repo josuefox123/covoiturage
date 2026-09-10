@@ -68,12 +68,31 @@ class NotificationViewSet(viewsets.ModelViewSet):
         return Notification.objects.filter(user=user).order_by('-created_at')
 
     def perform_create(self, serializer):
+        """
+        Règle de sécurité :
+        - Administrateurs (is_staff) : peuvent créer des notifications pour n'importe quel user.
+        - Utilisateurs normaux : ne peuvent créer des notifications que pour eux-mêmes.
+          Si un user tente de cibler un autre utilisateur, la requête est rejetée.
+        """
+        requester = self.request.user
+        target_user = serializer.validated_data.get('user', None)
+
+        if not getattr(requester, 'is_staff', False):
+            # Sécurité : utilisateur normal → imposer le user = soi-même
+            if target_user is not None and target_user != requester:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(
+                    "Vous ne pouvez pas créer une notification pour un autre utilisateur."
+                )
+            # Forcer le user au requêteur si non précisé
+            serializer.validated_data['user'] = requester
+
         notif = serializer.save()
         title = getattr(notif, 'title', None) or "Nouvelle notification"
         message = getattr(notif, 'message', None) or ""
         notif_id = getattr(notif, 'id', '')
         user = getattr(notif, 'user', None)
-        
+
         if user:
             # Envoi Push direct à l'utilisateur ciblé
             send_fcm_to_user(
@@ -83,12 +102,24 @@ class NotificationViewSet(viewsets.ModelViewSet):
                 data={'screen': 'notifications', 'notif_id': str(notif_id)}
             )
         else:
-            # Envoi Push broadcast à tous les utilisateurs
+            # Envoi Push broadcast à tous les utilisateurs (admin uniquement à ce stade)
             send_fcm_to_all_users(
                 title=title,
                 body=message,
                 data={'screen': 'notifications', 'notif_id': str(notif_id)}
             )
+
+    @action(detail=False, methods=['get'], url_path='unread-count')
+    def unread_count(self, request):
+        """
+        BUG6 FIX : Retourne le nombre exact de notifications non lues directement depuis la BDD.
+        Remplace le comptage client-side sur page_size=50 dans BadgeContext qui
+        plafonnait le badge à 50 même si l'utilisateur avait 100 notifications non lues.
+        """
+        if not request.user.is_authenticated:
+            return Response({'count': 0})
+        count = Notification.objects.filter(user=request.user, is_read=False).count()
+        return Response({'count': count})
 
     @action(detail=False, methods=['post'], url_path='mark-read')
     def mark_all_read(self, request):

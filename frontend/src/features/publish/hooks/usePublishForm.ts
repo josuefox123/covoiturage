@@ -797,24 +797,37 @@ export function usePublishForm(authCtx: any) {
           throw new Error("Veuillez sélectionner au moins un jour de départ.");
         }
 
-        const publishPromises = daySchedules.map(async (schedule) => {
+        // Regrouper les jours de récurrence par heure de départ pour n'envoyer qu'une seule série par créneau horaire
+        const schedulesByTime: { [time: string]: number[] } = {};
+        daySchedules.forEach((schedule) => {
+          const t = schedule.time || time;
+          if (!schedulesByTime[t]) {
+            schedulesByTime[t] = [];
+          }
+          if (!schedulesByTime[t].includes(schedule.day)) {
+            schedulesByTime[t].push(schedule.day);
+          }
+        });
+
+        const calculatedEndDate = repeatType === 'single_week'
+          ? (() => { const end = new Date(selectedDateObj); end.setDate(end.getDate() + 6); return end.toISOString().split('T')[0]; })()
+          : endDateObj.toISOString().split('T')[0];
+
+        let lastRes: any = null;
+        for (const [schedTime, days] of Object.entries(schedulesByTime)) {
           const schedulePayload = {
             ...payload,
             is_recurrent: true,
             start_date: dateString,
-            end_date: repeatType === 'single_week'
-              ? (() => { const end = new Date(selectedDateObj); end.setDate(end.getDate() + 6); return end.toISOString().split('T')[0]; })()
-              : endDateObj.toISOString().split('T')[0],
+            end_date: calculatedEndDate,
             repeat_type: 'weekly',
-            week_days: [schedule.day],
-            departure_time: schedule.time + ':00',
+            week_days: days,
+            departure_time: schedTime.includes(':') ? (schedTime.split(':').length === 2 ? schedTime + ':00' : schedTime) : schedTime + ':00',
           };
-          return authFetch('/rides/', { method: 'POST', body: JSON.stringify(schedulePayload) });
-        });
+          lastRes = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(schedulePayload) });
+        }
 
-        const results = await Promise.all(publishPromises);
-        const firstRes = results[0];
-        message = firstRes && firstRes.message ? firstRes.message : `Vos trajets récurrents ont été publiés !`;
+        message = lastRes && lastRes.message ? lastRes.message : `Vos trajets récurrents ont été publiés !`;
       } else {
         const res = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(payload) });
         message = res.message ? res.message : message;

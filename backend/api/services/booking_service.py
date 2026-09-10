@@ -6,6 +6,9 @@ from rest_framework.exceptions import ValidationError
 from ..models import Booking, Ride, Conversation, Message, RefundRequest
 from ..fcm import create_and_send_notification
 from .feexpay_service import FeexPayService
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BookingService:
     @staticmethod
@@ -52,19 +55,23 @@ class BookingService:
                                 ride.save()
                                 
                                 amount_due = int(existing_booking.amount_due_to_driver)
-                                create_and_send_notification(
-                                    user=existing_booking.passenger,
+                                _b = existing_booking  # capture for lambda
+                                _d = ride.driver
+                                _amount_due = amount_due
+                                # BUG1 FIX : on_commit garantit que la notif part seulement si la transaction commit
+                                transaction.on_commit(lambda: create_and_send_notification(
+                                    user=_b.passenger,
                                     title="Réservation confirmée",
-                                    message=f"Paiement de {existing_booking.total_amount} FCFA validé. Votre réservation est confirmée.",
-                                    data={'type': 'payment_confirmed', 'booking_id': str(existing_booking.id), 'screen': 'trips'}
-                                )
-                                if ride.driver:
-                                    create_and_send_notification(
-                                        user=ride.driver,
+                                    message=f"Paiement de {_b.total_amount} FCFA validé. Votre réservation est confirmée.",
+                                    data={'type': 'payment_confirmed', 'booking_id': str(_b.id), 'screen': 'trips'}
+                                ))
+                                if _d:
+                                    transaction.on_commit(lambda: create_and_send_notification(
+                                        user=_d,
                                         title="Nouvelle réservation",
-                                        message=f"{existing_booking.passenger.full_name or existing_booking.passenger.phone} a réservé {existing_booking.seats_booked} place(s). Votre gain de {amount_due} FCFA est crédité sur votre compte Zemy.",
-                                        data={'type': 'new_booking', 'booking_id': str(existing_booking.id), 'screen': 'rides'}
-                                    )
+                                        message=f"{_b.passenger.full_name or _b.passenger.phone} a réservé {_b.seats_booked} place(s). Votre gain de {_amount_due} FCFA est crédité sur votre compte Zemy.",
+                                        data={'type': 'new_booking', 'booking_id': str(_b.id), 'screen': 'rides'}
+                                    ))
                                 raise ValidationError({"error": "Vous avez déjà une réservation confirmée suite à votre paiement."})
                         except ValidationError:
                             raise
@@ -188,8 +195,9 @@ class BookingService:
                         reason="Annulation par le passager à plus de 5h du départ",
                         status='pending'
                     )
-            
+
             # Notifications si réservation confirmée
+            # BUG1 FIX : ces notifications sont envoyées hors transaction (booking.save() déjà commité)
             if old_status == 'confirmed':
                 if cancelled_by_user == driver:
                     create_and_send_notification(

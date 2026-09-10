@@ -111,14 +111,6 @@ class RideSeriesService:
             from ...models.utilisateur import User as UserModel
             UserModel.objects.select_for_update().get(id=driver.id)
 
-            # Validation temporelle globale du chauffeur/véhicule
-            validate_driver_and_vehicle(
-                driver=driver,
-                vehicle_id=vehicle_id,
-                departure_date=start_date,
-                departure_time=departure_time_val,
-                duration_min=duration_min
-            )
 
             vehicle_obj = None
             if vehicle_id:

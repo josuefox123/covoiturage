@@ -23,22 +23,49 @@ def auto_complete_past_rides():
     Auto-clôture (status='completed') les trajets actifs ou démarrés dont la date de départ
     est dépassée depuis plus de 24 heures.
     Met également à jour les réservations confirmées de ces trajets en 'completed'.
+
+    FIX 3 : Utilisation d'un cutoff datetime timezone-aware (USE_TZ=True).
+    Avant, un cutoff basé uniquement sur la date pouvait auto-compléter un trajet de 23h
+    dont la durée n'était pas encore écoulée, le retirant faussement des vérifications
+    de conflit et permettant la création de doublons.
     """
-    from datetime import timedelta
+    from datetime import timedelta, datetime
     from django.utils import timezone
     from ...models.trajet import Ride
     from ...models.reservation import Booking
 
     now = timezone.now()
-    cutoff_date = (now - timedelta(hours=24)).date()
+    # On ne touche que les trajets dont la date de départ est antérieure à (now - 24h)
+    # La vérification par date seule est insuffisante : un trajet à 22h hier peut se terminer à 2h aujourd'hui
+    cutoff_dt = now - timedelta(hours=24)
+    cutoff_date = cutoff_dt.date()
 
-    expired_rides = Ride.objects.filter(
+    # Requête initiale : trajets actifs dont la date est clairement dépassée
+    candidates = Ride.objects.filter(
         status__in=['active', 'started'],
-        departure_date__lt=cutoff_date
-    )
+        departure_date__lt=cutoff_date  # date strictement antérieure à hier
+    ).only('id', 'departure_date', 'departure_time', 'duration_min', 'status')
 
     count = 0
-    for ride in expired_rides:
+    for ride in candidates:
+        # FIX 3 : vérifier l'heure de fin réelle du trajet, pas juste la date
+        try:
+            ride_start_naive = datetime.combine(ride.departure_date, ride.departure_time)
+            ride_start = timezone.make_aware(ride_start_naive) if timezone.is_naive(ride_start_naive) else ride_start_naive
+            ride_duration = ride.duration_min if ride.duration_min else 120
+            ride_end = ride_start + timedelta(minutes=ride_duration)
+
+            # Ne compléter que si la fin réelle du trajet est bien passée
+            if ride_end > now:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"[AUTO-COMPLETE] Trajet {ride.id} ignoré : fin prévue à {ride_end} > maintenant {now}"
+                )
+                continue
+        except Exception:
+            # En cas d'erreur de parsing, on laisse passer la date brute
+            pass
+
         ride.status = 'completed'
         ride.save(update_fields=['status'])
         Booking.objects.filter(
@@ -88,6 +115,7 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
     logger = logging.getLogger(__name__)
     from rest_framework.exceptions import ValidationError
     from datetime import datetime, timedelta
+    from django.utils import timezone
 
     # Statuts qui constituent un vrai conflit horaire
     ACTIVE_STATUSES = ['active', 'started']
@@ -152,9 +180,31 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
         raise ValidationError({"error": "Format d'heure invalide (attendu HH:MM ou HH:MM:SS)."})
 
     # ─── 5. Construction des intervalles datetime pour le nouveau trajet ──────
+    # FIX 2 : datetime.combine produit un datetime naïf (sans tz).
+    # Avec USE_TZ=True, on le rend aware pour éviter les comparaisons faussement non-conflictuelles.
     duration = int(duration_min) if duration_min else 120
-    new_start = datetime.combine(dep_date, dep_time)
+    new_start_naive = datetime.combine(dep_date, dep_time)
+    new_start = timezone.make_aware(new_start_naive) if timezone.is_naive(new_start_naive) else new_start_naive
     new_end = new_start + timedelta(minutes=duration)
+
+    # ─── 5b. Vérification stricte doublons exacts (même conducteur, même date, même heure) ──
+    exact_dup_q = Q(
+        driver_id=driver_id,
+        departure_date=dep_date,
+        departure_time=dep_time,
+        status__in=ACTIVE_STATUSES,
+    )
+    if current_ride_id:
+        exact_dup_q &= ~Q(id=current_ride_id)
+    exact_dup = Ride.objects.filter(exact_dup_q).first()
+    if exact_dup:
+        raise ValidationError({
+            "error": (
+                f"Vous avez déjà un trajet identique ({exact_dup.departure_location} → {exact_dup.arrival_location}) "
+                f"à la même heure ({dep_time.strftime('%H:%M')}). "
+                f"Veuillez choisir un autre créneau ou annuler le trajet existant."
+            )
+        })
 
     logger.info(
         f"[RIDEPUBLISH] validate_driver_and_vehicle "
@@ -191,7 +241,9 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
 
     # ─── 7. Vérification du chevauchement d'intervalles ───────────────────────
     for ride in active_rides:
-        r_start = datetime.combine(ride.departure_date, ride.departure_time)
+        # FIX 2 : rendre r_start timezone-aware pour comparer avec new_start aware
+        r_start_naive = datetime.combine(ride.departure_date, ride.departure_time)
+        r_start = timezone.make_aware(r_start_naive) if timezone.is_naive(r_start_naive) else r_start_naive
         r_duration = ride.duration_min if ride.duration_min else 120
         r_end = r_start + timedelta(minutes=r_duration)
 

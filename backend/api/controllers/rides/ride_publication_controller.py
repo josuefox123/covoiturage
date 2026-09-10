@@ -84,12 +84,33 @@ class RidePublicationController:
                 parcels_available=data.get('max_parcels', 0)
             )
 
+        # FIX 1 : generate_legs est appelé hors de l'atomic principal (appels API externes).
+        # En cas d'échec, le trajet est supprimé proprement → pas de trajet orphelin sans legs.
+        # Un trajet orphelin (active + sans legs) causait des doublons car l'utilisateur recrée.
         try:
             RidePublicationService.generate_legs(ride)
         except Exception as e:
-            logger.error(f"Erreur lors de la génération automatique des tronçons : {e}")
+            logger.error(
+                f"[RIDEPUBLISH] Échec generate_legs pour trajet {ride.id} : {e}. "
+                f"Suppression du trajet pour éviter un trajet orphelin."
+            )
+            # Nettoyage : supprimer le trajet incomplet pour éviter les doublons
+            try:
+                ride.delete()
+            except Exception as del_err:
+                logger.critical(
+                    f"[RIDEPUBLISH] Impossible de supprimer le trajet orphelin {ride.id} : {del_err}"
+                )
+            from rest_framework.exceptions import ValidationError as DRFValidationError
+            raise DRFValidationError({
+                "error": (
+                    "Le calcul de l'itinéraire a échoué (service temporairement indisponible). "
+                    "Votre trajet n'a pas été créé. Veuillez réessayer dans quelques instants."
+                )
+            })
 
         return serializer.data
+
 
 
     @classmethod

@@ -89,9 +89,12 @@ class PaymentService:
         """
         Vérifie et valide une transaction auprès de FeexPay.
         Appelé après le retour de la WebView de paiement.
+        BUG11 FIX : select_for_update() évite la race condition si deux webhooks arrivent en parallèle.
         """
+        # Lock d'abord pour éviter la double validation concurrente
         try:
-            payment = Payment.objects.get(transaction_id=transaction_reference)
+            with transaction.atomic():
+                payment = Payment.objects.select_for_update().get(transaction_id=transaction_reference)
         except Payment.DoesNotExist:
             raise ValidationError({"error": "Transaction introuvable."})
 
@@ -136,21 +139,26 @@ class PaymentService:
 
                 # Créer le ticket
                 ticket_number = f"T-{booking.id.hex[:8].upper()}"
-                
                 amount_due = int(booking.amount_due_to_driver)
-                create_and_send_notification(
-                    user=booking.passenger,
+
+                # BUG1 FIX : on_commit garantit que les notifications partent seulement après commit DB
+                _booking = booking
+                _ticket = ticket_number
+                _amount_due = amount_due
+                transaction.on_commit(lambda: create_and_send_notification(
+                    user=_booking.passenger,
                     title="Réservation confirmée",
-                    message=f"Ticket {ticket_number} généré. Votre paiement de {booking.total_amount} FCFA is validé.",
-                    data={'type': 'payment_confirmed', 'booking_id': str(booking.id), 'screen': 'trips'}
-                )
+                    message=f"Ticket {_ticket} généré. Votre paiement de {_booking.total_amount} FCFA est validé.",
+                    data={'type': 'payment_confirmed', 'booking_id': str(_booking.id), 'screen': 'trips'}
+                ))
                 if booking.ride.driver:
-                    create_and_send_notification(
-                        user=booking.ride.driver,
+                    _driver = booking.ride.driver
+                    transaction.on_commit(lambda: create_and_send_notification(
+                        user=_driver,
                         title="Nouvelle Réservation Payée",
-                        message=f"{booking.passenger.full_name or booking.passenger.phone} vient de payer sa réservation. Votre gain de {amount_due} FCFA est sécurisé.",
-                        data={'type': 'passenger_paid_driver', 'booking_id': str(booking.id), 'screen': 'rides'}
-                    )
+                        message=f"{_booking.passenger.full_name or _booking.passenger.phone} vient de payer sa réservation. Votre gain de {_amount_due} FCFA est sécurisé.",
+                        data={'type': 'passenger_paid_driver', 'booking_id': str(_booking.id), 'screen': 'rides'}
+                    ))
                 
                 return payment, "Paiement validé avec succès."
         
