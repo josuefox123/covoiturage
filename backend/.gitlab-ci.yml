@@ -15,11 +15,14 @@ test-backend:
     paths:
       - .cache/pip/
   before_script:
-    - pip install --cache-dir .cache/pip -r requirements.txt --quiet
+    - apt-get update -qq && apt-get install -y -qq default-libmysqlclient-dev build-essential pkg-config > /dev/null 2>&1 || true
+    - pip install --cache-dir .cache/pip -r requirements.txt
   script:
     - python manage.py test api --verbosity=2
   only:
     - main
+    - master
+    - josue
     - merge_requests
 
 # 🚀 Déploiement sur VPS — automatique après les tests
@@ -30,6 +33,7 @@ deploy-backend:
     name: production
     url: https://zemybackend.sinustic.com/
   before_script:
+    - if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then echo "⚠️ Variables VPS non configurées dans GitLab CI. Saut du déploiement." && exit 0; fi
     - apk add --no-cache openssh-client bash
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
@@ -37,12 +41,16 @@ deploy-backend:
     - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
   script:
     - |
-      ssh -i ~/.ssh/deploy_key deploy@$VPS_HOST << 'ENDSSH'
+      if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then
+        echo "⚠️ Deployment skipped: VPS_HOST or VPS_SSH_KEY missing."
+        exit 0
+      fi
+      ssh -i ~/.ssh/deploy_key deploy@$VPS_HOST << ENDSSH
         set -e
         echo "📦 Pull du code..."
         cd /var/www/zemybackend
         git fetch origin
-        git reset --hard origin/main
+        git reset --hard origin/$CI_COMMIT_REF_NAME
         echo "🐍 Activation du venv..."
         source venv/bin/activate
         echo "📥 Installation des dépendances..."
@@ -54,8 +62,9 @@ deploy-backend:
         echo "🔄 Redémarrage Gunicorn..."
         sudo systemctl restart zemybackend-gunicorn
         echo "✅ Déploiement backend terminé !"
-      ENDSSH
+ENDSSH
   only:
     - main
+    - master
   needs:
     - test-backend

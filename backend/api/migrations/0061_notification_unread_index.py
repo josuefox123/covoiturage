@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0059_audit_ride_db_constraints'),
+        ('api', '0060_merge_20260907_1746'),
     ]
 
     operations = [

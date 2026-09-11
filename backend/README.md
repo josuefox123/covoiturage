@@ -1,5 +1,7 @@
 # Backend Covoiturage (Django REST Framework)
 
+> Dernier commit & mise à jour : 10 Septembre 2026 — Correction des trajets récurrents & audit du système de notifications.
+
 Ce dossier contient l'API backend de l'application de covoiturage, construite avec Django et Django REST Framework. Il utilise une base de données locale **SQLite** (`db.sqlite3`) par défaut pour le développement.
 
 ## Prérequis
