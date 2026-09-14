@@ -1,179 +1,109 @@
-# Documentation des Dépôts Git (Projet Covoiturage / Zemy)
+# Guide des Procédures Git (GitHub & GitLab)
 
-Ce document récapitule l'organisation de vos dépôts Git pour ce projet. Le projet est organisé en plusieurs dossiers, chacun étant relié à un dépôt GitHub spécifique.
-
----
-
-### 1. Projet Global (Dépôt Principal)
-- **Dossier local :** `c:\PROJETS\antigravity\covoiturage1`
-- **Lien GitHub :** [https://github.com/josuefox123/covoiturage.git](https://github.com/josuefox123/covoiturage.git)
-- **Description :** Ce dépôt englobe l'intégralité du projet. Il contient le backend, le frontend mobile et le dashboard d'administration. C'est ici qu'on met à jour le projet de manière globale.
-
-### 2. Dashboard (Interface d'Administration)
-- **Dossier local :** `c:\PROJETS\antigravity\covoiturage1\dashboard`
-- **Lien GitHub :** [https://github.com/josuefox123/zemy_dashbord.git](https://github.com/josuefox123/zemy_dashbord.git)
-- **Description :** Ce dépôt est spécifique au tableau de bord d'administration (interface web Nuxt/Vue). On y effectue les commits uniquement pour le code du dashboard.
-
-### 3. Frontend (Application Mobile)
-- **Dossier local :** `c:\PROJETS\antigravity\covoiturage1\frontend`
-- **Lien GitHub :** [https://github.com/josuefox123/zemy_mobile_frontend.git](https://github.com/josuefox123/zemy_mobile_frontend.git)
-- **Description :** Ce dépôt est dédié à l'application mobile React Native / Expo. Les mises à jour de l'interface utilisateur, des composants et des écrans mobiles sont poussées vers ce lien.
-
-### 4. Backend (API et Base de Données)
-- **Dossier local :** `c:\PROJETS\antigravity\covoiturage1\backend`
-- **Lien GitHub :** [https://github.com/josuefox123/zemy_backend.git](https://github.com/josuefox123/zemy_backend.git)
-- **Description :** Ce dépôt contient le code du serveur, l'API Django, et les modèles de données. On s'en sert pour mettre à jour la logique serveur de l'application.
+Ce document récapitule les étapes exactes pour effectuer les mises à jour et pousser votre code sur vos dépôts **GitHub** et **GitLab** en toute sécurité.
 
 ---
 
-> [!TIP]
-> **Rappel pour les mises à jour :**
-> Si vous modifiez un élément dans l'un des sous-dossiers (`backend`, `frontend`, `dashboard`), vous devez vous placer dans le dossier correspondant pour faire un `git push` vers son dépôt dédié, puis également le faire dans le dossier principal `covoiturage1` si vous souhaitez que le dépôt global soit aussi à jour.
+## 📂 Architecture des Dépôts
+
+| Composant | Dossier local | Dépôt Remote |
+| :--- | :--- | :--- |
+| **Backend (API Django)** | `c:\PROJETS\antigravity\covoiturage1\backend` | **GitLab** : `https://gitlab.com/sinustic1/zemy_backend.git`<br>**GitHub** : `https://github.com/josuefox123/zemy_backend.git` |
+| **Frontend (App Mobile)** | `c:\PROJETS\antigravity\covoiturage1\frontend` | **GitHub** : `https://github.com/josuefox123/zemy_mobile_frontend.git` |
+| **Dashboard (Nuxt Admin)** | `c:\PROJETS\antigravity\covoiturage1\dashboard` | **GitHub** : `https://github.com/josuefox123/zemy_dashbord.git` |
+| **Projet Global** | `c:\PROJETS\antigravity\covoiturage1` | **GitHub** : `https://github.com/josuefox123/covoiturage.git` |
 
 ---
 
-## Historique des Mises à Jour Récentes
+## 🚀 1. Procédure Backend (GitLab & GitHub)
 
-### 📅 Mise à jour du 5 Août 2026
-- **Messagerie et Résolution des Doublons :**
-  - Ajout d'une déduplication en mémoire dans la liste des discussions (`ConversationViewSet.get_queryset()`) pour n'afficher que la boîte de discussion la plus récente par trajet/participants.
-  - Résolution des créations de doublons de discussions lors des annulations et notifications en remplaçant les `get_or_create` ordonnés par des filtres croisés `Q()`.
-  - Intégration d'un indicateur de présence (`En ligne` / `Hors ligne`) dynamique et textuel dans l'en-tête de la discussion mobile.
-- **Documents PDF Officiels (Reçus et Billets) :**
-  - Création du service de génération de PDF (`pdf_service.py` utilisant `fpdf2` sur le serveur) avec le logo Zemy, bandeau de marque et fiches descriptives.
-  - Ajout d'un bouton de téléchargement de reçu de paiement PDF sur l'écran mobile de succès de paiement (passager).
-  - Ajout d'un bouton de téléchargement de reconnaissance de réservation PDF sous la liste des passagers confirmés (conducteur).
-  - Résolution du crash de téléchargement sous Android/Expo en migrant l'API vers le module `expo-file-system/legacy` (Expo SDK 54).
-- **Suppression des Emojis :**
-  - Retrait intégral des émojis et stickers dans le code backend et frontend (notifications push, météo, administration Django, notes étoiles).
-- **Géolocalisation Globale :**
-  - Récupération automatique de la position utilisateur au démarrage de l'application et partage global dans `AuthContext` via `useAuth().userLocation`.
+> [!IMPORTANT]
+> **Règle de sécurité pour le Backend :**
+> La branche `main` déclenche le **déploiement automatique sur le serveur VPS de production**.
+> Pour tester vos modifications sans risquer de corrompre le serveur, **poussez toujours d'abord sur la branche `testeur`**.
 
----
+### 🔹 Étape 1 : Récupérer les nouveautés de `main` (avant de travailler/pousser)
+```bash
+cd c:\PROJETS\antigravity\covoiturage1\backend
 
-### 📅 Mise à jour du 6 Août 2026
-- **Page de Paiement / Checkout (`payment_checkout.html`) :**
-  - Ajout d'une vérification stricte du paiement avant l'affichage des billets et QR codes (les passagers non-payés ne peuvent plus accéder au ticket directement).
-  - Pré-remplissage automatique des champs éditables dans le formulaire de checkout (nom, téléphone, montant).
-  - Intégration des logos Mobile Money et Zemy dans la page de checkout pour un rendu plus professionnel.
-- **Migration vers 100% Google Maps API :**
-  - Suppression totale des dépendances open-source (Nominatim / OSRM) dans le frontend et le backend.
-  - Toutes les fonctionnalités de géocodage, de calcul d'itinéraire et d'affichage de carte utilisent désormais exclusivement l'API Google Maps.
-- **Corrections Formulaire de Publication de Trajet :**
-  - Résolution de l'erreur `Maximum update depth exceeded` dans le formulaire de publication en protégeant les mises à jour d'état et l'injection de waypoints dans la WebView.
-- **Correction Type Checker Pyright (Backend) :**
-  - Correction du warning Pyright dans la déduplication du queryset `Conversation` en utilisant la représentation string pour la comparaison des UUID participants.
+# Récupérer les derniers commits depuis GitLab
+git fetch gitlab
 
----
+# Fusionner la branche main de GitLab dans votre branche locale
+git merge gitlab/main
+```
 
-### 📅 Mise à jour du 10 Août 2026
-- **Réorganisation et Modularisation (Zéro fichier de +300 lignes) :**
-  - **Onglet Mes Trajets :** Décomposition de [trips.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/(tabs)/trips.tsx) (de 663 à ~180 lignes) en composants modulaires sous `src/features/mes-trajets/` (EnteteTrajet, SwitcherRole, FiltresStatut, EtatVide, CarteTrajet).
-  - **Détails du Trajet Passager :** Réduction de [ride/[id].tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/ride/[id].tsx) (de 981 à ~370 lignes) avec extraction des cartes et boutons sous `src/features/ride/composants/` (CarteConducteur, CarteItineraire, CarteBillet, CarteSecurite, BoutonReservation, PiedDePageTrajet).
-  - **Gestion du Trajet Conducteur :** Réduction de [ride-management/[id].tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/ride-management/[id].tsx) (de 1047 à ~470 lignes) en composants modulaires sous `src/features/ride-management/composants/` (HeroCard, StatsGrid, Timeline, PendingBookingCard, PassengerCard, VehicleCard, PremiumScanner).
-  - **Résultats de recherche :** Réduction de [search-results.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/search-results.tsx) (de 1226 à ~450 lignes) sous `src/features/search/composants/` (FiltreModalRecherche, CarteTrajetCorrespondance).
-- **Sécurisation de la communication Conducteur / Passagers :**
-  - Masquage et blocage systématique des boutons rapides d'appel téléphonique et de chat par message pour les réservations annulées ou n'ayant pas fait l'objet d'un paiement effectif (`payment_status` différent de `'paid'` ou `'escrow'`).
-  - Restriction du bouton de contact collectif pour le conducteur aux seuls passagers actifs ayant payé.
-- **Rétrocompatibilité :**
-  - Maintien des re-exports pour les anciens modules de `trip-mission` pour éviter toute régression.
-  - Validation complète de la compilation TypeScript (0 erreur) et du fonctionnement sous Expo.
+### 🔹 Étape 2 : Commiter vos modifications locales
+```bash
+git add .
+git commit -m "description explicite de vos modifications"
+```
+
+### 🔹 Étape 3 : Pousser sur la branche de test (`testeur`)
+```bash
+# Envoie vos modifications sur la branche testeur de GitLab
+git push gitlab josue:testeur
+
+# (Optionnel) Sauvegarder aussi sur votre branche testeur GitHub
+git push origin josue:testeur
+```
+
+### 🔹 Étape 4 : Pousser en production sur `main` (une fois validé)
+```bash
+# Pousse sur main GitLab (Déclenche le déploiement CI/CD sur le VPS)
+git push gitlab josue:main
+
+# Pousse sur main GitHub
+git push origin josue:main
+```
 
 ---
 
-### 📅 Mise à jour du 14 Août 2026
-- **Moteur de Matching et Recherche Géographique (Backend) :**
-  - **Ajustement du rayon de recherche à 20 km** : Configuration de la recherche à `20.0` km (au lieu de 50 km ou 8 km) et prise en charge dynamique par `WaypointMatcher.find_closest_waypoint`.
-  - **Désactivation des notifications d'acceptation/refus** : Mise en commentaire des envois de push et d'e-mails de réservation acceptée ou refusée dans `BookingViewSet`.
-  - **Désactivation de la génération automatique d'escales** : Seuls les départ, arrivée et escales explicites du conducteur sont stockés en base, évitant les waypoints intermédiaires forcés.
-  - **Remplacement de la recherche avec correspondances** : Matching uniquement en direct, et mode corridor de repli par polyline réactivé uniquement pour les trajets sans waypoints explicites.
-  - **Tri des réservations** : Tri par date décroissante (`-created_at`) dans les requêtes de réservations.
-  - **Doublement par e-mail propre** : Envoi automatique d'un e-mail sans émojis ni stickers pour chaque notification.
+## 📱 2. Procédure Frontend (Application Mobile)
 
-- **Application Mobile React Native / Expo (Frontend) :**
-  - **Forçage et affichage du trajet initial complet** :
-    - La carte (`RideMap`), la carte flottante en verre et l'écran de détails (`app/ride/[id].tsx`) affichent toujours l'itinéraire d'origine complet (A ➔ B) du conducteur sans modification ou zoom sur le segment de recherche.
-    - Création de la réservation forcée sur le départ et l'arrivée réels de la publication dans `useRideDetails.ts`.
-  - **Note du conducteur réorganisée** : Déploiement de la note de présentation rédigée par le chauffeur au tout début des détails pour plus de visibilité.
-  - **Correction du crash de rendu de texte brut** : Résolution du plantage lié à l'affichage conditionnel d'un `0` numérique non-encapsulé dans un composant `<Text>`.
-  - **Bouton de Demande de Remboursement** : Ajout de l'accès au remboursement pour les réservations annulées dans l'historique de paiement.
+```bash
+cd c:\PROJETS\antigravity\covoiturage1\frontend
 
----
+# 1. Vérifier l'état
+git status
 
-### 📅 Mise à jour du 24 Août 2026
+# 2. Ajouter et commiter
+git add .
+git commit -m "update frontend: description des changements"
 
-#### 🖥️ Dashboard (Interface d'Administration)
-- **Refonte de la page Paramètres Financiers en onglets professionnels :**
-  - Réorganisation complète de `financial-settings/index.vue` en **3 onglets distincts** :
-    - **Commissions Trajets** : Toggle + 3 cartes (Pourcentage, Minimum, Maximum) avec boutons presets + simulateur en temps réel.
-    - **Commissions Colis** : Même structure indépendante pour les colis.
-    - **Prix Conseillé** : Champs `price_per_km` et `price_margin_percent` avec presets + **slider de prévisualisation dynamique** (Min / Conseillé / Max calculés en live pour N km).
-  - Indicateurs de statut (point vert / gris) sur les onglets selon l'état du toggle.
-  - Bouton Sauvegarder amélioré avec icône floppy-disk + spinner de chargement.
-- **Ajout des boutons presets rapides** pour les prix recommandés par km.
-- **Ajout du champ marge de prix autorisée (%)** dans les paramètres financiers.
-
-#### 📱 Frontend Mobile (React Native / Expo)
-- **Délégation exclusive du prix conseillé au backend :** Suppression de l'algorithme de calcul local dans `usePublishForm.ts`. L'app utilise désormais exclusivement les valeurs `FinancialSettings` du backend.
-- **Affichage du prix réorganisé :** Si un trajet a des arrêts, les portions de prix sont affichées en premier ; sinon, saisie du prix global directement.
-- **Suppression des numérotations d'index** superflues dans les listes d'arrêts (`StopoversStep`, `PublishSummaryModal`), remplacées par des puces simples.
-- **Boutons Up/Down de réordonnancement** des arrêts intégrés dans la sous-étape 1 (checklist des propositions) avec bandeau explicatif NB.
-
-#### 🔗 Commits de référence (dépôt principal `covoiturage`)
-| Hash | Description |
-|------|-------------|
-| `c3a6b0c` | Refonte dashboard: page paramètres financiers en onglets |
-| `c8f96f4` | Ajout boutons presets rapides pour prix recommandés |
-| `b806854` | Ajout champ marge de prix autorisée (%) |
-| `8058d67` | Délégation exclusive de la suggestion de prix au backend |
-| `4a21486` | Affichage portions de prix d'abord si trajet avec arrêts |
-| `1ff9a02` | Suppression numérotations superflues dans les listes d'arrêts |
-| `f2de281` | Intégration boutons Up/Down dans sous-étape 1 |
+# 3. Pousser vers GitHub
+git push origin main
+```
 
 ---
 
-### 📅 Mise à jour du 1er Septembre 2026
+## 🖥️ 3. Procédure Dashboard (Interface Administration)
 
-#### ⚙️ Backend (API & Sécurité Django)
-- **Sécurisation `is_staff` et `query_params` :**
-  - Standardisation de `getattr(request.user, 'is_staff', False)` sur l'ensemble des vues et contrôleurs pour éviter le crash `AttributeError: 'AbstractBaseUser' has no attribute 'is_staff'` lors d'accès bruts.
-  - Création du helper centralisé `get_query_params(request)` dans `helpers.py` pour supporter de manière transparente `rest_framework.request.Request` (`request.query_params`) et `django.http.HttpRequest` (`request.GET`).
-- **Correction des exceptions `NoneType.title` et typage ReportLab :**
-  - Sécurisation des accès aux objets `Promotion` et `Notification` dans `settings.py` et `notifications.py`.
-  - Sécurisation des méthodes `__str__` dans `parametres.py` et `notification.py` pour garanties de chaînes non-nulles.
-  - Correction de l'export Excel `export_excel` dans `transactions.py` prémunissant contre `wb.active` nul.
-  - Correction du paramètre `borderPadding` de ReportLab (`borderPadding=8`) et utilisation d'un tampon binaire `io.BytesIO` pour `SimpleDocTemplate` au lieu de l'instance `HttpResponse`.
-- **Validation des conflits de trajets et parsing des heures :**
-  - Traitement robuste des heures de départ avec suppression d'espaces et support multi-formats (`HH:MM`, `HH:MM:SS`, `%H:%M:%S.%f`).
-  - Validation temporelle anti-conflits (`validate_driver_and_vehicle`) réservée aux seuls trajets `active` et `started` (les trajets `completed` et `cancelled` ne bloquent plus).
-  - Transtypage des identifiants `str(vehicle.owner_id) != str(driver_id)` pour prévenir les erreurs de permissions IDOR sur les véhicules.
-- **Tarification négociée et commissions :**
-  - Prise en compte explicite de `custom_price = 0` dans `PricingService` (utilisation de `is_not_none` au lieu de `or`).
-  - Respect strict du toggle `is_commission_active = False` dans `FinancialSettings.load()`, retournant une commission de `0 FCFA` sans forcer 10% par défaut.
-- **Suite de tests automatisés :**
-  - Écriture et validation à 100% de 18 tests unitaires de non-régression dans `test_audit_comprehensive.py`.
+```bash
+cd c:\PROJETS\antigravity\covoiturage1\dashboard
+
+# 1. Ajouter et commiter
+git add .
+git commit -m "update dashboard: description des changements"
+
+# 2. Pousser vers GitHub
+git push origin main
+```
 
 ---
 
-### 📅 Mise à jour du 14 Septembre 2026
+## 🌐 4. Procédure du Dépôt Global (`covoiturage1`)
 
-#### ⚙️ Workflow Git & Pipeline de Déploiement (Backend)
-- **Synchronisation du code depuis `main` et isolation sur `testeur` :**
-  - Fusion Fast-forward des derniers commits de `gitlab/main` (`619da9c`) vers la branche locale `josue`.
-  - Poussée de la branche vers `gitlab testeur` ([SinusTic / zemy_backend](https://gitlab.com/sinustic1/zemy_backend.git)) pour validation avant intégration en production.
-  - Protection de la branche `main` (qui exécute les déploiements automatiques VPS) contre toute corruption directe.
-- **Correction des pipelines GitLab CI/CD (`.gitlab-ci.yml`) :**
-  - Correction des erreurs de syntaxe YAML d'indentation (`ENDSSH` dans les block scalars).
-  - Ajout de la commande de nettoyage automatique `git clean -fd` dans le script de déploiement pour éliminer les fichiers de migration non suivis.
+> [!NOTE]
+> À effectuer après avoir mis à jour les sous-dossiers spécifiques pour garder le dépôt global synchronisé.
 
-#### 💳 Harmonisation de l'affichage des prix & Source unique de vérité
-- **Suppression intégrale de la mention « À confirmer » :**
-  - Suppression de tout masquage ou mention "À confirmer avec le chauffeur" dans les cartes de recherche ([RideSearchCard.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/src/components/common/RideSearchCard.tsx)), les détails du trajet ([app/ride/[id].tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/ride/%5Bid%5D.tsx)) et les résolveurs de mission ([resolveur-mission.ts](file:///c:/PROJETS/antigravity/covoiturage1/frontend/src/features/mes-trajets/resolution/resolveur-mission.ts)).
-  - Le prix réel du trajet/tronçon fixé par le conducteur (`price_per_seat`) s'affiche désormais directement dès la recherche.
-- **Source unique de vérité pour le prix négocié & la réservation :**
-  - Application d'une résolution explicite par ordre de priorité avec l'opérateur `??` (nullish coalescing) :
-    `driver_counter_price ?? custom_price ?? passenger_proposed_price ?? price ?? 0`
-  - Modal de contre-proposition ([PassengerNegotiationModal.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/src/features/ride/modals/PassengerNegotiationModal.tsx)) mis à jour avec affichage transparent de la décomposition : Prix unitaire proposé, surcharges d'options et Total à payer.
-  - Le serveur (`PricingService.compute_for_booking`) demeure l'unique autorité calculant le `total_to_pay` final avec commissions et surcharges.
-  - Validation complète de la suite de tests automatisés backend Django (44/44 tests OK).
+```bash
+cd c:\PROJETS\antigravity\covoiturage1
 
+# 1. Ajouter et commiter
+git add .
+git commit -m "update global: récapitulatif des mises à jour"
+
+# 2. Pousser vers GitHub
+git push origin josue:master
+```
