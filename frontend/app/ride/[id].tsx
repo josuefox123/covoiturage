@@ -280,7 +280,7 @@ export default function RideDetailScreen() {
                 { icon: 'calendar', bg: '#EBF4FF', val: new Date(ride.departure_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), color: C.primary },
                 { icon: 'time', bg: '#FFF7ED', val: fmtDur(ride.duration_min ?? 0), color: C.warning },
                 { icon: 'people', bg: '#F0FDF4', val: `${ride.seats_available} place${ride.seats_available !== 1 ? 's' : ''}`, color: C.success },
-                { icon: 'wallet', bg: '#EBF4FF', val: `${ride.price_per_seat?.toLocaleString() ?? '0'} F`, color: C.primary },
+                { icon: 'wallet', bg: '#EBF4FF', val: `${(bookingState?.price ?? ride.price_per_seat)?.toLocaleString() ?? '0'} F`, color: C.primary },
               ].map((s, i, arr) => (
                 <React.Fragment key={i}>
                   <View style={ss.gcStat}>
@@ -318,10 +318,16 @@ export default function RideDetailScreen() {
           <FadeInCard delay={120}>
             <View style={[ss.card, { flexDirection: 'row', alignItems: 'center' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={ss.pLabel}>{isMid ? 'Prix estimé' : 'Prix par place'}</Text>
+                <Text style={ss.pLabel}>{isMid ? 'Prix du trajet' : 'Prix par place'}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
-                  <><Text style={ss.pAmt}>{ride.price_per_seat?.toLocaleString() ?? '0'}</Text><Text style={ss.pCur}> FCFA</Text></>
+                  <Text style={ss.pAmt}>{(bookingState?.price ?? ride.price_per_seat)?.toLocaleString() ?? '0'}</Text>
+                  <Text style={ss.pCur}> FCFA</Text>
                 </View>
+                {isMid && (
+                  <Text style={{ fontSize: 12, color: C.textSec, marginTop: 4, fontWeight: '500' }}>
+                    Prix estimé du trajet au complet : {ride.price_per_seat?.toLocaleString() ?? '0'} FCFA
+                  </Text>
+                )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
                   <Ionicons name="people" size={14} color={C.success} />
                   <Text style={{ fontSize: 13, color: C.success, fontWeight: '700' }}>
@@ -479,7 +485,7 @@ export default function RideDetailScreen() {
 
       {/* Pied de page fixe */}
       <PiedDePageTrajet
-        prixParPlace={ride.price_per_seat}
+        prixParPlace={bookingState?.price ?? ride.price_per_seat}
         isMid={isMid}
         canChat={canChat}
         chatLoading={chatLoading}
@@ -550,6 +556,10 @@ export default function RideDetailScreen() {
         hasPendingBookings={bookings?.some((b: any) => ['pending', 'pending_driver', 'pending_passenger', 'pending_payment'].includes(b.status))}
         onClose={() => setShowEditModal(false)}
         onSuccess={() => fetchRide()}
+        onDeleted={() => {
+          setShowEditModal(false);
+          router.replace('/(tabs)/home');
+        }}
         authFetch={authFetch}
       />
     </SafeAreaView>

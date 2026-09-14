@@ -9,6 +9,7 @@ la modification sécurisée/atomique d'un trajet déjà publié par un conducteu
 """
 from datetime import datetime, date, time as time_type
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
 import logging
@@ -19,7 +20,8 @@ from ..fcm import create_and_send_notification
 logger = logging.getLogger(__name__)
 
 # Statuts de réservation qui empêchent strictement toute modification du trajet
-BLOCKING_BOOKING_STATUSES = ['confirmed', 'started', 'completed', 'payment_processing']
+BLOCKING_BOOKING_STATUSES = ['confirmed', 'active', 'started', 'completed', 'payment_processing']
+BLOCKING_PAYMENT_STATUSES = ['escrow', 'paid']
 
 # Statuts de réservation en attente qui peuvent être annulés proprement lors d'une modification
 PENDING_BOOKING_STATUSES = ['pending', 'pending_driver', 'pending_passenger', 'pending_payment']
@@ -72,8 +74,10 @@ class RideEditService:
         if departure_dt <= timezone.now():
             return False, "TRIP_PASSED"
 
-        # Vérification des réservations bloquantes (confirmées, embarquées, payées ou en cours de paiement)
-        has_blocking_booking = ride.bookings.filter(status__in=BLOCKING_BOOKING_STATUSES).exists()
+        # Vérification des réservations bloquantes (confirmées, actives, embarquées, payées ou en cours de paiement)
+        has_blocking_booking = ride.bookings.filter(
+            Q(status__in=BLOCKING_BOOKING_STATUSES) | Q(payment_status__in=BLOCKING_PAYMENT_STATUSES)
+        ).exists()
         if has_blocking_booking:
             return False, "BOOKING_CONFIRMED"
 
@@ -152,8 +156,11 @@ class RideEditService:
                 fields_to_update.append('departure_time')
 
             if 'total_seats' in data:
-                seats_diff = int(data['total_seats']) - ride.total_seats
-                ride.total_seats = int(data['total_seats'])
+                new_total = int(data['total_seats'])
+                if new_total < 1:
+                    raise ValidationError({"total_seats": "Le nombre de places doit être d'au moins 1."})
+                seats_diff = new_total - ride.total_seats
+                ride.total_seats = new_total
                 ride.seats_available = max(0, ride.seats_available + seats_diff)
                 fields_to_update.extend(['total_seats', 'seats_available'])
 

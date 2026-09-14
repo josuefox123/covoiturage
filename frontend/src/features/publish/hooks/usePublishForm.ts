@@ -797,7 +797,12 @@ export function usePublishForm(authCtx: any) {
           throw new Error("Veuillez sélectionner au moins un jour de départ.");
         }
 
-        const publishPromises = daySchedules.map(async (schedule) => {
+        let totalCreated = 0;
+        let totalFailed = 0;
+        const allCreatedRides: any[] = [];
+        const allFailedRides: any[] = [];
+
+        for (const schedule of daySchedules) {
           const schedulePayload = {
             ...payload,
             is_recurrent: true,
@@ -809,28 +814,88 @@ export function usePublishForm(authCtx: any) {
             week_days: [schedule.day],
             departure_time: schedule.time + ':00',
           };
-          return authFetch('/rides/', { method: 'POST', body: JSON.stringify(schedulePayload) });
-        });
 
-        const results = await Promise.all(publishPromises);
-        const firstRes = results[0];
-        message = firstRes && firstRes.message ? firstRes.message : `Vos trajets récurrents ont été publiés !`;
+          try {
+            const res = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(schedulePayload) });
+            if (res.created_rides && Array.isArray(res.created_rides)) {
+              allCreatedRides.push(...res.created_rides);
+              totalCreated += res.created_count || res.created_rides.length;
+            }
+            if (res.failed_rides && Array.isArray(res.failed_rides)) {
+              allFailedRides.push(...res.failed_rides);
+              totalFailed += res.failed_count || res.failed_rides.length;
+            }
+          } catch (err: any) {
+            let reason = err.message || err.error || "Conflit d'horaire ou trajet déjà existant";
+            if (err.failed_rides && Array.isArray(err.failed_rides)) {
+              allFailedRides.push(...err.failed_rides);
+              totalFailed += err.failed_count || err.failed_rides.length;
+            } else {
+              allFailedRides.push({
+                date: dateString,
+                day_name: `Créneau de ${schedule.time}`,
+                reason
+              });
+              totalFailed += 1;
+            }
+          }
+        }
+
+        let alertTitle = 'Bilan de publication';
+        if (totalFailed > 0 && totalCreated > 0) {
+          alertTitle = '⚠️ Publication partielle des trajets';
+        } else if (totalCreated > 0 && totalFailed === 0) {
+          alertTitle = '🎉 Trajets récurrents créés !';
+        } else {
+          alertTitle = '❌ Erreur de publication';
+        }
+
+        let detailedMsg = '';
+
+        if (allCreatedRides.length > 0) {
+          detailedMsg += `✅ Trajets créés et publiés (${allCreatedRides.length}) :\n`;
+          allCreatedRides.forEach((r: any) => {
+            detailedMsg += ` • ${r.day_name || r.date} à ${r.time || time}\n`;
+          });
+        }
+
+        if (allFailedRides.length > 0) {
+          if (detailedMsg) detailedMsg += `\n`;
+          detailedMsg += `⚠️ Trajets non créés (conflit d'horaire) (${allFailedRides.length}) :\n`;
+          allFailedRides.forEach((r: any) => {
+            detailedMsg += ` • ${r.day_name || r.date} : ${r.reason}\n`;
+          });
+        }
+
+        if (totalCreated > 0) {
+          CustomAlert.alert(alertTitle, detailedMsg, [
+            { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
+          ]);
+          // Reset form
+          setDeparture(''); setArrival(''); setDepartureCords(null); setArrivalCords(null);
+          setStopovers([]); setDetectedStopovers([]); setGoogleRoutes([]); setSelectedRouteIndex(0);
+          setEstimation(null); setPrice(''); setSeats(3); setDescription('');
+          setIsRecurrent(false); setSelectedDays([]); setDaySchedules([]);
+          setPriceSuggestion(null);
+          goToStep(1);
+        } else {
+          CustomAlert.alert(alertTitle, detailedMsg || "Aucun trajet n'a pu être créé.");
+        }
       } else {
         const res = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(payload) });
         message = res.message ? res.message : message;
+        CustomAlert.alert('Félicitations !', message, [
+          { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
+        ]);
+
+        // Reset form
+        setDeparture(''); setArrival(''); setDepartureCords(null); setArrivalCords(null);
+        setStopovers([]); setDetectedStopovers([]); setGoogleRoutes([]); setSelectedRouteIndex(0);
+        setEstimation(null); setPrice(''); setSeats(3); setDescription('');
+        setIsRecurrent(false); setSelectedDays([]); setDaySchedules([]);
+        setPriceSuggestion(null);
+        goToStep(1);
       }
-
-      CustomAlert.alert('Félicitations !', message, [
-        { text: 'Voir mes trajets', onPress: () => router.push('/(tabs)/home') }
-      ]);
-
-      // Reset form
-      setDeparture(''); setArrival(''); setDepartureCords(null); setArrivalCords(null);
-      setStopovers([]); setDetectedStopovers([]); setGoogleRoutes([]); setSelectedRouteIndex(0);
-      setEstimation(null); setPrice(''); setSeats(3); setDescription('');
-      setIsRecurrent(false); setSelectedDays([]); setDaySchedules([]);
-      setPriceSuggestion(null);
-      goToStep(1);
     } catch (error: any) {
       CustomAlert.alert('Erreur', error.message || 'Impossible de publier le trajet.');
     } finally {

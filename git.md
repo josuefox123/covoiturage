@@ -18,43 +18,35 @@ Ce document récapitule les étapes exactes pour effectuer les mises à jour et 
 ## 🚀 1. Procédure Backend (GitLab & GitHub)
 
 > [!IMPORTANT]
-> **Règle de sécurité pour le Backend :**
-> Nous utilisons désormais la branche **`develop`** comme branche d'intégration principale (au lieu de `main`).
-> Pour tester vos modifications sans risquer d'impacter le serveur, **poussez toujours d'abord sur la branche `testeur`**, puis une fois validé, poussez de `testeur` vers `develop`.
+> **Règle de travail pour le Backend :**
+> Travaillez sur votre branche locale **`josue`**.
+> Pour déployer et tester vos modifications en toute sécurité, **récupérez les nouveautés sur `josue` et poussez votre branche `josue` vers la branche `testeur` de GitLab**.
 
-### 🔹 Étape 1 : Récupérer les nouveautés de `develop` (avant de travailler/pousser)
+### 🔹 Étape 1 : Récupérer les nouveautés de `josue` depuis GitLab
 ```bash
 cd c:\PROJETS\antigravity\covoiturage1\backend
 
-# Récupérer les derniers commits depuis GitLab
-git fetch gitlab
-
-# Fusionner la branche develop de GitLab dans votre branche locale
-git merge gitlab/develop
+# Récupérer et fusionner les derniers commits depuis la branche josue de GitLab
+git pull gitlab josue
 ```
 
 ### 🔹 Étape 2 : Commiter vos modifications locales
 ```bash
+cd c:\PROJETS\antigravity\covoiturage1\backend
+
 git add .
 git commit -m "description explicite de vos modifications"
 ```
 
 ### 🔹 Étape 3 : Pousser sur la branche de test (`testeur`)
 ```bash
-# Envoie vos modifications sur la branche testeur de GitLab
+cd c:\PROJETS\antigravity\covoiturage1\backend
+
+# Envoie vos modifications locales de la branche josue vers la branche testeur de GitLab
 git push gitlab josue:testeur
 
-# (Optionnel) Sauvegarder aussi sur votre branche testeur GitHub
-git push origin josue:testeur
-```
-
-### 🔹 Étape 4 : Pousser de `testeur` vers `develop` (une fois validé)
-```bash
-# Pousse vos modifications validées sur la branche develop de GitLab
-git push gitlab josue:develop
-
-# Pousse également sur la branche develop de GitHub
-git push origin josue:develop
+# (Optionnel) Sauvegarder aussi sur votre branche josue sur GitHub
+git push origin josue
 ```
 
 ---

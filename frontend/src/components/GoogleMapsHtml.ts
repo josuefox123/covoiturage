@@ -2,14 +2,6 @@
  * ==============================================================
  * GoogleMapsHtml.ts — Template HTML de la carte Google Maps (WebView)
  * ==============================================================
- * 
- * Ce fichier contient le template HTML injecté dans le composant WebView de React Native.
- * Il gère :
- * 1. L'affichage de la carte Google Maps.
- * 2. Le repère central (Marker Pin) avec animation de glissement.
- * 3. La communication bidirectionnelle (ReactNativeWebView.postMessage) pour notifier
- *    l'application lorsque la carte bouge ou est prête.
- * 4. Les marqueurs de prévisualisation et de position de l'utilisateur.
  */
 
 export const getGoogleMapsHtml = (defaultLat: number, defaultLon: number): string => `
@@ -22,6 +14,7 @@ export const getGoogleMapsHtml = (defaultLat: number, defaultLon: number): strin
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html, #map { width: 100%; height: 100%; background: #f0f4f8; }
     .center-marker {
+      display: none;
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       z-index: 1000; pointer-events: none; transition: transform 0.18s ease;

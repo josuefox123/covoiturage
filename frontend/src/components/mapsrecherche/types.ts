@@ -1,3 +1,21 @@
+export interface SearchLocationResult {
+  id: string;
+  name: string;
+  display_name: string;
+  latitude: number;
+  longitude: number;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    suburb?: string;
+    neighbourhood?: string;
+    road?: string;
+    country?: string;
+  };
+  source: 'nominatim' | 'local';
+}
+
 export interface LocationData {
   latitude: number;
   longitude: number;
@@ -16,3 +34,4 @@ export interface LocationPickerProps {
   initialLocation?: LocationData;
   title?: string;
 }
+

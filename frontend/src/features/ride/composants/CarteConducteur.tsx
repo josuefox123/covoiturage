@@ -108,25 +108,6 @@ export function CarteConducteur({
         </View>
       </View>
 
-      {/* Bouton modifier pour le conducteur */}
-      {isOwnRide && (
-        canEdit ? (
-          <TouchableOpacity style={styles.editCTA} onPress={onOpenEdit} activeOpacity={0.85}>
-            <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>Modifier le trajet</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.blockedBadge}>
-            <Ionicons name="lock-closed-outline" size={14} color="#6B7280" />
-            <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600' }}>
-              {blockReason === 'BOOKING_CONFIRMED' ? 'Modifications fermées : Réservation confirmée' :
-               blockReason === 'TRIP_PASSED' ? 'Modifications fermées : Heure de départ dépassée' :
-               'Trajet non modifiable'}
-            </Text>
-          </View>
-        )
-      )}
-
       {/* Bouton contacter pour le passager */}
       {!isOwnRide && canChat && (
         <TouchableOpacity style={styles.chatCTA} onPress={onOpenChat} disabled={chatLoading} activeOpacity={0.85}>

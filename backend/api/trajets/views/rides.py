@@ -275,9 +275,20 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         RideEditService.update_ride(serializer.instance.id, self.request.user, self.request.data)
 
     def perform_destroy(self, instance):
-        from rest_framework.exceptions import PermissionDenied
+        from rest_framework.exceptions import PermissionDenied, ValidationError
         if instance.driver != self.request.user and not getattr(self.request.user, 'is_staff', False):
             raise PermissionDenied("Vous n'êtes pas autorisé à supprimer ce trajet.")
+        
+        # Vérification si le trajet possède déjà des réservations non annulées
+        from ...models.reservation import Booking
+        active_bookings = Booking.objects.filter(
+            ride=instance,
+            status__in=['confirmed', 'active', 'started', 'pending_driver', 'pending_payment']
+        ).exists()
+        
+        if active_bookings or (instance.total_seats and instance.seats_available < instance.total_seats):
+            raise ValidationError({"error": "Impossible de supprimer ce trajet : des passagers ont déjà réservé."})
+            
         instance.delete()
 
     def create(self, request, *args, **kwargs):

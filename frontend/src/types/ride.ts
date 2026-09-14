@@ -27,6 +27,8 @@ export interface Ride {
   seats_available: number;
   total_seats: number;
   status: string;
+  can_edit?: boolean;
+  edit_block_reason?: string;
   description?: string;
   distance_km?: number;
   duration_min?: number;

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LocationData } from './types';
+import { LocationData, SearchLocationResult } from './types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -19,13 +19,15 @@ interface FloatingSuggestionsPanelProps {
   isQueryEmpty: boolean;
   recentLocations: LocationData[];
   popularPlaces: LocationData[];
-  searchResults: any[];
+  searchResults: SearchLocationResult[] | any[];
   isSearching: boolean;
   panY: Animated.Value;
   cardTopMargin: number;
   clearRecentLocations: () => void;
   handleSelectSuggestion: (loc: LocationData) => void;
   handleSelectSearchResult: (item: any) => void;
+  userLocationData?: LocationData | null;
+  onSelectCurrentLocation?: () => void;
 }
 
 export default function FloatingSuggestionsPanel({
@@ -40,6 +42,8 @@ export default function FloatingSuggestionsPanel({
   clearRecentLocations,
   handleSelectSuggestion,
   handleSelectSearchResult,
+  userLocationData,
+  onSelectCurrentLocation,
 }: FloatingSuggestionsPanelProps) {
   if (!showSuggestions) return null;
 
@@ -66,6 +70,25 @@ export default function FloatingSuggestionsPanel({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 16 }}
       >
+        {/* Position GPS Actuelle — Toujours en première position */}
+        <TouchableOpacity
+          style={styles.currentGpsItem}
+          onPress={onSelectCurrentLocation}
+          activeOpacity={0.8}
+        >
+          <View style={styles.currentGpsBadge}>
+            <Ionicons name="navigate" size={16} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.currentGpsTitle}>Ma position actuelle</Text>
+            <Text style={styles.currentGpsSub} numberOfLines={1}>
+              {userLocationData?.name ? `${userLocationData.name}${userLocationData.city ? `, ${userLocationData.city}` : ''}` : 'Utiliser la position GPS de l\'appareil'}
+            </Text>
+          </View>
+          <View style={styles.currentGpsTag}>
+            <Text style={styles.currentGpsTagTxt}>GPS</Text>
+          </View>
+        </TouchableOpacity>
         {/* Départs récents */}
         {recentLocations.length > 0 && isQueryEmpty && (
           <View style={styles.dropdownSection}>
@@ -335,5 +358,46 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     marginTop: 2,
+  },
+  currentGpsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    gap: 10,
+  },
+  currentGpsBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#0066FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currentGpsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  currentGpsSub: {
+    fontSize: 11,
+    color: '#3B82F6',
+    marginTop: 1,
+  },
+  currentGpsTag: {
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  currentGpsTagTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

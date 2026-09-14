@@ -216,13 +216,13 @@ class Ride(models.Model):
         dest_idx = -1
 
         for idx, pc in enumerate(place_cities):
-            if dep_city in pc:
+            if pc and (dep_city in pc or pc in dep_city):
                 dep_idx = idx
                 break
         
         if dep_idx != -1:
             for idx, pc in enumerate(place_cities):
-                if arr_city in pc and idx > dep_idx:
+                if pc and (arr_city in pc or pc in arr_city) and idx > dep_idx:
                     dest_idx = idx
                     break
 

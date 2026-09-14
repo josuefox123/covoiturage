@@ -30,6 +30,7 @@ interface FloatingFooterCardProps {
   nearbySuggestions: LocationData[];
   setSelectedLocation: (loc: LocationData) => void;
   sendToMap: (msg: any) => void;
+  handleFocusSearch?: () => void;
 }
 
 export default function FloatingFooterCard({
@@ -46,6 +47,7 @@ export default function FloatingFooterCard({
   nearbySuggestions,
   setSelectedLocation,
   sendToMap,
+  handleFocusSearch,
 }: FloatingFooterCardProps) {
   const insets = useSafeAreaInsets();
 
@@ -152,7 +154,7 @@ export default function FloatingFooterCard({
         <Ionicons name="pencil" size={14} color="#6B7280" />
         <TextInput
           style={styles.customNoteInput}
-          placeholder="Ajouter un nom précis pour la position"
+          placeholder="Ajouter un repère précis (ex: Pharmacie, Porte bleue...)"
           placeholderTextColor="#9CA3AF"
           value={customLocationName}
           onChangeText={setCustomLocationName}
@@ -276,29 +278,29 @@ const styles = StyleSheet.create({
   customNoteInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5FF',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 36,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 40,
     marginBottom: 14,
-    gap: 6,
+    gap: 8,
   },
   customNoteInput: {
     flex: 1,
-    fontSize: 12,
-    color: '#374151',
+    fontSize: 13,
+    color: '#1E293B',
     fontWeight: '500',
   },
   confirmLocationBtn: {
-    backgroundColor: '#0B56E4',
+    backgroundColor: '#0066FF',
     height: 52,
-    borderRadius: 12,
+    borderRadius: 14,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0B56E4',
+    shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

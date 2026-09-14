@@ -81,12 +81,6 @@ export default function RideSearchCard({
     return comm;
   };
 
-  const getDisplayPrice = () => {
-    return ride.price_per_seat;
-  };
-
-  const price = getDisplayPrice().toLocaleString() || '0';
-  const priceUnit = 'par place';
   const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
   const seatsLeft = ride.seats_available || 0;
 
@@ -121,6 +115,23 @@ export default function RideSearchCard({
     (searchedDestination && (extractCity(searchedDestination) !== extractCity(ride.arrival_location))) ||
     isSegment
   );
+
+  const getDisplayPrice = () => {
+    // 0. Si un tarif de portion spécifique est fourni via portion_price
+    if ((ride as any).portion_price !== undefined && Number((ride as any).portion_price) > 0) {
+      return Number((ride as any).portion_price);
+    }
+    // 1. Le backend fournit directement le tarif du tronçon recherché dans ride.price_per_seat
+    if (ride.price_per_seat !== undefined && ride.price_per_seat !== null) {
+      return Number(ride.price_per_seat);
+    }
+    return 0;
+  };
+
+  const displayPriceVal = getDisplayPrice();
+  const price = displayPriceVal.toLocaleString() || '0';
+  const priceUnit = isIntermediate ? 'Prix du trajet' : 'par place';
+  const fullPriceVal = ride.original_price_per_seat || (ride as any).full_price;
 
   const getArrivalTime = () => getArrivalTimeHelper(ride.departure_time, ride.duration_min);
   const getDurationText = () => getDurationTextHelper(ride.duration_min);
@@ -204,8 +215,16 @@ export default function RideSearchCard({
 
             {/* Zone de prix */}
             <View style={styles.priceContainer}>
-              <Text style={styles.priceText}>{price} FCFA</Text>
-              <Text style={styles.priceSub}>{priceUnit}</Text>
+              <Text style={styles.priceSub}>{isIntermediate ? 'Prix du trajet' : 'Prix par place'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
+                <Text style={styles.priceText}>{price}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 2 }}> FCFA</Text>
+              </View>
+              {isIntermediate && fullPriceVal && fullPriceVal !== displayPriceVal ? (
+                <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '500', marginTop: 2, textAlign: 'right' }}>
+                  Complet: {fullPriceVal.toLocaleString()} F
+                </Text>
+              ) : null}
             </View>
           </View>
 

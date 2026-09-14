@@ -29,6 +29,7 @@ import { PendingBookingCard } from '@/src/features/ride-management/composants/Pe
 import { PassengerCard } from '@/src/features/ride-management/composants/PassengerCard';
 import { VehicleCard } from '@/src/features/ride-management/composants/VehicleCard';
 import { PremiumScanner } from '@/src/features/ride-management/composants/PremiumScanner';
+import { EditRideModal } from '@/src/features/ride/modals/EditRideModal';
 
 export default function RideManagementScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,6 +49,7 @@ export default function RideManagementScreen() {
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [selectedBookingForCode, setSelectedBookingForCode] = useState<any>(null);
   const [downloadingManifestId, setDownloadingManifestId] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -216,8 +218,25 @@ export default function RideManagementScreen() {
             {new Date(ride.departure_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} • {ride.departure_time?.substring(0, 5)}
           </Text>
         </View>
-        <TouchableOpacity style={styles.hdrMenuBtn} onPress={() => CustomAlert.alert('Menu', 'Options à venir.')} activeOpacity={0.8}>
-          <Ionicons name="ellipsis-vertical" size={20} color={C.text} />
+        <TouchableOpacity
+          style={styles.hdrMenuBtn}
+          onPress={() => {
+            const canEdit = ride.can_edit !== false;
+            const blockReason = ride.edit_block_reason;
+            if (canEdit) {
+              setShowEditModal(true);
+            } else {
+              const msg = blockReason === 'BOOKING_CONFIRMED'
+                ? 'Modifications fermées : une réservation est déjà confirmée.'
+                : blockReason === 'TRIP_PASSED'
+                ? 'Modifications fermées : l\'heure de départ est dépassée.'
+                : 'Ce trajet ne peut plus être modifié.';
+              CustomAlert.alert('Modification impossible', msg);
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="create-outline" size={20} color={C.primary} />
         </TouchableOpacity>
       </View>
 
@@ -230,6 +249,29 @@ export default function RideManagementScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
       >
         <HeroCard ride={ride} />
+
+        {/* Bouton Modifier le Trajet */}
+        <TouchableOpacity
+          style={styles.editBanner}
+          onPress={() => {
+            const canEdit = ride.can_edit !== false;
+            const blockReason = ride.edit_block_reason;
+            if (canEdit) {
+              setShowEditModal(true);
+            } else {
+              const msg = blockReason === 'BOOKING_CONFIRMED'
+                ? 'Modifications fermées : une réservation est déjà confirmée.'
+                : blockReason === 'TRIP_PASSED'
+                ? 'Modifications fermées : l\'heure de départ est dépassée.'
+                : 'Ce trajet ne peut plus être modifié.';
+              CustomAlert.alert('Modification impossible', msg);
+            }
+          }}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="create-outline" size={18} color={C.primary} />
+          <Text style={styles.editBannerTxt}>Modifier les informations du trajet</Text>
+        </TouchableOpacity>
 
         <StatsGrid ride={ride} totalRevenue={totalRevenue} seatsBooked={seatsBooked} />
 
@@ -375,6 +417,21 @@ export default function RideManagementScreen() {
         permission={cameraPermission}
         requestPermission={requestCameraPermission}
       />
+
+      {/* Modal Modifier Trajet */}
+      <EditRideModal
+        visible={showEditModal}
+        ride={ride}
+        hasPendingBookings={pendingRequests.length > 0 || activeBookings.length > 0}
+        onClose={() => setShowEditModal(false)}
+        onSaved={async () => {
+          await onRefresh();
+        }}
+        onDeleted={() => {
+          setShowEditModal(false);
+          router.replace('/(tabs)/home');
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -387,6 +444,13 @@ const styles = StyleSheet.create({
   hdrCenter: { flex: 1, alignItems: 'center', gap: 2 },
   hdrTitle: { fontSize: 17, fontWeight: '800', color: C.text },
   hdrSub: { fontSize: 12, fontWeight: '500', color: C.textSec },
+  editBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: C.primaryLight, borderWidth: 1.5, borderColor: C.primary + '40',
+    paddingVertical: 12, paddingHorizontal: 20, borderRadius: 16, marginBottom: 14,
+    ...SHsm
+  },
+  editBannerTxt: { fontSize: 14, fontWeight: '700', color: C.primary },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 4 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 4 },
   sectionDot: { width: 8, height: 8, borderRadius: 4 },

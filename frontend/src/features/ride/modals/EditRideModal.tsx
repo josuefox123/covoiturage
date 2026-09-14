@@ -6,13 +6,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { C, SHsm } from '../composants/theme-trajet';
 
+import { useAuth } from '../../../context/AuthContext';
+
 interface EditRideModalProps {
   visible: boolean;
   ride: any;
   hasPendingBookings?: boolean;
   onClose: () => void;
-  onSuccess: () => void;
-  authFetch: (url: string, options?: any) => Promise<any>;
+  onSuccess?: () => void;
+  onSaved?: () => void;
+  onDeleted?: () => void;
+  authFetch?: (url: string, options?: any) => Promise<any>;
 }
 
 export function EditRideModal({
@@ -21,8 +25,13 @@ export function EditRideModal({
   hasPendingBookings = false,
   onClose,
   onSuccess,
-  authFetch,
+  onSaved,
+  onDeleted,
+  authFetch: customAuthFetch,
 }: EditRideModalProps) {
+  const { authFetch: contextAuthFetch } = useAuth();
+  const authFetch = customAuthFetch || contextAuthFetch;
+
   const [departureDate, setDepartureDate] = useState('');
   const [departureTime, setDepartureTime] = useState('');
   const [totalSeats, setTotalSeats] = useState('');
@@ -66,25 +75,64 @@ export function EditRideModal({
 
     setLoading(true);
     try {
-      const response = await authFetch(`/api/rides/${ride.id}/`, {
+      const response = await authFetch(`/rides/${ride.id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      if (response && response.ok) {
-        Alert.alert('Succès', 'Le trajet a été mis à jour avec succès.');
-        onSuccess();
-        onClose();
-      } else {
-        const errorData = await response?.json().catch(() => ({}));
-        Alert.alert('Erreur', errorData.error || errorData.detail || 'Impossible de modifier le trajet.');
-      }
+      Alert.alert('Succès', 'Le trajet a été mis à jour avec succès.');
+      if (onSuccess) onSuccess();
+      if (onSaved) onSaved();
+      onClose();
     } catch (err: any) {
       Alert.alert('Erreur', err?.message || 'Problème de connexion lors de la modification.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDelete = () => {
+    const seatsBooked = ride?.total_seats && ride?.seats_available ? (ride.total_seats - ride.seats_available) : 0;
+    const hasBookings = hasPendingBookings || seatsBooked > 0;
+
+    if (hasBookings) {
+      Alert.alert(
+        "Suppression impossible",
+        "Vous ne pouvez pas supprimer ce trajet car des passagers ont déjà réservé leur place."
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Supprimer le trajet",
+      "Êtes-vous sûr de vouloir supprimer définitivement ce trajet ? Cette action est irréversible.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await authFetch(`/rides/${ride.id}/`, {
+                method: 'DELETE',
+              });
+
+              Alert.alert('Succès', 'Le trajet a été supprimé.');
+              if (onDeleted) onDeleted();
+              else if (onSuccess) onSuccess();
+              if (onSaved) onSaved();
+              onClose();
+            } catch (err: any) {
+              Alert.alert('Erreur', err?.message || 'Impossible de supprimer le trajet.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (!visible) return null;
@@ -99,7 +147,7 @@ export function EditRideModal({
               <Ionicons name="create-outline" size={22} color={C.primary} />
               <Text style={styles.title}>Modifier le trajet</Text>
             </View>
-            <TouchableOpacity onPress={onClose} padding={4}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={24} color="#6B7280" />
             </TouchableOpacity>
           </View>
@@ -110,20 +158,21 @@ export function EditRideModal({
               <View style={styles.warningBanner}>
                 <Ionicons name="warning-outline" size={20} color="#D97706" />
                 <Text style={styles.warningText}>
-                  Demandes en attente : valider la modification annulera automatiquement les demandes de réservation non confirmées et en informera les passagers.
+                  Certaines modifications sont limitées car ce trajet comporte déjà des réservations.
                 </Text>
               </View>
             )}
 
-            {/* Date & Time */}
+            {/* Date & Heure */}
             <View style={styles.fieldRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Date de départ (AAAA-MM-JJ)</Text>
+                <Text style={styles.label}>Date (AAAA-MM-JJ)</Text>
                 <TextInput
                   style={styles.input}
                   value={departureDate}
                   onChangeText={setDepartureDate}
-                  placeholder="2026-09-15"
+                  placeholder="YYYY-MM-DD"
+                  keyboardType="numbers-and-punctuation"
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -132,21 +181,21 @@ export function EditRideModal({
                   style={styles.input}
                   value={departureTime}
                   onChangeText={setDepartureTime}
-                  placeholder="08:30"
+                  placeholder="HH:MM"
+                  keyboardType="numbers-and-punctuation"
                 />
               </View>
             </View>
 
-            {/* Seats & Price */}
+            {/* Places & Prix */}
             <View style={styles.fieldRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Nombre de places</Text>
+                <Text style={styles.label}>Places totales</Text>
                 <TextInput
                   style={styles.input}
                   value={totalSeats}
                   onChangeText={setTotalSeats}
                   keyboardType="numeric"
-                  placeholder="4"
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -156,49 +205,54 @@ export function EditRideModal({
                   value={pricePerSeat}
                   onChangeText={setPricePerSeat}
                   keyboardType="numeric"
-                  placeholder="5000"
                 />
               </View>
             </View>
 
-            {/* Parcels */}
+            {/* Colis */}
             <View style={styles.parcelRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>Accepte les colis</Text>
-                <Text style={{ fontSize: 12, color: C.textSec }}>Transport de petits colis ou courriers</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="cube-outline" size={20} color={C.textSec} />
+                <Text style={{ fontSize: 14, fontWeight: '600', color: C.text }}>Accepter les colis</Text>
               </View>
-              <Switch
-                value={acceptsParcels}
-                onValueChange={setAcceptsParcels}
-                trackColor={{ false: '#CBD5E1', true: C.primaryLight }}
-                thumbColor={acceptsParcels ? C.primary : '#F1F5F9'}
-              />
+              <Switch value={acceptsParcels} onValueChange={setAcceptsParcels} trackColor={{ false: '#CBD5E1', true: C.primary }} />
             </View>
 
             {acceptsParcels && (
               <View style={{ marginBottom: 14 }}>
-                <Text style={styles.label}>Prix colis (FCFA)</Text>
+                <Text style={styles.label}>Prix par colis (FCFA)</Text>
                 <TextInput
                   style={styles.input}
                   value={parcelPrice}
                   onChangeText={setParcelPrice}
                   keyboardType="numeric"
-                  placeholder="2000"
+                  placeholder="Ex: 1500"
                 />
               </View>
             )}
 
             {/* Description */}
-            <View style={{ marginBottom: 16 }}>
+            <View style={{ marginBottom: 12 }}>
               <Text style={styles.label}>Précisions / Note pour les passagers</Text>
               <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                style={[styles.input, { height: 75, textAlignVertical: 'top' }]}
                 value={description}
                 onChangeText={setDescription}
                 multiline
                 placeholder="Précisions sur le lieu de rendez-vous, bagages admis, etc."
               />
             </View>
+
+            {/* Bouton de Suppression */}
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={handleDelete}
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              <Text style={styles.deleteBtnText}>Supprimer ce trajet</Text>
+            </TouchableOpacity>
           </ScrollView>
 
           {/* Action Footer */}
@@ -329,5 +383,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  deleteBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   ActivityIndicator,
   Platform,
@@ -19,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
 import { fetchApi } from '../../services/api';
-import { LocationData, LocationPickerProps } from './types';
+import { LocationData, LocationPickerProps, SearchLocationResult } from './types';
 import { getGoogleMapsHtml } from './GoogleMapsHtml';
 import FloatingSearchCard from './FloatingSearchCard';
 import FloatingSuggestionsPanel from './FloatingSuggestionsPanel';
@@ -60,6 +61,7 @@ export default function LocationPicker({
 
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(initialLocation || null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [userLocationData, setUserLocationData] = useState<LocationData | null>(null);
 
   const [mapReady, setMapReady] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
@@ -246,10 +248,91 @@ export default function LocationPicker({
     } catch (e) {}
   };
 
+  const isPlusCode = (text: string): boolean => {
+    if (!text) return false;
+    const trimmed = text.trim();
+    return /^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}/i.test(trimmed) || /^[A-Z0-9]{4}\+[A-Z0-9]{2,4}/i.test(trimmed) || trimmed.includes('+');
+  };
+
+  const sanitizeAddress = (text: string): string => {
+    if (!text) return '';
+    const parts = text.split(',').map(p => p.trim()).filter(p => p.length > 0 && !isPlusCode(p));
+    return parts.join(', ');
+  };
+
+  const getGeocodedLocation = async (lat: number, lon: number, signal?: AbortSignal): Promise<LocationData | null> => {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${GOOGLE_MAPS_KEY}&language=fr`;
+      const res = await fetch(url, { signal });
+      const data = await res.json();
+      if (data && data.results && data.results.length > 0) {
+        let name = '';
+        let city = '';
+        let route = '';
+        let streetNum = '';
+        let neighborhood = '';
+
+        for (const item of data.results) {
+          const types = item.types || [];
+          const candidate = item.name || item.formatted_address?.split(',')[0] || '';
+          if (
+            (types.includes('point_of_interest') || types.includes('establishment') || types.includes('premise')) &&
+            candidate && !isPlusCode(candidate)
+          ) {
+            name = candidate;
+            break;
+          }
+        }
+
+        const primaryResult = data.results.find((r: any) => r.formatted_address && !isPlusCode(r.formatted_address.split(',')[0])) || data.results[0];
+        for (const comp of primaryResult.address_components || []) {
+          const types = comp.types || [];
+          const compName = comp.long_name || '';
+          if (isPlusCode(compName)) continue;
+
+          if (types.includes('street_number')) streetNum = compName;
+          if (types.includes('route')) route = compName;
+          if (types.includes('neighborhood') || types.includes('sublocality') || types.includes('sublocality_level_1')) {
+            neighborhood = compName;
+          }
+          if (types.includes('locality')) city = compName;
+        }
+
+        if (!name || isPlusCode(name)) {
+          if (streetNum && route) {
+            name = `${streetNum} ${route}`;
+          } else if (route) {
+            name = neighborhood ? `${route}, ${neighborhood}` : route;
+          } else if (neighborhood) {
+            name = neighborhood;
+          } else if (city) {
+            name = city;
+          } else {
+            const cleanAddr = sanitizeAddress(primaryResult.formatted_address);
+            name = cleanAddr.split(',')[0] || city || 'Position sélectionnée';
+          }
+        }
+
+        const fullAddress = sanitizeAddress(primaryResult.formatted_address) || `${name}, ${city || 'Bénin'}`;
+
+        return {
+          latitude: lat,
+          longitude: lon,
+          name: name.trim(),
+          address: fullAddress,
+          city: city || 'Bénin',
+          country: 'Bénin',
+        };
+      }
+    } catch (e) {}
+    return null;
+  };
+
   const initializeLocation = async () => {
     if (initialLocation) {
       setSelectedLocation(initialLocation);
       setCustomLocationName(initialLocation.name);
+      setSearchQuery(initialLocation.name);
       return;
     }
     try {
@@ -258,9 +341,12 @@ export default function LocationPicker({
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const coords = { lat: loc.coords.latitude, lon: loc.coords.longitude };
       setUserLocation(coords);
-      if (!selectedLocation) {
-        sendToMap({ type: 'setView', ...coords, zoom: 14 });
-        reverseGeocode(coords.lat, coords.lon);
+      sendToMap({ type: 'setView', ...coords, zoom: 14 });
+
+      // Precise geocoding for user position card
+      const gpsLoc = await getGeocodedLocation(coords.lat, coords.lon);
+      if (gpsLoc) {
+        setUserLocationData(gpsLoc);
       }
     } catch (e) {}
   };
@@ -274,6 +360,7 @@ export default function LocationPicker({
     try {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const coords = { lat: loc.coords.latitude, lon: loc.coords.longitude };
+      setUserLocation(coords);
       sendToMap({ type: 'setView', ...coords, zoom: 16 });
       sendToMap({ type: 'setUserMarker', ...coords });
       reverseGeocode(coords.lat, coords.lon);
@@ -282,6 +369,46 @@ export default function LocationPicker({
     } finally {
       gpsRotateAnim.setValue(0);
       setIsLoadingGPS(false);
+    }
+  };
+
+  const handleSelectCurrentLocation = async () => {
+    if (userLocationData) {
+      handleSelectSuggestion(userLocationData);
+    } else {
+      try {
+        setIsLoadingGPS(true);
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission refusée', 'Veuillez autoriser la géolocalisation pour utiliser votre position.');
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const coords = { lat: loc.coords.latitude, lon: loc.coords.longitude };
+        setUserLocation(coords);
+        sendToMap({ type: 'setView', ...coords, zoom: 16 });
+        sendToMap({ type: 'setUserMarker', ...coords });
+
+        const gpsLoc = await getGeocodedLocation(coords.lat, coords.lon);
+        if (gpsLoc) {
+          setUserLocationData(gpsLoc);
+          handleSelectSuggestion(gpsLoc);
+        } else {
+          const fallbackLoc: LocationData = {
+            latitude: coords.lat,
+            longitude: coords.lon,
+            name: 'Ma position actuelle',
+            address: 'Position GPS de l\'appareil',
+            city: 'Bénin',
+          };
+          setUserLocationData(fallbackLoc);
+          handleSelectSuggestion(fallbackLoc);
+        }
+      } catch (e) {
+        Alert.alert('Erreur GPS', 'Impossible de récupérer votre position actuelle.');
+      } finally {
+        setIsLoadingGPS(false);
+      }
     }
   };
 
@@ -295,35 +422,15 @@ export default function LocationPicker({
     setIsLoadingAddress(true);
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${GOOGLE_MAPS_KEY}&language=fr`;
-      const res = await fetch(url, { signal: abortRef.current.signal });
-      const data = await res.json();
-      if (data && data.results && data.results.length > 0) {
+      const formatted = await getGeocodedLocation(lat, lon, abortRef.current.signal);
+      if (formatted) {
         lastReverseRef.current = { lat, lon };
-        const result = data.results[0];
-        
-        let city = '';
-        let road = '';
-        for (const comp of result.address_components || []) {
-          if (comp.types.includes('locality')) {
-            city = comp.long_name;
-          }
-          if (comp.types.includes('route')) {
-            road = comp.long_name;
-          }
-        }
-        
-        const name = road || city || 'Lieu ciblé';
-        const formatted: LocationData = {
-          latitude: lat,
-          longitude: lon,
-          name,
-          address: result.formatted_address,
-          city: city,
-          country: 'Bénin',
-        };
         setSelectedLocation(formatted);
         setCustomLocationName('');
+        // Also update userLocationData if this matches user location
+        if (userLocation && Math.abs(userLocation.lat - lat) < 0.001 && Math.abs(userLocation.lon - lon) < 0.001) {
+          setUserLocationData(formatted);
+        }
       }
     } catch (e) {
     } finally {
@@ -365,6 +472,9 @@ export default function LocationPicker({
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
+    if (!isSearchFocused) {
+      setIsSearchFocused(true);
+    }
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => searchPlaces(text), 400);
   };
@@ -376,6 +486,7 @@ export default function LocationPicker({
 
   const handleSelectSuggestion = (loc: LocationData) => {
     setSelectedLocation(loc);
+    setSearchQuery(loc.name);
     setCustomLocationName('');
     sendToMap({ type: 'setView', lat: loc.latitude, lon: loc.longitude, zoom: 16 });
     setIsSearchFocused(false);
@@ -413,6 +524,7 @@ export default function LocationPicker({
       city: item.address?.city || item.address?.town || '',
     };
     setSelectedLocation(loc);
+    setSearchQuery(name);
     setCustomLocationName('');
     sendToMap({ type: 'setView', lat, lon, zoom: 16 });
     setIsSearchFocused(false);
@@ -460,7 +572,7 @@ export default function LocationPicker({
           sendToMap({ type: 'setView', lat: userLocation.lat, lon: userLocation.lon, zoom: 14 });
         }
       } else if (data.type === 'centerChanged') {
-        if (!isProgrammaticPanningRef.current) {
+        if (!isProgrammaticPanningRef.current && !isSearchFocused) {
           reverseGeocode(data.lat, data.lon);
         }
         isProgrammaticPanningRef.current = false;
@@ -498,7 +610,12 @@ export default function LocationPicker({
 
         {/* Center pin marker */}
         <View style={styles.centerPinContainer} pointerEvents="none">
-          <View style={styles.markerPin} />
+          <View style={styles.pinWrapper}>
+            <View style={styles.pinBubble}>
+              <Ionicons name="location" size={20} color="#FFFFFF" />
+            </View>
+            <View style={styles.pinPoint} />
+          </View>
           <View style={styles.markerShadow} />
         </View>
       </View>
@@ -508,10 +625,11 @@ export default function LocationPicker({
         <TouchableOpacity
           style={[styles.myLocationFloatingBtn, { bottom: snapState === 'lowered' ? insets.bottom + 200 : insets.bottom + 480 }]}
           onPress={goToMyLocation}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <Animated.View style={isLoadingGPS ? { transform: [{ rotate: gpsRotation }] } : null}>
-            <Ionicons name="navigate" size={22} color="#0066FF" />
+          <Animated.View style={[{ flexDirection: 'row', alignItems: 'center' }, isLoadingGPS ? { transform: [{ rotate: gpsRotation }] } : null]}>
+            <Ionicons name="navigate-circle" size={22} color="#0066FF" style={{ marginRight: 6 }} />
+            <Text style={styles.gpsBtnText}>Ma position</Text>
           </Animated.View>
         </TouchableOpacity>
       )}
@@ -543,6 +661,8 @@ export default function LocationPicker({
         clearRecentLocations={clearRecentLocations}
         handleSelectSuggestion={handleSelectSuggestion}
         handleSelectSearchResult={handleSelectSearchResult}
+        userLocationData={userLocationData}
+        onSelectCurrentLocation={handleSelectCurrentLocation}
       />
 
       {/* Floating Footer confirmation card */}
@@ -561,6 +681,7 @@ export default function LocationPicker({
           nearbySuggestions={nearbySuggestions}
           setSelectedLocation={setSelectedLocation}
           sendToMap={sendToMap}
+          handleFocusSearch={handleFocusSearch}
         />
       )}
     </View>
@@ -595,49 +716,71 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -12,
-    marginTop: -24,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
+    marginLeft: -20,
+    marginTop: -44,
+    width: 40,
+    height: 48,
     alignItems: 'center',
+    justifyContent: 'flex-end',
     zIndex: 10,
   },
-  markerPin: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  pinWrapper: {
+    alignItems: 'center',
+  },
+  pinBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#0066FF',
-    borderWidth: 3.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2.5,
     borderColor: '#FFFFFF',
     shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 5,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  pinPoint: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#0066FF',
+    marginTop: -2,
   },
   markerShadow: {
-    width: 12,
+    width: 16,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    marginTop: 8,
-    alignSelf: 'center',
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    marginTop: 2,
   },
   myLocationFloatingBtn: {
     position: 'absolute',
     right: 16,
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 6,
     zIndex: 90,
+  },
+  gpsBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F2937',
   },
 });
