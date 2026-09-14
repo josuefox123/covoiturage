@@ -152,3 +152,28 @@ Ce document récapitule l'organisation de vos dépôts Git pour ce projet. Le pr
   - Respect strict du toggle `is_commission_active = False` dans `FinancialSettings.load()`, retournant une commission de `0 FCFA` sans forcer 10% par défaut.
 - **Suite de tests automatisés :**
   - Écriture et validation à 100% de 18 tests unitaires de non-régression dans `test_audit_comprehensive.py`.
+
+---
+
+### 📅 Mise à jour du 14 Septembre 2026
+
+#### ⚙️ Workflow Git & Pipeline de Déploiement (Backend)
+- **Synchronisation du code depuis `main` et isolation sur `testeur` :**
+  - Fusion Fast-forward des derniers commits de `gitlab/main` (`619da9c`) vers la branche locale `josue`.
+  - Poussée de la branche vers `gitlab testeur` ([SinusTic / zemy_backend](https://gitlab.com/sinustic1/zemy_backend.git)) pour validation avant intégration en production.
+  - Protection de la branche `main` (qui exécute les déploiements automatiques VPS) contre toute corruption directe.
+- **Correction des pipelines GitLab CI/CD (`.gitlab-ci.yml`) :**
+  - Correction des erreurs de syntaxe YAML d'indentation (`ENDSSH` dans les block scalars).
+  - Ajout de la commande de nettoyage automatique `git clean -fd` dans le script de déploiement pour éliminer les fichiers de migration non suivis.
+
+#### 💳 Harmonisation de l'affichage des prix & Source unique de vérité
+- **Suppression intégrale de la mention « À confirmer » :**
+  - Suppression de tout masquage ou mention "À confirmer avec le chauffeur" dans les cartes de recherche ([RideSearchCard.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/src/components/common/RideSearchCard.tsx)), les détails du trajet ([app/ride/[id].tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/app/ride/%5Bid%5D.tsx)) et les résolveurs de mission ([resolveur-mission.ts](file:///c:/PROJETS/antigravity/covoiturage1/frontend/src/features/mes-trajets/resolution/resolveur-mission.ts)).
+  - Le prix réel du trajet/tronçon fixé par le conducteur (`price_per_seat`) s'affiche désormais directement dès la recherche.
+- **Source unique de vérité pour le prix négocié & la réservation :**
+  - Application d'une résolution explicite par ordre de priorité avec l'opérateur `??` (nullish coalescing) :
+    `driver_counter_price ?? custom_price ?? passenger_proposed_price ?? price ?? 0`
+  - Modal de contre-proposition ([PassengerNegotiationModal.tsx](file:///c:/PROJETS/antigravity/covoiturage1/frontend/src/features/ride/modals/PassengerNegotiationModal.tsx)) mis à jour avec affichage transparent de la décomposition : Prix unitaire proposé, surcharges d'options et Total à payer.
+  - Le serveur (`PricingService.compute_for_booking`) demeure l'unique autorité calculant le `total_to_pay` final avec commissions et surcharges.
+  - Validation complète de la suite de tests automatisés backend Django (44/44 tests OK).
+
