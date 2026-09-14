@@ -19,18 +19,18 @@ Ce document récapitule les étapes exactes pour effectuer les mises à jour et 
 
 > [!IMPORTANT]
 > **Règle de sécurité pour le Backend :**
-> La branche `main` déclenche le **déploiement automatique sur le serveur VPS de production**.
-> Pour tester vos modifications sans risquer de corrompre le serveur, **poussez toujours d'abord sur la branche `testeur`**.
+> Nous utilisons désormais la branche **`develop`** comme branche d'intégration principale (au lieu de `main`).
+> Pour tester vos modifications sans risquer d'impacter le serveur, **poussez toujours d'abord sur la branche `testeur`**, puis une fois validé, poussez de `testeur` vers `develop`.
 
-### 🔹 Étape 1 : Récupérer les nouveautés de `main` (avant de travailler/pousser)
+### 🔹 Étape 1 : Récupérer les nouveautés de `develop` (avant de travailler/pousser)
 ```bash
 cd c:\PROJETS\antigravity\covoiturage1\backend
 
 # Récupérer les derniers commits depuis GitLab
 git fetch gitlab
 
-# Fusionner la branche main de GitLab dans votre branche locale
-git merge gitlab/main
+# Fusionner la branche develop de GitLab dans votre branche locale
+git merge gitlab/develop
 ```
 
 ### 🔹 Étape 2 : Commiter vos modifications locales
@@ -48,13 +48,13 @@ git push gitlab josue:testeur
 git push origin josue:testeur
 ```
 
-### 🔹 Étape 4 : Pousser en production sur `main` (une fois validé)
+### 🔹 Étape 4 : Pousser de `testeur` vers `develop` (une fois validé)
 ```bash
-# Pousse sur main GitLab (Déclenche le déploiement CI/CD sur le VPS)
-git push gitlab josue:main
+# Pousse vos modifications validées sur la branche develop de GitLab
+git push gitlab josue:develop
 
-# Pousse sur main GitHub
-git push origin josue:main
+# Pousse également sur la branche develop de GitHub
+git push origin josue:develop
 ```
 
 ---
