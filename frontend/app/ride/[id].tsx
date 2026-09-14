@@ -386,9 +386,9 @@ export default function RideDetailScreen() {
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border }}>
-                    <Text style={{ fontSize: 13, color: C.textSec, fontWeight: '600' }}>Tarif estimé</Text>
+                    <Text style={{ fontSize: 13, color: C.textSec, fontWeight: '600' }}>Tarif du trajet</Text>
                     <Text style={{ fontSize: 16, fontWeight: '800', color: C.primary }}>
-                      {isMid ? 'À confirmer par le conducteur' : `${(bookingState?.price ?? ride.price_per_seat)?.toLocaleString()} FCFA`}
+                      {`${(bookingState?.price ?? ride.price_per_seat)?.toLocaleString()} FCFA`}
                     </Text>
                   </View>
                   {approachDist && (
@@ -589,7 +589,7 @@ const ss = StyleSheet.create({
   warnBox: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: C.warningLight, borderRadius: 12, padding: 12, marginTop: 10 },
   warnTxt: { fontSize: 12, color: '#92400E', flex: 1, lineHeight: 18, fontWeight: '500' },
   fullScreenOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(15, 23, 42, 0.85)',
     zIndex: 99999,
     elevation: 99999,

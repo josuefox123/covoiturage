@@ -200,4 +200,50 @@ class RideSeriesService:
 
                 created_count += 1
 
+        logger.info(
+            f"[RideSeriesService] Série {series.id} créée pour le conducteur {driver.id} : "
+            f"{created_count} trajet(s) générés entre {start_date} et {end_date} "
+            f"({departure_location} → {arrival_location})."
+        )
+
         return created_count
+
+    @staticmethod
+    def get_series_summary(series_id: str) -> dict:
+        """
+        Retourne un résumé statistique d'une série de trajets :
+        nombre total de trajets, nombre de trajets passés/futurs,
+        places disponibles restantes, et taux de remplissage moyen.
+        """
+        from django.utils import timezone
+        from django.db.models import Avg, Sum
+
+        try:
+            series = RideSeries.objects.get(id=series_id)
+        except RideSeries.DoesNotExist:
+            return {}
+
+        rides_qs = Ride.objects.filter(series=series)
+        now = timezone.now().date()
+
+        total = rides_qs.count()
+        past = rides_qs.filter(departure_date__lt=now).count()
+        upcoming = rides_qs.filter(departure_date__gte=now).count()
+
+        avg_fill = rides_qs.aggregate(
+            avg_available=Avg('seats_available'),
+            total_seats=Avg('total_seats')
+        )
+        total_seats_avg = avg_fill.get('total_seats') or 1
+        avg_available = avg_fill.get('avg_available') or 0
+        fill_rate = round((1 - avg_available / total_seats_avg) * 100, 1) if total_seats_avg else 0
+
+        return {
+            "series_id": str(series.id),
+            "driver_id": str(series.driver_id),
+            "route": f"{series.departure_location} → {series.arrival_location}",
+            "total_rides": total,
+            "past_rides": past,
+            "upcoming_rides": upcoming,
+            "avg_fill_rate_pct": fill_rate,
+        }

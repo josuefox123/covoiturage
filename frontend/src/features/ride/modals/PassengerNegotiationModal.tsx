@@ -26,13 +26,17 @@ export function PassengerNegotiationModal({
   onAccept,
   onReject
 }: PassengerNegotiationModalProps) {
-  // Prix chauffeur unitaire proposé ou contre-proposé
-  const unitPrice = myBooking?.driver_counter_price || myBooking?.passenger_proposed_price || myBooking?.custom_price || 0;
+  // Résolution stricte avec ordre de priorité explicite : driver_counter_price > custom_price > passenger_proposed_price > price
+  const unitPrice = myBooking?.driver_counter_price 
+    ?? myBooking?.custom_price 
+    ?? myBooking?.passenger_proposed_price 
+    ?? myBooking?.price 
+    ?? 0;
   
-  // Calcul robuste du montant total proposé (basePrice + commission) * seats + surcharges d'option
+  const seats = myBooking?.seats_booked || 1;
   const commission = myBooking?.pricing_breakdown?.commission || 0;
   const surcharge = (myBooking?.pickup_surcharge || 0) + (myBooking?.dropoff_surcharge || 0);
-  const calculatedTotal = ((unitPrice + commission) * (myBooking?.seats_booked || 1)) + surcharge;
+  const calculatedTotal = ((unitPrice + commission) * seats) + surcharge;
   const totalAmount = myBooking?.total_amount || myBooking?.portion_price || myBooking?.amount_paid_online || calculatedTotal || 0;
 
   return (
@@ -53,24 +57,35 @@ export function PassengerNegotiationModal({
 
           <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
             <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 16 }}>
-              Le conducteur {driverName} propose un tarif personnalisé pour votre portion de voyage :
+              Le conducteur {driverName} vous propose un tarif révisé pour votre trajet :
             </Text>
 
             {/* Portion recap */}
             <View style={{ backgroundColor: '#F3F4F6', borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 4 }}>
-                VOTRE COVOITURAGE ({myBooking?.seats_booked} place{myBooking && myBooking.seats_booked > 1 ? 's' : ''})
+                VOTRE TRAJET ({seats} place{seats > 1 ? 's' : ''})
               </Text>
               <Text style={{ fontSize: 14, fontWeight: '600', color: '#1F2937' }}>
                 {myBooking?.departure_location || departure} → {myBooking?.arrival_location || destination}
               </Text>
             </View>
 
-            {/* Price card details */}
-            <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A', borderRadius: 16, padding: 16, marginBottom: 24, gap: 10 }}>
+            {/* Détail du calcul de tarif */}
+            <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A', borderRadius: 16, padding: 16, marginBottom: 24, gap: 8 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#B45309', flex: 1 }}>MONTANT TOTAL PROPOSÉ PAR LE CONDUCTEUR :</Text>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: '#D97706' }}>
+                <Text style={{ fontSize: 13, color: '#92400E', fontWeight: '600' }}>Prix unitaire proposé :</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1F2937' }}>{unitPrice.toLocaleString()} FCFA / pl.</Text>
+              </View>
+              {surcharge > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#92400E', fontWeight: '600' }}>Surcharges optionnelles :</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#1F2937' }}>+{surcharge.toLocaleString()} FCFA</Text>
+                </View>
+              )}
+              <View style={{ height: 1, backgroundColor: '#FCD34D', marginVertical: 4 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#B45309' }}>TOTAL À PAYER :</Text>
+                <Text style={{ fontSize: 20, fontWeight: '900', color: '#D97706' }}>
                   {totalAmount.toLocaleString()} FCFA
                 </Text>
               </View>

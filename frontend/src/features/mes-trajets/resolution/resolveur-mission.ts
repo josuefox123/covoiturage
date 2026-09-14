@@ -36,15 +36,14 @@ export class ResolveurMission {
       bookingArr.split(',')[0].trim().toLowerCase() !== rideArr.split(',')[0].trim().toLowerCase()
     );
 
-    let montant: number | string = 0;
+    let montant: number = 0;
     if (isPassager) {
-      const bookingStatus = String(booking?.status || '').toLowerCase();
-      montant = booking?.price || ride.price_per_seat || 0;
-      if (booking && isIntermediaire) {
-        if (['pending', 'pending_driver', 'waiting_driver'].includes(bookingStatus)) {
-          montant = 'À confirmer';
-        }
-      }
+      montant = booking?.driver_counter_price 
+        ?? booking?.custom_price 
+        ?? booking?.price 
+        ?? booking?.passenger_proposed_price 
+        ?? ride.price_per_seat 
+        ?? 0;
     } else {
       montant = ride.driver_payout || ride.price_per_seat || 0;
     }
@@ -56,7 +55,7 @@ export class ResolveurMission {
       driverId: ride.driver ? String(ride.driver) : undefined,
       amount: montant,
       proposedPrice: booking?.passenger_proposed_price,
-      counterPrice: booking?.driver_counter_price || booking?.custom_price,
+      counterPrice: booking?.driver_counter_price ?? booking?.custom_price,
       seatsBooked: booking?.seats_booked || 1,
       otpCode: (booking?.payment_status === 'paid' || booking?.payment_status === 'escrow')
         ? `T-${booking.id.substring(0, 8).toUpperCase()}`

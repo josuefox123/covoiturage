@@ -35,6 +35,7 @@ export interface Booking {
   departure_longitude?: number | string | null;
   arrival_latitude?: number | string | null;
   arrival_longitude?: number | string | null;
+  price?: number;
   portion_price?: number;
   passenger_proposed_price?: number;
   driver_counter_price?: number;

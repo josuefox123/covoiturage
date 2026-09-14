@@ -23,6 +23,7 @@ test-backend:
     - main
     - master
     - josue
+    - develop
     - merge_requests
 
 # 🚀 Déploiement sur VPS — automatique après les tests
@@ -40,31 +41,11 @@ deploy-backend:
     - chmod 600 ~/.ssh/deploy_key
     - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
   script:
-    - |
-      if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then
-        echo "⚠️ Deployment skipped: VPS_HOST or VPS_SSH_KEY missing."
-        exit 0
-      fi
-      ssh -i ~/.ssh/deploy_key deploy@$VPS_HOST << ENDSSH
-        set -e
-        echo "📦 Pull du code..."
-        cd /var/www/zemybackend
-        git fetch origin
-        git reset --hard origin/$CI_COMMIT_REF_NAME
-        echo "🐍 Activation du venv..."
-        source venv/bin/activate
-        echo "📥 Installation des dépendances..."
-        pip install -r requirements.txt --quiet
-        echo "🗄️ Migrations..."
-        python manage.py migrate --no-input
-        echo "📁 Fichiers statiques..."
-        python manage.py collectstatic --no-input
-        echo "🔄 Redémarrage Gunicorn..."
-        sudo systemctl restart zemybackend-gunicorn
-        echo "✅ Déploiement backend terminé !"
-ENDSSH
+    - 'if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then echo "⚠️ Deployment skipped: VPS_HOST or VPS_SSH_KEY missing."; exit 0; fi'
+    - 'ssh -i ~/.ssh/deploy_key deploy@$VPS_HOST "set -e; echo ''📦 Pull du code...''; cd /var/www/zemybackend; git fetch origin; git reset --hard origin/$CI_COMMIT_REF_NAME; git clean -fd; echo ''🐍 Activation du venv...''; source venv/bin/activate; echo ''📥 Installation des dépendances...''; pip install -r requirements.txt --quiet; echo ''🗄️ Migrations...''; python manage.py migrate --no-input; echo ''📁 Fichiers statiques...''; python manage.py collectstatic --no-input; echo ''🔄 Redémarrage Gunicorn...''; sudo systemctl restart zemybackend-gunicorn; echo ''✅ Déploiement backend terminé !''"'
   only:
     - main
     - master
+    - develop
   needs:
     - test-backend

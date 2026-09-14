@@ -204,19 +204,8 @@ export default function RideSearchCard({
 
             {/* Zone de prix */}
             <View style={styles.priceContainer}>
-              {isIntermediate ? (
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.priceText, { fontSize: 13, color: '#D97706', fontWeight: '800' }]}>À confirmer</Text>
-                  <Text style={{ fontSize: 9, color: '#9CA3AF', fontWeight: '600', marginTop: 2 }}>
-                    avec le chauffeur
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.priceText}>{price} FCFA</Text>
-                  <Text style={styles.priceSub}>{priceUnit}</Text>
-                </>
-              )}
+              <Text style={styles.priceText}>{price} FCFA</Text>
+              <Text style={styles.priceSub}>{priceUnit}</Text>
             </View>
           </View>
 

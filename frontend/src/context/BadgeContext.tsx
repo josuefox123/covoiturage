@@ -63,10 +63,13 @@ export function BadgeProvider({ children }: { children: React.ReactNode }) {
     if (!token || !user) return;
 
     try {
-      // ─── 1. Notifications non lues — endpoint dédié BUG6 FIX ──────────
-      // Remplace l'ancien fetch page_size=50 + comptage client qui plafonnait à 50.
-      const unreadData = await authFetch('/notifications/unread-count/');
-      setNotifCount(unreadData?.count ?? 0);
+      // ─── 1. Notifications non lues ────────────────────────
+      const notifData = await authFetch('/notifications/?page_size=50');
+      const notifList: any[] = Array.isArray(notifData)
+        ? notifData
+        : notifData?.results || [];
+      const unread = notifList.filter((n: any) => !n.is_read).length;
+      setNotifCount(unread);
 
       // ─── 2. Trajets nécessitant une action ────────────────
       const [bookingsData, ridesData] = await Promise.all([
