@@ -56,6 +56,15 @@ export function ItineraryStep({
       .trim();
   };
 
+  const parseLoc = (locStr: string | undefined | null) => {
+    if (!locStr) return { name: '', note: '' };
+    const parts = locStr.split('|||');
+    return { name: parts[0]?.trim() || '', note: parts[1]?.trim() || '' };
+  };
+
+  const parsedDep = parseLoc(departure);
+  const parsedArr = parseLoc(arrival);
+
   return (
     <View style={styles.container}>
 
@@ -101,14 +110,21 @@ export function ItineraryStep({
             </Text>
 
             <Text
-              numberOfLines={2}
+              numberOfLines={1}
               style={[
                 styles.locationValue,
                 !departure && styles.locationPlaceholder,
               ]}
             >
-              {departure || 'Choisir le lieu de départ'}
+              {parsedDep.name || 'Choisir le lieu de départ'}
             </Text>
+
+            {parsedDep.note ? (
+              <View style={styles.locationNoteRow}>
+                <Ionicons name="location-outline" size={12} color={theme.colors.primary} />
+                <Text style={styles.locationNoteText}>{parsedDep.note}</Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.locationAction}>
@@ -143,14 +159,21 @@ export function ItineraryStep({
             </Text>
 
             <Text
-              numberOfLines={2}
+              numberOfLines={1}
               style={[
                 styles.locationValue,
                 !arrival && styles.locationPlaceholder,
               ]}
             >
-              {arrival || 'Choisir la destination'}
+              {parsedArr.name || 'Choisir la destination'}
             </Text>
+
+            {parsedArr.note ? (
+              <View style={styles.locationNoteRow}>
+                <Ionicons name="location-outline" size={12} color={theme.colors.primary} />
+                <Text style={styles.locationNoteText}>{parsedArr.note}</Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.locationAction}>
@@ -789,5 +812,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#334155',
+  },
+
+  locationNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+
+  locationNoteText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
 });
