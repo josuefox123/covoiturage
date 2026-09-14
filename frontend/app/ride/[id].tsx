@@ -21,6 +21,7 @@ import { PassengerCard } from '@/src/features/ride/components/PassengerCard';
 import { BookingConfirmModal } from '@/src/features/ride/modals/BookingConfirmModal';
 import { BookingSuccessModal } from '@/src/features/ride/modals/BookingSuccessModal';
 import { PassengerNegotiationModal } from '@/src/features/ride/modals/PassengerNegotiationModal';
+import { EditRideModal } from '@/src/features/ride/modals/EditRideModal';
 
 // ─── Nouveaux composants extraits ────────────────────────────────────────────
 import { EcranChargement, FadeInCard, TitreSection } from '@/src/features/ride/composants/AnimationsFade';
@@ -81,6 +82,7 @@ export default function RideDetailScreen() {
   const [showBookModal, setShowBookModal] = useState(false);
   const [showSuccModal, setShowSuccModal] = useState(false);
   const [showNegModal, setShowNegModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -331,20 +333,20 @@ export default function RideDetailScreen() {
             </View>
           </FadeInCard>
 
-          {/* Carte Conducteur */}
-          {!isOwnRide && (
-            <FadeInCard delay={120}>
-              <CarteConducteur
-                ride={ride}
-                canChat={canChat}
-                chatLoading={chatLoading}
-                heureDepart={ride.departure_time?.substring(0, 5)}
-                heureArrivee={getArrival()}
-                dureeTxt={fmtDur(ride.duration_min ?? 0)}
-                onOpenChat={openChat}
-              />
-            </FadeInCard>
-          )}
+          {/* Carte Conducteur / Trajet */}
+          <FadeInCard delay={120}>
+            <CarteConducteur
+              ride={ride}
+              canChat={canChat}
+              chatLoading={chatLoading}
+              heureDepart={ride.departure_time?.substring(0, 5)}
+              heureArrivee={getArrival()}
+              dureeTxt={fmtDur(ride.duration_min ?? 0)}
+              onOpenChat={openChat}
+              isOwnRide={isOwnRide}
+              onOpenEdit={() => setShowEditModal(true)}
+            />
+          </FadeInCard>
 
           {/* Carte Portion de voyage */}
           {depLocation && destLocation && !isOwnRide && (
@@ -541,6 +543,14 @@ export default function RideDetailScreen() {
         onReject={async () => {
           if (myBooking) { const s = await handlePassengerReject(myBooking.id); if (s) setShowNegModal(false); }
         }}
+      />
+      <EditRideModal
+        visible={showEditModal}
+        ride={ride}
+        hasPendingBookings={bookings?.some((b: any) => ['pending', 'pending_driver', 'pending_passenger', 'pending_payment'].includes(b.status))}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={() => fetchRide()}
+        authFetch={authFetch}
       />
     </SafeAreaView>
   );

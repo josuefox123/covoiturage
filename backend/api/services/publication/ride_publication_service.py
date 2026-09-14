@@ -125,8 +125,8 @@ class RidePublicationService:
         final_stopovers = []
         if stopovers:
             for s in stopovers:
-                lat = s.get('latitude')
-                lon = s.get('longitude')
+                lat = s.get('latitude') if s.get('latitude') is not None else s.get('lat')
+                lon = s.get('longitude') if s.get('longitude') is not None else (s.get('lon') if s.get('lon') is not None else s.get('lng'))
                 if lat is not None and lon is not None:
                     try:
                         final_stopovers.append({

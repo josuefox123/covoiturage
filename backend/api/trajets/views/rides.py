@@ -263,11 +263,16 @@ class RideViewSet(RideActionsMixin, viewsets.ModelViewSet):
         result = RidePublicationController.suggest_price(distance_km)
         return Response(result, status=status.HTTP_200_OK)
 
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        from api.services.ride_edit_service import RideEditService
+        updated_ride = RideEditService.update_ride(instance.id, request.user, request.data)
+        serializer = self.get_serializer(updated_ride)
+        return Response(serializer.data)
+
     def perform_update(self, serializer):
-        from rest_framework.exceptions import PermissionDenied
-        if serializer.instance.driver != self.request.user and not getattr(self.request.user, 'is_staff', False):
-            raise PermissionDenied("Vous n'êtes pas autorisé à modifier ce trajet.")
-        serializer.save()
+        from api.services.ride_edit_service import RideEditService
+        RideEditService.update_ride(serializer.instance.id, self.request.user, self.request.data)
 
     def perform_destroy(self, instance):
         from rest_framework.exceptions import PermissionDenied

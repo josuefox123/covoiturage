@@ -13,11 +13,13 @@ interface CarteConducteurProps {
   heureArrivee: string;
   dureeTxt: string;
   onOpenChat: () => void;
+  isOwnRide?: boolean;
+  onOpenEdit?: () => void;
 }
 
 /**
  * Carte d'information sur le conducteur :
- * avatar, nom, véhicule, statistiques, et bouton de contact.
+ * avatar, nom, véhicule, statistiques, et bouton de contact ou de modification.
  */
 export function CarteConducteur({
   ride,
@@ -26,15 +28,20 @@ export function CarteConducteur({
   heureDepart,
   heureArrivee,
   dureeTxt,
-  onOpenChat
+  onOpenChat,
+  isOwnRide,
+  onOpenEdit,
 }: CarteConducteurProps) {
   const driverName = ride.driver_details?.full_name || 'Inconnu';
   const initials = driverName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
   const vehicle = ride.driver_details?.vehicles?.[0];
 
+  const canEdit = ride.can_edit !== false;
+  const blockReason = ride.edit_block_reason;
+
   return (
     <View style={styles.carte}>
-      <TitreSection titre="Votre conducteur" icone="person-circle-outline" />
+      <TitreSection titre={isOwnRide ? "Votre trajet" : "Votre conducteur"} icone={isOwnRide ? "car-sport-outline" : "person-circle-outline"} />
 
       {/* Avatar + Infos conducteur */}
       <View style={{ flexDirection: 'row', gap: 14, marginBottom: 16 }}>
@@ -101,8 +108,27 @@ export function CarteConducteur({
         </View>
       </View>
 
-      {/* Bouton contacter */}
-      {canChat && (
+      {/* Bouton modifier pour le conducteur */}
+      {isOwnRide && (
+        canEdit ? (
+          <TouchableOpacity style={styles.editCTA} onPress={onOpenEdit} activeOpacity={0.85}>
+            <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>Modifier le trajet</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.blockedBadge}>
+            <Ionicons name="lock-closed-outline" size={14} color="#6B7280" />
+            <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600' }}>
+              {blockReason === 'BOOKING_CONFIRMED' ? 'Modifications fermées : Réservation confirmée' :
+               blockReason === 'TRIP_PASSED' ? 'Modifications fermées : Heure de départ dépassée' :
+               'Trajet non modifiable'}
+            </Text>
+          </View>
+        )
+      )}
+
+      {/* Bouton contacter pour le passager */}
+      {!isOwnRide && canChat && (
         <TouchableOpacity style={styles.chatCTA} onPress={onOpenChat} disabled={chatLoading} activeOpacity={0.85}>
           {chatLoading
             ? <ActivityIndicator color={C.primary} size="small" />
@@ -147,5 +173,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderWidth: 1.5, borderColor: C.primary, borderRadius: 14,
     paddingVertical: 12, paddingHorizontal: 16
+  },
+  editCTA: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: C.primary, borderRadius: 14,
+    paddingVertical: 12, paddingHorizontal: 16
+  },
+  blockedBadge: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#F3F4F6', borderRadius: 14,
+    paddingVertical: 10, paddingHorizontal: 14
   }
 });
