@@ -53,7 +53,7 @@ class SegmentMatcher:
         if available_seats < seats_requested:
             return None
 
-        pricing = price_calculator.calculate_segment_price(ride, dep_leg_idx, arr_leg_idx, seats=1)
+        pricing = price_calculator.calculate_segment_price(ride, dep_order, arr_order, seats=1)
         price = pricing['total_price']
 
         if not price:

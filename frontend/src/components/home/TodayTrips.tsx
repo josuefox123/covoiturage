@@ -126,23 +126,51 @@ export default function TodayTrips({ onTripPress, onSeeAll }: TodayTripsProps) {
       const data = await authFetch(`/rides/?_t=${Date.now()}`);
       const list: Ride[] = Array.isArray(data) ? data : data?.results || [];
       const now = new Date();
-      const available = list
-        .filter((r) => {
-          if ((r.seats_available ?? 1) <= 0) return false;
-          if (r.status === 'completed' || r.status === 'cancelled') return false;
-          if (r.status === 'started') return true;
-          if (r.departure_date && r.departure_time) {
-            const [h, m] = (r.departure_time as string).split(':').map(Number);
-            const dep = new Date(r.departure_date);
-            dep.setHours(h, m, 0, 0);
-            const durationMin = r.duration_min || 240;
-            const estimatedArrival = new Date(dep.getTime() + (durationMin + 120) * 60 * 1000);
-            if (now > estimatedArrival) return false;
+      const validRides = list.filter((r) => {
+        if ((r.seats_available ?? 1) <= 0) return false;
+        if (r.status === 'completed' || r.status === 'cancelled') return false;
+        if (r.status === 'started') return true;
+        if (r.departure_date && r.departure_time) {
+          const [h, m] = (r.departure_time as string).split(':').map(Number);
+          const dep = new Date(r.departure_date);
+          dep.setHours(h, m, 0, 0);
+          const durationMin = r.duration_min || 240;
+          const estimatedArrival = new Date(dep.getTime() + (durationMin + 120) * 60 * 1000);
+          if (now > estimatedArrival) return false;
+        }
+        return true;
+      });
+
+      // Regrouper par conducteur pour sélectionner au moins 2 trajets par conducteur (si disponible)
+      const driverMap = new Map<string, Ride[]>();
+      for (const ride of validRides) {
+        const driverId = String(ride.driver_details?.id || ride.driver || 'unknown');
+        if (!driverMap.has(driverId)) {
+          driverMap.set(driverId, []);
+        }
+        driverMap.get(driverId)!.push(ride);
+      }
+
+      const selectedRides: Ride[] = [];
+      // 1ère passe : ajouter jusqu'à 2 trajets par conducteur
+      driverMap.forEach((driverRides) => {
+        selectedRides.push(...driverRides.slice(0, 2));
+      });
+
+      // 2ème passe : compléter avec les trajets restants si besoin
+      if (selectedRides.length < 6) {
+        driverMap.forEach((driverRides) => {
+          if (driverRides.length > 2) {
+            for (const extraRide of driverRides.slice(2)) {
+              if (selectedRides.length < 8 && !selectedRides.some((s) => s.id === extraRide.id)) {
+                selectedRides.push(extraRide);
+              }
+            }
           }
-          return true;
-        })
-        .slice(0, 3); // Show only 3 latest
-      setRides(available);
+        });
+      }
+
+      setRides(selectedRides);
     } catch {
     } finally {
       setLoading(false);
@@ -170,7 +198,7 @@ export default function TodayTrips({ onTripPress, onSeeAll }: TodayTripsProps) {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Trajets disponibles</Text>
-          <Text style={styles.subtitle}>{rides.length} trajet{rides.length !== 1 ? 's' : ''} prochains</Text>
+          <Text style={styles.subtitle}>Prochains départs</Text>
         </View>
         <TouchableOpacity onPress={onSeeAll} activeOpacity={0.8}>
           <Text style={styles.seeAll}>Voir tout</Text>

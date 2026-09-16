@@ -12,6 +12,12 @@ export const getMediaUrl = (url: string | null | undefined): string | undefined 
     return `file:///${cleanedPath}`;
   }
 
+  // Rediriger les images avec le nom de domaine en ligne vers le serveur local si nécessaire
+  if (url.includes('zemybackend.sinustic.com')) {
+    const relativePath = url.split('zemybackend.sinustic.com')[1];
+    return `${BASE_URL}${relativePath}`;
+  }
+
   // If it's already an absolute URL or local file path
   if (
     url.startsWith('http://') || 

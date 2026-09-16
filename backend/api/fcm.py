@@ -240,16 +240,18 @@ def strip_emojis(text: str) -> str:
 
 def create_and_send_notification(user, title: str, message: str, data: dict | None = None):
     """
-    Enregistre une notification en base de données, l'envoie sur le mobile de l'utilisateur via FCM
-    et lui envoie un email personnalisé sans emojis/stickers en arrière-plan.
+    Enregistre une notification en base de données (source de vérité).
+    Une fois la transaction DB validée (commit), elle est diffusée via WebSocket, FCM et Email.
     """
+    notif_id = None
+    notif_obj = None
     try:
         from .models import Notification
         notif_type = None
         if data and isinstance(data, dict):
             notif_type = data.get('type') or data.get('screen')
 
-        Notification.objects.create(
+        notif_obj = Notification.objects.create(
             user=user,
             title=title,
             message=message,
@@ -257,91 +259,99 @@ def create_and_send_notification(user, title: str, message: str, data: dict | No
             type=notif_type,
             data=data
         )
+        notif_id = notif_obj.id
     except Exception as e:
         logger.error(f"Erreur création Notification en BD: {e}")
-        
-    # Diffuser en temps réel via WebSocket au groupe user_<user_id> (Async daemon thread)
-    def _send_ws_async():
-        try:
-            from channels.layers import get_channel_layer
-            from asgiref.sync import async_to_sync
-            channel_layer = get_channel_layer()
-            if channel_layer:
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{user.id}",
-                    {
-                        "type": "send_realtime_notification",
-                        "notification": {
-                            "title": title,
-                            "message": message,
-                            "data": data or {'screen': 'notifications'}
-                        }
-                    }
-                )
-        except Exception as e:
-            logger.debug(f"WS notification send error: {e}")
+        return None
 
-    threading.Thread(target=_send_ws_async, daemon=True).start()
-
-    # 1. Envoi du Push Notification FCM (Async)
-    def _send_push_async():
-        try:
-            send_fcm_to_user(
-                user=user,
-                title=title,
-                body=message,
-                data=data or {'screen': 'notifications'}
-            )
-        except Exception as e:
-            logger.error(f"Erreur envoi notification FCM async: {e}")
-
-    threading.Thread(target=_send_push_async, daemon=True).start()
-
-    # 2. Envoi de l'Email personnalisé sans emojis/stickers (Async)
-    if getattr(user, 'email', None):
-        def _send_email_async():
+    def _dispatch_after_commit():
+        # Diffuser en temps réel via WebSocket au groupe user_<user_id> (Async daemon thread)
+        def _send_ws_async():
             try:
-                import re
-                from django.core.mail import send_mail
-                from django.conf import settings
-
-                # Validation basique du format email avant tentative d'envoi
-                email_regex = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                if not email_regex.match(user.email):
-                    logger.warning(f"Adresse email invalide (format), envoi ignoré : {user.email}")
-                    return
-
-                clean_title = strip_emojis(title)
-                clean_message = strip_emojis(message)
-
-                if not clean_title:
-                    clean_title = "Notification Zemy"
-
-                email_body = (
-                    f"Bonjour {user.full_name or 'Utilisateur'},\n\n"
-                    f"{clean_message}\n\n"
-                    f"Cordialement,\n"
-                    f"L'équipe Zemy"
-                )
-
-                send_mail(
-                    subject=clean_title,
-                    message=email_body,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=False  # On veut capturer les vraies erreurs
-                )
-                logger.info(f"Email envoyé avec succès à {user.email}")
-            except Exception as e:
-                error_str = str(e)
-                # Erreur permanente : boîte inexistante (550) — pas une erreur critique
-                if '550' in error_str or 'Mailbox does not exist' in error_str or 'does not exist' in error_str.lower():
-                    logger.warning(
-                        f"Envoi email impossible — adresse inexistante ou rejetée : {user.email}. "
-                        f"Vérifier l'adresse en BDD. Détail : {e}"
+                from channels.layers import get_channel_layer
+                from asgiref.sync import async_to_sync
+                channel_layer = get_channel_layer()
+                if channel_layer:
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.id}",
+                        {
+                            "type": "send_realtime_notification",
+                            "notification": {
+                                "id": notif_id,
+                                "title": title,
+                                "message": message,
+                                "data": data or {'screen': 'notifications'}
+                            }
+                        }
                     )
-                else:
-                    logger.error(f"Erreur envoi email à {user.email}: {e}")
+            except Exception as e:
+                logger.debug(f"WS notification send error: {e}")
 
-        threading.Thread(target=_send_email_async, daemon=True).start()
+        threading.Thread(target=_send_ws_async, daemon=True).start()
+
+        # 1. Envoi du Push Notification FCM (Async)
+        def _send_push_async():
+            try:
+                send_fcm_to_user(
+                    user=user,
+                    title=title,
+                    body=message,
+                    data=data or {'screen': 'notifications'}
+                )
+            except Exception as e:
+                logger.error(f"Erreur envoi notification FCM async: {e}")
+
+        threading.Thread(target=_send_push_async, daemon=True).start()
+
+        # 2. Envoi de l'Email personnalisé sans emojis/stickers (Async)
+        if getattr(user, 'email', None):
+            def _send_email_async():
+                try:
+                    import re
+                    from django.core.mail import send_mail
+                    from django.conf import settings
+
+                    # Validation basique du format email avant tentative d'envoi
+                    email_regex = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                    if not email_regex.match(user.email):
+                        logger.warning(f"Adresse email invalide (format), envoi ignoré : {user.email}")
+                        return
+
+                    clean_title = strip_emojis(title)
+                    clean_message = strip_emojis(message)
+
+                    if not clean_title:
+                        clean_title = "Notification Zemy"
+
+                    email_body = (
+                        f"Bonjour {user.full_name or 'Utilisateur'},\n\n"
+                        f"{clean_message}\n\n"
+                        f"Cordialement,\n"
+                        f"L'équipe Zemy"
+                    )
+
+                    send_mail(
+                        subject=clean_title,
+                        message=email_body,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        fail_silently=False  # On veut capturer les vraies erreurs
+                    )
+                    logger.info(f"Email envoyé avec succès à {user.email}")
+                except Exception as e:
+                    error_str = str(e)
+                    # Erreur permanente : boîte inexistante (550) — pas une erreur critique
+                    if '550' in error_str or 'Mailbox does not exist' in error_str or 'does not exist' in error_str.lower():
+                        logger.warning(
+                            f"Envoi email impossible — adresse inexistante ou rejetée : {user.email}. "
+                            f"Vérifier l'adresse en BDD. Détail : {e}"
+                        )
+                    else:
+                        logger.error(f"Erreur envoi email à {user.email}: {e}")
+
+            threading.Thread(target=_send_email_async, daemon=True).start()
+
+    from django.db import transaction
+    transaction.on_commit(_dispatch_after_commit)
+    return notif_obj
 

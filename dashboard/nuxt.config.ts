@@ -30,8 +30,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemybackend.sinustic.com/api',
-      apiUrl: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'https://zemybackend.sinustic.com/api',
+      apiBase: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000/api',
+      apiUrl: (globalThis as any).process?.env?.NUXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000/api',
     },
   },
 

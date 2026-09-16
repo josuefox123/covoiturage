@@ -131,7 +131,7 @@ export default function RideSearchCard({
   const displayPriceVal = getDisplayPrice();
   const price = displayPriceVal.toLocaleString() || '0';
   const priceUnit = isIntermediate ? 'Prix du trajet' : 'par place';
-  const fullPriceVal = ride.original_price_per_seat || (ride as any).full_price;
+  const fullPriceVal = ride.original_price_per_seat || (ride as any).full_price || (ride as any).full_price_per_seat || (isIntermediate ? ride.price_per_seat : null);
 
   const getArrivalTime = () => getArrivalTimeHelper(ride.departure_time, ride.duration_min);
   const getDurationText = () => getDurationTextHelper(ride.duration_min);
@@ -220,9 +220,9 @@ export default function RideSearchCard({
                 <Text style={styles.priceText}>{price}</Text>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 2 }}> FCFA</Text>
               </View>
-              {isIntermediate && fullPriceVal && fullPriceVal !== displayPriceVal ? (
-                <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '500', marginTop: 2, textAlign: 'right' }}>
-                  Complet: {fullPriceVal.toLocaleString()} F
+              {isIntermediate && fullPriceVal ? (
+                <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500', marginTop: 3, textAlign: 'right' }}>
+                  Prix estimé du trajet au complet : {fullPriceVal.toLocaleString()} FCFA
                 </Text>
               ) : null}
             </View>

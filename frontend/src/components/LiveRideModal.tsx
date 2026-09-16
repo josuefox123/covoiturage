@@ -28,6 +28,7 @@ import { Ride } from '../types';
 import { CustomAlert } from '../utils/CustomAlert';
 import * as Speech from 'expo-speech';
 import NetInfo from '@react-native-community/netinfo';
+import { usePathname, useSegments } from 'expo-router';
 
 // ============================================================
 // CONSTANTS & CONFIGURATION
@@ -212,17 +213,34 @@ const formatDistance = (meters: number): string => {
 };
 
 /**
- * Vérification si le trajet est actif
+ * Vérification si le trajet est actif (entre 10 minutes avant le départ et 24 heures après l'heure prévue)
  */
 const isItTimeForLiveRide = (dateStr: string, timeStr: string): boolean => {
   if (!dateStr || !timeStr) return false;
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const departureDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-  const now = new Date();
-  const tenMinutesBefore = new Date(departureDate.getTime() - 10 * 60 * 1000);
-  const twentyFourHoursAfter = new Date(departureDate.getTime() + 24 * 60 * 60 * 1000);
-  return now.getTime() >= tenMinutesBefore.getTime() && now.getTime() <= twentyFourHoursAfter.getTime();
+
+  try {
+    const cleanDate = String(dateStr).split('T')[0].trim();
+    const cleanTime = String(timeStr).trim();
+
+    const [year, month, day] = cleanDate.split('-').map(Number);
+    const timeParts = cleanTime.split(':').map(Number);
+
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return false;
+
+    const hours = !isNaN(timeParts[0]) ? timeParts[0] : 0;
+    const minutes = !isNaN(timeParts[1]) ? timeParts[1] : 0;
+
+    const departureDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    if (isNaN(departureDate.getTime())) return false;
+
+    const now = new Date();
+    const tenMinutesBefore = new Date(departureDate.getTime() - 10 * 60 * 1000);
+    const twentyFourHoursAfter = new Date(departureDate.getTime() + 24 * 60 * 60 * 1000);
+
+    return now.getTime() >= tenMinutesBefore.getTime() && now.getTime() <= twentyFourHoursAfter.getTime();
+  } catch {
+    return false;
+  }
 };
 
 // ============================================================
@@ -233,6 +251,26 @@ export default function LiveRideModal() {
   // Hooks
   const { user, authFetch } = useAuth();
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const segments = useSegments();
+
+  // Exclure les pages d'accueil/onboarding, de connexion et d'inscription
+  const isExcludedPage = useMemo(() => {
+    const path = (pathname || '').toLowerCase();
+    const segStr = (segments || []).join('/').toLowerCase();
+
+    return (
+      !pathname ||
+      path === '/' ||
+      path === '/index' ||
+      path.includes('login') ||
+      path.includes('register') ||
+      path.includes('auth') ||
+      segStr.includes('(auth)') ||
+      segStr.includes('login') ||
+      segStr.includes('register')
+    );
+  }, [pathname, segments]);
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -840,6 +878,24 @@ export default function LiveRideModal() {
     return () => clearInterval(interval);
   }, [user, checkActiveRides, visible]);
 
+  // Auto-fermeture de la fenêtre et de la bulle flottante après 24h par rapport à l'heure et la date prévues de démarrage
+  useEffect(() => {
+    if (!activeRide) return;
+
+    const checkExpiration = () => {
+      if (!isItTimeForLiveRide(activeRide.departure_date, activeRide.departure_time)) {
+        setVisible(false);
+        setIsMinimized(false);
+        setActiveRide(null);
+        stopTracking();
+      }
+    };
+
+    checkExpiration();
+    const interval = setInterval(checkExpiration, 10000);
+    return () => clearInterval(interval);
+  }, [activeRide, stopTracking]);
+
   // Sync map with location
   useEffect(() => {
     if (!mapReady || !location) return;
@@ -1405,7 +1461,7 @@ export default function LiveRideModal() {
   // RENDER
   // ============================================================
 
-  if (!activeRide) return null;
+  if (!user || !activeRide || isExcludedPage) return null;
 
   // Minimized state
   if (isMinimized) {

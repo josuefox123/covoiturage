@@ -32,7 +32,7 @@ export const apiEventEmitter = {
 };
 
 // L'URL de l'API est définie de manière unique dans .env / .env.local via EXPO_PUBLIC_API_URL
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://zemybackend.sinustic.com/api';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.100.4:8000/api';
 console.log('[ZEMY MOBILE] API Target URL:', API_URL);
 
 export class ApiError extends Error {

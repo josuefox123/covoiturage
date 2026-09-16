@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DeviceEventEmitter } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
@@ -104,8 +105,25 @@ export function useNotificationQueries() {
     },
   });
 
-  // Aplatir les pages en un seul tableau
-  const notifications: Notification[] = data?.pages.flatMap(page => page.results) || [];
+  // Aplatir les pages, dédupliquer par ID unique et trier du plus récent au plus ancien
+  const notifications: Notification[] = useMemo(() => {
+    const raw: Notification[] = data?.pages.flatMap((page) => page.results) || [];
+    const seen = new Set<number | string>();
+    const deduplicated: Notification[] = [];
+
+    for (const item of raw) {
+      if (!item || item.id === undefined || item.id === null) continue;
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      deduplicated.push(item);
+    }
+
+    return deduplicated.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [data]);
 
   return {
     notifications,

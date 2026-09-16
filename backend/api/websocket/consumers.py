@@ -371,6 +371,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         """Envoie la notification en JSON au client mobile via WebSocket."""
         await self.send(text_data=json.dumps({
             'type': 'notification',
+            'id': event['notification'].get('id'),
             'title': event['notification']['title'],
             'message': event['notification']['message'],
             'data': event['notification']['data']
