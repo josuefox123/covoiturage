@@ -85,7 +85,7 @@ export default function PaymentScreen() {
         } 
         // Détecter si on retombe sur le dashboard après le paiement
         else if (
-            (url.includes('zemybackend.sinustic.com') || url.includes('127.0.0.1.nip.io') || url.includes('localhost')) && 
+            (url.includes('localhost:8000') || url.includes('127.0.0.1.nip.io') || url.includes('localhost')) && 
             !url.includes('/payments/checkout/')
         ) {
             let txId = '';

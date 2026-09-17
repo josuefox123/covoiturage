@@ -17,14 +17,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://zemybackend.sinustic.com/api",
+        "EXPO_PUBLIC_API_URL": "http://localhost:8000/api",
         "EAS_BUILD_NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://zemybackend.sinustic.com/api",
+        "EXPO_PUBLIC_API_URL": "http://localhost:8000/api",
         "EAS_BUILD_NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     }

@@ -228,7 +228,7 @@ const saveBranding = async () => {
       'Authorization': `Bearer ${authCookie.value}`
     }
 
-    const apiUrl = configRuntime.public?.apiUrl || 'https://zemybackend.sinustic.com/api'
+    const apiUrl = configRuntime.public?.apiUrl || 'http://localhost:8000/api'
 
     await $fetch(`${apiUrl}/branding/`, {
       method: 'PUT',

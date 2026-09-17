@@ -13,12 +13,12 @@ class HostOverrideMiddleware:
     def __call__(self, request):
         if 'HTTP_X_FORWARDED_FOR' in request.META or 'HTTP_X_REAL_IP' in request.META:
             # On récupère le domaine de production
-            backend_url = os.getenv('BACKEND_URL', 'https://zemybackend.sinustic.com')
+            backend_url = os.getenv('BACKEND_URL', 'http://localhost:8000')
             backend_domain = backend_url.replace('https://', '').replace('http://', '').strip('/')
             
-            # Forcer le host et HTTPS pour que request.build_absolute_uri() utilise zemybackend.sinustic.com
+            # Forcer le host pour que request.build_absolute_uri() utilise le bon domaine
             request.META['HTTP_HOST'] = backend_domain
-            request.META['wsgi.url_scheme'] = 'https'
-            request.META['SERVER_PORT'] = '443'
+            request.META['wsgi.url_scheme'] = 'http'
+            request.META['SERVER_PORT'] = '8000'
             
         return self.get_response(request)
