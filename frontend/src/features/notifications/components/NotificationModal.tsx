@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import { Notification } from '../types/notification';
 import { theme } from '../../../styles/theme';
 import { getNotificationStyle } from '../constants/notificationTypes';
 import { formatTimeAgo } from '../utils/notificationHelpers';
+import { TripConfirmationModal } from '../../mes-trajets/composants/TripConfirmationModal';
 
 interface Props {
   notification: Notification | null;
@@ -15,8 +16,44 @@ interface Props {
 
 export const NotificationModal = ({ notification, onClose }: Props) => {
   const router = useRouter();
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   if (!notification) return null;
+
+  // Parser les données extra en amont pour détecter le type d'urgence
+  let extraDataCheck: any = {};
+  if (notification.data) {
+    try {
+      extraDataCheck = typeof notification.data === 'string'
+        ? JSON.parse(notification.data)
+        : notification.data;
+    } catch { extraDataCheck = {}; }
+  }
+  const notifType = extraDataCheck.type || notification.type;
+  const isDepartureConfirmation = notifType === 'departure_confirmation_required';
+  const urgentRideId = extraDataCheck.ride_id || notification.ride_id;
+
+  // ► Si c'est une alerte urgente de confirmation de départ,
+  //   on affiche le TripConfirmationModal à la place du modal classique
+  if (isDepartureConfirmation && urgentRideId) {
+    return (
+      <TripConfirmationModal
+        visible={!!notification}
+        rideId={String(urgentRideId)}
+        departureLocation={extraDataCheck.departure_location || undefined}
+        arrivalLocation={extraDataCheck.arrival_location || undefined}
+        onClose={onClose}
+        onConfirmed={() => {
+          onClose();
+          router.push('/(tabs)/trips');
+        }}
+        onCancelled={() => {
+          onClose();
+          router.push('/(tabs)/trips');
+        }}
+      />
+    );
+  }
 
   const { icon, color } = getNotificationStyle(notification);
 

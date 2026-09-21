@@ -663,11 +663,7 @@ export function PublishSummaryModal({
                   </Text>
                 </View>
 
-                <View style={styles.preferenceCount}>
-                  <Text style={styles.preferenceCountText}>
-                    {preferenceCount}
-                  </Text>
-                </View>
+
               </View>
             </View>
 

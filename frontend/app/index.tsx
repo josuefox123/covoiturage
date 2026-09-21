@@ -48,26 +48,29 @@ export default function OnboardingScreen() {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
 
+  // Dès que la session est restaurée, on redirige immédiatement
   useEffect(() => {
-    if (!isLoading && user) {
-      router.replace('/(tabs)/home');
+    if (!isLoading) {
+      if (user) {
+        // Utilisateur connecté → aller directement à home
+        router.replace('/(tabs)/home');
+      } else {
+        // Pas de session → animer l'onboarding
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
     }
   }, [isLoading, user]);
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
 
   const handlePressIn = () => {
     Animated.spring(buttonScale, {
@@ -90,6 +93,14 @@ export default function OnboardingScreen() {
   const handleLogin = () => {
     router.push('/(auth)/login');
   };
+
+  // Pendant la restauration de la session, afficher un écran blanc
+  // pour éviter tout flash de l'onboarding avant la redirection
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.white }} />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

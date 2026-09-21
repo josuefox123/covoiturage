@@ -170,7 +170,8 @@ class RideSeriesService:
                         vehicle_id=vehicle_id,
                         departure_date=current_date,
                         departure_time=departure_time_val,
-                        duration_min=duration_min
+                        duration_min=duration_min,
+                        series_id=series.id  # exclure les trajets déjà créés dans cette série
                     )
 
                     ride_obj = RideRepository.create_ride(

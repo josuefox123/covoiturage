@@ -826,7 +826,36 @@ export function usePublishForm(authCtx: any) {
               totalFailed += res.failed_count || res.failed_rides.length;
             }
           } catch (err: any) {
-            let reason = err.message || err.error || "Conflit d'horaire ou trajet déjà existant";
+            // Retry une fois en cas d'erreur réseau
+            const isNetworkError = err.message && (
+              err.message.toLowerCase().includes('fetch failed') ||
+              err.message.toLowerCase().includes('network request failed') ||
+              err.message.toLowerCase().includes('host unreachable') ||
+              err.message.toLowerCase().includes('noroutetohostexception')
+            );
+
+            if (isNetworkError) {
+              try {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                const res = await authFetch('/rides/', { method: 'POST', body: JSON.stringify(schedulePayload) });
+                if (res.created_rides && Array.isArray(res.created_rides)) {
+                  allCreatedRides.push(...res.created_rides);
+                  totalCreated += res.created_count || res.created_rides.length;
+                }
+                if (res.failed_rides && Array.isArray(res.failed_rides)) {
+                  allFailedRides.push(...res.failed_rides);
+                  totalFailed += res.failed_count || res.failed_rides.length;
+                }
+                continue; // retry réussi, passer au prochain créneau
+              } catch (_retryErr: any) {
+                // Retry échoué aussi — message propre
+              }
+            }
+
+            let reason = isNetworkError
+              ? "Connexion au serveur impossible. Vérifiez votre connexion et réessayez."
+              : err.message || err.error || "Conflit d'horaire ou trajet déjà existant";
+
             if (err.failed_rides && Array.isArray(err.failed_rides)) {
               allFailedRides.push(...err.failed_rides);
               totalFailed += err.failed_count || err.failed_rides.length;
@@ -897,7 +926,16 @@ export function usePublishForm(authCtx: any) {
         goToStep(1);
       }
     } catch (error: any) {
-      CustomAlert.alert('Erreur', error.message || 'Impossible de publier le trajet.');
+      const isNetworkErr = error.message && (
+        error.message.toLowerCase().includes('fetch failed') ||
+        error.message.toLowerCase().includes('network request failed') ||
+        error.message.toLowerCase().includes('host unreachable') ||
+        error.message.toLowerCase().includes('noroutetohostexception')
+      );
+      const userMessage = isNetworkErr
+        ? 'Connexion au serveur impossible. Vérifiez que vous êtes bien connecté au Wi-Fi et réessayez.'
+        : error.message || 'Impossible de publier le trajet.';
+      CustomAlert.alert('Erreur de publication', userMessage);
     } finally {
       setLoading(false);
     }

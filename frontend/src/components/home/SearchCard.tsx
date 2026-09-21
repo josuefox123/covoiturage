@@ -91,37 +91,6 @@ export default function SearchCard({ params, onChange, onSearch, onPickLocation,
   return (
     <>
       <View style={styles.card}>
-        {/* ── Trip type toggle ── */}
-        <View style={styles.tripTypeRow}>
-          <TouchableOpacity
-            style={[styles.tripTypeBtn, params.tripType === 'aller' && styles.tripTypeBtnActive]}
-            onPress={() => onChange({ tripType: 'aller' })}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="arrow-forward"
-              size={13}
-              color={params.tripType === 'aller' ? '#fff' : '#6B7280'}
-            />
-            <Text style={[styles.tripTypeTxt, params.tripType === 'aller' && styles.tripTypeTxtActive]}>
-              Aller simple
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tripTypeBtn, params.tripType === 'retour' && styles.tripTypeBtnActive]}
-            onPress={() => onChange({ tripType: 'retour' })}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="swap-horizontal"
-              size={13}
-              color={params.tripType === 'retour' ? '#fff' : '#6B7280'}
-            />
-            <Text style={[styles.tripTypeTxt, params.tripType === 'retour' && styles.tripTypeTxtActive]}>
-              Aller-retour
-            </Text>
-          </TouchableOpacity>
-        </View>
 
         {/* ── Départ ── */}
         <TouchableOpacity
