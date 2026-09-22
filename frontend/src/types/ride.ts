@@ -68,4 +68,8 @@ export interface Ride {
   pets_allowed?: boolean;
   luggage_allowed?: boolean;
   stops_allowed?: boolean;
+
+  // Departure confirmation (T-30 min flow)
+  driver_confirmed_departure?: boolean | null;
+  departure_confirmation_sent_at?: string | null;
 }

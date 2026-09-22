@@ -318,6 +318,9 @@ export default function LiveRideModal() {
   const [problemText, setProblemText] = useState('');
   const [sendingReport, setSendingReport] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
+  // Trajet dans la fenêtre live mais pas encore confirmé par le conducteur
+  const [pendingConfirmationRide, setPendingConfirmationRide] = useState<Ride | null>(null);
+  const [confirmingDeparture, setConfirmingDeparture] = useState(false);
 
   // ============================================================
   // ANIMATIONS
@@ -632,21 +635,36 @@ export default function LiveRideModal() {
       const ridesData = ridesResp.results || ridesResp || [];
       const bookingsData = bookingsResp.results || bookingsResp || [];
 
+      // Trajets conducteur dans la fenêtre live ET confirmés
       const driverRides: Ride[] = ridesData.filter(
-        (r: Ride) => (r.status === 'active' || r.status === 'started') && 
-                     isItTimeForLiveRide(r.departure_date, r.departure_time)
+        (r: Ride) => (r.status === 'active' || r.status === 'started') &&
+                     isItTimeForLiveRide(r.departure_date, r.departure_time) &&
+                     r.driver_confirmed_departure === true   // ← confirmation obligatoire
+      );
+
+      // Trajets dans la fenêtre live mais PAS encore confirmés (attente conducteur)
+      const driverRidesPendingConfirmation: Ride[] = ridesData.filter(
+        (r: Ride) => r.status === 'active' &&
+                     isItTimeForLiveRide(r.departure_date, r.departure_time) &&
+                     r.driver_confirmed_departure !== true
       );
       
       const passengerRides: Ride[] = bookingsData
         .filter((b: any) => b.status === 'confirmed' && b.payment_status !== 'pending')
         .map((b: any) => b.ride_details)
         .filter((r: Ride) => r && (r.status === 'active' || r.status === 'started') && 
-               isItTimeForLiveRide(r.departure_date, r.departure_time));
+               isItTimeForLiveRide(r.departure_date, r.departure_time) &&
+               r.driver_confirmed_departure === true);  // ← idem côté passager
 
       let currentRide: Ride | null = null;
       let asDriver = false;
       let bookingId: string | null = null;
       let bookingObj: any = null;
+
+      // Mettre à jour la bannière d'attente de confirmation
+      setPendingConfirmationRide(
+        driverRidesPendingConfirmation.length > 0 ? driverRidesPendingConfirmation[0] : null
+      );
 
       if (driverRides.length > 0) {
         currentRide = driverRides[0];
@@ -1461,9 +1479,81 @@ export default function LiveRideModal() {
   // RENDER
   // ============================================================
 
-  if (!user || !activeRide || isExcludedPage) return null;
+  if (!user || isExcludedPage) return null;
+  if (!activeRide && !pendingConfirmationRide) return null;
 
-  // Minimized state
+  // ⚠️ Trajet dans la fenêtre live mais pas encore confirmé
+  if (!activeRide && pendingConfirmationRide) {
+    const dep = pendingConfirmationRide.departure_location?.split(',')[0] || '';
+    const arr = pendingConfirmationRide.arrival_location?.split(',')[0] || '';
+
+    const handleConfirmDeparture = async (confirmed: boolean) => {
+      if (confirmingDeparture) return;
+      setConfirmingDeparture(true);
+      try {
+        await authFetch(`/rides/${pendingConfirmationRide.id}/confirm-departure/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed }),
+        });
+        await checkActiveRides();
+      } catch (err: any) {
+        CustomAlert.alert('Erreur', err.message || 'Impossible de confirmer le départ.');
+      } finally {
+        setConfirmingDeparture(false);
+      }
+    };
+
+    return (
+      <View style={styles.confirmCard}>
+        {/* Header */}
+        <View style={styles.confirmCardHeader}>
+          <Ionicons name="time-outline" size={18} color="#D97706" style={{ marginRight: 6 }} />
+          <Text style={styles.confirmCardTag}>DÉPART IMMINENT</Text>
+        </View>
+
+        {/* Route */}
+        <Text style={styles.confirmCardRoute} numberOfLines={1}>
+          {dep}{'  →  '}{arr}
+        </Text>
+
+        {/* Question */}
+        <Text style={styles.confirmCardQuestion}>
+          Votre trajet tient-il toujours ?
+        </Text>
+
+        {/* Boutons */}
+        <View style={styles.confirmCardActions}>
+          <TouchableOpacity
+            style={[styles.confirmCardBtn, styles.confirmCardBtnNo]}
+            onPress={() => handleConfirmDeparture(false)}
+            disabled={confirmingDeparture}
+            activeOpacity={0.85}
+          >
+            {confirmingDeparture
+              ? <ActivityIndicator size="small" color="#EF4444" />
+              : <Text style={styles.confirmCardBtnNoText}>✕  Annuler le trajet</Text>
+            }
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.confirmCardBtn, styles.confirmCardBtnYes]}
+            onPress={() => handleConfirmDeparture(true)}
+            disabled={confirmingDeparture}
+            activeOpacity={0.85}
+          >
+            {confirmingDeparture
+              ? <ActivityIndicator size="small" color="#FFF" />
+              : <Text style={styles.confirmCardBtnYesText}>✓  Oui, je pars !</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (!activeRide) return null;
+
   if (isMinimized) {
     return (
       <TouchableOpacity 
@@ -2055,4 +2145,105 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
   },
+  confirmBanner: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    backgroundColor: '#D97706',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 9999,
+  },
+  confirmBannerTitle: {
+    color: '#FFF',
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  confirmBannerBody: {
+    color: 'rgba(255,255,255,0.9)',
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+
+  // --- Confirmation card (replaces confirmBanner in JSX) ---
+  confirmCard: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 12,
+    zIndex: 9999,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+  },
+  confirmCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  confirmCardTag: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#D97706',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  confirmCardRoute: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  confirmCardQuestion: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 16,
+  },
+  confirmCardActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmCardBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmCardBtnNo: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+  },
+  confirmCardBtnYes: {
+    backgroundColor: '#16A34A',
+  },
+  confirmCardBtnNoText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  confirmCardBtnYesText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
+  },
 });
+

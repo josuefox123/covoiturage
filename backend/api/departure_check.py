@@ -196,13 +196,12 @@ def check_upcoming_departures():
                         confirmed_bookings = ride.bookings.filter(status='confirmed', payment_status='escrow')
                         from django.db.models import F
                         refund_count = 0
+                        total_seats_to_restore = 0
                         for booking in confirmed_bookings:
                             booking.status = 'cancelled'
                             booking.payment_status = 'refunded'
                             booking.save(update_fields=['status', 'payment_status'])
-
-                            ride.seats_available = F('seats_available') + booking.seats_booked
-                            ride.save(update_fields=['seats_available'])
+                            total_seats_to_restore += booking.seats_booked
 
                             amount_to_refund = booking.total_amount
                             RF.objects.create(
@@ -236,6 +235,13 @@ def check_upcoming_departures():
                                     'requires_acknowledgment': 'true',
                                 }
                             )
+
+                        # Restore seats in one atomic update after the loop
+                        if total_seats_to_restore > 0:
+                            type(ride).objects.filter(pk=ride.pk).update(
+                                seats_available=F('seats_available') + total_seats_to_restore
+                            )
+
 
                         # Notifier le conducteur de l'annulation automatique
                         create_and_send_notification(
