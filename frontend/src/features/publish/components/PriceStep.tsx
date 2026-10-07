@@ -338,12 +338,14 @@ export function PriceStep({
    */
 
   const handleGlobalPriceChange = (txt: string) => {
-    const cleaned = txt.replace(/[^0-9]/g, '');
+    let cleaned = txt.replace(/[^0-9]/g, '');
 
-    const value = cleaned || '0';
+    if (cleaned.length > 1 && cleaned.startsWith('0')) {
+      cleaned = cleaned.replace(/^0+/, '');
+    }
 
-    setLocalPriceText(value);
-    updateOverallPrice(value);
+    setLocalPriceText(cleaned);
+    updateOverallPrice(cleaned);
   };
 
   return (
@@ -636,8 +638,8 @@ export function PriceStep({
 
             <TouchableOpacity
               onPress={() => {
-                setLocalPriceText('0');
-                updateOverallPrice('0');
+                setLocalPriceText('');
+                updateOverallPrice('');
               }}
             >
               <Text style={styles.clearText}>Effacer</Text>

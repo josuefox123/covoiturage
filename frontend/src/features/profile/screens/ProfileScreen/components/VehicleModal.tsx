@@ -20,6 +20,7 @@ import { theme } from '../../../../../styles/theme';
 import { styles } from '../styles';
 import { AppBottomSheet } from '../../../../../components/AppBottomSheet';
 import { CustomAlert } from '../../../../../utils/CustomAlert';
+import { formatBeninLicensePlate } from '../../../../../utils/vehicleFormatter';
 
 interface VehicleModalProps {
   visible: boolean;
@@ -266,6 +267,9 @@ export function VehicleModal({
             onChangeText={setBrand}
             placeholder="Marque (ex: Toyota)"
             placeholderTextColor={theme.colors.textMuted}
+            autoCapitalize="words"
+            autoCorrect={false}
+            keyboardType="default"
           />
         </View>
 
@@ -277,6 +281,9 @@ export function VehicleModal({
             onChangeText={setModel}
             placeholder="Modèle (ex: Corolla)"
             placeholderTextColor={theme.colors.textMuted}
+            autoCapitalize="words"
+            autoCorrect={false}
+            keyboardType="default"
           />
         </View>
 
@@ -288,6 +295,9 @@ export function VehicleModal({
             onChangeText={setColor}
             placeholder="Couleur (ex: Gris)"
             placeholderTextColor={theme.colors.textMuted}
+            autoCapitalize="words"
+            autoCorrect={false}
+            keyboardType="default"
           />
         </View>
 
@@ -296,10 +306,12 @@ export function VehicleModal({
           <TextInput
             style={styles.modalInputModern}
             value={plate}
-            onChangeText={setPlate}
-            placeholder="Plaque d'immatriculation"
+            onChangeText={(val) => setPlate(formatBeninLicensePlate(val))}
+            placeholder="Immatriculation (ex: AQ 1234 RB)"
             placeholderTextColor={theme.colors.textMuted}
             autoCapitalize="characters"
+            autoCorrect={false}
+            keyboardType="default"
           />
         </View>
 
@@ -312,9 +324,12 @@ export function VehicleModal({
               <TextInput
                 style={styles.modalInputModern}
                 value={driverLicense}
-                onChangeText={setDriverLicense}
+                onChangeText={(val) => setDriverLicense(val.toUpperCase())}
                 placeholder="Numéro de permis de conduire"
                 placeholderTextColor={theme.colors.textMuted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                keyboardType="default"
               />
             </View>
 

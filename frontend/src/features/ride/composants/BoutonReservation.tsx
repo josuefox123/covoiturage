@@ -146,14 +146,23 @@ export function BoutonReservation({
 
 const styles = StyleSheet.create({
   bookBtn: {
-    flex: 1, height: 52, borderRadius: 16,
+    flex: 1,
+    minHeight: 52,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     backgroundColor: C.primary,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
     ...SHlg
   },
-  bookBtnTxt: { fontSize: 15, fontWeight: '800', color: C.white },
+  bookBtnTxt: { fontSize: 15, fontWeight: '800', color: C.white, textAlign: 'center' },
   rowC: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6, flex: 1, paddingHorizontal: 4
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    flex: 1,
+    paddingHorizontal: 4
   }
 });

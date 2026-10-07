@@ -36,6 +36,7 @@ import CountryPicker from 'react-native-country-picker-modal';
 
 import { styles } from './styles';
 import { useLoginForm } from './hooks/useLoginForm';
+import { formatPhoneNumber } from '../../../../utils/phoneFormatter';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -261,8 +262,8 @@ export default function LoginScreen() {
                   placeholderTextColor={theme.colors.textMuted}
                   value={form.identifier}
                   onChangeText={(value) => {
-                    const cleaned = value.replace(/[^\d\s]/g, '');
-                    form.setIdentifier(cleaned);
+                    const formatted = formatPhoneNumber(value, form.countryCode);
+                    form.setIdentifier(formatted);
                   }}
                   onFocus={handleIdentifierFocus}
                   onBlur={() => form.setIdentifierFocused(false)}

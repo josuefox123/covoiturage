@@ -95,6 +95,7 @@ export default function RideDetailScreen() {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const isOwnRide = user?.id === ride.driver_details?.id;
+  const displayPrice = myBooking?.portion_price || myBooking?.amount_paid_online || myBooking?.total_amount || bookingState?.price || ride.price_per_seat || 0;
   const canChat = (myBooking && (myBooking.payment_status === 'paid' || myBooking.payment_status === 'escrow')) || isOwnRide;
   const isCompleted = ride.status === 'completed';
   const isStarted = ride.status === 'started';
@@ -280,7 +281,7 @@ export default function RideDetailScreen() {
                 { icon: 'calendar', bg: '#EBF4FF', val: new Date(ride.departure_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), color: C.primary },
                 { icon: 'time', bg: '#FFF7ED', val: fmtDur(ride.duration_min ?? 0), color: C.warning },
                 { icon: 'people', bg: '#F0FDF4', val: `${ride.seats_available} place${ride.seats_available !== 1 ? 's' : ''}`, color: C.success },
-                { icon: 'wallet', bg: '#EBF4FF', val: `${(bookingState?.price ?? ride.price_per_seat)?.toLocaleString() ?? '0'} F`, color: C.primary },
+                { icon: 'wallet', bg: '#EBF4FF', val: `${displayPrice.toLocaleString('fr-FR')} F`, color: C.primary },
               ].map((s, i, arr) => (
                 <React.Fragment key={i}>
                   <View style={ss.gcStat}>
@@ -318,14 +319,14 @@ export default function RideDetailScreen() {
           <FadeInCard delay={120}>
             <View style={[ss.card, { flexDirection: 'row', alignItems: 'center' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={ss.pLabel}>{isMid ? 'Prix du trajet' : 'Prix par place'}</Text>
+                <Text style={ss.pLabel}>{myBooking ? 'Montant de votre réservation' : isMid ? 'Prix du trajet' : 'Prix par place'}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
-                  <Text style={ss.pAmt}>{(bookingState?.price ?? ride.price_per_seat)?.toLocaleString() ?? '0'}</Text>
+                  <Text style={ss.pAmt}>{displayPrice.toLocaleString('fr-FR')}</Text>
                   <Text style={ss.pCur}> FCFA</Text>
                 </View>
-                {isMid && (
+                {isMid && !myBooking && (
                   <Text style={{ fontSize: 12, color: C.textSec, marginTop: 4, fontWeight: '500' }}>
-                    Prix estimé du trajet au complet : {ride.price_per_seat?.toLocaleString() ?? '0'} FCFA
+                    Prix estimé du trajet au complet : {ride.price_per_seat?.toLocaleString('fr-FR') ?? '0'} FCFA
                   </Text>
                 )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
@@ -523,11 +524,8 @@ export default function RideDetailScreen() {
         pricingBreakdown={bookingState?.pricing_breakdown}
         onClose={() => setShowBookModal(false)}
         onConfirm={async (seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra) => {
-          try {
-            await performBooking(seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
-          } finally {
-            setShowBookModal(false);
-          }
+          setShowBookModal(false);
+          await performBooking(seats, customPrice, msg, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
         }}
       />
       <BookingSuccessModal

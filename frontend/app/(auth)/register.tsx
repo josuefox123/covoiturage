@@ -35,6 +35,8 @@ import CustomAlert from '../../src/components/CustomAlert';
 import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import * as Location from 'expo-location';
 import { API_URL } from '../../src/services/api';
+import { getPostAuthRoute } from '../../src/utils/authNavigation';
+import { formatPhoneNumber } from '../../src/utils/phoneFormatter';
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -219,12 +221,13 @@ export default function RegisterScreen() {
    * Lance la vérification debounce après 600ms si le numéro est assez long.
    */
   const handlePhoneChange = (value: string) => {
-    setPhoneLocal(value);
+    const formatted = formatPhoneNumber(value, countryCode);
+    setPhoneLocal(formatted);
     setPhoneAvailability('idle');
 
     if (phoneDebounceRef.current) clearTimeout(phoneDebounceRef.current);
 
-    const digits = value.replace(/\D/g, '');
+    const digits = formatted.replace(/\D/g, '');
     const minDigits = COUNTRY_MIN_DIGITS[countryCode] ?? 6;
     if (digits.length < minDigits) return;
 
@@ -266,6 +269,7 @@ export default function RegisterScreen() {
       setCallingCode(country.callingCode[0]);
     }
     setShowCountryPicker(false);
+    setPhoneLocal((prev) => formatPhoneNumber(prev, country.cca2));
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -351,7 +355,7 @@ export default function RegisterScreen() {
       const digits = phoneLocal.replace(/\D/g, '');
       const formattedPhone = `+${callingCode}${digits}`;
 
-      await registerWithPassword({
+      const registeredUser = await registerWithPassword({
         full_name: `${firstName} ${lastName}`,
         email: email.trim(),
         phone: formattedPhone,
@@ -359,7 +363,10 @@ export default function RegisterScreen() {
         password: password,
       });
 
-      router.replace('/(tabs)/home');
+      // Rediriger selon le statut de vérification d'identité
+      // Les nouveaux utilisateurs sont toujours not_verified → /verify-identity
+      const route = getPostAuthRoute(registeredUser);
+      router.replace(route as any);
     } catch {
       setAlertConfig({
         visible: true,

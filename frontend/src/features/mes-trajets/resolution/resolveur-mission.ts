@@ -38,12 +38,13 @@ export class ResolveurMission {
 
     let montant: number = 0;
     if (isPassager) {
-      montant = booking?.driver_counter_price 
-        ?? booking?.custom_price 
-        ?? booking?.price 
-        ?? booking?.passenger_proposed_price 
-        ?? ride.price_per_seat 
-        ?? 0;
+      montant = booking?.portion_price 
+        ?? booking?.amount_paid_online 
+        ?? booking?.total_amount
+        ?? (booking?.driver_counter_price ? booking.driver_counter_price * (booking?.seats_booked || 1) : null)
+        ?? (booking?.custom_price ? booking.custom_price * (booking?.seats_booked || 1) : null)
+        ?? (booking?.passenger_proposed_price ? booking.passenger_proposed_price * (booking?.seats_booked || 1) : null)
+        ?? (ride.price_per_seat ? ride.price_per_seat * (booking?.seats_booked || 1) : 0);
     } else {
       montant = ride.driver_payout || ride.price_per_seat || 0;
     }

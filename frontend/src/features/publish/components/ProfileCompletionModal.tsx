@@ -6,6 +6,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { AppBottomSheet } from '../../../../src/components/AppBottomSheet';
 import { getMediaUrl } from '../../../../src/utils/media';
 import { theme } from '../../../../src/styles/theme';
+import { formatBeninLicensePlate } from '../../../../src/utils/vehicleFormatter';
 
 interface ProfileCompletionModalProps {
   visible: boolean;
@@ -150,11 +151,11 @@ export function ProfileCompletionModal({
           <>
             <View style={styles.inputWrapper}>
               <Ionicons name="car-sport-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-              <TextInput style={styles.modalInputModern} value={brandModel} onChangeText={setBrandModel} placeholder="Marque & Modèle (ex: Toyota Corolla)" placeholderTextColor={theme.colors.textMuted} />
+              <TextInput style={styles.modalInputModern} value={brandModel} onChangeText={setBrandModel} placeholder="Marque & Modèle (ex: Toyota Corolla)" placeholderTextColor={theme.colors.textMuted} autoCapitalize="words" autoCorrect={false} keyboardType="default" />
             </View>
             <View style={styles.inputWrapper}>
               <Ionicons name="pricetag-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-              <TextInput style={styles.modalInputModern} value={plate} onChangeText={setPlate} placeholder="Immatriculation (ex: BJ-1234)" placeholderTextColor={theme.colors.textMuted} autoCapitalize="characters" />
+              <TextInput style={styles.modalInputModern} value={plate} onChangeText={(val) => setPlate(formatBeninLicensePlate(val))} placeholder="Immatriculation (ex: AQ 1234 RB)" placeholderTextColor={theme.colors.textMuted} autoCapitalize="characters" autoCorrect={false} keyboardType="default" />
             </View>
             <Text style={styles.vehicleTypeLabel}>Type de véhicule</Text>
             <View style={styles.vehicleTypeContainer}>
@@ -169,7 +170,7 @@ export function ProfileCompletionModal({
                 <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginTop: 12, marginBottom: 8 }}>Permis de conduire</Text>
                 <View style={styles.inputWrapper}>
                   <Ionicons name="id-card-outline" size={20} color={theme.colors.textMuted} style={styles.inputIcon} />
-                  <TextInput style={styles.modalInputModern} value={driverLicense} onChangeText={setDriverLicense} placeholder="Numéro de permis (Obligatoire)" placeholderTextColor={theme.colors.textMuted} />
+                  <TextInput style={styles.modalInputModern} value={driverLicense} onChangeText={(val) => setDriverLicense(val.toUpperCase())} placeholder="Numéro de permis (ex: 123456789)" placeholderTextColor={theme.colors.textMuted} autoCapitalize="characters" autoCorrect={false} keyboardType="default" />
                 </View>
                 <TouchableOpacity style={[styles.inputWrapper, licenseExpirationError ? { borderColor: theme.colors.error } : null]} onPress={() => setShowDatePicker(true)}>
                   <Ionicons name="calendar-outline" size={20} color={licenseExpirationError ? theme.colors.error : theme.colors.textMuted} style={styles.inputIcon} />

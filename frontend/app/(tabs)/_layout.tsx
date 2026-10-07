@@ -57,9 +57,12 @@ export default function TabsLayout() {
   const { notifCount, tripCount, messageCount } = useBadges();
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (isLoading) return;
+    if (!user) {
+      // Pas de session → écran d'accueil
       router.replace('/');
     }
+    // La vérification d'identité est gérée par VerificationModal dans home.tsx
   }, [user, isLoading]);
 
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 20 : 16);

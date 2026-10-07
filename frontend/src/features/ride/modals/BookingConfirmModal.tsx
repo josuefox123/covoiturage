@@ -191,12 +191,8 @@ export function BookingConfirmModal({
 
     const message = passengerMessageText.trim() || undefined;
 
-    setSubmitting(true);
-    try {
-      await onConfirm(seatsToBook, undefined, message, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
-    } catch (error) {
-      setSubmitting(false);
-    }
+    onConfirm(seatsToBook, undefined, message, pickupLoc, pickupExtra, dropoffLoc, dropoffExtra);
+    setSubmitting(false);
   };
 
   const isLoading = submitting || bookingLoading;

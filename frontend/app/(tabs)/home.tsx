@@ -109,16 +109,16 @@ export default function HomeScreen() {
   // VERIFICATION
   // ============================================================
 
+  // Afficher la modal dès que l'utilisateur n'est pas vérifié (not_verified ou rejected)
+  // Indépendant de hasStartedVerification : la modal revient à chaque connexion
   const shouldShowVerif =
     !!user &&
     !user.is_verified &&
-    user.verification_status !== 'pending' &&
-    !hasStartedVerification;
+    user.verification_status !== 'pending';
 
   const [showVerifModal, setShowVerifModal] = useState(false);
 
-  // Réagit dès que user ou hasStartedVerification change
-  // (couvre le cas juste après l'inscription où user vient d'être set)
+  // Affiche la modal dès l'arrivée sur home si l'utilisateur n'est pas vérifié
   React.useEffect(() => {
     if (shouldShowVerif) {
       setShowVerifModal(true);
@@ -137,7 +137,7 @@ export default function HomeScreen() {
     useCallback(() => {
       refreshUser();
       setRefreshKey((key) => key + 1);
-      // Ré-évaluer au retour sur l'écran (ex: après fermeture de verify-identity)
+      // Ré-afficher la modal à chaque retour sur l'écran si non vérifié
       if (shouldShowVerif) {
         setShowVerifModal(true);
       }

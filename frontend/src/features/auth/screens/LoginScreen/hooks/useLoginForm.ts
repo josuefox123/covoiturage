@@ -4,6 +4,9 @@ import { useRouter } from 'expo-router';
 import { CountryCode, Country } from 'react-native-country-picker-modal';
 import * as Location from 'expo-location';
 import { useAuth } from '../../../../../context/AuthContext';
+import { getPostAuthRoute } from '../../../../../utils/authNavigation';
+
+import { formatPhoneNumber } from '../../../../../utils/phoneFormatter';
 
 const COUNTRY_MIN_DIGITS: Record<string, number> = {
   BJ: 8,  // Bénin         +229
@@ -22,7 +25,7 @@ const isInternational = (value: string): boolean => value.trim().startsWith('+')
 
 export function useLoginForm() {
   const router = useRouter();
-  const { loginWithPassword } = useAuth();
+  const { loginWithPassword, user } = useAuth();
 
   // ── States ────────────────────────────────────────────────
   const [identifier, setIdentifier] = useState('');
@@ -71,6 +74,7 @@ export function useLoginForm() {
     setCountryCode(country.cca2);
     if (country.callingCode?.length > 0) setCallingCode(country.callingCode[0]);
     setShowCountryPicker(false);
+    setIdentifier((prev) => formatPhoneNumber(prev, country.cca2));
   }, []);
 
   const formatIdentifier = useCallback((): string => {
@@ -119,8 +123,10 @@ export function useLoginForm() {
     }
     setLoading(true);
     try {
-      await loginWithPassword(formatIdentifier(), password);
-      router.replace('/(tabs)/home');
+      const loggedUser = await loginWithPassword(formatIdentifier(), password);
+      // Rediriger selon le statut de vérification d'identité
+      const route = getPostAuthRoute(loggedUser);
+      router.replace(route as any);
     } catch (error: any) {
       setAlertConfig({
         visible: true,

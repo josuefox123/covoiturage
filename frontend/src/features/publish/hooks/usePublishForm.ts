@@ -102,12 +102,12 @@ export function usePublishForm(authCtx: any) {
     suggested_price: number; min_price: number; max_price: number;
     price_per_km: number; margin_percent: number;
   } | null>(null);
-  const [price, setPrice] = useState('0');
+  const [price, setPrice] = useState('');
   const [priceLoading, setPriceLoading] = useState(false);
   const [legs, setLegs] = useState<any[]>([]);
   const [legPrices, setLegPrices] = useState<number[]>([]);
   const [priceInputFocused, setPriceInputFocused] = useState(false);
-  const [localPriceText, setLocalPriceText] = useState('0');
+  const [localPriceText, setLocalPriceText] = useState('');
 
   // Preferences
   const [music, setMusic] = useState(true);

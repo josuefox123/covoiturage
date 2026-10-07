@@ -61,7 +61,7 @@ const STEPS: Step[] = [
  */
 export default function VerifyIdentityScreen() {
   const router = useRouter();
-  const { setHasStartedVerification, refreshUser } = useAuth();
+  const { user, setHasStartedVerification, refreshUser } = useAuth();
 
   useEffect(() => {
     setHasStartedVerification(true);
@@ -80,7 +80,9 @@ export default function VerifyIdentityScreen() {
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const cardAnim = useRef(new Animated.Value(0)).current;
-  const successScale = useRef(new Animated.Value(0)).current;
+  const successScale = useRef(new Animated.Value(0.9)).current;
+
+  const showStatusScreen = submitted || user?.verification_status === 'pending' || user?.verification_status === 'verified';
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -94,10 +96,11 @@ export default function VerifyIdentityScreen() {
   }, [currentStep]);
 
   useEffect(() => {
-    if (submitted) {
+    if (showStatusScreen) {
+      successScale.setValue(0.9);
       Animated.spring(successScale, { toValue: 1, friction: 6, useNativeDriver: true }).start();
     }
-  }, [submitted]);
+  }, [showStatusScreen]);
 
   // ── Image picker helper ────────────────────────────────────────────────────
   const pickImage = async (
@@ -122,6 +125,9 @@ export default function VerifyIdentityScreen() {
         quality: 0.35,   // réduit pour accélérer l'upload
         base64: false,   // pas besoin — on envoie l'URI directement via XHR
         mediaTypes: ['images'],
+        ...(source === 'camera' ? {
+          cameraType: _isSelfie ? ImagePicker.CameraType.front : ImagePicker.CameraType.back
+        } : {})
       };
 
       const result = source === 'camera'
@@ -222,32 +228,132 @@ export default function VerifyIdentityScreen() {
     return true;
   };
 
-  // ── Success screen ────────────────────────────────────────────────────────
-  if (submitted) {
+  // ── Success / Status screen ───────────────────────────────────────────────
+  if (showStatusScreen) {
+    const isVerified = user?.verification_status === 'verified';
+
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={StyleSheet.absoluteFill} />
-        <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Animated.View style={[styles.successCard, { transform: [{ scale: successScale }] }]}>
-            <View style={styles.successIconWrapper}>
-              <Ionicons name="shield-checkmark" size={42} color={PRIMARY} />
-            </View>
-            <Text style={styles.successTitle}>Votre identité est en cours de vérification</Text>
+        <LinearGradient colors={['#F8FAFC', '#EFF6FF', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.statusHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/home');
+                }
+              }}
+              style={styles.backBtn}
+            >
+              <Ionicons name="arrow-back" size={22} color="#1F2937" />
+            </TouchableOpacity>
+            <Text style={styles.statusHeaderTitle}>Vérification du profil</Text>
+            <View style={{ width: 42 }} />
+          </View>
 
-            <View style={styles.statusBox}>
-              <View style={styles.statusRow}>
-                <Ionicons name="time-outline" size={24} color="#6B7280" />
-                <View>
-                  <Text style={styles.statusLabel}>Temps estimé :</Text>
-                  <Text style={styles.statusValue}>24 à 48 heures</Text>
+          <ScrollView
+            contentContainerStyle={styles.statusScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View style={[styles.successCard, { transform: [{ scale: successScale }] }]}>
+              {/* Badge Pill */}
+              <View style={[styles.statusBadgePill, isVerified ? styles.statusBadgeVerified : styles.statusBadgePending]}>
+                <Ionicons
+                  name={isVerified ? "checkmark-circle" : "time-outline"}
+                  size={16}
+                  color={isVerified ? "#059669" : "#2563EB"}
+                />
+                <Text style={[styles.statusBadgeText, isVerified ? styles.statusBadgeTextVerified : styles.statusBadgeTextPending]}>
+                  {isVerified ? "Profil Certifié" : "Vérification en cours"}
+                </Text>
+              </View>
+
+              {/* Icon Container with Gradient */}
+              <View style={[styles.successIconWrapper, isVerified && styles.successIconWrapperVerified]}>
+                <LinearGradient
+                  colors={isVerified ? ['#10B981', '#059669'] : ['#3B82F6', '#1D4ED8']}
+                  style={styles.successIconGradient}
+                >
+                  <Ionicons
+                    name={isVerified ? "ribbon-outline" : "shield-checkmark"}
+                    size={46}
+                    color="#FFFFFF"
+                  />
+                </LinearGradient>
+              </View>
+
+              {/* Title & Description */}
+              <Text style={styles.successTitle}>
+                {isVerified
+                  ? "Votre identité est validée !"
+                  : "Vos documents sont en cours de traitement"}
+              </Text>
+
+              <Text style={styles.successSubtitle}>
+                {isVerified
+                  ? "Votre profil est entièrement certifié. Vous pouvez réserver et proposer des trajets en toute sécurité."
+                  : "Nous examinons vos informations pour garantir la sécurité et la sérénité de la communauté Zemy."}
+              </Text>
+
+              {/* Information Status Card */}
+              <View style={styles.statusBox}>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                    <Ionicons name="time-outline" size={22} color="#2563EB" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.statusLabel}>Délai de traitement</Text>
+                    <Text style={styles.statusValue}>
+                      {isVerified ? "Validation effectuée" : "24 à 48 heures ouvrées"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.statusDivider} />
+
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusIconCircle, { backgroundColor: '#ECFDF5' }]}>
+                    <Ionicons name="lock-closed-outline" size={22} color="#059669" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.statusLabel}>Confidentialité</Text>
+                    <Text style={styles.statusValue}>Données chiffrées & protégées</Text>
+                  </View>
+                </View>
+
+                <View style={styles.statusDivider} />
+
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusIconCircle, { backgroundColor: '#FFFBEB' }]}>
+                    <Ionicons name="notifications-outline" size={22} color="#D97706" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.statusLabel}>Notification</Text>
+                    <Text style={styles.statusValue}>Alerte envoyée dès décision</Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <TouchableOpacity style={styles.successBtn} onPress={() => router.replace('/(tabs)/home')}>
-              <Text style={styles.successBtnText}>Retour à l'accueil</Text>
-            </TouchableOpacity>
-          </Animated.View>
+              {/* Action Button */}
+              <TouchableOpacity
+                style={{ width: '100%', borderRadius: 16, overflow: 'hidden' }}
+                activeOpacity={0.85}
+                onPress={() => router.replace('/(tabs)/home')}
+              >
+                <LinearGradient
+                  colors={['#2563EB', '#1D4ED8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.successBtnGradient}
+                >
+                  <Text style={styles.successBtnText}>Retour à l'accueil</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+          </ScrollView>
         </SafeAreaView>
       </View>
     );
@@ -270,7 +376,16 @@ export default function VerifyIdentityScreen() {
       <View style={styles.headerBlur}>
         <SafeAreaView edges={['top']} style={{ paddingBottom: 16 }}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <TouchableOpacity
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/home');
+                }
+              }}
+              style={styles.backBtn}
+            >
               <Ionicons name="arrow-back" size={22} color="#1F2937" />
             </TouchableOpacity>
 
@@ -362,7 +477,7 @@ export default function VerifyIdentityScreen() {
                   uri={selfieUri}
                   placeholder="Prendre un selfie"
                   placeholderIcon="person"
-                  onCamera={() => pickImage('camera', setSelfieUri)}
+                  onCamera={() => pickImage('camera', setSelfieUri, undefined, true)}
                   onGallery={() => {}}
                   onContinue={goNext}
                   onView={() => setFullscreenUri(selfieUri)}
@@ -760,32 +875,182 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
   },
   navBtnSecondary: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#F3F4F6', borderRadius: 16, paddingVertical: 16,
+    flex: 1,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
   },
-  navBtnSecondaryText: { fontSize: 15, color: '#4B5563', fontWeight: '700' },
-  navBtnPrimary: { flex: 1, borderRadius: 16, backgroundColor: PRIMARY, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  navBtnSecondaryText: { fontSize: 15, color: '#4B5563', fontWeight: '700', textAlign: 'center' },
+  navBtnPrimary: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: PRIMARY,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   navBtnDisabled: { backgroundColor: '#E5E7EB' },
-  navBtnPrimaryText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  // Success screen
+  navBtnPrimaryText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
+  // Success / Status screen
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  statusHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  statusScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  statusBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  statusBadgePending: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  statusBadgeVerified: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  statusBadgeTextPending: {
+    color: '#2563EB',
+  },
+  statusBadgeTextVerified: {
+    color: '#059669',
+  },
   successCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 32, padding: 32, alignItems: 'center', width: '100%',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 24, elevation: 6,
-    borderWidth: 1, borderColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#1E40AF',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   successIconWrapper: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginBottom: 24,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    marginBottom: 20,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
   },
-  successTitle: { fontSize: 24, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 24, lineHeight: 32 },
+  successIconWrapperVerified: {
+    shadowColor: '#10B981',
+  },
+  successIconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 10,
+    lineHeight: 28,
+  },
+  successSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
   statusBox: {
-    width: '100%', backgroundColor: '#F9FAFB', borderRadius: 20, padding: 20, marginBottom: 32,
-    borderWidth: 1, borderColor: '#F3F4F6',
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  statusLabel: { fontSize: 14, color: '#6B7280', fontWeight: '500', marginBottom: 4 },
-  statusValue: { fontSize: 16, color: '#111827', fontWeight: '700' },
-  successBtn: { width: '100%', borderRadius: 16, backgroundColor: '#F3F4F6', paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-  successBtnText: { fontSize: 16, fontWeight: '700', color: '#374151' },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  statusIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statusValue: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  statusDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 14,
+  },
+  successBtnGradient: {
+    width: '100%',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  successBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   stepTitlePreview: { fontSize: 20, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 20 },
   modalBg: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.95)', justifyContent: 'center' },
   modalContent: { flex: 1, justifyContent: 'space-between' },

@@ -165,6 +165,8 @@ export default function PaymentSuccessScreen() {
         ? new Date(ride.departure_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
         : 'Date non précisée';
 
+    const finalAmount = bookingDetails?.portion_price || bookingDetails?.amount_paid_online || bookingDetails?.total_amount || amount;
+
     // Données pour le QR Code du ticket
     const qrData = JSON.stringify({
         ticket: ticketNumber,
@@ -173,7 +175,7 @@ export default function PaymentSuccessScreen() {
         departure: ride.departure_location,
         arrival: ride.arrival_location,
         seats: bookingDetails?.seats_booked || 1,
-        amount: amount
+        amount: finalAmount
     });
     
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData)}`;
@@ -246,7 +248,7 @@ export default function PaymentSuccessScreen() {
                     </View>
                     <View style={styles.detailsCol}>
                         <Text style={styles.detailsLabel}>{isPaid ? 'Montant total payé' : 'Montant à payer'}</Text>
-                        <Text style={styles.detailsValAmount}>{amount} FCFA</Text>
+                        <Text style={styles.detailsValAmount}>{finalAmount.toLocaleString('fr-FR')} FCFA</Text>
                     </View>
                 </View>
 
