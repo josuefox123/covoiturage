@@ -181,15 +181,16 @@ const styles = StyleSheet.create({
   },
   imageWrapper: {
     position: 'absolute',
-    top: -55,
+    top: 0,
     left: 0,
     right: 0,
-    height: height * 0.6 + 55,
+    height: height * 0.52,
     overflow: 'hidden',
   },
   fullWidthImage: {
     width: width,
-    height: '100%',
+    height: height * 0.7,
+    marginTop: -110,
   },
   gradientOverlay: {
     position: 'absolute',
