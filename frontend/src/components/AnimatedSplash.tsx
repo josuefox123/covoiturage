@@ -1,182 +1,104 @@
 /**
  * ==============================================================
- * Fichier :
- * AnimatedSplash.tsx
- *
- * Description :
- * Composant ou logique de l'application Zemy.
- *
- * Projet :
- * Zemy
+ * Fichier : AnimatedSplash.tsx
+ * Description : Écran de démarrage animé propre et ultra-sécurisé sans crash.
+ * Projet : Zemy
  * ==============================================================
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Animated, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, Animated, StyleSheet, Image } from 'react-native';
 import { theme } from '../styles/theme';
 import { fetchApi } from '../services/api';
 
 type Props = {
-  /** Callback called when the splash animation finishes */
+  /** Callback appelée quand l'animation splash est terminée */
   onFinish: () => void;
 };
 
-/**
- * Composant AnimatedSplash.
- *
- * Responsabilités :
- * - Affichage et gestion de l'état lié à AnimatedSplash.
- */
 export default function AnimatedSplash({ onFinish }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const logoAnimScale = useRef(new Animated.Value(0.8)).current;
-
-  const [branding, setBranding] = useState({
-    logoUrl: null as string | null,
-    scale: 1.0,
-    posX: 160, // Default center of 320 canvas
-    posY: 284, // Default center of 568 canvas
-    animationType: 'fade_scale',
-  });
+  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let animType = 'fade_scale';
+    let mounted = true;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
 
-    // 1. Fetch branding config with a 1.5s timeout to prevent startup hangs
+    // Tentative de récupération du logo distant (1s max)
     fetchApi('/branding/', { signal: controller.signal })
       .then((data) => {
-        clearTimeout(timeoutId);
-        if (data && data.logo) {
-          animType = data.animation_type || 'fade_scale';
-          setBranding({
-            logoUrl: data.logo,
-            scale: data.logo_scale || 1.0,
-            posX: data.logo_position_x !== undefined ? data.logo_position_x : 160,
-            posY: data.logo_position_y !== undefined ? data.logo_position_y : 284,
-            animationType: animType,
-          });
+        if (mounted && data && data.logo) {
+          setLogoUrl(data.logo);
         }
       })
-      .catch((err) => {
-        clearTimeout(timeoutId);
-      })
+      .catch(() => {})
       .finally(() => {
-        // 2. Start animation based on the selected type
-        let enterAnimation;
-        
-        if (animType === 'bounce') {
-          logoAnimScale.setValue(0.3);
-          enterAnimation = Animated.parallel([
-            Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-            Animated.spring(logoAnimScale, {
+        if (!mounted) return;
+
+        // Animation fluide d'entrée et de sortie
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(opacity, {
               toValue: 1,
-              friction: 3,
+              duration: 450,
+              useNativeDriver: true,
+            }),
+            Animated.spring(logoScale, {
+              toValue: 1,
+              friction: 6,
               tension: 40,
               useNativeDriver: true,
-            })
-          ]);
-        } else if (animType === 'pulse') {
-          logoAnimScale.setValue(0.8);
-          enterAnimation = Animated.sequence([
-            Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-            Animated.timing(logoAnimScale, { toValue: 1.15, duration: 300, useNativeDriver: true }),
-            Animated.timing(logoAnimScale, { toValue: 1.0, duration: 300, useNativeDriver: true }),
-            Animated.timing(logoAnimScale, { toValue: 1.05, duration: 200, useNativeDriver: true }),
-            Animated.timing(logoAnimScale, { toValue: 1.0, duration: 200, useNativeDriver: true }),
-          ]);
-        } else {
-          // fade_scale
-          logoAnimScale.setValue(0.8);
-          enterAnimation = Animated.parallel([
-            Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-            Animated.timing(logoAnimScale, { toValue: 1, duration: 500, useNativeDriver: true }),
-          ]);
-        }
-
-        Animated.sequence([
-          enterAnimation,
-          Animated.delay(1200),
+            }),
+          ]),
+          Animated.delay(900),
           Animated.timing(opacity, {
             toValue: 0,
-            duration: 400,
+            duration: 350,
             useNativeDriver: true,
           }),
         ]).start(() => {
-          onFinish();
+          if (mounted) {
+            onFinish();
+          }
         });
       });
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
-
-  const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
-  const scaleRatio = windowWidth / 320;
-
-  // Calculate translations from center of the 320x568 virtual canvas, and scale to screen size
-  const translateX = (branding.posX - 160) * scaleRatio;
-  const translateY = (branding.posY - 284) * scaleRatio;
-  
-  // Combine the fetched scale with the animation scale AND screen ratio
-  const combinedScale = Animated.multiply(logoAnimScale, branding.scale * scaleRatio);
 
   return (
     <View style={styles.container}>
-      {branding.logoUrl ? (
-        <View style={styles.virtualCanvas}>
-          <Animated.Image
-            source={{ uri: branding.logoUrl }}
-            style={[
-              styles.logoImage,
-              { 
-                opacity, 
-                transform: [
-                  { translateX }, 
-                  { translateY }, 
-                  { scale: combinedScale }
-                ] 
-              }
-            ]}
-            resizeMode="contain"
-          />
-        </View>
-      ) : (
-        <Animated.View
-          style={[styles.logoFallbackContainer, { opacity, transform: [{ scale: logoAnimScale }] }]}>
-          <Image
-            source={require('../../assets/images/logozemy.png')}
-            style={styles.brandLogo}
-            resizeMode="contain"
-          />
-        </Animated.View>
-      )}
+      <Animated.View style={[styles.logoWrapper, { opacity, transform: [{ scale: logoScale }] }]}>
+        <Image
+          source={logoUrl ? { uri: logoUrl } : require('../../assets/images/logozemy.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: theme.colors.white,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
   },
-  virtualCanvas: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoImage: {
-    width: 220,
-    height: 100,
-  },
-  logoFallbackContainer: {
+  logoWrapper: {
     width: 240,
     height: 110,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  brandLogo: {
+  logo: {
     width: '100%',
     height: '100%',
   },
