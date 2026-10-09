@@ -181,10 +181,11 @@ const styles = StyleSheet.create({
   },
   imageWrapper: {
     position: 'absolute',
-    top: 0,
+    top: -55,
     left: 0,
     right: 0,
-    height: height * 0.6,
+    height: height * 0.6 + 55,
+    overflow: 'hidden',
   },
   fullWidthImage: {
     width: width,
