@@ -42,14 +42,14 @@ export function PendingBookingCard({
       </View>
 
       {/* Profil du passager */}
-      <View style={{ flexDirection: 'row', gap: 14, marginBottom: 16 }}>
+      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16, alignItems: 'flex-start' }}>
         {pax?.avatar
           ? <Image source={{ uri: getMediaUrl(pax.avatar) }} style={styles.paxAvatar} />
           : <View style={[styles.paxAvatar, styles.paxAvatarPH]}><Text style={styles.paxInitials}>{initials}</Text></View>
         }
         <View style={{ flex: 1, gap: 3 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={styles.paxName}>{name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+            <Text style={[styles.paxName, { flexShrink: 1 }]} numberOfLines={1}>{name}</Text>
             <View style={styles.verifiedBadge}><Ionicons name="checkmark" size={9} color={C.white} /></View>
           </View>
           <Text style={{ fontSize: 12, color: C.textSec }}>
@@ -64,9 +64,9 @@ export function PendingBookingCard({
             </View>
           )}
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 3 }}>
+        <View style={{ alignItems: 'flex-end', justifyContent: 'flex-end', marginTop: 18, paddingLeft: 6 }}>
           <Text style={styles.paxPrice}>{(price * seatsReq).toLocaleString()}</Text>
-          <Text style={{ fontSize: 11, color: C.textSec, fontWeight: '600' }}>FCFA</Text>
+          <Text style={{ fontSize: 10, color: C.textSec, fontWeight: '700' }}>FCFA</Text>
         </View>
       </View>
 

@@ -208,5 +208,5 @@ const styles = StyleSheet.create({
   compteurSection: { fontSize: 12, color: '#94A3B8', fontWeight: '500' },
   chargement: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
   texteChargement: { marginTop: 12, fontSize: 14, color: '#94A3B8', fontWeight: '500' },
-  contenuScroll: { padding: 16, paddingTop: 4 }
+  contenuScroll: { padding: 16, paddingTop: 4, paddingBottom: 100 }
 });

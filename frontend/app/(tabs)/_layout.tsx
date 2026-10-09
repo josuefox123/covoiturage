@@ -65,8 +65,8 @@ export default function TabsLayout() {
     // La vérification d'identité est gérée par VerificationModal dans home.tsx
   }, [user, isLoading]);
 
-  const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 20 : 16);
-  const tabBarHeight = 56 + bottomPadding;
+  const bottomPadding = insets.bottom > 0 ? insets.bottom + 8 : (Platform.OS === 'ios' ? 22 : 18);
+  const tabBarHeight = 60 + bottomPadding;
 
   return (
     <View style={{ flex: 1 }}>
@@ -81,12 +81,16 @@ export default function TabsLayout() {
             borderTopColor: theme.colors.border,
             height: tabBarHeight,
             paddingBottom: bottomPadding,
-            paddingTop: 10,
+            paddingTop: 4,
             ...theme.shadows.md,
           },
+          tabBarItemStyle: {
+            paddingVertical: 2,
+          },
           tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '500',
+            fontSize: 11,
+            fontWeight: '600',
+            marginTop: 1,
           },
         }}
       >

@@ -67,13 +67,14 @@ def feexpay_webhook(request):
         return HttpResponse("Missing transaction reference", status=400)
 
     try:
-        # Tenter de retrouver le paiement correspondant
-        payment = Payment.objects.filter(transaction_id=transaction_id).first()
-        if not payment:
-            # Si non trouvé avec transaction_id direct, essayer avec custom_id
-            custom_id = payload.get('custom_id')
-            if custom_id:
-                payment = Payment.objects.filter(booking_id=custom_id).first()
+        from django.db.models import Q
+        custom_id = payload.get('custom_id') or payload.get('reference')
+        payment = Payment.objects.filter(
+            Q(transaction_id=transaction_id) |
+            Q(booking_id=transaction_id) |
+            Q(booking_id=custom_id) |
+            Q(transaction_id=custom_id)
+        ).first()
         
         if payment:
             # Si le statut envoyé est un succès, on valide via notre service

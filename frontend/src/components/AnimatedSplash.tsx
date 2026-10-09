@@ -141,10 +141,10 @@ export default function AnimatedSplash({ onFinish }: Props) {
         </View>
       ) : (
         <Animated.View
-          style={[styles.iconContainer, { opacity, transform: [{ scale: logoAnimScale }] }]}>
+          style={[styles.logoFallbackContainer, { opacity, transform: [{ scale: logoAnimScale }] }]}>
           <Image
-            source={require('../../assets/icon.png')}
-            style={styles.icon}
+            source={require('../../assets/images/logozemy.png')}
+            style={styles.brandLogo}
             resizeMode="contain"
           />
         </Animated.View>
@@ -155,29 +155,28 @@ export default function AnimatedSplash({ onFinish }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: theme.colors.primary, // Utilise la couleur principale Zemy par défaut
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
+    zIndex: 9999,
   },
   virtualCanvas: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoImage: {
-    width: 200, // Largeur par défaut, l'échelle (scale) s'appliquera par-dessus
-    height: 200,
+    width: 220,
+    height: 100,
   },
-  iconContainer: {
-    width: 150,
-    height: 150,
-    backgroundColor: theme.colors.white,
-    borderRadius: 32,
-    padding: 16,
+  logoFallbackContainer: {
+    width: 240,
+    height: 110,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  icon: {
+  brandLogo: {
     width: '100%',
     height: '100%',
   },

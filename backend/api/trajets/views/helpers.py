@@ -100,7 +100,7 @@ def check_availability(request):
 
     return Response({"available": True})
 
-def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_time, duration_min, current_ride_id=None, series_id=None):
+def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_time, duration_min, current_ride_id=None):
     """
     Valide les règles métier d'un conducteur et son véhicule :
     1. Propriété du véhicule par le conducteur (IDOR Check).
@@ -110,9 +110,6 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
 
     Statuts bloquants : active, started
     Statuts NON bloquants : completed, cancelled (un trajet terminé/annulé n'est pas un conflit).
-
-    series_id : si fourni, les trajets appartenant à cette même série sont exclus de la vérification
-                (évite les faux conflits lors de la création de trajets récurrents multi-jours).
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -183,6 +180,8 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
         raise ValidationError({"error": "Format d'heure invalide (attendu HH:MM ou HH:MM:SS)."})
 
     # ─── 5. Construction des intervalles datetime pour le nouveau trajet ──────
+    # FIX 2 : datetime.combine produit un datetime naïf (sans tz).
+    # Avec USE_TZ=True, on le rend aware pour éviter les comparaisons faussement non-conflictuelles.
     duration = int(duration_min) if duration_min else 120
     new_start_naive = datetime.combine(dep_date, dep_time)
     new_start = timezone.make_aware(new_start_naive) if timezone.is_naive(new_start_naive) else new_start_naive
@@ -197,10 +196,6 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
     )
     if current_ride_id:
         exact_dup_q &= ~Q(id=current_ride_id)
-    # Exclure les trajets de la même série récurrente
-    if series_id:
-        exact_dup_q &= ~Q(series_id=series_id)
-
     exact_dup = Ride.objects.filter(exact_dup_q).first()
     if exact_dup:
         raise ValidationError({
@@ -215,14 +210,17 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
         f"[RIDEPUBLISH] validate_driver_and_vehicle "
         f"driver_id={driver_id} vehicle_id={vehicle_id} "
         f"new_start={new_start} new_end={new_end} "
-        f"current_ride_id={current_ride_id} series_id={series_id}"
+        f"current_ride_id={current_ride_id}"
     )
 
-    # ─── 6. Requête sur les trajets actifs — UNIQUEMENT le même jour ──────────
-    # On cherche uniquement sur dep_date (pas ±1 jour) pour les trajets récurrents
-    # afin d'éviter les faux conflits entre jours différents de la semaine.
+    # ─── 6. Requête sur les trajets actifs — plage élargie pour cross-midnight ─
+    # On cherche sur [dep_date - 1 jour, dep_date + 1 jour] pour capturer
+    # les trajets commencés la veille et se terminant après minuit.
+    date_min = dep_date - timedelta(days=1)
+    date_max = dep_date + timedelta(days=1)
+
     overlap_q = Q(
-        departure_date=dep_date,
+        departure_date__range=(date_min, date_max),
         status__in=ACTIVE_STATUSES,
     )
 
@@ -230,11 +228,7 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
     if current_ride_id:
         overlap_q &= ~Q(id=current_ride_id)
 
-    # Exclure les trajets appartenant à la même série récurrente
-    if series_id:
-        overlap_q &= ~Q(series_id=series_id)
-
-    # Filtrer par conducteur ou véhicule
+    # Filtrer par conducteur ou véhicule (on récupère les deux et on distingue après)
     if vehicle_id:
         overlap_q &= (Q(driver_id=driver_id) | Q(vehicle_id=vehicle_id))
     else:
@@ -247,6 +241,7 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
 
     # ─── 7. Vérification du chevauchement d'intervalles ───────────────────────
     for ride in active_rides:
+        # FIX 2 : rendre r_start timezone-aware pour comparer avec new_start aware
         r_start_naive = datetime.combine(ride.departure_date, ride.departure_time)
         r_start = timezone.make_aware(r_start_naive) if timezone.is_naive(r_start_naive) else r_start_naive
         r_duration = ride.duration_min if ride.duration_min else 120

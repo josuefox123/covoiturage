@@ -47,17 +47,18 @@ class VerifyPaymentView(APIView):
         try:
             # Si le frontend a capturé l'ID de FeexPay depuis la WebView, on le lie à notre paiement local
             from ..models import Payment
-            try:
-                payment = Payment.objects.get(transaction_id=transaction_reference)
-                if feexpay_transaction_id and payment.transaction_id != feexpay_transaction_id:
-                    # Mettre à jour l'identifiant pour utiliser celui de FeexPay si nécessaire pour la vérification
-                    # ou garder une trace des deux. Le plus simple est de mettre à jour le transaction_id pour la requête FeexPay.
-                    # Pour conserver l'idempotence et la recherche, on peut mettre à jour ou requérir l'ID de FeexPay.
-                    payment.feexpay_id = feexpay_transaction_id # On peut utiliser un champ temporaire ou remplacer transaction_id
-                    # Si on remplace, attention à l'unicité. Le plus propre est d'utiliser le feexpay_transaction_id
-                    # pour interroger FeexPay, tout en gardant notre référence en clé de recherche locale.
-                    pass
-            except Payment.DoesNotExist:
+            from django.db.models import Q
+            payment = Payment.objects.filter(
+                Q(transaction_id=transaction_reference) |
+                Q(booking_id=transaction_reference)
+            ).first()
+            if not payment and len(str(transaction_reference)) >= 8:
+                clean_ref = str(transaction_reference).replace('-', '')
+                payment = Payment.objects.filter(
+                    Q(transaction_id__icontains=clean_ref) |
+                    Q(booking__id__icontains=clean_ref)
+                ).first()
+            if not payment:
                 return Response({"error": "Transaction locale introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
             # Utiliser l'ID de FeexPay s'il est fourni, sinon notre référence (pour le mode sandbox par exemple)

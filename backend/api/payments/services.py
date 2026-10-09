@@ -92,10 +92,24 @@ class PaymentService:
         BUG11 FIX : select_for_update() évite la race condition si deux webhooks arrivent en parallèle.
         """
         # Lock d'abord pour éviter la double validation concurrente
+        from django.db.models import Q
         try:
             with transaction.atomic():
-                payment = Payment.objects.select_for_update().get(transaction_id=transaction_reference)
-        except Payment.DoesNotExist:
+                payment = Payment.objects.select_for_update().filter(
+                    Q(transaction_id=transaction_reference) |
+                    Q(booking_id=transaction_reference)
+                ).first()
+                if not payment and len(str(transaction_reference)) >= 8:
+                    clean_ref = str(transaction_reference).replace('-', '')
+                    payment = Payment.objects.select_for_update().filter(
+                        Q(transaction_id__icontains=clean_ref) |
+                        Q(booking__id__icontains=clean_ref)
+                    ).first()
+                if not payment:
+                    raise ValidationError({"error": "Transaction introuvable."})
+        except Exception as e:
+            if isinstance(e, ValidationError):
+                raise e
             raise ValidationError({"error": "Transaction introuvable."})
 
         booking = payment.booking

@@ -352,7 +352,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Trusted origins for CSRF (Nuxt dashboard)
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,http://localhost:8000,http://127.0.0.1:8000,https://zemybackend.sinustic.com'
+    'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,https://zemybackend.sinustic.com'
 ).split(',')
 
 JAZZMIN_SETTINGS = {

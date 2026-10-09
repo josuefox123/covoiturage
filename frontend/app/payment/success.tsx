@@ -12,9 +12,9 @@ export default function PaymentSuccessScreen() {
     const { authFetch } = useAuth();
     const { verifyPayment } = usePayment();
     
-    const txRef = params.transaction_reference as string;
-    const txId = params.transaction_id as string;
-    const bookingId = params.booking_id as string;
+    const txRef = (params.transaction_reference || params.ref || params.custom_id) as string;
+    const txId = (params.transaction_id || params.ref || params.reference) as string;
+    const bookingId = (params.booking_id || params.booking || params.custom_id || params.ref) as string;
     const amount = Number(params.amount) || 0;
 
     const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');

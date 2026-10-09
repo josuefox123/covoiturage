@@ -349,7 +349,7 @@
                                 payment_method: paymentMethod
                             }));
                         } else {
-                            const callbackUrl = urlParams.get('callback_url') || 'zemy://payments';
+                            const callbackUrl = urlParams.get('callback_url') || 'zemy://payment/success';
                             window.location.href = `${callbackUrl}?status=success&transaction_id=${txId}`;
                         }
                     } else if (response && response.status === 'FAILED') {
@@ -383,7 +383,7 @@
                             id: merchantId,
                             token: apiToken,
                             reference: customId,
-                            callback_url: urlParams.get('callback_url') || 'zemy://payments',
+                            callback_url: urlParams.get('callback_url') || 'zemy://payment/success',
                             // Pré-remplissage des champs "Informations Personnelles" du widget FeexPay
                             first_name: fullnameState,
                             email: emailState,

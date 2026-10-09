@@ -6,6 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { C, SHsm } from '../composants/theme-trajet';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
 
 interface EditRideModalProps {
@@ -29,6 +31,8 @@ export function EditRideModal({
   onDeleted,
   authFetch: customAuthFetch,
 }: EditRideModalProps) {
+  const insets = useSafeAreaInsets();
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 16);
   const { authFetch: contextAuthFetch } = useAuth();
   const authFetch = customAuthFetch || contextAuthFetch;
 
@@ -152,7 +156,7 @@ export function EditRideModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.scrollBody} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
             {/* Warning pending bookings */}
             {hasPendingBookings && (
               <View style={styles.warningBanner}>
@@ -256,7 +260,7 @@ export function EditRideModal({
           </ScrollView>
 
           {/* Action Footer */}
-          <View style={styles.footerRow}>
+          <View style={[styles.footerRow, { paddingBottom: safeBottom }]}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={loading}>
               <Text style={styles.cancelBtnText}>Annuler</Text>
             </TouchableOpacity>

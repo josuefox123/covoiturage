@@ -286,7 +286,7 @@ export default function EarningsScreen() {
         ) : (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
+            contentContainerStyle={{ paddingBottom: 110 }}
           >
             {/* Stat Cards Row */}
             <View style={styles.statsRow}>

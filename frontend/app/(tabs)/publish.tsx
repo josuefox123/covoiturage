@@ -790,7 +790,7 @@ export default function PublishScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F6FA' },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 48, paddingTop: 8 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 110, paddingTop: 8 },
   header: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#EAEDF2', paddingBottom: 8 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
   headerTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.text },

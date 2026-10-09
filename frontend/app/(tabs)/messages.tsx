@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContent: { 
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: 110,
     paddingTop: theme.spacing.md,
   },
   separator: { 

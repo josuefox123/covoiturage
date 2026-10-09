@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Booking } from '../../../../src/types';
 
@@ -26,6 +27,8 @@ export function PassengerNegotiationModal({
   onAccept,
   onReject
 }: PassengerNegotiationModalProps) {
+  const insets = useSafeAreaInsets();
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 16);
   // Résolution stricte avec ordre de priorité explicite : driver_counter_price > custom_price > passenger_proposed_price > price
   const unitPrice = myBooking?.driver_counter_price 
     ?? myBooking?.custom_price 
@@ -55,7 +58,7 @@ export function PassengerNegotiationModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[styles.modalScroll, { paddingBottom: safeBottom + 24 }]} showsVerticalScrollIndicator={false}>
             <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 16 }}>
               Le conducteur {driverName} vous propose un tarif révisé pour votre trajet :
             </Text>
