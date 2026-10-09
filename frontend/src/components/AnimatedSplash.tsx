@@ -86,7 +86,7 @@ export default function AnimatedSplash({ onFinish }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: theme.colors.white,
     justifyContent: 'center',
     alignItems: 'center',
