@@ -155,14 +155,14 @@ export default function AnimatedSplash({ onFinish }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: theme.colors.white,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
   },
   virtualCanvas: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
   },
