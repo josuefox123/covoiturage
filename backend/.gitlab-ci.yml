@@ -1,7 +1,6 @@
 stages:
   - test
   - deploy
-# trigger pipeline
 
 # ✅ Tests avec SQLite (pas besoin de PostgreSQL pour les tests)
 test-backend:
@@ -44,16 +43,11 @@ deploy-backend:
     - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
   script:
     - |
-      if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then
-        echo "⚠️ Deployment skipped: VPS_HOST or VPS_SSH_KEY missing."
-        exit 0
-      fi
-    - |
       ssh -i ~/.ssh/deploy_key deploy@$VPS_HOST "set -e
       echo '📦 Pull du code...'
       cd /var/www/zemybackend
-      git fetch origin
-      git reset --hard origin/$CI_COMMIT_REF_NAME
+      git fetch https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/sinustic1/zemy_backend.git $CI_COMMIT_REF_NAME
+      git reset --hard FETCH_HEAD
       git clean -fd
       echo '🐍 Activation du venv...'
       source venv/bin/activate

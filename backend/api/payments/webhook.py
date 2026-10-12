@@ -68,13 +68,17 @@ def feexpay_webhook(request):
 
     try:
         from django.db.models import Q
+        from .services import is_valid_uuid
         custom_id = payload.get('custom_id') or payload.get('reference')
-        payment = Payment.objects.filter(
-            Q(transaction_id=transaction_id) |
-            Q(booking_id=transaction_id) |
-            Q(booking_id=custom_id) |
-            Q(transaction_id=custom_id)
-        ).first()
+        lookup_q = Q(transaction_id=transaction_id)
+        if is_valid_uuid(transaction_id):
+            lookup_q |= Q(booking_id=transaction_id)
+        if custom_id:
+            lookup_q |= Q(transaction_id=custom_id)
+            if is_valid_uuid(custom_id):
+                lookup_q |= Q(booking_id=custom_id)
+
+        payment = Payment.objects.filter(lookup_q).first()
         
         if payment:
             # Si le statut envoyé est un succès, on valide via notre service

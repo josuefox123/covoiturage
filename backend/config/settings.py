@@ -604,6 +604,18 @@ CELERY_TASK_COMPRESSION = 'gzip'
 # sans quoi le handler Slack serait remplace par celui de Celery.
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
+# Résilience Celery / Redis : ne jamais bloquer le thread de requête HTTP
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TASK_PUBLISH_RETRY = False
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 2
+CELERY_TASK_PUBLISH_RETRY_POLICY = {
+    'max_retries': 1,
+    'interval_start': 0.1,
+    'interval_step': 0.1,
+    'interval_max': 0.2,
+}
+
 if 'test' in sys.argv:
     CELERY_TASK_ALWAYS_EAGER = False
     CELERY_BROKER_URL = 'memory://'

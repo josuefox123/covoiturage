@@ -1,5 +1,4 @@
 """
-========================================================
 
 Fichier :
 departure_check.py
@@ -11,7 +10,6 @@ Module de l'application Zemy.
 Projet :
 Zemy
 
-========================================================
 """
 import threading
 import time

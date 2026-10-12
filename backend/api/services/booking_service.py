@@ -129,7 +129,7 @@ class BookingService:
             try:
                 from ..tasks.expire_booking import expire_booking_task as _expire_task
                 if hasattr(_expire_task, 'apply_async'):
-                    _expire_task.apply_async((str(booking.id),), countdown=countdown_secs)  # type: ignore[union-attr]
+                    _expire_task.apply_async((str(booking.id),), countdown=countdown_secs, retry=False)  # type: ignore[union-attr]
                 elif callable(_expire_task):
                     pass
             except Exception:

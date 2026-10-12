@@ -48,18 +48,25 @@ class VerifyPaymentView(APIView):
             # Si le frontend a capturé l'ID de FeexPay depuis la WebView, on le lie à notre paiement local
             from ..models import Payment
             from django.db.models import Q
-            payment = Payment.objects.filter(
-                Q(transaction_id=transaction_reference) |
-                Q(booking_id=transaction_reference) |
-                (Q(transaction_id=feexpay_transaction_id) if feexpay_transaction_id else Q()) |
-                (Q(booking_id=feexpay_transaction_id) if feexpay_transaction_id else Q())
-            ).first()
+            from .services import is_valid_uuid
+
+            lookup_q = Q(transaction_id=transaction_reference)
+            if is_valid_uuid(transaction_reference):
+                lookup_q |= Q(booking_id=transaction_reference)
+
+            if feexpay_transaction_id:
+                lookup_q |= Q(transaction_id=feexpay_transaction_id)
+                if is_valid_uuid(feexpay_transaction_id):
+                    lookup_q |= Q(booking_id=feexpay_transaction_id)
+
+            payment = Payment.objects.filter(lookup_q).first()
+
             if not payment and len(str(transaction_reference)) >= 8:
                 clean_ref = str(transaction_reference).replace('-', '')
-                payment = Payment.objects.filter(
-                    Q(transaction_id__icontains=clean_ref) |
-                    Q(booking__id__icontains=clean_ref)
-                ).first()
+                partial_q = Q(transaction_id__icontains=clean_ref)
+                if is_valid_uuid(clean_ref):
+                    partial_q |= Q(booking__id=clean_ref)
+                payment = Payment.objects.filter(partial_q).first()
             if not payment:
                 return Response({"error": "Transaction locale introuvable."}, status=status.HTTP_404_NOT_FOUND)
 

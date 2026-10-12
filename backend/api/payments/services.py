@@ -11,6 +11,15 @@ from .feexpay import FeexPayClient
 
 logger = logging.getLogger(__name__)
 
+def is_valid_uuid(val):
+    if not val:
+        return False
+    try:
+        uuid.UUID(str(val).strip())
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
+
 class PaymentService:
     @staticmethod
     def initiate_payment(booking_id, user):
@@ -95,16 +104,17 @@ class PaymentService:
         from django.db.models import Q
         try:
             with transaction.atomic():
-                payment = Payment.objects.select_for_update().filter(
-                    Q(transaction_id=transaction_reference) |
-                    Q(booking_id=transaction_reference)
-                ).first()
+                lookup_q = Q(transaction_id=transaction_reference)
+                if is_valid_uuid(transaction_reference):
+                    lookup_q |= Q(booking_id=transaction_reference)
+                payment = Payment.objects.select_for_update().filter(lookup_q).first()
+
                 if not payment and len(str(transaction_reference)) >= 8:
                     clean_ref = str(transaction_reference).replace('-', '')
-                    payment = Payment.objects.select_for_update().filter(
-                        Q(transaction_id__icontains=clean_ref) |
-                        Q(booking__id__icontains=clean_ref)
-                    ).first()
+                    partial_q = Q(transaction_id__icontains=clean_ref)
+                    if is_valid_uuid(clean_ref):
+                        partial_q |= Q(booking__id=clean_ref)
+                    payment = Payment.objects.select_for_update().filter(partial_q).first()
                 if not payment:
                     raise ValidationError({"error": "Transaction introuvable."})
         except Exception as e:
