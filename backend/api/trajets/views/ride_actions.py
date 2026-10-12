@@ -123,7 +123,7 @@ class RideActionsMixin:
         if ride.driver and total_driver_gain > 0:
             create_and_send_notification(
                 user=ride.driver,
-                title="Gains disponibles 💰",
+                title="Gains disponibles",
                 message=(
                     f"Trajet {ride.departure_location} → {ride.arrival_location} terminé. "
                     f"Vos gains de {total_driver_gain:,} FCFA sont maintenant disponibles. "
@@ -215,7 +215,7 @@ class RideActionsMixin:
 
                 create_and_send_notification(
                     user=booking.passenger,
-                    title="Arrivée à votre arrêt 📍",
+                    title="Arrivée à votre arrêt",
                     message=f"Vous êtes arrivé(e) à {current_leg.end_location}. Merci d'avoir voyagé avec Zemy !",
                     data={'type': 'passenger_alighting', 'booking_id': str(booking.id), 'ride_id': str(ride.id)}
                 )
@@ -293,3 +293,131 @@ class RideActionsMixin:
             "alighting_passengers": len(alighting_passengers),
             "ride_status": ride.status,
         })
+
+    # =========================================================================
+    # Confirmation de départ 30 min avant (alerte conducteur)
+    # =========================================================================
+
+    @action(detail=True, methods=['post'], url_path='confirm-departure')
+    def confirm_departure(self, request, pk=None):
+        """
+        Endpoint appelé quand le conducteur répond à l'alerte de confirmation 30 min avant départ.
+
+        Body JSON:
+            { "confirmed": true }  → Le trajet tient
+            { "confirmed": false } → Le conducteur annule
+
+        Si confirmed=False :
+            - Le trajet passe en 'cancelled'
+            - Tous les passagers confirmés (escrow) sont remboursés automatiquement (RefundRequest)
+            - Chaque passager reçoit une notification + email d'excuse
+            - Le conducteur reçoit une notification récapitulative
+        """
+        ride = self.get_object()
+
+        # Seul le conducteur peut confirmer
+        if ride.driver != request.user:
+            return Response({"error": "Seul le conducteur peut confirmer ce trajet."}, status=status.HTTP_403_FORBIDDEN)
+
+        if ride.status in ['cancelled', 'completed']:
+            return Response({"error": f"Ce trajet est déjà {ride.status}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        confirmed = request.data.get('confirmed')
+        if confirmed is None:
+            return Response({"error": "Le champ 'confirmed' est requis (true/false)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            ride.driver_confirmed_departure = bool(confirmed)
+            ride.save(update_fields=['driver_confirmed_departure'])
+
+            # ——— OUI : le trajet tient ———
+            if confirmed:
+                logger.info(f"[DepartureConfirm] Conducteur {ride.driver.id} a confirmé le trajet {ride.id}")
+                return Response({
+                    "status": "confirmed",
+                    "message": "Parfait ! Une fenêtre de démarrage vous sera envoyée 10 minutes avant le départ."
+                })
+
+            # ——— NON : annulation du trajet ———
+            logger.info(f"[DepartureConfirm] Conducteur {ride.driver.id} a annulé le trajet {ride.id}")
+
+            ride.status = 'cancelled'
+            ride.save(update_fields=['status'])
+
+            dep = ride.departure_location or ''
+            arr = ride.arrival_location or ''
+            driver_name = ride.driver.full_name or ride.driver.phone or 'Le conducteur'
+
+            # Rembourser tous les passagers confirmés (payment_status='escrow')
+            confirmed_bookings = ride.bookings.filter(status='confirmed', payment_status='escrow')
+            refund_count = 0
+            for booking in confirmed_bookings:
+                # Marquer comme annulé + remboursé
+                booking.status = 'cancelled'
+                booking.payment_status = 'refunded'
+                booking.save(update_fields=['status', 'payment_status'])
+
+                # Libérer les places (update atomique, pas d'assignation F() sur l'instance)
+                from django.db.models import F
+                Ride.objects.filter(pk=ride.pk).update(
+                    seats_available=F('seats_available') + booking.seats_booked
+                )
+
+                # Créer la demande de remboursement approuvée automatiquement
+                from ...models.paiement import RefundRequest as RF
+                amount_to_refund = booking.total_amount
+                RF.objects.create(
+                    booking=booking,
+                    passenger=booking.passenger,
+                    driver=ride.driver,
+                    amount=amount_to_refund,
+                    reason=f"Annulation du trajet par le conducteur 30 min avant le départ ({dep} → {arr})",
+                    status='approved'
+                )
+                refund_count += 1
+
+                # Notification d'excuse au passager (urgente)
+                b_dep = booking.departure_location or dep
+                b_arr = booking.arrival_location or arr
+                excuse_message = (
+                    f"Trajet annulé - {b_dep} -> {b_arr}\n\n"
+                    f"{driver_name} a malheureusement dû annuler ce trajet 30 min avant le départ. "
+                    f"Toutes nos excuses pour la gêne occasionnée. "
+                    f"Votre remboursement de {amount_to_refund} FCFA est en cours et sera crédité sous 24-48h. "
+                    f"L'équipe Zemy reste disponible pour vous aider à trouver un autre trajet."
+                )
+                create_and_send_notification(
+                    user=booking.passenger,
+                    title="Trajet annulé - Remboursement en cours",
+                    message=excuse_message,
+                    data={
+                        'type': 'ride_cancelled_by_driver',
+                        'booking_id': str(booking.id),
+                        'ride_id': str(ride.id),
+                        'screen': 'trips',
+                        'requires_acknowledgment': 'true',
+                    }
+                )
+
+            # Notification récapitulative au conducteur
+            create_and_send_notification(
+                user=ride.driver,
+                title="Trajet annulé",
+                message=(
+                    f"Votre trajet {dep} → {arr} a été annulé. "
+                    f"{refund_count} passager(s) ont été remboursés automatiquement. "
+                    f"Merci de prévenir à l'avance la prochaine fois."
+                ),
+                data={
+                    'type': 'driver_cancelled_own_ride',
+                    'ride_id': str(ride.id),
+                    'screen': 'rides',
+                }
+            )
+
+            return Response({
+                "status": "cancelled",
+                "message": f"Trajet annulé. {refund_count} passager(s) ont été remboursés automatiquement.",
+                "refund_count": refund_count,
+            })
+

@@ -123,7 +123,7 @@ class RidePublicationController:
         zemy_commission = cls.calculate_commission(driver_payout)
         price_per_seat = driver_payout + zemy_commission
 
-        created_count = RideSeriesService.create_recurrent_rides(
+        res_summary = RideSeriesService.create_recurrent_rides(
             driver=user,
             start_date=start_date,
             end_date=end_date,
@@ -159,4 +159,4 @@ class RidePublicationController:
             arr_lon=float(data['arrival_longitude']) if data.get('arrival_longitude') is not None else None
         )
 
-        return {"message": f"{created_count} trajets générés avec succès."}
+        return res_summary

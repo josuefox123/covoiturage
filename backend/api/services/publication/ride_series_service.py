@@ -52,11 +52,20 @@ class RideSeriesService:
         dep_lon: Optional[float] = None,
         arr_lat: Optional[float] = None,
         arr_lon: Optional[float] = None
-    ) -> int:
+    ) -> dict:
         """
         Valide les récurrences et procède à la création de la série (RideSeries)
-        ainsi que de chaque trajet individuel programmé (Ride) avec génération de segments.
+        ainsi que de chaque trajet individuel programmé (Ride).
+        Retourne un bilan détaillé des trajets créés et de ceux en conflit/erreur.
         """
+        MONTHS_FR = ["", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+        DAYS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+        def format_french_date(d: date) -> str:
+            day_name = DAYS_FR[d.weekday()]
+            month_name = MONTHS_FR[d.month]
+            return f"{day_name} {d.day} {month_name} {d.year}"
+
         # 1. Validation métier de la récurrence dans le Domain
         error_msg = ReglesPublicationDomain.valider_parametres_recurrence(
             start_date, end_date, repeat_type, week_days
@@ -85,7 +94,11 @@ class RideSeriesService:
             start_date, end_date, repeat_type, week_days
         )
 
-        # 4. Résoudre l'itinéraire Google Directions une seule fois pour toute la série (hors transaction)
+        if not target_dates:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"error": "Aucune date ne correspond aux critères de récurrence sélectionnés."})
+
+        # 4. Résoudre l'itinéraire Google Directions une seule fois pour toute la série
         precalculated_route = None
         if target_dates:
             from ...cartographie.routes import RoutesOrchestrator
@@ -103,101 +116,204 @@ class RideSeriesService:
             except Exception as e:
                 logger.warning(f"Erreur pré-calcul itinéraire récurrence : {e}")
 
+        # 5. Verrouiller le conducteur pour sérialiser les publications
+        from ...models.utilisateur import User as UserModel
         with transaction.atomic():
-            # BUG-013 FIX : Verrouiller le conducteur pour sérialiser les publications
-            # concurrentes. Avant ce fix, la validation (ci-dessous) pouvait être
-            # exécutée par deux requêtes simultanées qui passaient toutes les deux
-            # la vérification de conflit avant que l'une des deux ait créé les trajets.
-            from ...models.utilisateur import User as UserModel
             UserModel.objects.select_for_update().get(id=driver.id)
 
+        vehicle_obj = None
+        if vehicle_id:
+            vehicle_obj = Vehicle.objects.filter(id=vehicle_id).first()
+        if not vehicle_obj:
+            vehicle_obj = Vehicle.objects.filter(owner=driver).first()
 
-            vehicle_obj = None
-            if vehicle_id:
-                vehicle_obj = Vehicle.objects.filter(id=vehicle_id).first()
-            if not vehicle_obj:
-                vehicle_obj = Vehicle.objects.filter(owner=driver).first()
+        # Création de la série via Repository
+        series = RideSeriesRepository.create_series(
+            driver=driver,
+            start_date=start_date,
+            end_date=end_date,
+            repeat_type=repeat_type,
+            week_days=week_days,
+            departure_time=departure_time_val,
+            departure_location=departure_location,
+            arrival_location=arrival_location,
+            price_per_seat=price_per_seat,
+            driver_payout=driver_payout,
+            zemy_commission=zemy_commission,
+            total_seats=total_seats,
+            vehicle=vehicle_obj,
+            accepts_parcels=accepts_parcels,
+            max_parcels=max_parcels,
+            max_weight_per_parcel=max_weight_per_parcel,
+            max_dimensions=max_dimensions,
+            price_per_parcel=price_per_parcel,
+            allowed_parcel_types=allowed_parcel_types,
+            departure_latitude=dep_lat,
+            departure_longitude=dep_lon,
+            arrival_latitude=arr_lat,
+            arrival_longitude=arr_lon
+        )
 
-            # Création de la série via Repository
-            series = RideSeriesRepository.create_series(
-                driver=driver,
-                start_date=start_date,
-                end_date=end_date,
-                repeat_type=repeat_type,
-                week_days=week_days,
-                departure_time=departure_time_val,
-                departure_location=departure_location,
-                arrival_location=arrival_location,
-                price_per_seat=price_per_seat,
-                driver_payout=driver_payout,
-                zemy_commission=zemy_commission,
-                total_seats=total_seats,
-                vehicle=vehicle_obj,
-                accepts_parcels=accepts_parcels,
-                max_parcels=max_parcels,
-                max_weight_per_parcel=max_weight_per_parcel,
-                max_dimensions=max_dimensions,
-                price_per_parcel=price_per_parcel,
-                allowed_parcel_types=allowed_parcel_types,
-                departure_latitude=dep_lat,
-                departure_longitude=dep_lon,
-                arrival_latitude=arr_lat,
-                arrival_longitude=arr_lon
-            )
+        created_count = 0
+        created_rides = []
+        failed_rides = []
+        time_str = departure_time_val.strftime("%H:%M") if hasattr(departure_time_val, 'strftime') else str(departure_time_val)
 
-            created_count = 0
-            # Création de chaque trajet
-            for current_date in target_dates:
-                # Validation locale de conflit
-                validate_driver_and_vehicle(
-                    driver=driver,
-                    vehicle_id=vehicle_id,
-                    departure_date=current_date,
-                    departure_time=departure_time_val,
-                    duration_min=duration_min
-                )
+        # Création de chaque trajet avec isolation atomique par date
+        for current_date in target_dates:
+            date_formatted = current_date.strftime("%d/%m/%Y")
+            day_name = format_french_date(current_date)
+            try:
+                with transaction.atomic():
+                    validate_driver_and_vehicle(
+                        driver=driver,
+                        vehicle_id=vehicle_id,
+                        departure_date=current_date,
+                        departure_time=departure_time_val,
+                        duration_min=duration_min,
+                        series_id=series.id  # exclure les trajets déjà créés dans cette série
+                    )
 
-                ride_obj = RideRepository.create_ride(
-                    series=series,
-                    driver=driver,
-                    vehicle=vehicle_obj,
-                    departure_location=departure_location,
-                    arrival_location=arrival_location,
-                    departure_date=current_date,
-                    departure_time=departure_time_val,
-                    price_per_seat=price_per_seat,
-                    driver_payout=driver_payout,
-                    zemy_commission=zemy_commission,
-                    total_seats=total_seats,
-                    seats_available=total_seats,
-                    accepts_parcels=accepts_parcels,
-                    max_parcels=max_parcels,
-                    parcels_available=max_parcels,
-                    max_weight_per_parcel=max_weight_per_parcel,
-                    max_dimensions=max_dimensions,
-                    price_per_parcel=price_per_parcel,
-                    allowed_parcel_types=allowed_parcel_types,
-                    departure_latitude=dep_lat,
-                    departure_longitude=dep_lon,
-                    arrival_latitude=arr_lat,
-                    arrival_longitude=arr_lon,
-                    music=music,
-                    smoking=smoking,
-                    chatty=chatty,
-                    air_conditioner=air_conditioner,
-                    pets_allowed=pets_allowed,
-                    luggage_allowed=luggage_allowed,
-                    stops_allowed=stops_allowed,
-                    description=description,
-                    distance_km=float(distance_km) if distance_km else None,
-                    duration_min=int(duration_min) if duration_min else None,
-                )
+                    ride_obj = RideRepository.create_ride(
+                        series=series,
+                        driver=driver,
+                        vehicle=vehicle_obj,
+                        departure_location=departure_location,
+                        arrival_location=arrival_location,
+                        departure_date=current_date,
+                        departure_time=departure_time_val,
+                        price_per_seat=price_per_seat,
+                        driver_payout=driver_payout,
+                        zemy_commission=zemy_commission,
+                        total_seats=total_seats,
+                        seats_available=total_seats,
+                        accepts_parcels=accepts_parcels,
+                        max_parcels=max_parcels,
+                        parcels_available=max_parcels,
+                        max_weight_per_parcel=max_weight_per_parcel,
+                        max_dimensions=max_dimensions,
+                        price_per_parcel=price_per_parcel,
+                        allowed_parcel_types=allowed_parcel_types,
+                        departure_latitude=dep_lat,
+                        departure_longitude=dep_lon,
+                        arrival_latitude=arr_lat,
+                        arrival_longitude=arr_lon,
+                        music=music,
+                        smoking=smoking,
+                        chatty=chatty,
+                        air_conditioner=air_conditioner,
+                        pets_allowed=pets_allowed,
+                        luggage_allowed=luggage_allowed,
+                        stops_allowed=stops_allowed,
+                        description=description,
+                        distance_km=float(distance_km) if distance_km else None,
+                        duration_min=int(duration_min) if duration_min else None,
+                    )
 
-                try:
-                    RidePublicationService.generate_legs(ride_obj, precalculated_route=precalculated_route)
-                except Exception as e:
-                    logger.error(f"Erreur legs trajet récurrent {ride_obj.id}: {e}")
+                    try:
+                        RidePublicationService.generate_legs(ride_obj, precalculated_route=precalculated_route)
+                    except Exception as e:
+                        logger.error(f"Erreur legs trajet récurrent {ride_obj.id}: {e}")
 
-                created_count += 1
+                    created_count += 1
+                    created_rides.append({
+                        "date": date_formatted,
+                        "date_iso": current_date.strftime("%Y-%m-%d"),
+                        "day_name": day_name,
+                        "time": time_str
+                    })
+            except Exception as err:
+                err_msg = "Conflit d'horaire ou trajet déjà existant"
+                if hasattr(err, "detail") and isinstance(err.detail, dict) and "error" in err.detail:
+                    err_msg = str(err.detail["error"])
+                elif hasattr(err, "detail"):
+                    err_msg = str(err.detail)
+                elif hasattr(err, "message"):
+                    err_msg = str(err.message)
+                else:
+                    err_msg = str(err)
 
-        return created_count
+                logger.warning(f"[RideSeriesService] Conflit publication pour le {current_date}: {err_msg}")
+                failed_rides.append({
+                    "date": date_formatted,
+                    "date_iso": current_date.strftime("%Y-%m-%d"),
+                    "day_name": day_name,
+                    "time": time_str,
+                    "reason": err_msg
+                })
+
+        # Nettoyage de la série si aucun trajet n'a été créé
+        if created_count == 0:
+            try:
+                series.delete()
+            except Exception:
+                pass
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({
+                "error": f"Aucun trajet n'a pu être créé en raison de conflits.",
+                "created_count": 0,
+                "failed_count": len(failed_rides),
+                "total_requested": len(target_dates),
+                "failed_rides": failed_rides
+            })
+
+        logger.info(
+            f"[RideSeriesService] Série {series.id} : {created_count} créés, "
+            f"{len(failed_rides)} en conflit."
+        )
+
+        msg = (
+            f"Félicitations ! Vos {created_count} trajets récurrents ont été créés avec succès."
+            if len(failed_rides) == 0
+            else f"{created_count} trajet(s) créé(s) avec succès. {len(failed_rides)} n'ont pas pu être créés en raison d'un conflit."
+        )
+
+        return {
+            "status": "success" if len(failed_rides) == 0 else "partial",
+            "created_count": created_count,
+            "failed_count": len(failed_rides),
+            "total_requested": len(target_dates),
+            "created_rides": created_rides,
+            "failed_rides": failed_rides,
+            "message": msg
+        }
+
+    @staticmethod
+    def get_series_summary(series_id: str) -> dict:
+        """
+        Retourne un résumé statistique d'une série de trajets :
+        nombre total de trajets, nombre de trajets passés/futurs,
+        places disponibles restantes, et taux de remplissage moyen.
+        """
+        from django.utils import timezone
+        from django.db.models import Avg, Sum
+
+        try:
+            series = RideSeries.objects.get(id=series_id)
+        except RideSeries.DoesNotExist:
+            return {}
+
+        rides_qs = Ride.objects.filter(series=series)
+        now = timezone.now().date()
+
+        total = rides_qs.count()
+        past = rides_qs.filter(departure_date__lt=now).count()
+        upcoming = rides_qs.filter(departure_date__gte=now).count()
+
+        avg_fill = rides_qs.aggregate(
+            avg_available=Avg('seats_available'),
+            total_seats=Avg('total_seats')
+        )
+        total_seats_avg = avg_fill.get('total_seats') or 1
+        avg_available = avg_fill.get('avg_available') or 0
+        fill_rate = round((1 - avg_available / total_seats_avg) * 100, 1) if total_seats_avg else 0
+
+        return {
+            "series_id": str(series.id),
+            "driver_id": str(series.driver_id),
+            "route": f"{series.departure_location} → {series.arrival_location}",
+            "total_rides": total,
+            "past_rides": past,
+            "upcoming_rides": upcoming,
+            "avg_fill_rate_pct": fill_rate,
+        }

@@ -147,6 +147,21 @@ class CorridorMatcher:
         if not seats_ok:
             return None
 
+        # Prorata de prix si portion partielle sur la polyline sans tarif de leg explicite
+        if (not calculated_price or calculated_price == ride.price_per_seat) and polyline and len(polyline) > 1:
+            if idx_dep > 0 or idx_arr < len(polyline) - 1:
+                total_poly_dist = sum(
+                    haversine_km(polyline[i][0], polyline[i][1], polyline[i+1][0], polyline[i+1][1])
+                    for i in range(len(polyline) - 1)
+                )
+                seg_poly_dist = sum(
+                    haversine_km(polyline[i][0], polyline[i][1], polyline[i+1][0], polyline[i+1][1])
+                    for i in range(idx_dep, min(idx_arr, len(polyline) - 1))
+                )
+                if total_poly_dist > 0 and seg_poly_dist > 0:
+                    ratio = seg_poly_dist / total_poly_dist
+                    calculated_price = max(100, int(round((ride.price_per_seat * ratio) / 50.0) * 50))
+
         if not calculated_price:
             calculated_price = ride.price_per_seat
 

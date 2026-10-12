@@ -145,6 +145,17 @@ class Ride(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Confirmation de départ conducteur (alerte 30 min avant)
+    # None = pas encore envoyé/répondu, True = confirmé, False = annulé par le conducteur
+    driver_confirmed_departure = models.BooleanField(
+        null=True, blank=True,
+        help_text="Confirmation du conducteur 30 min avant le départ. None=en attente, True=confirmé, False=annulé"
+    )
+    departure_confirmation_sent_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Heure à laquelle l'alerte de confirmation de départ a été envoyée au conducteur"
+    )
+
     class Meta:
         verbose_name = "Trajet"
         verbose_name_plural = "Trajets"
@@ -216,13 +227,13 @@ class Ride(models.Model):
         dest_idx = -1
 
         for idx, pc in enumerate(place_cities):
-            if dep_city in pc:
+            if pc and (dep_city in pc or pc in dep_city):
                 dep_idx = idx
                 break
         
         if dep_idx != -1:
             for idx, pc in enumerate(place_cities):
-                if arr_city in pc and idx > dep_idx:
+                if pc and (arr_city in pc or pc in arr_city) and idx > dep_idx:
                     dest_idx = idx
                     break
 

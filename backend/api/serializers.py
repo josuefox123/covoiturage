@@ -200,6 +200,16 @@ class RideSerializer(serializers.ModelSerializer):
 
         request = self.context.get('request')
         if request:
+            user = getattr(request, 'user', None)
+            if user and not user.is_anonymous:
+                from api.services.ride_edit_service import RideEditService
+                can_edit, reason = RideEditService.check_editability(instance, user)
+                ret['can_edit'] = can_edit
+                ret['edit_block_reason'] = reason
+            else:
+                ret['can_edit'] = False
+                ret['edit_block_reason'] = "NOT_OWNER"
+
             query_params = request.query_params if hasattr(request, 'query_params') else getattr(request, 'GET', {})
             departure = query_params.get('departure')
             destination = query_params.get('destination')
@@ -207,6 +217,9 @@ class RideSerializer(serializers.ModelSerializer):
                 segment_price = instance.get_segment_price(departure, destination)
                 if segment_price:
                     ret['price_per_seat'] = segment_price
+        else:
+            ret['can_edit'] = False
+            ret['edit_block_reason'] = None
         return ret
 
 class BookingSerializer(serializers.ModelSerializer):
