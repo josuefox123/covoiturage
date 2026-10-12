@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 
 /**
@@ -30,6 +31,7 @@ import { theme } from '../styles/theme';
  */
 export default function SupportBubble() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [visible, setVisible] = useState(true);
@@ -83,8 +85,10 @@ export default function SupportBubble() {
 
   if (!visible) return null;
 
+  const bottomOffset = (insets.bottom > 0 ? insets.bottom : 18) + 85;
+
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={[styles.container, { bottom: bottomOffset }]} pointerEvents="box-none">
       {/* Pulse ring */}
       <Animated.View
         style={[
@@ -113,7 +117,6 @@ export default function SupportBubble() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 90,
     right: 20,
     alignItems: 'center',
     justifyContent: 'center',
