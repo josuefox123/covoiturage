@@ -19,15 +19,15 @@ Ce document récapitule les étapes exactes pour effectuer les mises à jour et 
 
 > [!IMPORTANT]
 > **Règle de travail pour le Backend :**
-> Travaillez sur votre branche locale **`josue`**.
-> Pour déployer et tester vos modifications en toute sécurité, **récupérez les nouveautés sur `josue` et poussez votre branche `josue` vers la branche `testeur` de GitLab**.
+> Les seules branches actives sur GitLab sont **`develop`** et **`main`** (les branches `testeur` et `josue` ne sont plus utilisées).
+> Travaillez sur votre branche locale **`develop`**. Ne modifiez jamais le fichier `.gitlab-ci.yml`.
 
-### 🔹 Étape 1 : Récupérer les nouveautés de `josue` depuis GitLab
+### 🔹 Étape 1 : Récupérer les nouveautés depuis GitLab
 ```bash
 cd c:\PROJETS\antigravity\covoiturage1\backend
 
-# Récupérer et fusionner les derniers commits depuis la branche josue de GitLab
-git pull gitlab josue
+# Récupérer et fusionner les derniers commits depuis la branche develop de GitLab
+git pull gitlab develop
 ```
 
 ### 🔹 Étape 2 : Commiter vos modifications locales
@@ -38,15 +38,15 @@ git add .
 git commit -m "description explicite de vos modifications"
 ```
 
-### 🔹 Étape 3 : Pousser sur la branche de test (`testeur`)
+### 🔹 Étape 3 : Pousser vers GitLab et GitHub
 ```bash
 cd c:\PROJETS\antigravity\covoiturage1\backend
 
-# Envoie vos modifications locales de la branche josue vers la branche testeur de GitLab
-git push gitlab josue:testeur
+# Envoie vos modifications directement sur la branche develop de GitLab
+git push gitlab develop
 
-# (Optionnel) Sauvegarder aussi sur votre branche josue sur GitHub
-git push origin josue
+# (Optionnel) Sauvegarder aussi sur develop sur GitHub
+git push origin develop
 ```
 
 ---
