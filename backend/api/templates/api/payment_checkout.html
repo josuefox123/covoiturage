@@ -341,16 +341,22 @@
                         const txId = response.transaction_id || response.reference;
                         const paymentMethod = response.reseau || 'LOCAL';
                         
+                        const txRef = urlParams.get('transaction_id') || txId;
+                        const bkId = customId;
+                        
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 status: 'success',
                                 transaction_id: txId,
+                                transaction_reference: txRef,
+                                booking_id: bkId,
+                                custom_id: bkId,
                                 amount: amount,
                                 payment_method: paymentMethod
                             }));
                         } else {
                             const callbackUrl = urlParams.get('callback_url') || 'zemy://payment/success';
-                            window.location.href = `${callbackUrl}?status=success&transaction_id=${txId}`;
+                            window.location.href = `${callbackUrl}?status=success&transaction_id=${encodeURIComponent(txId)}&transaction_reference=${encodeURIComponent(txRef)}&booking_id=${encodeURIComponent(bkId)}&custom_id=${encodeURIComponent(bkId)}&amount=${amount}`;
                         }
                     } else if (response && response.status === 'FAILED') {
                         if (window.ReactNativeWebView) {

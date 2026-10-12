@@ -148,10 +148,10 @@ export default function PaymentScreen() {
                 router.replace({
                     pathname: '/payment/success',
                     params: { 
-                        transaction_reference: txRef || '',
+                        transaction_reference: data.transaction_reference || txRef || data.transaction_id || '',
                         transaction_id: data.transaction_id,
-                        booking_id: bookingId,
-                        amount: amount
+                        booking_id: data.booking_id || bookingId || '',
+                        amount: data.amount || amount
                     }
                 });
             } else if (data.status === 'failed') {

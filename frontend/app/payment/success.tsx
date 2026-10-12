@@ -12,9 +12,9 @@ export default function PaymentSuccessScreen() {
     const { authFetch } = useAuth();
     const { verifyPayment } = usePayment();
     
-    const txRef = (params.transaction_reference || params.ref || params.custom_id) as string;
-    const txId = (params.transaction_id || params.ref || params.reference) as string;
-    const bookingId = (params.booking_id || params.booking || params.custom_id || params.ref) as string;
+    const txRef = (params.transaction_reference || params.transaction_id || params.ref || params.reference || params.custom_id) as string;
+    const txId = (params.transaction_id || params.reference || params.ref) as string;
+    const bookingId = (params.booking_id || params.booking || params.custom_id) as string;
     const amount = Number(params.amount) || 0;
 
     const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
@@ -23,7 +23,8 @@ export default function PaymentSuccessScreen() {
     const [downloading, setDownloading] = useState(false);
 
     const handleDownloadReceipt = async () => {
-        if (!bookingId) return;
+        const effectiveId = bookingDetails?.id || bookingId;
+        if (!effectiveId) return;
         try {
             setDownloading(true);
             const FileSystem = require('expo-file-system/legacy');
@@ -37,8 +38,8 @@ export default function PaymentSuccessScreen() {
             }
 
             const storedToken = await SecureStore.getItemAsync('zemy_access_token');
-            const receiptUrl = `${API_URL}/bookings/${bookingId}/receipt/`;
-            const localUri = (((FileSystem as any).documentDirectory) ?? '') + `recu_paiement_${bookingId.substring(0, 8)}.pdf`;
+            const receiptUrl = `${API_URL}/bookings/${effectiveId}/receipt/`;
+            const localUri = (((FileSystem as any).documentDirectory) ?? '') + `recu_paiement_${String(effectiveId).substring(0, 8)}.pdf`;
 
             const downloadResult = await FileSystem.downloadAsync(receiptUrl, localUri, {
                 headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : {},
@@ -62,7 +63,7 @@ export default function PaymentSuccessScreen() {
     };
 
     useEffect(() => {
-        if (txRef) {
+        if (txRef || txId) {
             handleVerify();
         } else if (bookingId) {
             handleLoadTicket();
@@ -75,14 +76,13 @@ export default function PaymentSuccessScreen() {
     const handleLoadTicket = async () => {
         try {
             const details = await authFetch(`/bookings/${bookingId}/`);
-            const validStatuses = ['confirmed', 'active', 'started', 'completed'];
             if (details && (details.payment_status === 'paid' || details.payment_status === 'escrow')) {
                 setBookingDetails(details);
                 setStatus('success');
-                setMessage('Votre ticket a été chargé.');
+                setMessage('Votre réservation a été validée avec succès.');
             } else {
                 setStatus('failed');
-                setMessage("Ce billet n'est pas disponible (réservation en attente de paiement ou annulée).");
+                setMessage("Ce billet n'est pas encore disponible (réservation en attente de paiement).");
             }
         } catch (error: any) {
             setStatus('failed');
@@ -91,35 +91,89 @@ export default function PaymentSuccessScreen() {
     };
 
     const handleVerify = async () => {
-        try {
-            const response = await verifyPayment(txRef, txId);
-            if (response && response.status === 'SUCCESS') {
-                // Charger les détails de la réservation
-                const details = await authFetch(`/bookings/${bookingId}/`);
-                const rideId = details?.ride_details?.id || details?.ride?.id || details?.ride;
+        const targetRef = txRef || txId;
+        if (!targetRef) {
+            setStatus('failed');
+            setMessage('Référence de transaction manquante.');
+            return;
+        }
 
-                if (!rideId) {
-                    throw new Error("Impossible de récupérer l'identifiant du trajet.");
+        let attempts = 0;
+        const maxAttempts = 6;
+
+        while (attempts < maxAttempts) {
+            try {
+                setMessage(attempts === 0 
+                    ? 'Vérification du paiement en cours auprès de FeexPay...' 
+                    : `Confirmation auprès de l'opérateur Mobile Money (${attempts}/${maxAttempts})...`
+                );
+
+                const response = await verifyPayment(targetRef, txId || targetRef);
+                
+                // 1. Succès confirmé par le service de paiement
+                if (response && response.status === 'SUCCESS') {
+                    const effectiveBookingId = (response as any).booking_id || bookingId;
+                    if (effectiveBookingId) {
+                        try {
+                            const details = await authFetch(`/bookings/${effectiveBookingId}/`);
+                            setBookingDetails(details);
+                            const rideId = details?.ride_details?.id || details?.ride?.id || details?.ride;
+                            if (rideId) {
+                                const conv = await authFetch('/conversations/ride-chat/', {
+                                    method: 'POST',
+                                    body: JSON.stringify({ ride_id: rideId })
+                                });
+                                router.replace({
+                                    pathname: `/chat/${conv.id}`,
+                                    params: { show_proposal: 'true' }
+                                });
+                                return;
+                            }
+                        } catch (e) {
+                            console.warn('Redirection chat post-paiement ignorée:', e);
+                        }
+                    }
+                    setStatus('success');
+                    setMessage('Paiement validé avec succès !');
+                    return;
                 }
 
-                // Récupérer ou créer la conversation de chat
-                const conv = await authFetch('/conversations/ride-chat/', {
-                    method: 'POST',
-                    body: JSON.stringify({ ride_id: rideId })
-                });
+                // 2. Échec définitif confirmé par FeexPay
+                if (response && ['FAILED', 'DECLINED', 'REJECTED', 'CANCELLED'].includes(response.status)) {
+                    setStatus('failed');
+                    setMessage(response.message || "Le paiement a été refusé par l'opérateur.");
+                    return;
+                }
 
-                // Rediriger directement dans le chat avec le conducteur
-                router.replace({
-                    pathname: `/chat/${conv.id}`,
-                    params: { show_proposal: 'true' }
-                });
-            } else {
-                setStatus('failed');
-                setMessage(response?.message || 'Le paiement n\'a pas pu être validé.');
+                // 3. Statut en attente (Mobile money delay) : retenter après 2.5 secondes
+                attempts++;
+                if (attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 2500));
+                } else {
+                    // Dernier contrôle : vérifier si le webhook a validé la réservation en base
+                    if (bookingId) {
+                        try {
+                            const details = await authFetch(`/bookings/${bookingId}/`);
+                            if (details && (details.payment_status === 'paid' || details.payment_status === 'escrow')) {
+                                setBookingDetails(details);
+                                setStatus('success');
+                                setMessage('Paiement validé avec succès.');
+                                return;
+                            }
+                        } catch (e) {}
+                    }
+                    setStatus('failed');
+                    setMessage(response?.message || 'Le paiement n\'a pas pu être validé dans le délai imparti.');
+                }
+            } catch (error: any) {
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    setStatus('failed');
+                    setMessage(error.message || 'Erreur lors de la validation du paiement.');
+                } else {
+                    await new Promise(resolve => setTimeout(resolve, 2500));
+                }
             }
-        } catch (error: any) {
-            setStatus('failed');
-            setMessage(error.message || 'Erreur lors de la validation du paiement.');
         }
     };
 

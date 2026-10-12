@@ -50,7 +50,9 @@ class VerifyPaymentView(APIView):
             from django.db.models import Q
             payment = Payment.objects.filter(
                 Q(transaction_id=transaction_reference) |
-                Q(booking_id=transaction_reference)
+                Q(booking_id=transaction_reference) |
+                (Q(transaction_id=feexpay_transaction_id) if feexpay_transaction_id else Q()) |
+                (Q(booking_id=feexpay_transaction_id) if feexpay_transaction_id else Q())
             ).first()
             if not payment and len(str(transaction_reference)) >= 8:
                 clean_ref = str(transaction_reference).replace('-', '')
@@ -65,7 +67,7 @@ class VerifyPaymentView(APIView):
             ref_to_verify = feexpay_transaction_id or transaction_reference
             
             # Enregistrer l'ID de FeexPay sur notre paiement pour les futures vérifications (cron, webhook)
-            if feexpay_transaction_id:
+            if feexpay_transaction_id and payment.transaction_id != feexpay_transaction_id:
                 # Si un autre paiement existe déjà avec cet ID FeexPay, cela pourrait être un replay attack/fraude
                 duplicate = Payment.objects.filter(transaction_id=feexpay_transaction_id).exclude(id=payment.id).exists()
                 if duplicate:
@@ -80,6 +82,7 @@ class VerifyPaymentView(APIView):
             return Response({
                 "status": payment.status,
                 "message": message,
+                "booking_id": str(payment.booking.id) if payment.booking else None,
                 "booking_status": payment.booking.status if payment.booking else None
             }, status=status.HTTP_200_OK)
             
