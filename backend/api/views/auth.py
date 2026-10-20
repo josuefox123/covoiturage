@@ -9,6 +9,8 @@ from ..utilisateurs.views.authentification import (
     verify_code,
     register_user,
     login_user,
+    logout_user,
+    get_current_user,
     send_reset_code,
     verify_reset_code,
     reset_password,
@@ -34,6 +36,8 @@ __all__ = [
     'verify_code',
     'register_user',
     'login_user',
+    'logout_user',
+    'get_current_user',
     'send_reset_code',
     'verify_reset_code',
     'reset_password',
@@ -47,3 +51,4 @@ __all__ = [
     'request_verification',
     'verification_status',
 ]
+

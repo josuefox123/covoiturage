@@ -161,12 +161,14 @@ class RidePublicationService:
 
         final_stopovers.sort(key=get_node_polyline_index)
 
-        # Sauvegarde des escales validées
+        # Sauvegarde uniquement des escales explicitement choisies par le conducteur
+        driver_stopovers = [fs for fs in final_stopovers if fs.get('is_driver')]
         ride.stopovers = [{
             'name': fs['name'],
             'latitude': fs['latitude'],
-            'longitude': fs['longitude']
-        } for fs in final_stopovers]
+            'longitude': fs['longitude'],
+            'is_driver': True
+        } for fs in driver_stopovers]
         ride.save(update_fields=['stopovers'])
 
         # 7. Préparation des nœuds et tronçons (legs)

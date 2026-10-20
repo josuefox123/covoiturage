@@ -15,8 +15,9 @@ Zemy
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-    verify_code, register_user, login_user, check_availability,
+    verify_code, register_user, login_user, logout_user, get_current_user, check_availability,
     request_verification, verification_status,
     dashboard_stats, save_fcm_token, payment_checkout, confirm_payment, sync_payments,
     PaymentViewSet,
@@ -55,9 +56,13 @@ urlpatterns = [
     path('auth/verify-code/', verify_code, name='verify_code'),
     path('auth/register/', register_user, name='register_user'),
     path('auth/login/', login_user, name='login_user'),
+    path('auth/logout/', logout_user, name='logout_user'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/me/', get_current_user, name='auth_me'),
     path('auth/check-availability/', check_availability, name='check_availability'),
     path('auth/request-verification/', request_verification, name='request_verification'),
     path('auth/verification-status/', verification_status, name='verification_status'),
+
     path('auth/fcm-token/', save_fcm_token, name='save_fcm_token'),
     path('auth/send-reset-code/', send_reset_code, name='send_reset_code'),
     path('auth/verify-reset-code/', verify_reset_code, name='verify_reset_code'),

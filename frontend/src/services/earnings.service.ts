@@ -5,7 +5,7 @@
  * Zemy — Frontend
  */
 import { fetchApi } from './api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getStoredAccessToken } from '../context/AuthContext';
 
 // ---------------------------------------------------------------
 // Types
@@ -73,7 +73,7 @@ export interface ClaimPayoutResponse {
 // ---------------------------------------------------------------
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const token = await AsyncStorage.getItem('access_token');
+  const token = await getStoredAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -86,7 +86,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
  */
 export async function fetchDriverEarnings(): Promise<DriverEarningsResponse> {
   const headers = await getAuthHeaders();
-  return fetchApi('/driver/earnings/', { method: 'GET', headers });
+  return fetchApi('/driver/earnings/', { method: 'GET', headers, skipUnauthorizedEmit: true });
 }
 
 /**
@@ -98,6 +98,7 @@ export async function claimPayout(payload: ClaimPayoutPayload): Promise<ClaimPay
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
+    skipUnauthorizedEmit: true,
   });
 }
 
@@ -106,7 +107,7 @@ export async function claimPayout(payload: ClaimPayoutPayload): Promise<ClaimPay
  */
 export async function fetchDriverPayouts(): Promise<{ payouts: PayoutItem[]; count: number }> {
   const headers = await getAuthHeaders();
-  return fetchApi('/driver/payouts/', { method: 'GET', headers });
+  return fetchApi('/driver/payouts/', { method: 'GET', headers, skipUnauthorizedEmit: true });
 }
 
 /**
@@ -114,5 +115,5 @@ export async function fetchDriverPayouts(): Promise<{ payouts: PayoutItem[]; cou
  */
 export async function fetchPayoutDetail(payoutId: string): Promise<any> {
   const headers = await getAuthHeaders();
-  return fetchApi(`/driver/payouts/${payoutId}/`, { method: 'GET', headers });
+  return fetchApi(`/driver/payouts/${payoutId}/`, { method: 'GET', headers, skipUnauthorizedEmit: true });
 }

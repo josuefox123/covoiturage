@@ -93,7 +93,13 @@ type AvailabilityState = 'idle' | 'checking' | 'available' | 'taken' | 'error';
  */
 export default function RegisterScreen() {
   const router = useRouter();
-  const { registerWithPassword } = useAuth();
+  const { registerWithPassword, user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/(tabs)/home');
+    }
+  }, [user, router]);
 
   // ── Champs du formulaire ──────────────────────────────────────
   const [lastName, setLastName] = useState('');
@@ -364,8 +370,10 @@ export default function RegisterScreen() {
       });
 
       // Rediriger selon le statut de vérification d'identité
-      // Les nouveaux utilisateurs sont toujours not_verified → /verify-identity
       const route = getPostAuthRoute(registeredUser);
+      if (router.canDismiss()) {
+        router.dismissAll();
+      }
       router.replace(route as any);
     } catch {
       setAlertConfig({

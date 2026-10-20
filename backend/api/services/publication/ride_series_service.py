@@ -51,7 +51,8 @@ class RideSeriesService:
         dep_lat: Optional[float] = None,
         dep_lon: Optional[float] = None,
         arr_lat: Optional[float] = None,
-        arr_lon: Optional[float] = None
+        arr_lon: Optional[float] = None,
+        stopovers: Optional[List[dict]] = None
     ) -> dict:
         """
         Valide les récurrences et procède à la création de la série (RideSeries)
@@ -108,7 +109,7 @@ class RideSeriesService:
                     origin_lon=dep_lon or 0.0,
                     dest_lat=arr_lat or 0.0,
                     dest_lon=arr_lon or 0.0,
-                    stopovers=None,
+                    stopovers=stopovers,
                     origin_place_id='',
                     dest_place_id='',
                     default_duration_min=duration_min or 120
@@ -208,6 +209,7 @@ class RideSeriesService:
                         description=description,
                         distance_km=float(distance_km) if distance_km else None,
                         duration_min=int(duration_min) if duration_min else None,
+                        stopovers=stopovers,
                     )
 
                     try:

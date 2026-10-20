@@ -10,7 +10,6 @@ const BENIN_CITIES_COORDS = [
   { name: 'Bohicon', lat: 7.1782, lon: 2.0667 },
   { name: 'Abomey', lat: 7.1808, lon: 1.9978 },
   { name: 'Dassa-Zoumé', lat: 7.7472, lon: 2.1839 },
-  { name: 'Dassa', lat: 7.7472, lon: 2.1839 },
   { name: 'Savè', lat: 8.0333, lon: 2.4833 },
   { name: 'Parakou', lat: 9.3372, lon: 2.6294 },
   { name: 'Tchaourou', lat: 8.8864, lon: 2.5975 },
@@ -404,7 +403,17 @@ export function usePublishForm(authCtx: any) {
       let isNearRoute = false;
       if (matchedCitiesByText.has(cityLower)) {
         isNearRoute = true;
-      } else {
+      } else if (route.overview_path && Array.isArray(route.overview_path) && route.overview_path.length > 0) {
+        for (const pt of route.overview_path) {
+          if (typeof pt.lat === 'number' && typeof pt.lng === 'number') {
+            const dist = getDistanceKm(cityObj.lat, cityObj.lon, pt.lat, pt.lng);
+            if (dist <= 8) {
+              isNearRoute = true;
+              break;
+            }
+          }
+        }
+      } else if (route.steps) {
         for (const step of route.steps) {
           if (step.end_location && typeof step.end_location.lat === 'number' && typeof step.end_location.lng === 'number') {
             const dist = getDistanceKm(cityObj.lat, cityObj.lon, step.end_location.lat, step.end_location.lng);

@@ -36,11 +36,19 @@ import CountryPicker from 'react-native-country-picker-modal';
 
 import { styles } from './styles';
 import { useLoginForm } from './hooks/useLoginForm';
+import { useAuth } from '../../../../context/AuthContext';
 import { formatPhoneNumber } from '../../../../utils/phoneFormatter';
 
 export default function LoginScreen() {
   const router = useRouter();
   const form = useLoginForm();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/(tabs)/home');
+    }
+  }, [user, router]);
 
   // Refs
   const phoneInputRef = useRef<TextInput>(null);

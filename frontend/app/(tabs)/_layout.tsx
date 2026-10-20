@@ -71,6 +71,7 @@ export default function TabsLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
+        backBehavior="firstRoute"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: theme.colors.primary,

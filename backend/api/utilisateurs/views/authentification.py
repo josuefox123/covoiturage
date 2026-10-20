@@ -3,7 +3,6 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.conf import settings
 from datetime import timedelta
@@ -13,11 +12,11 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 from ...throttles import LoginThrottle, OTPThrottle, ResetPasswordThrottle
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
 
 from ...models.utilisateur import User, PasswordResetOTP
 from ...serializers import UserSerializer, RegisterSerializer
 from .helpers import send_zemy_reset_email
+
 
 import firebase_admin
 from firebase_admin import auth as firebase_auth
@@ -269,3 +268,43 @@ def change_password(request):
     user.save()
     
     return Response({"status": "Mot de passe modifié avec succès."})
+
+
+@extend_schema(request=dict, responses={200: dict}, tags=['Authentification'])
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def logout_user(request):
+    """
+    Déconnexion explicite : révoque le refresh token (blacklist) et nettoie le token FCM.
+    """
+    refresh_token = request.data.get('refresh')
+    if refresh_token:
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except Exception as e:
+            logger.warning(f"Impossible de blacklister le refresh token lors du logout: {e}")
+
+    try:
+        user = request.user
+        if hasattr(user, 'fcm_token') and user.fcm_token:
+            user.fcm_token = None
+            user.save(update_fields=['fcm_token'])
+    except Exception as e:
+        logger.warning(f"Erreur nettoyage fcm_token logout: {e}")
+
+    return Response({"message": "Déconnexion réussie."}, status=status.HTTP_200_OK)
+
+
+@extend_schema(responses={200: UserSerializer}, tags=['Authentification'])
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_current_user(request):
+    """
+    Retourne le profil de l'utilisateur actuellement authentifié (validation de session / auth/me).
+    """
+    user_data = UserSerializer(request.user).data
+    user_data['is_staff'] = getattr(request.user, 'is_staff', False)
+    user_data['is_superuser'] = getattr(request.user, 'is_superuser', False)
+    return Response(user_data, status=status.HTTP_200_OK)
+

@@ -15,6 +15,8 @@ import {
   Platform,
   TouchableOpacity,
   ActivityIndicator,
+  BackHandler,
+  ToastAndroid,
 } from 'react-native';
 
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -141,6 +143,25 @@ export default function HomeScreen() {
       if (shouldShowVerif) {
         setShowVerifModal(true);
       }
+
+      // Interception du bouton retour Android sur l'écran d'accueil :
+      // Empêche de revenir sur la page de connexion ou l'onboarding
+      let lastBackPress = 0;
+      const onBackPress = () => {
+        const now = Date.now();
+        if (now - lastBackPress < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+        lastBackPress = now;
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Appuyez à nouveau pour quitter', ToastAndroid.SHORT);
+        }
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
     }, [shouldShowVerif, refreshUser])
   );
 

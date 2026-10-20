@@ -1,6 +1,8 @@
 from .auth import (
     register_user,
     login_user,
+    logout_user,
+    get_current_user,
     verify_code,
     send_reset_code,
     verify_reset_code,
@@ -15,6 +17,7 @@ from .auth import (
     update_profile,
     change_password,
 )
+
 from .rides import (
     check_availability,
     RideViewSet,

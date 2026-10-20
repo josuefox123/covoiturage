@@ -126,6 +126,9 @@ export function useLoginForm() {
       const loggedUser = await loginWithPassword(formatIdentifier(), password);
       // Rediriger selon le statut de vérification d'identité
       const route = getPostAuthRoute(loggedUser);
+      if (router.canDismiss()) {
+        router.dismissAll();
+      }
       router.replace(route as any);
     } catch (error: any) {
       setAlertConfig({

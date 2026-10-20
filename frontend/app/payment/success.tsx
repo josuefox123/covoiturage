@@ -204,7 +204,7 @@ export default function PaymentSuccessScreen() {
                 >
                     <Text style={styles.retryBtnText}>Réessayer le paiement</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineBtn} onPress={() => router.replace('/(tabs)/')}>
+                <TouchableOpacity style={styles.outlineBtn} onPress={() => router.replace('/(tabs)/home')}>
                     <Text style={styles.outlineBtnText}>Retour à l'accueil</Text>
                 </TouchableOpacity>
             </View>

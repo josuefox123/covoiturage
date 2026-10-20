@@ -150,7 +150,8 @@ export default function PublishScreen() {
               durationText: r.legs[0].duration.text,
               durationValue: r.legs[0].duration.value,
               steps: getRouteSteps(r),
-              legs: getRouteLegs(r)
+              legs: getRouteLegs(r),
+              overview_path: (r.overview_path || []).filter(function(_, i) { return i % 4 === 0; }).map(function(p) { return { lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng }; })
             };
           });
           window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -279,7 +280,8 @@ export default function PublishScreen() {
               durationValue: durVal,
               steps: getRouteSteps(r),
               legs: legs,
-              orderedStopoverNames: orderedStopoverNames
+              orderedStopoverNames: orderedStopoverNames,
+              overview_path: (r.overview_path || []).filter(function(_, i) { return i % 4 === 0; }).map(function(p) { return { lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng }; })
             };
           });
  

@@ -156,7 +156,8 @@ class RidePublicationController:
             dep_lat=float(data['departure_latitude']) if data.get('departure_latitude') is not None else None,
             dep_lon=float(data['departure_longitude']) if data.get('departure_longitude') is not None else None,
             arr_lat=float(data['arrival_latitude']) if data.get('arrival_latitude') is not None else None,
-            arr_lon=float(data['arrival_longitude']) if data.get('arrival_longitude') is not None else None
+            arr_lon=float(data['arrival_longitude']) if data.get('arrival_longitude') is not None else None,
+            stopovers=data.get('stopovers')
         )
 
         return res_summary

@@ -28,6 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../../styles/theme';
 import { API_URL } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getStoredAccessToken } from '../../../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -104,7 +105,7 @@ export const TripConfirmationModal: React.FC<TripConfirmationModalProps> = ({
     setStep('loading');
     setError(null);
     try {
-      const token = await AsyncStorage.getItem('access_token');
+      const token = await getStoredAccessToken();
       const res = await fetch(`${API_URL}/rides/${rideId}/confirm-departure/`, {
         method: 'POST',
         headers: {

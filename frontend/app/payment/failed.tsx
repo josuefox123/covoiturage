@@ -27,7 +27,7 @@ export default function PaymentFailedScreen() {
                     <Text style={styles.buttonText}>Retourner à la réservation</Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity style={styles.outlineButton} onPress={() => router.replace('/(tabs)/')}>
+                <TouchableOpacity style={styles.outlineButton} onPress={() => router.replace('/(tabs)/home')}>
                     <Text style={styles.outlineButtonText}>Retour à l'accueil</Text>
                 </TouchableOpacity>
             </View>

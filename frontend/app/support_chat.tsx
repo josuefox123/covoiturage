@@ -174,9 +174,9 @@ export default function SupportChatScreen() {
     setSendingMessage(true);
     try {
       const formData = new FormData();
-      formData.append('conversation', conversation.id);
+      formData.append('conversation', String(conversation.id));
       formData.append('content', '');
-      formData.append('message_type', type);
+      formData.append('message_type', String(type));
       await appendFileToFormData(formData, 'attachment', uri, name || 'attachment.jpg');
 
       await authFetch('/messages/', {
