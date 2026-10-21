@@ -143,7 +143,14 @@ export function useRideManagement(id: string, authFetch: any, user: any) {
               await authFetch(`/rides/${id}/complete/`, { method: 'POST' });
               setRide(prev => prev ? { ...prev, status: 'completed' } : null);
               playStatusAnimation();
-              CustomAlert.alert('Succès', 'Le trajet est marqué comme terminé.');
+              CustomAlert.alert(
+                'Succès',
+                'Le trajet est marqué comme terminé. Vos gains sont disponibles sur votre solde.',
+                [
+                  { text: 'OK' },
+                  { text: 'Voir mes revenus', onPress: () => router.push('/(tabs)/earnings') }
+                ]
+              );
             } catch (error: any) {
               CustomAlert.alert('Erreur', error.message || 'Impossible de terminer le trajet.');
             }

@@ -28,7 +28,7 @@ import { Ride } from '../types';
 import { CustomAlert } from '../utils/CustomAlert';
 import * as Speech from 'expo-speech';
 import NetInfo from '@react-native-community/netinfo';
-import { usePathname, useSegments } from 'expo-router';
+import { usePathname, useSegments, useRouter } from 'expo-router';
 
 // ============================================================
 // CONSTANTS & CONFIGURATION
@@ -250,6 +250,7 @@ const isItTimeForLiveRide = (dateStr: string, timeStr: string): boolean => {
 export default function LiveRideModal() {
   // Hooks
   const { user, authFetch } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const segments = useSegments();
@@ -781,7 +782,14 @@ export default function LiveRideModal() {
             setVisible(false);
             stopTracking();
             speakText("Le trajet est terminé. Merci d'avoir voyagé avec Zemy !");
-            CustomAlert.alert('Trajet terminé', 'Merci pour ce trajet !');
+            CustomAlert.alert(
+              'Trajet terminé',
+              'Votre trajet est terminé avec succès ! Vos gains sont disponibles sur votre solde.',
+              [
+                { text: 'Fermer' },
+                { text: 'Voir mes revenus', onPress: () => router.push('/(tabs)/earnings') }
+              ]
+            );
           } catch (error: any) {
             CustomAlert.alert('Erreur', error.message || 'Impossible de terminer le trajet.');
           }

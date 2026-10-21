@@ -71,11 +71,14 @@ class DriverEarningService:
         from api.models.reservation import Booking
         from api.models.paiement import DriverPayout
 
-        # Bookings eligibles : trajet complete + paiement escrow ou paid
+        # Bookings éligibles : trajet terminé (ou réservation terminée) + paiement escrow ou paid
         bookings_qs = Booking.objects.filter(
             ride__driver=driver,
-            status='completed',
             payment_status__in=['escrow', 'paid']
+        ).filter(
+            Q(status='completed') | Q(ride__status='completed')
+        ).exclude(
+            status__in=['cancelled', 'expired', 'payment_failed', 'payment_refunded']
         ).select_related('ride')
 
         if lock:
@@ -90,9 +93,9 @@ class DriverEarningService:
         driver_amount = 0
         for booking in eligible_bookings:
             try:
-                gross_amount += int(booking.total_amount)
-                zemy_commission += int(booking.zemy_commission)
-                driver_amount += int(booking.amount_due_to_driver)
+                gross_amount += booking.total_amount
+                zemy_commission += booking.zemy_commission
+                driver_amount += booking.amount_due_to_driver
             except Exception as e:
                 logger.warning(f"[EARNINGS] Erreur calcul booking {booking.id}: {e}")
 
@@ -137,11 +140,6 @@ class DriverEarningService:
         if requested_amount is None:
             return False, "Le montant est requis.", None
 
-        try:
-            requested_amount = int(requested_amount)
-        except (ValueError, TypeError):
-            return False, "Montant invalide.", None
-
         if requested_amount <= 0:
             return False, "Le montant doit etre superieur a zero.", None
 
@@ -170,8 +168,13 @@ class DriverEarningService:
             Booking.objects
             .filter(
                 ride__driver=driver,
-                status='completed',
                 payment_status__in=['escrow', 'paid']
+            )
+            .filter(
+                Q(status='completed') | Q(ride__status='completed')
+            )
+            .exclude(
+                status__in=['cancelled', 'expired', 'payment_failed', 'payment_refunded']
             )
             .select_related('ride')
             .order_by('-ride__departure_date')
@@ -201,9 +204,9 @@ class DriverEarningService:
             entry = seen_rides[ride_id]
             try:
                 entry['bookings_count'] += 1
-                entry['gross_amount'] += int(booking.total_amount)
-                entry['driver_amount'] += int(booking.amount_due_to_driver)
-                entry['zemy_commission'] += int(booking.zemy_commission)
+                entry['gross_amount'] += booking.total_amount
+                entry['driver_amount'] += booking.amount_due_to_driver
+                entry['zemy_commission'] += booking.zemy_commission
             except Exception:
                 pass
 

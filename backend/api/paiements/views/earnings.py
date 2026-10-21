@@ -97,11 +97,24 @@ class DriverClaimPayoutView(APIView):
 
     def post(self, request):
         driver = request.user
-        requested_amount = request.data.get('amount')
+        raw_amount = request.data.get('amount')
         phone_number = request.data.get('phone_number', '').strip()
         operator = request.data.get('operator', 'mtn').strip().lower()
 
         # --- Validations basiques ---
+        if raw_amount is None:
+            return Response(
+                {'error': 'Le montant est requis.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            requested_amount = int(raw_amount)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Montant invalide.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         if not phone_number:
             return Response(
                 {'error': 'Le numéro Mobile Money est requis.'},
@@ -161,6 +174,23 @@ class DriverClaimPayoutView(APIView):
         # --- Mode automatique : déclencher FeexPay immédiatement ---
         if payment_mode == 'automatic':
             self._process_automatic_payout(payout)
+            payout.refresh_from_db()
+
+        success_msg = (
+            f"Virement de {payout.amount:,} FCFA envoyé avec succès par FeexPay."
+            if payout.status == 'paid'
+            else f"Votre demande de retrait de {payout.amount:,} FCFA a été soumise (statut: {payout.status})."
+        ).replace(',', ' ')
+
+        if payout.status == 'failed':
+            return Response({
+                'success': False,
+                'payout_id': str(payout.id),
+                'payout_reference': payout_reference,
+                'amount': payout.amount,
+                'status': 'failed',
+                'error': payout.failure_reason or "Échec de l'envoi Mobile Money. Le montant reste disponible sur votre solde.",
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({
             'success': True,
@@ -171,10 +201,7 @@ class DriverClaimPayoutView(APIView):
             'operator': operator,
             'payment_mode': payment_mode,
             'status': payout.status,
-            'message': (
-                f"Votre demande de retrait de {payout.amount:,} XOF a été soumise. "
-                f"Référence : {payout_reference}"
-            ).replace(',', ' '),
+            'message': success_msg,
         }, status=status.HTTP_201_CREATED)
 
     def _process_automatic_payout(self, payout):

@@ -4,7 +4,7 @@ tests_financial.py
 Tests du systeme financier Zemy -- Gains conducteur et reversements.
 12 tests couvrant les cas critiques.
 """
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from unittest.mock import patch, MagicMock
 from decimal import Decimal
@@ -435,6 +435,7 @@ class TestDriverEarningService(TestCase):
         result = FeexPayPayoutService.create_refund(refund)
         self.assertEqual(result.error_code, 'ALREADY_PROCESSED')
 
+    @override_settings(FEEXPAY_WEBHOOK_SECRET='local_webhook_secret_for_testing_purposes')
     def test_20_webhook_payout_confirmation(self):
         """TEST 20 : Webhook FeexPay valide un DriverPayout en 'paid'."""
         import json
@@ -468,6 +469,7 @@ class TestDriverEarningService(TestCase):
         payout.refresh_from_db()
         self.assertEqual(payout.status, 'paid')
 
+    @override_settings(FEEXPAY_WEBHOOK_SECRET='local_webhook_secret_for_testing_purposes')
     def test_21_webhook_refund_confirmation(self):
         """TEST 21 : Webhook FeexPay valide un RefundRequest en 'refunded'."""
         import json
@@ -513,6 +515,7 @@ class TestDriverEarningService(TestCase):
         booking.refresh_from_db()
         self.assertEqual(booking.payment_status, 'refunded')
 
+    @override_settings(FEEXPAY_WEBHOOK_SECRET='local_webhook_secret_for_testing_purposes')
     def test_22_webhook_unauthorized_signature(self):
         """TEST 22 : Webhook avec token invalide rejeté avec HTTP 403."""
         import json

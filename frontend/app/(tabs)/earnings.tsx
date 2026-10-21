@@ -473,9 +473,13 @@ export default function EarningsScreen() {
             {withdrawStep === "success" && payoutResult && (
               <Animated.View style={[styles.successContainer, { opacity: fadeAnim }]}>
                 <Ionicons name="checkmark-circle" size={60} color={PRIMARY} />
-                <Text style={styles.successTitle}>Demande enregistrée !</Text>
+                <Text style={styles.successTitle}>
+                  {payoutResult.status === 'paid' ? "Virement envoyé !" : "Demande enregistrée !"}
+                </Text>
                 <Text style={styles.successDesc}>
-                  Votre demande de versement de {formatAmount(payoutResult.amount)} a bien été prise en compte sous la référence {payoutResult.payout_reference}.
+                  {payoutResult.status === 'paid'
+                    ? `Votre virement de ${formatAmount(payoutResult.amount)} a été envoyé automatiquement avec succès sur votre numéro Mobile Money.`
+                    : `Votre demande de versement de ${formatAmount(payoutResult.amount)} a bien été prise en compte sous la référence ${payoutResult.payout_reference}.`}
                 </Text>
                 <TouchableOpacity style={styles.sendBtn} onPress={handleSuccessFinished}>
                   <Text style={styles.sendBtnText}>Terminer</Text>

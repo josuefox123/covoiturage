@@ -89,7 +89,7 @@ class RideActionsMixin:
         ride.status = 'completed'
         ride.save()
         
-        bookings = ride.bookings.filter(status__in=['pending', 'confirmed'])
+        bookings = ride.bookings.exclude(status__in=['cancelled', 'expired', 'payment_failed', 'payment_refunded'])
         total_driver_gain = 0
         for booking in bookings:
             booking.status = 'completed'
@@ -202,6 +202,8 @@ class RideActionsMixin:
             )[1]
 
             if arr_idx == current_idx:
+                booking.status = 'completed'
+                booking.save(update_fields=['status'])
                 dep_idx = MatchingService.get_leg_indices_for_booking(
                     ride,
                     booking.departure_location or ride.departure_location,
@@ -230,6 +232,7 @@ class RideActionsMixin:
             next_leg_obj.save(update_fields=['leg_status'])
         else:
             ride.status = 'completed'
+            ride.bookings.exclude(status__in=['cancelled', 'expired', 'payment_failed', 'payment_refunded']).update(status='completed')
 
         ride.save(update_fields=['current_leg_index', 'status'])
 

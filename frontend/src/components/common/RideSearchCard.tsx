@@ -25,6 +25,17 @@ const extractCity = (locStr: string | undefined): string => {
   return cleanParts.length ? cleanParts[cleanParts.length - 1].toLowerCase() : (parts[0] || '').toLowerCase();
 };
 
+const isSameLocation = (locA?: string, locB?: string): boolean => {
+  if (!locA || !locB) return false;
+  const a = locA.toLowerCase().trim();
+  const b = locB.toLowerCase().trim();
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  const cityA = extractCity(locA);
+  const cityB = extractCity(locB);
+  return !!(cityA && cityB && cityA === cityB);
+};
+
 const formatFullDate = (dateString: string | undefined) => {
   if (!dateString) return 'Date inconnue';
   try {
@@ -84,37 +95,32 @@ export default function RideSearchCard({
   const departureTime = ride.departure_time?.substring(0, 5) || '--:--';
   const seatsLeft = ride.seats_available || 0;
 
-  // Déterminer si le départ recherché est un arrêt intermédiaire dans une autre ville
+  // Déterminer le lieu de départ affiché
   let displayDeparture = ride.departure_location || 'Départ';
   let isIntermediatePickup = false;
   if (searchedDeparture) {
-    const searchDepCity = extractCity(searchedDeparture);
-    const rideDepCity = extractCity(ride.departure_location);
-    if (searchDepCity && rideDepCity && searchDepCity !== rideDepCity) {
+    if (isSameLocation(searchedDeparture, ride.departure_location)) {
+      displayDeparture = ride.departure_location || searchedDeparture;
+    } else {
       displayDeparture = searchedDeparture;
       isIntermediatePickup = true;
     }
   }
 
-  // Déterminer si l'arrivée recherchée est un arrêt intermédiaire dans une autre ville
+  // Déterminer le lieu d'arrivée affiché
   let displayArrival = ride.arrival_location || 'Arrivée';
   let isIntermediateDropoff = false;
   if (searchedDestination) {
-    const searchDestCity = extractCity(searchedDestination);
-    const rideDestCity = extractCity(ride.arrival_location);
-    if (searchDestCity && rideDestCity && searchDestCity !== rideDestCity) {
+    if (isSameLocation(searchedDestination, ride.arrival_location)) {
+      displayArrival = ride.arrival_location || searchedDestination;
+    } else {
       displayArrival = searchedDestination;
       isIntermediateDropoff = true;
     }
   }
 
-  const isSegment = !!(ride.price_per_seat && ride.original_price_per_seat && ride.price_per_seat !== ride.original_price_per_seat);
-  // Trajet intermédiaire : la ville recherchée diffère de la ville de départ/arrivée du conducteur
-  const isIntermediate = !!(
-    (searchedDeparture && (extractCity(searchedDeparture) !== extractCity(ride.departure_location))) ||
-    (searchedDestination && (extractCity(searchedDestination) !== extractCity(ride.arrival_location))) ||
-    isSegment
-  );
+  const isSegment = !!(ride.price_per_seat && ride.original_price_per_seat && Number(ride.price_per_seat) !== Number(ride.original_price_per_seat));
+  const isIntermediate = isIntermediatePickup || isIntermediateDropoff || isSegment;
 
   const getDisplayPrice = () => {
     // 0. Si un tarif de portion spécifique est fourni via portion_price
@@ -131,7 +137,8 @@ export default function RideSearchCard({
   const displayPriceVal = getDisplayPrice();
   const price = displayPriceVal.toLocaleString() || '0';
   const priceUnit = isIntermediate ? 'Prix du trajet' : 'par place';
-  const fullPriceVal = ride.original_price_per_seat || (ride as any).full_price || (ride as any).full_price_per_seat || (isIntermediate ? ride.price_per_seat : null);
+  const rawFullPrice = ride.original_price_per_seat || (ride as any).full_price || (ride as any).full_price_per_seat;
+  const fullPriceVal = rawFullPrice && Number(rawFullPrice) > displayPriceVal ? Number(rawFullPrice) : null;
 
   const getArrivalTime = () => getArrivalTimeHelper(ride.departure_time, ride.duration_min);
   const getDurationText = () => getDurationTextHelper(ride.duration_min);
@@ -141,7 +148,9 @@ export default function RideSearchCard({
   const parseLoc = (locStr: string | undefined | null) => {
     if (!locStr) return { name: '', note: '' };
     const parts = locStr.split('|||');
-    return { name: parts[0], note: parts[1] || '' };
+    let name = (parts[0] || '').trim();
+    name = name.replace(/,\s*(bénin|benin|togo|nigeria|ghana|france)\s*$/i, '');
+    return { name, note: (parts[1] || '').trim() };
   };
 
   const parsedDep = parseLoc(displayDeparture);
@@ -171,8 +180,8 @@ export default function RideSearchCard({
                   <View style={[styles.timelineLine, { backgroundColor: PRIMARY_COLOR }]} />
                 </View>
                 <View style={styles.cityTextContainer}>
-                  <Text style={styles.cityText} numberOfLines={1}>
-                    {parsedDep.name}
+                  <Text style={styles.cityText} numberOfLines={2}>
+                    {parsedDep.name || 'Départ'}
                   </Text>
                   {parsedDep.note ? (
                     <Text style={styles.noteText} numberOfLines={1}>
@@ -200,8 +209,8 @@ export default function RideSearchCard({
                   <View style={[styles.timelineDot, { borderColor: '#10B981' }]} />
                 </View>
                 <View style={styles.cityTextContainer}>
-                  <Text style={styles.cityText} numberOfLines={1}>
-                    {parsedArr.name}
+                  <Text style={styles.cityText} numberOfLines={2}>
+                    {parsedArr.name || 'Arrivée'}
                   </Text>
                   {parsedArr.note ? (
                     <Text style={styles.noteText} numberOfLines={1}>
@@ -216,13 +225,13 @@ export default function RideSearchCard({
             {/* Zone de prix */}
             <View style={styles.priceContainer}>
               <Text style={styles.priceSub}>{isIntermediate ? 'Prix du trajet' : 'Prix par place'}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
+              <View style={styles.priceRow}>
                 <Text style={styles.priceText}>{price}</Text>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 2 }}> FCFA</Text>
+                <Text style={styles.priceCurrency}> FCFA</Text>
               </View>
               {isIntermediate && fullPriceVal ? (
-                <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500', marginTop: 3, textAlign: 'right' }}>
-                  Prix estimé du trajet au complet : {fullPriceVal.toLocaleString()} FCFA
+                <Text style={styles.fullPriceText} numberOfLines={2}>
+                  Complet : {fullPriceVal.toLocaleString()} FCFA
                 </Text>
               ) : null}
             </View>
@@ -353,20 +362,22 @@ const styles = StyleSheet.create({
   },
   routeContainer: {
     flex: 1,
+    minWidth: 0,
+    marginRight: 10,
   },
   routePointRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   timeText: {
-    width: 48,
-    fontSize: 14,
+    width: 44,
+    fontSize: 13,
     fontWeight: '700',
     color: '#0F172A',
     paddingTop: 1,
   },
   indicatorContainer: {
-    width: 20,
+    width: 16,
     alignItems: 'center',
     alignSelf: 'stretch',
   },
@@ -385,11 +396,12 @@ const styles = StyleSheet.create({
   },
   cityTextContainer: {
     flex: 1,
-    paddingLeft: 8,
+    minWidth: 0,
+    paddingLeft: 6,
     paddingBottom: 4,
   },
   cityText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#0F172A',
     lineHeight: 18,
@@ -406,11 +418,12 @@ const styles = StyleSheet.create({
     minHeight: 18,
   },
   timePlaceholder: {
-    width: 48,
+    width: 44,
   },
   durationTextContainer: {
     flex: 1,
-    paddingLeft: 8,
+    minWidth: 0,
+    paddingLeft: 6,
   },
   durationText: {
     fontSize: 10,
@@ -420,18 +433,38 @@ const styles = StyleSheet.create({
   priceContainer: {
     alignItems: 'flex-end',
     justifyContent: 'flex-start',
-    marginLeft: 10,
+    maxWidth: '38%',
+    flexShrink: 0,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
   },
   priceText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  priceCurrency: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 2,
   },
   priceSub: {
     fontSize: 10,
     color: '#64748B',
     fontWeight: '500',
     marginTop: 2,
+    textAlign: 'right',
+  },
+  fullPriceText: {
+    fontSize: 9,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'right',
   },
   dateBarSimple: {
     flexDirection: 'row',
