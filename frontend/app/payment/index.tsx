@@ -15,10 +15,10 @@ export default function PaymentScreen() {
     const { initiatePayment, loading, error } = usePayment();
     const { authFetch } = useAuth();
     
-    // Preference: Active RideSession booking ID over route params
+    // Preference: Explicit route params over cached in-memory session
     const activeSession = rideSessionManager.getCurrentSession();
-    const bookingId = activeSession?.payment?.bookingId || (params.booking_id as string);
-    const amount = activeSession?.payment?.amountPaidOnline || Number(params.amount) || 0;
+    const bookingId = (params.booking_id as string) || activeSession?.payment?.bookingId || '';
+    const amount = Number(params.amount) || activeSession?.payment?.amountPaidOnline || 0;
 
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
     const [txRef, setTxRef] = useState<string | null>(null);
@@ -34,17 +34,6 @@ export default function PaymentScreen() {
         if (response && response.payment_url) {
             setPaymentUrl(response.payment_url);
             setTxRef(response.transaction_reference);
-        }
-    };
-
-    const resetBookingStatus = async () => {
-        if (!bookingId) return;
-        try {
-            await authFetch(`/bookings/${bookingId}/cancel/`, {
-                method: 'POST'
-            });
-        } catch (e) {
-            console.error('Failed to cancel booking:', e);
         }
     };
 
@@ -132,7 +121,6 @@ export default function PaymentScreen() {
                 }
             } catch (err) {}
             
-            await resetBookingStatus();
             router.replace({
                 pathname: '/payment/failed',
                 params: { message: msg }
@@ -155,7 +143,6 @@ export default function PaymentScreen() {
                     }
                 });
             } else if (data.status === 'failed') {
-                await resetBookingStatus();
                 router.replace({
                     pathname: '/payment/failed',
                     params: { message: data.message }
@@ -187,8 +174,7 @@ export default function PaymentScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={async () => {
-                    await resetBookingStatus();
+                <TouchableOpacity style={styles.backBtn} onPress={() => {
                     if (router.canGoBack()) {
                         router.back();
                     } else {

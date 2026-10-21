@@ -204,7 +204,7 @@ export class RideSessionManager {
   public async acceptOffer(authFetch: any, user: any, bookingId: string): Promise<boolean> {
     if (!this.currentSession || !authFetch) return false;
     try {
-      this.currentSession.loading = true;
+      this.currentSession.synchronizing = true;
       this.notify();
 
       await RideSessionService.acceptOffer(authFetch, bookingId);
@@ -222,7 +222,7 @@ export class RideSessionManager {
       this.currentSession.errorMessage = parsedErr.message;
     } finally {
       if (this.currentSession) {
-        this.currentSession.loading = false;
+        this.currentSession.synchronizing = false;
         this.notify();
       }
     }

@@ -7,10 +7,17 @@ export default function PaymentsIndexRedirectScreen() {
   const params = useLocalSearchParams();
 
   useEffect(() => {
-    router.replace({
-      pathname: '/payment/success',
-      params: params,
-    });
+    if (params.transaction_id || params.transaction_reference || params.ref || params.reference) {
+      router.replace({
+        pathname: '/payment/success',
+        params: params,
+      });
+    } else {
+      router.replace({
+        pathname: '/payment',
+        params: params,
+      });
+    }
   }, [params, router]);
 
   return (

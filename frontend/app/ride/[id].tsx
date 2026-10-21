@@ -56,6 +56,7 @@ export default function RideDetailScreen() {
     bookings, bookingLoading, chatLoading, bookingState, portionMetrics,
     onRefresh, openChat, handleChatWithPassenger, performBooking,
     handlePassengerAccept, handlePassengerReject, handleCancelBooking, fetchRide,
+    error,
   } = useRideDetails(
     id as string, departure, destination,
     passenger_dep_lat, passenger_dep_lon,
@@ -91,7 +92,33 @@ export default function RideDetailScreen() {
     }
   }, [myBooking?.status, ride?.status]);
 
-  if (loading || !ride) return <EcranChargement />;
+  if (loading && !ride) return <EcranChargement />;
+
+  if (!ride) {
+    return (
+      <SafeAreaView style={[ss.screen, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <Ionicons name="alert-circle-outline" size={54} color={C.error} />
+        <Text style={{ fontSize: 18, fontWeight: '700', color: C.text, marginTop: 16, textAlign: 'center' }}>
+          Trajet indisponible
+        </Text>
+        <Text style={{ fontSize: 14, color: C.textSec, marginTop: 8, textAlign: 'center', marginBottom: 24 }}>
+          {error || "Impossible de charger les détails du trajet."}
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: C.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+          onPress={fetchRide}
+        >
+          <Text style={{ color: C.white, fontWeight: '700', fontSize: 15 }}>Réessayer</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{ marginTop: 12, paddingHorizontal: 24, paddingVertical: 12 }}
+          onPress={() => router.back()}
+        >
+          <Text style={{ color: C.textSec, fontWeight: '600', fontSize: 14 }}>Retour</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const isOwnRide = user?.id === ride.driver_details?.id;

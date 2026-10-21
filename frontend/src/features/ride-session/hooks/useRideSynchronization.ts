@@ -16,7 +16,6 @@ export function useRideSynchronization(segment: SegmentIdentifier, bookingId?: s
 
     return () => {
       rideSynchronizer.stop();
-      rideSessionManager.dispose();
     };
   }, [segment.rideId, segment.departureWaypointOrder, segment.arrivalWaypointOrder, authFetch, user]);
 

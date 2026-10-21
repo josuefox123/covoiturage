@@ -267,6 +267,7 @@ export function useRideDetails(
     handlePassengerAccept,
     handlePassengerReject,
     handleCancelBooking,
-    fetchRide: refreshSession
+    fetchRide: refreshSession,
+    error: error || session?.errorMessage || null
   };
 }
