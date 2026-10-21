@@ -88,7 +88,59 @@ def feexpay_webhook(request):
             else:
                 logger.info(f"Webhook received status {status_payment} for transaction {transaction_id}, no action taken.")
         else:
-            logger.warning(f"No local payment record found matching transaction_id {transaction_id}")
+            # Vérifier si c'est un virement sortant (DriverPayout ou RefundRequest)
+            from ..models.paiement import DriverPayout, RefundRequest
+            from django.db import transaction as db_transaction
+            from django.utils import timezone
+
+            refs = [r for r in [transaction_id, custom_id] if r]
+            payout = DriverPayout.objects.filter(
+                Q(payout_reference__in=refs) | Q(feexpay_reference__in=refs)
+            ).first()
+
+            if payout:
+                with db_transaction.atomic():
+                    p_locked = DriverPayout.objects.select_for_update().get(id=payout.id)
+                    if status_payment in ['SUCCESSFUL', 'SUCCESS', 'APPROVED', 'PAID', 'COMPLETED']:
+                        if p_locked.status != 'paid':
+                            p_locked.status = 'paid'
+                            p_locked.paid_at = timezone.now()
+                            p_locked.save()
+                            logger.info(f"[WEBHOOK] DriverPayout {p_locked.payout_reference} confirmed PAID.")
+                    elif status_payment in ['FAILED', 'DECLINED', 'REJECTED', 'ERROR']:
+                        if p_locked.status != 'failed':
+                            p_locked.status = 'failed'
+                            p_locked.failure_reason = payload.get('reason') or 'Virement refusé par FeexPay'
+                            p_locked.failed_at = timezone.now()
+                            p_locked.save()
+                            logger.info(f"[WEBHOOK] DriverPayout {p_locked.payout_reference} marked FAILED.")
+                return HttpResponse("Webhook processed for DriverPayout", status=200)
+
+            refund = RefundRequest.objects.filter(
+                Q(refund_reference__in=refs) | Q(feexpay_reference__in=refs)
+            ).first()
+
+            if refund:
+                with db_transaction.atomic():
+                    r_locked = RefundRequest.objects.select_for_update().get(id=refund.id)
+                    if status_payment in ['SUCCESSFUL', 'SUCCESS', 'APPROVED', 'PAID', 'COMPLETED']:
+                        if r_locked.status != 'refunded':
+                            r_locked.status = 'refunded'
+                            r_locked.refunded_at = timezone.now()
+                            r_locked.save()
+                            r_locked.booking.payment_status = 'refunded'
+                            r_locked.booking.save()
+                            logger.info(f"[WEBHOOK] RefundRequest {r_locked.refund_reference} confirmed REFUNDED.")
+                    elif status_payment in ['FAILED', 'DECLINED', 'REJECTED', 'ERROR']:
+                        if r_locked.status != 'failed':
+                            r_locked.status = 'failed'
+                            r_locked.failure_reason = payload.get('reason') or 'Remboursement refusé par FeexPay'
+                            r_locked.failed_at = timezone.now()
+                            r_locked.save()
+                            logger.info(f"[WEBHOOK] RefundRequest {r_locked.refund_reference} marked FAILED.")
+                return HttpResponse("Webhook processed for RefundRequest", status=200)
+
+            logger.warning(f"No local payment, payout, or refund record found matching transaction_id {transaction_id}")
             
     except Exception as e:
         logger.error(f"Error handling FeexPay Webhook: {e}")

@@ -283,12 +283,10 @@ if FEEXPAY_MODE == 'SANDBOX':
         "Les paiements ne sont PAS réels. Ne pas utiliser en production."
     )
 
-# FeexPay Payout Configuration — Reversement conducteur (Mobile Money sortant)
-# Mettre FEEXPAY_PAYOUT_ENABLED=True UNIQUEMENT lorsque l'URL et les credentials Payout
-# sont confirmés par FeexPay. En attendant, le mode manuel (admin) reste actif.
-FEEXPAY_PAYOUT_ENABLED = os.getenv('FEEXPAY_PAYOUT_ENABLED', 'False').lower() == 'true'
-FEEXPAY_PAYOUT_URL = os.getenv('FEEXPAY_PAYOUT_URL', '')           # À configurer avec l'URL FeexPay Payout
-FEEXPAY_PAYOUT_STATUS_URL = os.getenv('FEEXPAY_PAYOUT_STATUS_URL', '')  # URL de vérification statut (optionnel)
+# FeexPay Payout Configuration — Reversement conducteur et remboursement passager (Mobile Money sortant)
+FEEXPAY_PAYOUT_ENABLED = os.getenv('FEEXPAY_PAYOUT_ENABLED', 'True').lower() == 'true'
+FEEXPAY_PAYOUT_URL = os.getenv('FEEXPAY_PAYOUT_URL', 'https://api-v2.feexpay.me/api/payouts/public/transfer/global')
+FEEXPAY_PAYOUT_STATUS_URL = os.getenv('FEEXPAY_PAYOUT_STATUS_URL', 'https://api-v2.feexpay.me/api/payouts/status/public/')
 
 AUTH_USER_MODEL = 'api.User'
 

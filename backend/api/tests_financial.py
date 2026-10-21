@@ -236,3 +236,297 @@ class TestDriverEarningService(TestCase):
             refs.add(ref)
         self.assertEqual(len(refs), 10, "Toutes les references doivent etre uniques")
 
+    def test_13_feexpay_phone_normalization(self):
+        """TEST 13 : Normalisation du numéro béninois (229...) pour FeexPay."""
+        from api.services.feexpay_payout_service import normalize_phone_number
+        self.assertEqual(normalize_phone_number('+229 97 00 00 01'), '22997000001')
+        self.assertEqual(normalize_phone_number('97000001'), '22997000001')
+        self.assertEqual(normalize_phone_number('0197000001'), '2290197000001')
+        self.assertEqual(normalize_phone_number('+2290197000001'), '2290197000001')
+
+    def test_14_payout_timeout_keeps_processing(self):
+        """TEST 14 : En cas de timeout FeexPay, le payout reste en 'processing' (pas de fail hâtif)."""
+        import requests
+        payout = DriverPayout.objects.create(
+            driver=self.driver,
+            amount=5000,
+            phone_number='+22997000001',
+            operator='mtn',
+            status='pending',
+            payout_reference=DriverPayout.generate_reference(),
+            payment_mode='automatic',
+        )
+
+        with patch.object(FeexPayPayoutService, 'is_automatic_enabled', return_value=True):
+            with patch('requests.post', side_effect=requests.Timeout("Connection timed out")):
+                from api.paiements.views.earnings import DriverClaimPayoutView
+                view = DriverClaimPayoutView()
+                view._process_automatic_payout(payout)
+
+        payout.refresh_from_db()
+        self.assertEqual(payout.status, 'processing')
+        self.assertEqual(payout.failure_code, 'TIMEOUT')
+
+    def test_15_driver_cancellation_triggers_auto_refund(self):
+        """TEST 15 : Annulation par le conducteur -> Remboursement automatique sans avis admin."""
+        from api.services.booking_service import BookingService
+        from api.models.paiement import RefundRequest, Payment
+
+        ride = create_ride(self.driver, price_per_seat=5000)
+        booking = Booking.objects.create(
+            passenger=self.passenger,
+            ride=ride,
+            seats_booked=1,
+            status='confirmed',
+            payment_status='paid',
+            departure_location='Cotonou',
+            arrival_location='Porto-Novo',
+        )
+        Payment.objects.create(
+            transaction_id='TX-TEST-CANCEL-001',
+            amount=5000,
+            user=self.passenger,
+            booking=booking,
+            status='SUCCESS'
+        )
+
+        mock_result = FeexPayPayoutResult(
+            success=True, reference='FXP-REFUND-111', status='SUCCESSFUL'
+        )
+
+        with patch.object(FeexPayPayoutService, 'is_automatic_enabled', return_value=True):
+            with patch.object(FeexPayPayoutService, 'create_refund', return_value=mock_result):
+                BookingService.cancel_booking(booking, cancelled_by_user=self.driver)
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'cancelled')
+        self.assertEqual(booking.payment_status, 'refunded')
+
+        refund = RefundRequest.objects.filter(booking=booking).first()
+        self.assertIsNotNone(refund)
+        self.assertEqual(refund.status, 'refunded')
+        self.assertEqual(refund.feexpay_reference, 'FXP-REFUND-111')
+        self.assertEqual(refund.amount, 5000)
+
+    def test_16_passenger_early_cancellation_triggers_auto_refund(self):
+        """TEST 16 : Annulation passager à plus de 5h -> Remboursement automatique direct."""
+        from api.services.booking_service import BookingService
+        from api.models.paiement import RefundRequest, Payment
+        import datetime
+
+        # Trajet prévu dans 24h (> 5h)
+        future_date = timezone.now().date() + datetime.timedelta(days=1)
+        ride = Ride.objects.create(
+            driver=self.driver,
+            departure_location='Cotonou',
+            arrival_location='Parakou',
+            departure_date=future_date,
+            departure_time=timezone.now().time(),
+            price_per_seat=8000,
+            total_seats=3,
+            seats_available=3,
+            status='confirmed',
+        )
+        booking = Booking.objects.create(
+            passenger=self.passenger,
+            ride=ride,
+            seats_booked=1,
+            status='confirmed',
+            payment_status='paid',
+            departure_location='Cotonou',
+            arrival_location='Parakou',
+        )
+        Payment.objects.create(
+            transaction_id='TX-TEST-EARLY-002',
+            amount=8000,
+            user=self.passenger,
+            booking=booking,
+            status='SUCCESS'
+        )
+
+        mock_result = FeexPayPayoutResult(
+            success=True, reference='FXP-REFUND-222', status='SUCCESSFUL'
+        )
+
+        with patch.object(FeexPayPayoutService, 'is_automatic_enabled', return_value=True):
+            with patch.object(FeexPayPayoutService, 'create_refund', return_value=mock_result):
+                BookingService.cancel_booking(booking, cancelled_by_user=self.passenger)
+
+        booking.refresh_from_db()
+        refund = RefundRequest.objects.filter(booking=booking).first()
+        self.assertIsNotNone(refund)
+        self.assertEqual(refund.status, 'refunded')
+        self.assertEqual(refund.feexpay_reference, 'FXP-REFUND-222')
+
+    def test_17_refund_exceeding_balance_refused(self):
+        """TEST 17 : Demande de remboursement supérieure au montant encaissé refusée."""
+        from api.services.refund_service import RefundService
+        from api.models.paiement import Payment
+
+        ride = create_ride(self.driver, price_per_seat=4000)
+        booking = Booking.objects.create(
+            passenger=self.passenger,
+            ride=ride,
+            seats_booked=1,
+            status='confirmed',
+            payment_status='paid',
+        )
+        Payment.objects.create(
+            transaction_id='TX-TEST-4000',
+            amount=4000,
+            user=self.passenger,
+            booking=booking,
+            status='SUCCESS'
+        )
+
+        is_valid, error, _ = RefundService.validate_refund_eligibility(
+            booking=booking,
+            amount=5000,  # 5000 > 4000
+            requested_by=self.passenger
+        )
+        self.assertFalse(is_valid)
+        self.assertIn('supérieur', error.lower())
+
+    def test_18_refund_unauthorized_user_blocked(self):
+        """TEST 18 : Un utilisateur B ne peut pas demander le remboursement du passager A."""
+        from api.services.refund_service import RefundService
+        other_user = User.objects.create_user(phone='+22997999999', password='password123')
+
+        ride = create_ride(self.driver, price_per_seat=4000)
+        booking = Booking.objects.create(
+            passenger=self.passenger,
+            ride=ride,
+            seats_booked=1,
+            status='confirmed',
+            payment_status='paid',
+        )
+
+        is_valid, error, _ = RefundService.validate_refund_eligibility(
+            booking=booking,
+            amount=4000,
+            requested_by=other_user
+        )
+        self.assertFalse(is_valid)
+        self.assertIn('pas autorisé', error.lower())
+
+    def test_19_refund_idempotency_double_refund_blocked(self):
+        """TEST 19 : Idempotence de remboursement FeexPay."""
+        from api.models.paiement import RefundRequest
+
+        ride = create_ride(self.driver, price_per_seat=5000)
+        booking = Booking.objects.create(
+            passenger=self.passenger,
+            ride=ride,
+            seats_booked=1,
+            status='confirmed',
+            payment_status='paid',
+        )
+        refund = RefundRequest.objects.create(
+            booking=booking,
+            passenger=self.passenger,
+            driver=self.driver,
+            amount=5000,
+            reason="Test",
+            status='refunded',
+            feexpay_reference='FXP-ALREADY-REFUNDED-001',
+            refund_reference=RefundRequest.generate_reference()
+        )
+
+        result = FeexPayPayoutService.create_refund(refund)
+        self.assertEqual(result.error_code, 'ALREADY_PROCESSED')
+
+    def test_20_webhook_payout_confirmation(self):
+        """TEST 20 : Webhook FeexPay valide un DriverPayout en 'paid'."""
+        import json
+        from django.test import Client
+
+        payout = DriverPayout.objects.create(
+            driver=self.driver,
+            amount=6000,
+            phone_number='+22997000001',
+            operator='mtn',
+            status='processing',
+            payout_reference=DriverPayout.generate_reference(),
+            feexpay_reference='FXP-PAYOUT-WH-001',
+        )
+
+        client = Client()
+        payload = {
+            "transaction_id": payout.payout_reference,
+            "status": "SUCCESSFUL",
+            "amount": 6000,
+        }
+
+        response = client.post(
+            '/api/payments/webhook/',
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_X_ZEMY_WEBHOOK_TOKEN='local_webhook_secret_for_testing_purposes'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        payout.refresh_from_db()
+        self.assertEqual(payout.status, 'paid')
+
+    def test_21_webhook_refund_confirmation(self):
+        """TEST 21 : Webhook FeexPay valide un RefundRequest en 'refunded'."""
+        import json
+        from django.test import Client
+        from api.models.paiement import RefundRequest
+
+        ride = create_ride(self.driver, price_per_seat=5000)
+        booking = Booking.objects.create(
+            passenger=self.passenger,
+            ride=ride,
+            seats_booked=1,
+            status='cancelled',
+            payment_status='pending',
+        )
+        refund = RefundRequest.objects.create(
+            booking=booking,
+            passenger=self.passenger,
+            driver=self.driver,
+            amount=5000,
+            reason="Annulation",
+            status='processing',
+            refund_reference=RefundRequest.generate_reference(),
+            feexpay_reference='FXP-REFUND-WH-002',
+        )
+
+        client = Client()
+        payload = {
+            "transaction_id": refund.refund_reference,
+            "status": "SUCCESSFUL",
+            "amount": 5000,
+        }
+
+        response = client.post(
+            '/api/payments/webhook/',
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_X_ZEMY_WEBHOOK_TOKEN='local_webhook_secret_for_testing_purposes'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        refund.refresh_from_db()
+        self.assertEqual(refund.status, 'refunded')
+        booking.refresh_from_db()
+        self.assertEqual(booking.payment_status, 'refunded')
+
+    def test_22_webhook_unauthorized_signature(self):
+        """TEST 22 : Webhook avec token invalide rejeté avec HTTP 403."""
+        import json
+        from django.test import Client
+
+        client = Client()
+        payload = {"transaction_id": "TEST-UNAUTH", "status": "SUCCESSFUL"}
+
+        response = client.post(
+            '/api/payments/webhook/',
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_X_ZEMY_WEBHOOK_TOKEN='wrong_secret'
+        )
+        self.assertEqual(response.status_code, 403)
+
+

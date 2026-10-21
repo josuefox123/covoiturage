@@ -47,32 +47,80 @@ class FinancialSettings(models.Model):
 
 class RefundRequest(models.Model):
     """
-    ModÃ¨le de demande de remboursement.
-    
-    RÃ´le :
-        GÃ©rÃ© par l'administrateur lorsqu'un trajet est annulÃ© de maniÃ¨re conflictuelle.
+    Modèle de demande de remboursement.
+    Supporte le remboursement automatique via FeexPay Payout ou manuel par l'admin.
     """
     STATUS_CHOICES = [
         ('pending', 'En attente'),
-        ('approved', 'ApprouvÃ©e'),
-        ('rejected', 'RejetÃ©e'),
+        ('processing', 'En cours de traitement'),
+        ('approved', 'Approuvée'),
+        ('refunded', 'Remboursée'),
+        ('failed', 'Échouée'),
+        ('rejected', 'Rejetée'),
     ]
+
+    OPERATOR_CHOICES = [
+        ('mtn', 'MTN Mobile Money'),
+        ('moov', 'Moov Money'),
+        ('celtiis', 'Celtiis Cash'),
+        ('other', 'Autre'),
+    ]
+
+    PAYMENT_MODE_CHOICES = [
+        ('automatic', 'Automatique (FeexPay)'),
+        ('manual', 'Manuel (Admin)'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.ForeignKey('Booking', on_delete=models.CASCADE, related_name='refund_requests')
     passenger = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refund_requests_as_passenger')
     driver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refund_requests_as_driver')
-    amount = models.IntegerField()
+    amount = models.IntegerField(help_text="Montant remboursé en XOF")
     reason = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    payment_mode = models.CharField(max_length=20, choices=PAYMENT_MODE_CHOICES, default='automatic')
+
+    # Coordonnées bénéficiaire Mobile Money
+    phone_number = models.CharField(max_length=30, blank=True, null=True, help_text="Numéro Mobile Money du passager")
+    operator = models.CharField(max_length=20, choices=OPERATOR_CHOICES, default='mtn')
+
+    # Références
+    refund_reference = models.CharField(max_length=50, unique=True, null=True, blank=True,
+                                         help_text="Référence interne Zemy (ZMY-REFUND-XXXXXXXX)")
+    feexpay_reference = models.CharField(max_length=255, null=True, blank=True,
+                                          help_text="Référence de la transaction FeexPay")
+
+    # Audit & échec
+    admin_note = models.TextField(blank=True, null=True)
+    failure_reason = models.TextField(null=True, blank=True)
+    failure_code = models.CharField(max_length=50, null=True, blank=True)
+
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    failed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Demande de Remboursement"
         verbose_name_plural = "Demandes de Remboursement"
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"Remboursement #{self.id} - {self.status}"
+        ref = self.refund_reference or str(self.id)[:8]
+        return f"Remboursement [{ref}] {self.passenger} — {self.amount} XOF ({self.status})"
+
+    @classmethod
+    def generate_reference(cls):
+        """Génère une référence unique ZMY-REFUND-XXXXXXXX."""
+        import random
+        import string
+        while True:
+            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            ref = f"ZMY-REFUND-{suffix}"
+            if not cls.objects.filter(refund_reference=ref).exists():
+                return ref
 
 class Transaction(models.Model):
     """

@@ -197,7 +197,7 @@ class DriverClaimPayoutView(APIView):
             with transaction.atomic():
                 payout_locked = DriverPayout.objects.select_for_update().get(id=payout.id)
 
-                if result.success and result.error_code != 'ALREADY_PROCESSED':
+                if result.success and (result.status == 'SUCCESSFUL' or result.error_code == 'ALREADY_PROCESSED'):
                     payout_locked.status = 'paid'
                     payout_locked.feexpay_reference = result.reference
                     payout_locked.paid_at = timezone.now()
@@ -214,12 +214,20 @@ class DriverClaimPayoutView(APIView):
                     )
                     logger.info(f"[PAYOUT] {payout.payout_reference} → paid (FeexPay: {result.reference})")
 
-                elif result.error_code == 'ALREADY_PROCESSED':
-                    # Idempotence — déjà traité, considérer comme paid
-                    payout_locked.status = 'paid'
+                elif result.success and result.status == 'PENDING':
+                    # Accepté par FeexPay, en cours de débouclage Mobile Money
+                    payout_locked.status = 'processing'
                     payout_locked.feexpay_reference = result.reference
-                    payout_locked.paid_at = timezone.now()
                     payout_locked.save()
+                    logger.info(f"[PAYOUT] {payout.payout_reference} → processing (FeexPay: {result.reference})")
+
+                elif not result.success and result.status == 'PROCESSING':
+                    # Cas de timeout : garder en processing pour vérification de statut ultérieure
+                    payout_locked.status = 'processing'
+                    payout_locked.failure_reason = result.error
+                    payout_locked.failure_code = result.error_code
+                    payout_locked.save()
+                    logger.warning(f"[PAYOUT] {payout.payout_reference} → timeout (kept in processing)")
 
                 else:
                     payout_locked.status = 'failed'
@@ -541,6 +549,41 @@ class DriverPayoutViewSet(viewsets.ModelViewSet):
         return Response({
             'status': payout.status,
             'message': f'Payout relancé (mode: {payout.payment_mode}).'
+        })
+
+    # ---- CHECK STATUS FeexPay ----
+    @action(detail=True, methods=['get'], url_path='check-status')
+    def check_status(self, request, pk=None):
+        """Consulte le statut d'un payout auprès de FeexPay et synchronise la base locale."""
+        payout = self.get_object()
+        if not payout.feexpay_reference:
+            return Response({
+                'status': payout.status,
+                'message': "Aucune référence FeexPay associée à ce payout."
+            })
+
+        result = FeexPayPayoutService.check_payout_status(payout.feexpay_reference)
+
+        with transaction.atomic():
+            payout_locked = DriverPayout.objects.select_for_update().get(pk=payout.pk)
+            if result.status == 'SUCCESSFUL' and payout_locked.status != 'paid':
+                payout_locked.status = 'paid'
+                payout_locked.paid_at = timezone.now()
+                payout_locked.save()
+            elif result.status == 'FAILED' and payout_locked.status != 'failed':
+                payout_locked.status = 'failed'
+                payout_locked.failure_reason = result.error
+                payout_locked.failed_at = timezone.now()
+                payout_locked.save()
+
+        payout.refresh_from_db()
+        return Response({
+            'payout_id': str(payout.id),
+            'payout_reference': payout.payout_reference,
+            'feexpay_reference': payout.feexpay_reference,
+            'status': payout.status,
+            'feexpay_status': result.status,
+            'raw_response': result.raw_response
         })
 
     # ---- STATS globales ----

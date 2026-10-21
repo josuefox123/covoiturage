@@ -163,17 +163,18 @@ class BookingService:
             price_paid = booking.amount_paid_online
             
             if cancelled_by_user == driver:
-                # Conducteur annule -> Remboursement automatique approuvé
-                booking.payment_status = 'refunded'
-                booking.save()
-                RefundRequest.objects.create(
-                    booking=booking,
-                    passenger=passenger,
-                    driver=driver,
-                    amount=price_paid,
-                    reason="Annulation par le conducteur",
-                    status='approved'
-                )
+                # Conducteur annule -> Remboursement automatique sans avis admin
+                if price_paid > 0:
+                    from .refund_service import RefundService
+                    RefundService.create_and_process_refund(
+                        booking=booking,
+                        amount=price_paid,
+                        reason="Annulation par le conducteur",
+                        auto_disburse=True
+                    )
+                else:
+                    booking.payment_status = 'refunded'
+                    booking.save()
             else:
                 # Passager annule
                 ride_dt = datetime.combine(ride.departure_date, ride.departure_time)
@@ -186,14 +187,13 @@ class BookingService:
                 time_diff = ride_dt - now()
                 
                 if price_paid >= 1000 and time_diff > timedelta(hours=5):
-                    # Éligible au remboursement -> en attente
-                    RefundRequest.objects.create(
+                    # Éligible au remboursement automatique (> 5h du départ) sans avis admin
+                    from .refund_service import RefundService
+                    RefundService.create_and_process_refund(
                         booking=booking,
-                        passenger=passenger,
-                        driver=driver,
                         amount=price_paid,
                         reason="Annulation par le passager à plus de 5h du départ",
-                        status='pending'
+                        auto_disburse=True
                     )
 
             # Notifications si réservation confirmée
