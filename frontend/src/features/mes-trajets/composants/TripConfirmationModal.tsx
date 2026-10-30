@@ -159,7 +159,11 @@ export const TripConfirmationModal: React.FC<TripConfirmationModalProps> = ({
                 </Animated.View>
 
                 <Text style={styles.title}>VOTRE TRAJET PART DANS 30 MIN</Text>
-                <Text style={styles.route}>{departureLocation} → {arrivalLocation}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
+                  <Text style={[styles.route, { flexShrink: 1 }]} numberOfLines={1}>{departureLocation}</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#374151" style={{ marginHorizontal: 6 }} />
+                  <Text style={[styles.route, { flexShrink: 1 }]} numberOfLines={1}>{arrivalLocation}</Text>
+                </View>
 
                 <View style={styles.messageBubble}>
                   <Text style={styles.messageText}>
@@ -203,7 +207,11 @@ export const TripConfirmationModal: React.FC<TripConfirmationModalProps> = ({
                 </View>
 
                 <Text style={styles.title}>LE TRAJET TIENT-IL TOUJOURS ?</Text>
-                <Text style={styles.route}>{departureLocation} → {arrivalLocation}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginVertical: 4 }}>
+                  <Text style={[styles.route, { flexShrink: 1 }]} numberOfLines={1}>{departureLocation}</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#374151" style={{ marginHorizontal: 6 }} />
+                  <Text style={[styles.route, { flexShrink: 1 }]} numberOfLines={1}>{arrivalLocation}</Text>
+                </View>
 
                 {error && (
                   <View style={styles.errorBox}>

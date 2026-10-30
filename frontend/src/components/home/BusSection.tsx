@@ -265,7 +265,7 @@ export function BusSection() {
 
                 <TouchableOpacity
                   style={styles.bookBtn}
-                  onPress={() => handleInProductionAlert('Réservation Billet Bus', `Réservation ${trip.company} ${trip.departureCity} → ${trip.arrivalCity}`)}
+                  onPress={() => handleInProductionAlert('Réservation Billet Bus', `Réservation ${trip.company} ${trip.departureCity} - ${trip.arrivalCity}`)}
                   activeOpacity={0.85}
                 >
                   <Ionicons name="ticket-outline" size={16} color="#FFFFFF" />

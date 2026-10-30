@@ -138,11 +138,15 @@ export default function ConversationCard({ item, currentUserId, onArchive, onDel
           {(booking || ride) && (
             <View style={styles.rideRow}>
               <Ionicons name="car-outline" size={14} color={theme.colors.textMuted} />
-              <Text style={styles.rideText} numberOfLines={1}>
-                {booking 
-                  ? `${booking.departure_location?.split(',')[0]} → ${booking.arrival_location?.split(',')[0]}`
-                  : `${ride.departure_location?.split(',')[0]} → ${ride.arrival_location?.split(',')[0]}`}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                <Text style={[styles.rideText, { flexShrink: 1 }]} numberOfLines={1}>
+                  {(booking?.departure_location || ride?.departure_location)?.split(',')[0]}
+                </Text>
+                <Ionicons name="arrow-forward" size={10} color={theme.colors.textMuted} style={{ marginHorizontal: 3 }} />
+                <Text style={[styles.rideText, { flexShrink: 1 }]} numberOfLines={1}>
+                  {(booking?.arrival_location || ride?.arrival_location)?.split(',')[0]}
+                </Text>
+              </View>
               <View style={[
                 styles.badge, 
                 ['confirmed', 'active', 'started'].includes(rideStatus) 

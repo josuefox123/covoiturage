@@ -651,7 +651,7 @@ export default function LiveRideModal() {
       );
       
       const passengerRides: Ride[] = bookingsData
-        .filter((b: any) => b.status === 'confirmed' && b.payment_status !== 'pending')
+        .filter((b: any) => (b.status === 'confirmed' || b.status === 'started') && b.payment_status !== 'pending')
         .map((b: any) => b.ride_details)
         .filter((r: Ride) => r && (r.status === 'active' || r.status === 'started') && 
                isItTimeForLiveRide(r.departure_date, r.departure_time) &&
@@ -673,7 +673,9 @@ export default function LiveRideModal() {
       } else if (passengerRides.length > 0) {
         currentRide = passengerRides[0];
         const matchingBooking = bookingsData.find(
-          (b: any) => b.ride_details?.id === currentRide!.id
+          (b: any) => b.ride_details?.id === currentRide!.id &&
+                      (b.status === 'confirmed' || b.status === 'started') &&
+                      b.payment_status !== 'pending'
         );
         bookingId = matchingBooking?.id || null;
         bookingObj = matchingBooking || null;
@@ -1521,9 +1523,15 @@ export default function LiveRideModal() {
         </View>
 
         {/* Route */}
-        <Text style={styles.confirmCardRoute} numberOfLines={1}>
-          {dep}{'  →  '}{arr}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+          <Text style={[styles.confirmCardRoute, { flexShrink: 1 }]} numberOfLines={1}>
+            {dep}
+          </Text>
+          <Ionicons name="arrow-forward" size={13} color="#D97706" style={{ marginHorizontal: 6 }} />
+          <Text style={[styles.confirmCardRoute, { flexShrink: 1 }]} numberOfLines={1}>
+            {arr}
+          </Text>
+        </View>
 
         {/* Question */}
         <Text style={styles.confirmCardQuestion}>

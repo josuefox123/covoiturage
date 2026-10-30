@@ -68,9 +68,15 @@ export function PassengerNegotiationModal({
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 4 }}>
                 VOTRE TRAJET ({seats} place{seats > 1 ? 's' : ''})
               </Text>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#1F2937' }}>
-                {myBooking?.departure_location || departure} → {myBooking?.arrival_location || destination}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#1F2937', flexShrink: 1 }} numberOfLines={1}>
+                  {myBooking?.departure_location || departure}
+                </Text>
+                <Ionicons name="arrow-forward" size={13} color="#6B7280" style={{ marginHorizontal: 6 }} />
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#1F2937', flexShrink: 1 }} numberOfLines={1}>
+                  {myBooking?.arrival_location || destination}
+                </Text>
+              </View>
             </View>
 
             {/* Détail du calcul de tarif */}

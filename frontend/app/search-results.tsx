@@ -69,8 +69,12 @@ export default function SearchResultsScreen() {
     radius?: string;
   }>();
 
-  const departure   = raw.departure   || '';
-  const destination = raw.destination || '';
+  const cleanLoc = (s?: string) => {
+    if (!s) return '';
+    return s.split('|||')[0].trim();
+  };
+  const departure   = cleanLoc(raw.departure);
+  const destination = cleanLoc(raw.destination);
   const vehicleType = raw.vehicleType || '';
   const date        = raw.date        || '';
   const passengers  = parseInt(raw.passengers || '1', 10);
@@ -246,13 +250,25 @@ export default function SearchResultsScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerMid}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {isNearbySearch
-              ? 'Trajets autour de moi'
-              : departure && destination
-              ? `${departure} → ${destination}`
-              : departure || destination || 'Tous les trajets'}
-          </Text>
+          {isNearbySearch ? (
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              Trajets autour de moi
+            </Text>
+          ) : departure && destination ? (
+            <View style={styles.headerRouteRow}>
+              <Text style={styles.headerRouteText} numberOfLines={1} ellipsizeMode="tail">
+                {departure}
+              </Text>
+              <Ionicons name="arrow-forward" size={13} color="#4B5563" style={styles.headerRouteArrow} />
+              <Text style={styles.headerRouteText} numberOfLines={1} ellipsizeMode="tail">
+                {destination}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {departure || destination || 'Tous les trajets'}
+            </Text>
+          )}
           <Text style={styles.headerSub} numberOfLines={1}>
             {isNearbySearch
               ? `Rayon : ${radius} km · ${headerSub}`
@@ -488,7 +504,11 @@ export default function SearchResultsScreen() {
                   <View style={styles.stepIndicator}><Text style={styles.stepIndicatorTxt}>1</Text></View>
                   <Text style={styles.modalSectionTitle}>Premier Trajet</Text>
                 </View>
-                <Text style={styles.modalLocation}>{selectedConnection?.ride_1.departure_location.split(',')[0]} ➔ {selectedConnection?.connection_point_name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Text style={styles.modalLocation}>{selectedConnection?.ride_1.departure_location.split(',')[0]}</Text>
+                  <Ionicons name="arrow-forward" size={13} color="#4B5563" />
+                  <Text style={styles.modalLocation}>{selectedConnection?.connection_point_name}</Text>
+                </View>
                 <Text style={styles.modalTime}>Départ : {selectedConnection?.departure_time_1.substring(0, 5)} | Arrivée : {selectedConnection?.arrival_time_1.substring(0, 5)}</Text>
                 <Text style={styles.modalDriver}>Conducteur : {selectedConnection?.ride_1.driver_details?.full_name} ({selectedConnection?.ride_1.vehicle_details?.brand || 'Véhicule'} {selectedConnection?.ride_1.vehicle_details?.model || ''})</Text>
                 <TouchableOpacity 
@@ -522,7 +542,11 @@ export default function SearchResultsScreen() {
                   <View style={styles.stepIndicator}><Text style={styles.stepIndicatorTxt}>2</Text></View>
                   <Text style={styles.modalSectionTitle}>Second Trajet</Text>
                 </View>
-                <Text style={styles.modalLocation}>{selectedConnection?.connection_point_name} ➔ {selectedConnection?.ride_2.arrival_location.split(',')[0]}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Text style={styles.modalLocation}>{selectedConnection?.connection_point_name}</Text>
+                  <Ionicons name="arrow-forward" size={13} color="#4B5563" />
+                  <Text style={styles.modalLocation}>{selectedConnection?.ride_2.arrival_location.split(',')[0]}</Text>
+                </View>
                 <Text style={styles.modalTime}>Départ : {selectedConnection?.departure_time_2.substring(0, 5)} | Arrivée : {selectedConnection?.arrival_time_2.substring(0, 5)}</Text>
                 <Text style={styles.modalDriver}>Conducteur : {selectedConnection?.ride_2.driver_details?.full_name} ({selectedConnection?.ride_2.vehicle_details?.brand || 'Véhicule'} {selectedConnection?.ride_2.vehicle_details?.model || ''})</Text>
                 <TouchableOpacity 
@@ -558,6 +582,20 @@ const styles = StyleSheet.create({
   backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
   headerMid: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  headerRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '100%',
+  },
+  headerRouteText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    flexShrink: 1,
+  },
+  headerRouteArrow: {
+    marginHorizontal: 5,
+  },
   headerSub:   { fontSize: 11, color: '#6B7280', marginTop: 1, fontWeight: '500' },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 8,

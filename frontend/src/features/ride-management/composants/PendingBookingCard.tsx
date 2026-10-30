@@ -56,10 +56,14 @@ export function PendingBookingCard({
             {seatsReq} place{seatsReq > 1 ? 's' : ''} demandée{seatsReq > 1 ? 's' : ''}
           </Text>
           {(booking.departure_location || booking.arrival_location) && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, flex: 1 }}>
               <View style={[styles.miniDot, { backgroundColor: C.success }]} />
-              <Text style={{ fontSize: 11, color: C.textSec, flex: 1 }} numberOfLines={1}>
-                {booking.departure_location?.split(',')[0]} → {booking.arrival_location?.split(',')[0]}
+              <Text style={{ fontSize: 11, color: C.textSec, flexShrink: 1 }} numberOfLines={1}>
+                {booking.departure_location?.split(',')[0]}
+              </Text>
+              <Ionicons name="arrow-forward" size={10} color={C.textSec} />
+              <Text style={{ fontSize: 11, color: C.textSec, flexShrink: 1 }} numberOfLines={1}>
+                {booking.arrival_location?.split(',')[0]}
               </Text>
             </View>
           )}

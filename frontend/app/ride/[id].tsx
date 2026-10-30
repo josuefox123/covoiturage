@@ -232,7 +232,7 @@ export default function RideDetailScreen() {
     try {
       const cleanDep = parseLoc(ride.departure_location).name;
       const cleanArr = parseLoc(ride.arrival_location).name;
-      await Share.share({ message: `Zemy: ${cleanDep.split(',')[0]} → ${cleanArr.split(',')[0]} ${new Date(ride.departure_date).toLocaleDateString('fr-FR')} ${ride.departure_time?.substring(0, 5)}` });
+      await Share.share({ message: `Zemy: ${cleanDep.split(',')[0]} - ${cleanArr.split(',')[0]} ${new Date(ride.departure_date).toLocaleDateString('fr-FR')} ${ride.departure_time?.substring(0, 5)}` });
     } catch { }
   };
 

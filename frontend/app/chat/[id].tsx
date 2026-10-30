@@ -307,12 +307,18 @@ export default function ChatScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.headerName} numberOfLines={1}>{partnerName}</Text>
             {(conversation?.booking_details || rideInfo) && (
-              <Text style={styles.rideInfoText} numberOfLines={1}>
-                {conversation?.booking_details
-                  ? `${conversation.booking_details.departure_location?.split(',')[0]} → ${conversation.booking_details.arrival_location?.split(',')[0]}`
-                  : `${rideInfo.departure_location?.split(',')[0]} → ${rideInfo.arrival_location?.split(',')[0]}`}
-                {` • ${otherUser?.is_online ? 'En ligne' : 'Hors ligne'}`}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.rideInfoText, { flexShrink: 1 }]} numberOfLines={1}>
+                  {(conversation?.booking_details?.departure_location || rideInfo?.departure_location)?.split(',')[0]}
+                </Text>
+                <Ionicons name="arrow-forward" size={10} color="#6B7280" style={{ marginHorizontal: 3 }} />
+                <Text style={[styles.rideInfoText, { flexShrink: 1 }]} numberOfLines={1}>
+                  {(conversation?.booking_details?.arrival_location || rideInfo?.arrival_location)?.split(',')[0]}
+                </Text>
+                <Text style={styles.rideInfoText}>
+                  {` • ${otherUser?.is_online ? 'En ligne' : 'Hors ligne'}`}
+                </Text>
+              </View>
             )}
           </View>
         </View>

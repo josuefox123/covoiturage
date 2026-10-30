@@ -67,10 +67,14 @@ export function PassengerCard({
             <Text style={{ fontSize: 12, color: C.textSec }}>{pax.phone}</Text>
           )}
           {(booking.departure_location || booking.arrival_location) && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
               <View style={[styles.miniDot, { backgroundColor: C.success }]} />
-              <Text style={{ fontSize: 11, color: C.textSec }} numberOfLines={1}>
-                {booking.departure_location?.split(',')[0]} → {booking.arrival_location?.split(',')[0]}
+              <Text style={{ fontSize: 11, color: C.textSec, flexShrink: 1 }} numberOfLines={1}>
+                {booking.departure_location?.split(',')[0]}
+              </Text>
+              <Ionicons name="arrow-forward" size={10} color={C.textSec} />
+              <Text style={{ fontSize: 11, color: C.textSec, flexShrink: 1 }} numberOfLines={1}>
+                {booking.arrival_location?.split(',')[0]}
               </Text>
             </View>
           )}

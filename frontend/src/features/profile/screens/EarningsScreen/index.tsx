@@ -131,8 +131,12 @@ const RideEarningCard = ({ item }: { item: RideEarning }) => {
       >
         <View style={styles.rideRoute}>
           <Ionicons name="location" size={14} color={COLORS.primary} />
-          <Text style={styles.rideRouteText} numberOfLines={1}>
-            {item.departure_location} → {item.arrival_location}
+          <Text style={[styles.rideRouteText, { flexShrink: 1 }]} numberOfLines={1}>
+            {item.departure_location}
+          </Text>
+          <Ionicons name="arrow-forward" size={11} color={COLORS.muted} style={{ marginHorizontal: 4 }} />
+          <Text style={[styles.rideRouteText, { flexShrink: 1 }]} numberOfLines={1}>
+            {item.arrival_location}
           </Text>
         </View>
         <View style={styles.rideRight}>

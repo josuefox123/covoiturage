@@ -331,9 +331,15 @@ export default function EarningsScreen() {
                           />
                         </View>
                         <View style={styles.txInfo}>
-                          <Text style={styles.txTitle} numberOfLines={1}>
-                            {item.departure_location} → {item.arrival_location}
-                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={[styles.txTitle, { flexShrink: 1 }]} numberOfLines={1}>
+                              {item.departure_location}
+                            </Text>
+                            <Ionicons name="arrow-forward" size={12} color="#4B5563" style={{ marginHorizontal: 4 }} />
+                            <Text style={[styles.txTitle, { flexShrink: 1 }]} numberOfLines={1}>
+                              {item.arrival_location}
+                            </Text>
+                          </View>
                           <Text style={styles.txDate}>
                             {formatDate(item.departure_date)}
                             {firstPayout && cfg ? `  ·  ${cfg.label}` : "  ·  Gains disponibles"}
