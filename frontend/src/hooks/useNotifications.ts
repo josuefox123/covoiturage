@@ -36,7 +36,11 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 let Notifications: any = null;
 let Device: any = null;
 
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const isExpoGo =
+  (Constants as any).appOwnership === 'expo' ||
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+  (Constants.executionEnvironment as any) === 'storeClient' ||
+  Boolean((Constants as any).expoVersion);
 
 if (Platform.OS !== 'web' && !isExpoGo) {
   try {
@@ -48,16 +52,20 @@ if (Platform.OS !== 'web' && !isExpoGo) {
 }
 
 // Configuration de l'affichage des notifications en premier plan
-if (Notifications) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch (e) {
+    console.warn('[Notifications] Erreur setNotificationHandler:', e);
+  }
 }
 
 /**
@@ -103,22 +111,24 @@ export function useNotifications() {
 
     setPermissionGranted(true);
 
-    // Canal Android haute priorité Zemy
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Alertes Zemy',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 500, 250, 500, 250, 500],
-        lightColor: '#0066FF',
-        sound: 'default',
-        enableVibrate: true,
-        enableLights: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      });
-    }
-
     if (isExpoGo) {
       return null;
+    }
+
+    // Canal Android haute priorité Zemy
+    if (Platform.OS === 'android') {
+      try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Alertes Zemy',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 500, 250, 500, 250, 500],
+          lightColor: '#0066FF',
+          sound: 'default',
+          enableVibrate: true,
+          enableLights: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+      } catch {}
     }
 
     // Récupérer le token Push (Expo Push Token ou FCM Device Token)
@@ -133,7 +143,9 @@ export function useNotifications() {
           const nativeTokenData = await Notifications.getDevicePushTokenAsync();
           pushToken = nativeTokenData?.data || null;
         } catch (e2) {
-          console.warn('[Notifications] Impossible d\'obtenir le push token:', e1);
+          if (!String((e1 as any)?.message).includes('Expo Go')) {
+            console.warn('[Notifications] Impossible d\'obtenir le push token:', e1);
+          }
         }
       }
       if (pushToken) {

@@ -101,7 +101,7 @@ export default function TabsLayout() {
           options={{
             title: 'Accueil',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color as string} />
             ),
           }}
         />
@@ -111,7 +111,7 @@ export default function TabsLayout() {
           options={{
             title: 'Publier',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={24} color={color as string} />
             ),
           }}
         />
@@ -160,7 +160,7 @@ export default function TabsLayout() {
             title: 'Trajets',
             tabBarIcon: ({ color, focused }) => (
               <View style={styles.iconWrapper}>
-                <Ionicons name={focused ? 'car' : 'car-outline'} size={24} color={color} />
+                <Ionicons name={focused ? 'car' : 'car-outline'} size={24} color={color as string} />
                 <TabBadge count={tripCount} />
               </View>
             ),
@@ -173,17 +173,19 @@ export default function TabsLayout() {
             title: 'Messages',
             tabBarIcon: ({ color, focused }) => (
               <View style={styles.iconWrapper}>
-                <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
+                <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color as string} />
                 <TabBadge count={messageCount} />
               </View>
             ),
           }}
         />
-        {/* Profil - caché de la barre, accessible via l'accueil */}
+        {/* Profil masqué du menu du bas */}
         <Tabs.Screen
           name="profile"
           options={{
-            href: null,
+            title: 'Profil',
+            tabBarItemStyle: { display: 'none' },
+            tabBarButton: () => null,
           }}
         />
       </Tabs>

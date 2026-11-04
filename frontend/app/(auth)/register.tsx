@@ -32,7 +32,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import CustomAlert from '../../src/components/CustomAlert';
-import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
+import CountryPicker, { Country, CountryCode, CountryFilter, getCallingCode } from 'react-native-country-picker-modal';
+
+function CountryFilterInput(props: any) {
+  const [text, setText] = useState('');
+
+  return (
+    <CountryFilter
+      {...props}
+      value={text}
+      placeholder="Rechercher un pays ou indicatif (+33, 229, FR...)"
+      onChangeText={(val: string) => {
+        setText(val);
+        const clean = val.replace(/^\++\s*/, '').trim();
+        props.onChangeText?.(clean);
+      }}
+    />
+  );
+}
 import * as Location from 'expo-location';
 import { API_URL } from '../../src/services/api';
 import { getPostAuthRoute } from '../../src/utils/authNavigation';
@@ -52,6 +69,7 @@ const COUNTRY_MIN_DIGITS: Record<string, number> = {
   NE: 8,  // Niger         +227
   CM: 9,  // Cameroun      +237
   GA: 8,  // Gabon         +241
+  FR: 9,  // France        +33
 };
 
 /**
@@ -67,6 +85,7 @@ const COUNTRY_PHONE_PLACEHOLDER: Record<string, string> = {
   NE: '90 12 34 56',
   CM: '6 70 12 34 56',
   GA: '07 12 34 56',
+  FR: '06 12 34 56 78',
 };
 
 /** Délai debounce avant appel API de vérification (ms) */
@@ -165,6 +184,14 @@ export default function RegisterScreen() {
         const detected = geo[0].isoCountryCode as CountryCode;
         if (detected && detected.length === 2) {
           setCountryCode(detected);
+          try {
+            const code = await getCallingCode(detected);
+            if (code) {
+              setCallingCode(code);
+            }
+          } catch {
+            // Silencieux
+          }
         }
       }
     } catch {
@@ -576,12 +603,19 @@ export default function RegisterScreen() {
                     withFlag
                     withCallingCode
                     withFilter
+                    translation="fra"
+                    renderCountryFilter={(filterProps) => (
+                      <CountryFilterInput
+                        {...filterProps}
+                        key={showCountryPicker ? 'open' : 'closed'}
+                      />
+                    )}
                     withAlphaFilter
                     withEmoji
                     onSelect={handleCountrySelect}
                     visible={showCountryPicker}
                     onClose={() => setShowCountryPicker(false)}
-                    preferredCountries={['BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA']}
+                    preferredCountries={['BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA', 'FR']}
                     containerButtonStyle={styles.countryPickerContainer}
                   />
                   <Ionicons

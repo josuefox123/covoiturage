@@ -7,16 +7,10 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "updates": {
       "enabled": false,
       "checkAutomatically": "NEVER",
       "fallbackToCacheTimeout": 0
-    },
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2563eb"
     },
     "ios": {
       "supportsTablet": true
@@ -26,9 +20,9 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#2563eb"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.jojo13.frontend"
+      "package": "com.sinustic.zemy",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,7 +33,8 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#2563EB"
+          "color": "#2563EB",
+          "defaultChannel": "default"
         }
       ],
       "expo-font",
@@ -47,7 +42,15 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-sharing",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#2563eb"
+        }
+      ]
     ],
     "extra": {
       "router": {},

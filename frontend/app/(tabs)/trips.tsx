@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { theme } from '../../src/styles/theme';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTrips } from '../../src/hooks/useTrips';
@@ -30,10 +31,20 @@ export default function TripsScreen() {
   const [driverTrips, setDriverTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<any>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: true });
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // ─── Chargement des données ──────────────────────────────────────────
   useFocusEffect(
     useCallback(() => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: false });
       chargerTrajets();
     }, [user, fetchPassengerBookings, fetchDriverRides])
   );
@@ -163,6 +174,7 @@ export default function TripsScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.contenuScroll}
           showsVerticalScrollIndicator={false}
           refreshControl={

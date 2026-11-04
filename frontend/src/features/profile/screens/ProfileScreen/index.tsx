@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
   Text,
@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Animated,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { theme } from '../../../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { getMediaUrl, appendFileToFormData } from '../../../../utils/media';
@@ -41,12 +41,24 @@ export default function ProfileScreen() {
   const [prefsModalVisible, setPrefsModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const userRef = useRef(user);
+  userRef.current = user;
+  const scrollRef = useRef<any>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: true });
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // Parent state for vehicle summary to display in menu subtitle
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [plate, setPlate] = useState('');
+  const [vehiclesList, setVehiclesList] = useState<any[]>([]);
 
   // Animations
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -71,6 +83,7 @@ export default function ProfileScreen() {
     try {
       const data = await authFetch('/vehicles/');
       const list = Array.isArray(data) ? data : (data?.results || []);
+      setVehiclesList(list);
       if (list.length > 0) {
         const vehicle = list[0];
         setVehicleId(vehicle.id);
@@ -89,7 +102,8 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (user) {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+      if (userRef.current) {
         fetchVehicle();
         refreshUser();
       }
@@ -97,11 +111,11 @@ export default function ProfileScreen() {
       if (openVehicleModal === 'true') {
         const timer = setTimeout(() => {
           setVehicleModalVisible(true);
-          router.setParams({ openVehicleModal: undefined });
+          // modal ouverte
         }, 150);
         return () => clearTimeout(timer);
       }
-    }, [user, openVehicleModal])
+    }, [openVehicleModal])
   );
 
   const onRefresh = useCallback(async () => {
@@ -161,11 +175,11 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleVehicleSaveSuccess = (updatedData: { id: string; brand: string; model: string; plate: string }) => {
-    setVehicleId(updatedData.id);
-    setBrand(updatedData.brand);
-    setModel(updatedData.model);
-    setPlate(updatedData.plate);
+  const handleVehicleSaveSuccess = () => {
+    fetchVehicle();
+
+
+
   };
 
   const MenuItem = ({ icon, title, subtitle, iconColor = theme.colors.primary, onPress, isDestructive = false }: {
@@ -215,6 +229,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -222,6 +237,33 @@ export default function ProfileScreen() {
         }
         style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
       >
+        {/* Header avec bouton retour vers l'accueil */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.navigate('/(tabs)/home');
+              }
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: theme.colors.card,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginRight: 12,
+              ...theme.shadows.sm,
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: theme.colors.text }}>Mon Profil</Text>
+        </View>
+
         {/* Profile Header Card */}
         <LinearGradient
           colors={[theme.colors.white, theme.colors.background]}
@@ -402,7 +444,13 @@ export default function ProfileScreen() {
             <MenuItem
               icon="car-outline"
               title="Mon véhicule"
-              subtitle={vehicleId ? `${brand} ${model} - ${plate}` : 'Ajouter un véhicule'}
+              subtitle={
+                vehiclesList.length === 0
+                  ? 'Ajouter un véhicule'
+                  : vehiclesList.length === 1
+                  ? `${vehiclesList[0].brand_model} (${vehiclesList[0].vehicle_type || 'voiture'})`
+                  : `${vehiclesList.length} véhicules enregistrés`
+              }
               onPress={() => setVehicleModalVisible(true)}
             />
             <View style={styles.menuDivider} />

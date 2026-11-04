@@ -17,15 +17,31 @@ Zemy
 Utilitaire Firebase Cloud Messaging (FCM).
 Utilise firebase_admin (déjà initialisé dans views.py).
 """
+import os
 import logging
 import threading
 import requests
-from firebase_admin import messaging
+from django.conf import settings
+import firebase_admin
+from firebase_admin import credentials, messaging
 # Import direct pour éviter TypeError lors du catch (messaging.UnregisteredError
 # est un attribut dynamique et n'hérite pas de BaseException quand mocké)
 from firebase_admin.messaging import UnregisteredError as FCMUnregisteredError
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_firebase_initialized():
+    """Garantit l'initialisation de Firebase Admin à partir de la clé de compte de service."""
+    try:
+        if not firebase_admin._apps:
+            cred_path = os.path.join(settings.BASE_DIR, 'firebase-adminsdk.json')
+            if os.path.exists(cred_path):
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+                logger.info("Firebase Admin initialisé avec succès dans fcm.py")
+    except Exception as e:
+        logger.error(f"Erreur initialisation Firebase Admin: {e}")
 
 
 def send_fcm_notification(token: str, title: str, body: str, data: dict | None = None) -> bool:
@@ -82,6 +98,7 @@ def send_fcm_notification(token: str, title: str, body: str, data: dict | None =
 
     # Sinon, utiliser Firebase Cloud Messaging (FCM) direct pour les tokens natifs
     try:
+        _ensure_firebase_initialized()
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,

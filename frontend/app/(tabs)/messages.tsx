@@ -10,9 +10,9 @@
  * Zemy
  * ==============================================================
  */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -65,9 +65,20 @@ export default function MessagesScreen() {
     }
   }, [authFetch]);
 
+  const scrollRef = useRef<any>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      scrollRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Handle Focus & Polling
   useFocusEffect(
     useCallback(() => {
+      scrollRef.current?.scrollToOffset?.({ offset: 0, animated: false });
       if (user) {
         fetchConversations();
         // Start polling every 10 seconds for real-time updates without refreshing indicator
@@ -217,6 +228,7 @@ export default function MessagesScreen() {
         </View>
       ) : (
         <FlatList
+          ref={scrollRef}
           data={filteredConversations}
           renderItem={renderItem}
           keyExtractor={keyExtractor}

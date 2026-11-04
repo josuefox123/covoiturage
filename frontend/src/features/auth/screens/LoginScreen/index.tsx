@@ -11,7 +11,7 @@
  * ==============================================================
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Text,
   View,
@@ -32,7 +32,24 @@ import { theme } from '../../../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomAlert from '../../../../components/CustomAlert';
-import CountryPicker from 'react-native-country-picker-modal';
+import CountryPicker, { CountryFilter } from 'react-native-country-picker-modal';
+
+function CountryFilterInput(props: any) {
+  const [text, setText] = useState('');
+
+  return (
+    <CountryFilter
+      {...props}
+      value={text}
+      placeholder="Rechercher un pays ou indicatif (+33, 229, FR...)"
+      onChangeText={(val: string) => {
+        setText(val);
+        const clean = val.replace(/^\++\s*/, '').trim();
+        props.onChangeText?.(clean);
+      }}
+    />
+  );
+}
 
 import { styles } from './styles';
 import { useLoginForm } from './hooks/useLoginForm';
@@ -239,13 +256,20 @@ export default function LoginScreen() {
                     withFlag
                     withCallingCode
                     withFilter
+                    translation="fra"
+                    renderCountryFilter={(filterProps) => (
+                      <CountryFilterInput
+                        {...filterProps}
+                        key={form.showCountryPicker ? 'open' : 'closed'}
+                      />
+                    )}
                     withAlphaFilter
                     withEmoji
                     onSelect={form.handleCountrySelect}
                     visible={form.showCountryPicker}
                     onClose={() => form.setShowCountryPicker(false)}
                     preferredCountries={[
-                      'BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA', 'NG',
+                      'BJ', 'TG', 'CI', 'SN', 'BF', 'NE', 'CM', 'GA', 'NG', 'FR',
                     ]}
                     containerButtonStyle={styles.pickerButtonStyle}
                   />

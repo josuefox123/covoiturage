@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CountryCode, Country } from 'react-native-country-picker-modal';
+import { CountryCode, Country, getCallingCode } from 'react-native-country-picker-modal';
 import * as Location from 'expo-location';
 import { useAuth } from '../../../../../context/AuthContext';
 import { getPostAuthRoute } from '../../../../../utils/authNavigation';
@@ -18,6 +18,7 @@ const COUNTRY_MIN_DIGITS: Record<string, number> = {
   CM: 9,  // Cameroun      +237
   GA: 8,  // Gabon         +241
   NG: 10, // Nigeria       +234
+  FR: 9,  // France        +33
 };
 
 const isEmail = (value: string): boolean => value.includes('@');
@@ -60,7 +61,13 @@ export function useLoginForm() {
       });
       if (geo.length > 0 && geo[0].isoCountryCode) {
         const detected = geo[0].isoCountryCode as CountryCode;
-        if (detected && detected.length === 2) setCountryCode(detected);
+        if (detected && detected.length === 2) {
+          setCountryCode(detected);
+          try {
+            const code = await getCallingCode(detected);
+            if (code) setCallingCode(code);
+          } catch { /* silent */ }
+        }
       }
     } catch { /* silent */ }
   }, []);

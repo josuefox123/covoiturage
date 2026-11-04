@@ -85,12 +85,12 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
     []
   );
 
-  // Note: snapPoints est passé directement — le BottomSheet est stable car rendu toujours monté
+  const memoizedSnapPoints = React.useMemo(() => snapPoints, [JSON.stringify(snapPoints)]);
 
   return (
     <BottomSheet
       ref={bottomSheetRef}
-      snapPoints={snapPoints}
+      snapPoints={memoizedSnapPoints}
       index={-1}
       onChange={handleSheetChanges}
       backdropComponent={renderBackdrop}

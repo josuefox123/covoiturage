@@ -15,6 +15,18 @@ import { LogBox } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 LogBox.ignoreAllLogs(true);
+if (typeof console !== 'undefined') {
+  const origWarn = console.warn;
+  console.warn = (...args: any[]) => {
+    if (
+      typeof args[0] === 'string' &&
+      (args[0].includes('[Reanimated]') || args[0].includes('expo-notifications'))
+    ) {
+      return;
+    }
+    origWarn(...args);
+  };
+}
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -76,6 +88,7 @@ export default function RootLayout() {
           <Stack.Screen name="support_chat" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
           <Stack.Screen name="weather" options={{ presentation: 'card', headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="payment" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
         </Stack>
         <LiveRideModal />
         <BookingRequestModal />

@@ -53,6 +53,24 @@ class UserViewSet(viewsets.ModelViewSet):
             return User.objects.filter(id=user.id, is_archived=False)
         return User.objects.none()
 
+    @action(detail=False, methods=['post'], url_path='check_phone', permission_classes=[permissions.AllowAny])
+    def check_phone(self, request):
+        raw_phone = request.data.get('phone', '')
+        from .helpers import normalize_phone
+        norm = normalize_phone(raw_phone)
+        qs = User.objects.filter(phone=norm)
+        if request.user and request.user.is_authenticated:
+            qs = qs.exclude(id=request.user.id)
+        return Response({'exists': qs.exists(), 'phone': norm})
+
+    @action(detail=False, methods=['post'], url_path='check_email', permission_classes=[permissions.AllowAny])
+    def check_email(self, request):
+        email = request.data.get('email', '').strip().lower()
+        qs = User.objects.filter(email__iexact=email)
+        if request.user and request.user.is_authenticated:
+            qs = qs.exclude(id=request.user.id)
+        return Response({'exists': qs.exists(), 'email': email})
+
     @action(detail=False, methods=['post'], url_path='create-admin', permission_classes=[permissions.IsAdminUser])
     def create_admin(self, request):
         full_name = request.data.get('full_name')
@@ -286,8 +304,11 @@ def update_profile(request):
     if email and email != user.email and User.objects.filter(email=email).exclude(id=user.id).exists():
         return Response({'error': 'Cet email est déjà utilisé.'}, status=status.HTTP_400_BAD_REQUEST)
     
-    if phone and phone != user.phone and User.objects.filter(phone=phone).exclude(id=user.id).exists():
-        return Response({'error': 'Ce numéro de téléphone est déjà utilisé.'}, status=status.HTTP_400_BAD_REQUEST)
+    if phone:
+        from .helpers import normalize_phone
+        phone = normalize_phone(phone)
+        if phone != user.phone and User.objects.filter(phone=phone).exclude(id=user.id).exists():
+            return Response({'error': 'Ce numéro de téléphone est déjà utilisé.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if full_name:
         user.full_name = full_name

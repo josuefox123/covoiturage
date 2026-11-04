@@ -31,14 +31,18 @@ class EmailOrPhoneModelBackend(ModelBackend):
         
         user = None
         try:
-            # Check if it matches phone OR email (full_name supprimé car non unique)
-            user = User.objects.get(Q(phone=username) | Q(email=username))
-        except User.DoesNotExist:
-            # Mitigation de timing attack : exécuter le hachage sur un utilisateur factice (SEV-026)
+            from .utilisateurs.views.helpers import get_phone_candidates
+            candidates = get_phone_candidates(username)
+            if candidates:
+                user = User.objects.filter(Q(phone__in=candidates) | Q(email__iexact=username)).order_by('id').first()
+            else:
+                user = User.objects.filter(email__iexact=username).order_by('id').first()
+            if not user:
+                dummy = User()
+                dummy.set_password(password or "dummy")
+        except Exception:
             dummy = User()
             dummy.set_password(password or "dummy")
-        except User.MultipleObjectsReturned:
-            user = User.objects.filter(Q(phone=username) | Q(email=username)).order_by('id').first()
             
         if user:
             if user.check_password(password) and self.user_can_authenticate(user):

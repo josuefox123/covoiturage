@@ -128,6 +128,44 @@ class RideSeriesService:
         if not vehicle_obj:
             vehicle_obj = Vehicle.objects.filter(owner=driver).first()
 
+        # Validation permis de conduire pour voiture
+        if vehicle_obj and getattr(vehicle_obj, 'vehicle_type', None) == 'voiture':
+            if not vehicle_obj.driver_license_number or not vehicle_obj.license_expiration:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"error": "Les informations du permis de conduire sont obligatoires pour publier un trajet en voiture."})
+            
+            from django.utils import timezone
+            today_date = timezone.now().date()
+            if vehicle_obj.license_expiration < today_date:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    "error": f"Votre permis de conduire a expiré le {vehicle_obj.license_expiration.strftime('%d/%m/%Y')}. Veuillez le renouveler dans votre profil avant de publier un trajet."
+                })
+
+            max_target_date = max(target_dates) if target_dates else end_date
+            if max_target_date > vehicle_obj.license_expiration:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    "error": f"Votre permis de conduire expire le {vehicle_obj.license_expiration.strftime('%d/%m/%Y')}. Vous ne pouvez pas planifier de trajets récurrents après cette date."
+                })
+
+            # Contrôle assurance
+            if not vehicle_obj.insurance_expiration or not vehicle_obj.insurance_photo:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"error": "L'attestation d'assurance en cours de validité est obligatoire pour publier un trajet en voiture."})
+
+            if vehicle_obj.insurance_expiration < today_date:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    "error": f"L'assurance de votre véhicule a expiré le {vehicle_obj.insurance_expiration.strftime('%d/%m/%Y')}. Veuillez la renouveler dans votre profil."
+                })
+
+            if max_target_date > vehicle_obj.insurance_expiration:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    "error": f"L'assurance de votre véhicule expire le {vehicle_obj.insurance_expiration.strftime('%d/%m/%Y')}. Vous ne pouvez pas planifier de trajets récurrents après cette date."
+                })
+
         # Création de la série via Repository
         series = RideSeriesRepository.create_series(
             driver=driver,

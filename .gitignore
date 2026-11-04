@@ -4,7 +4,10 @@
 .env
 .env.*
 deploy_secrets.env
+google-services.json
+*firebase*.json
 *firebase-adminsdk*.json
+*serviceAccountKey*.json
 *service-account*.json
 *.pem
 *.key

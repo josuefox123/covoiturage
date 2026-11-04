@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,12 +9,13 @@ import {
   ActivityIndicator,
   Animated,
   TouchableOpacity,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 
 import { theme } from '../../src/styles/theme';
 import { useAuth } from '../../src/context/AuthContext';
@@ -40,15 +41,51 @@ export default function PublishScreen() {
   const user = authCtx?.user ?? null;
 
   const form = usePublishForm(authCtx);
+  const formRef = useRef(form);
+  formRef.current = form;
+
   const webviewRef = useRef<WebView>(null);
   const buttonScale = useRef(new Animated.Value(1)).current;
+  const scrollRef = useRef<any>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: true });
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
       if (user && user.is_verified) {
-        form.checkVehicle();
+        formRef.current.checkVehicle();
       }
-    }, [user, form.checkVehicle])
+
+      const onBackPress = () => {
+        const currentForm = formRef.current;
+        if (currentForm.pickingLocationFor !== null) {
+          currentForm.setPickingLocationFor(null);
+          return true;
+        }
+        if (currentForm.showSummaryModal) {
+          currentForm.setShowSummaryModal(false);
+          return true;
+        }
+        if (currentForm.profileModalVisible) {
+          currentForm.setProfileModalVisible(false);
+          return true;
+        }
+        if (currentForm.formStep > 1) {
+          currentForm.handleBack();
+          return true;
+        }
+        return false;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [user?.id, user?.is_verified])
   );
 
   // Google Maps HTML code
@@ -371,6 +408,9 @@ export default function PublishScreen() {
       case 3:
         return (
           <DateTimeStep
+            availableVehicles={form.availableVehicles}
+            selectedVehicleId={form.vehicleId}
+            onSelectVehicle={form.selectVehicle}
             selectedDateObj={form.selectedDateObj}
             time={form.time}
             seats={form.seats}
@@ -552,17 +592,44 @@ export default function PublishScreen() {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             {form.formStep > 1 ? (
-              <TouchableOpacity onPress={form.handleBack} style={styles.backBtn}>
-                <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
+              <TouchableOpacity
+                onPress={form.handleBack}
+                style={styles.navBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Étape précédente"
+              >
+                <Ionicons name="arrow-back" size={20} color={theme.colors.primary} />
               </TouchableOpacity>
-            ) : <View style={{ width: 40 }} />}
+            ) : (
+              <View style={{ width: 40 }} />
+            )}
+
             <Text style={styles.headerTitle}>Publier un trajet</Text>
-            <View style={{ width: 40 }} />
+
+            {form.formStep < form.maxStepReached ? (
+              <TouchableOpacity
+                onPress={form.handleForward}
+                style={styles.navBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Étape suivante"
+              >
+                <Ionicons name="arrow-forward" size={20} color={theme.colors.primary} />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 40 }} />
+            )}
           </View>
-          <StepIndicator currentStep={form.formStep} totalSteps={5} labels={STEP_LABELS} />
+          <StepIndicator
+            currentStep={form.formStep}
+            totalSteps={5}
+            labels={STEP_LABELS}
+            maxStepReached={form.maxStepReached}
+            onStepPress={form.handleStepPress}
+          />
         </View>
 
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -796,7 +863,26 @@ const styles = StyleSheet.create({
   header: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#EAEDF2', paddingBottom: 8 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
   headerTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.text },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  navBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   notLoggedTitle: { fontSize: 22, fontWeight: '800', color: theme.colors.text, marginTop: 16, marginBottom: 8, textAlign: 'center' },
   notLoggedText: { fontSize: 14, color: theme.colors.textLight, textAlign: 'center', marginBottom: 24 },
   notLoggedButton: { borderRadius: 12, overflow: 'hidden' },

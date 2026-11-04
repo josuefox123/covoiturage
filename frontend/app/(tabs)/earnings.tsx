@@ -10,8 +10,8 @@
  * Zemy
  * ==============================================================
  */
-import React, { useState, useCallback, useRef } from "react";
-import { useFocusEffect } from "expo-router";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useFocusEffect, useNavigation } from "expo-router";
 import {
   View,
   Text,
@@ -148,8 +148,19 @@ export default function EarningsScreen() {
     }
   }, [authFetch]);
 
+  const scrollRef = useRef<any>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: true });
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   useFocusEffect(
     useCallback(() => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: false });
       fetchEarnings();
     }, [fetchEarnings])
   );
@@ -285,6 +296,7 @@ export default function EarningsScreen() {
           </View>
         ) : (
           <ScrollView
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 110 }}
           >

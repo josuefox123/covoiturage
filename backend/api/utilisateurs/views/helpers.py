@@ -1,8 +1,75 @@
 import os
+import re
 import logging
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+def normalize_phone(phone: str) -> str:
+    """
+    Normalise un numéro de téléphone au format international sans espaces (+229...).
+    Par défaut, préfixe +229 si aucun indicatif n'est fourni.
+    """
+    if not phone:
+        return ""
+    cleaned = re.sub(r'[\s\-\(\)\.]', '', str(phone).strip())
+    digits = re.sub(r'\D', '', cleaned)
+    if not digits:
+        return cleaned
+
+    if cleaned.startswith('+'):
+        return f"+{digits}"
+    if cleaned.startswith('00'):
+        return f"+{digits[2:]}"
+    if digits.startswith('229'):
+        return f"+{digits}"
+    return f"+229{digits}"
+
+
+def get_phone_candidates(identifier: str) -> list:
+    """
+    Génère toutes les variantes courantes d'un numéro de téléphone pour la recherche utilisateur.
+    Permet de trouver un compte peu importe comment le numéro est stocké en BDD ou saisi.
+    """
+    if not identifier:
+        return []
+    raw = str(identifier).strip()
+    if '@' in raw:
+        return []
+
+    cleaned = re.sub(r'[\s\-\(\)\.]', '', raw)
+    digits = re.sub(r'\D', '', cleaned)
+    if not digits:
+        return [raw, cleaned] if raw else []
+
+    candidates = {raw, cleaned, digits, f"+{digits}"}
+
+    if digits.startswith('229') and len(digits) > 3:
+        local = digits[3:]
+        candidates.add(local)
+        candidates.add(f"+229{local}")
+        candidates.add(f"229{local}")
+        if local.startswith('01') and len(local) > 2:
+            local_short = local[2:]
+            candidates.add(local_short)
+            candidates.add(f"+229{local_short}")
+            candidates.add(f"229{local_short}")
+        else:
+            candidates.add(f"01{local}")
+            candidates.add(f"+22901{local}")
+    else:
+        candidates.add(f"+229{digits}")
+        candidates.add(f"229{digits}")
+        if digits.startswith('01') and len(digits) > 2:
+            short = digits[2:]
+            candidates.add(short)
+            candidates.add(f"+229{short}")
+            candidates.add(f"229{short}")
+        else:
+            candidates.add(f"01{digits}")
+            candidates.add(f"+22901{digits}")
+
+    return list(candidates)
 
 def get_valid_callback_url(request, path):
     """

@@ -51,6 +51,18 @@ class UserSerializer(serializers.ModelSerializer):
             'verification_status',
         ]
 
+    def validate_phone(self, value):
+        if not value:
+            return value
+        from .utilisateurs.views.helpers import normalize_phone
+        normalized = normalize_phone(value)
+        qs = User.objects.filter(phone=normalized)
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+        if qs.exists():
+            raise serializers.ValidationError("Ce numéro de téléphone est déjà associé à un autre compte.")
+        return normalized
+
     @extend_schema_field(dict)
     def get_vehicles(self, obj):
         return VehicleSerializer(obj.vehicles.all(), many=True).data
@@ -138,6 +150,18 @@ class AdminUserSerializer(serializers.ModelSerializer):
             'is_archived', 'archived_at', 'archive_reason', 'archived_by_name'
         ]
         read_only_fields = ['id', 'created_at', 'rating', 'archived_at', 'archived_by_name']
+
+    def validate_phone(self, value):
+        if not value:
+            return value
+        from .utilisateurs.views.helpers import normalize_phone
+        normalized = normalize_phone(value)
+        qs = User.objects.filter(phone=normalized)
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+        if qs.exists():
+            raise serializers.ValidationError("Ce numéro de téléphone est déjà associé à un autre compte.")
+        return normalized
 
     def get_archived_by_name(self, obj):
         if obj.archived_by:

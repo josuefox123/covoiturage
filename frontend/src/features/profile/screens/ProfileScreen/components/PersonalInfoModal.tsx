@@ -83,9 +83,15 @@ export function PersonalInfoModal({
   const handlePhoneBlur = async () => {
     if (!editPhone) return;
     try {
+      const digits = editPhone.replace(/\D/g, '');
+      const phoneToCheck = editPhone.startsWith('+')
+        ? `+${digits}`
+        : digits.startsWith('229')
+        ? `+${digits}`
+        : `+229${digits}`;
       const data = await authFetch('/users/check_phone/', {
         method: 'POST',
-        body: JSON.stringify({ phone: editPhone }),
+        body: JSON.stringify({ phone: phoneToCheck }),
       });
       if (data.exists && data.phone !== user?.phone) {
         setPhoneError('Ce numéro est déjà utilisé');
@@ -111,10 +117,23 @@ export function PersonalInfoModal({
 
     setIsSaving(true);
     try {
+      const rawPhone = editPhone.trim();
+      const digits = rawPhone.replace(/\D/g, '');
+      let formattedPhone = rawPhone;
+      if (digits) {
+        if (rawPhone.startsWith('+')) {
+          formattedPhone = `+${digits}`;
+        } else if (digits.startsWith('229')) {
+          formattedPhone = `+${digits}`;
+        } else {
+          formattedPhone = `+229${digits}`;
+        }
+      }
+
       const formData = new FormData();
       formData.append('full_name', editFullName.trim());
-      formData.append('phone', editPhone);
-      if (editEmail) formData.append('email', editEmail);
+      formData.append('phone', formattedPhone);
+      if (editEmail) formData.append('email', editEmail.trim());
 
       if (avatarUri && avatarUri !== user?.avatar) {
         await appendFileToFormData(formData, 'avatar', avatarUri, 'avatar.jpg');
@@ -126,9 +145,9 @@ export function PersonalInfoModal({
       });
 
       updateUser({
-        full_name: editFullName,
-        email: editEmail,
-        phone: editPhone,
+        full_name: editFullName.trim(),
+        email: editEmail.trim(),
+        phone: formattedPhone,
         avatar: avatarUri,
       });
 

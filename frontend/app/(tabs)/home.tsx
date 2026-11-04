@@ -19,7 +19,7 @@ import {
   ToastAndroid,
 } from 'react-native';
 
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -132,11 +132,21 @@ export default function HomeScreen() {
   // ============================================================
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<any>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: true });
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const [refreshKey, setRefreshKey] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: false });
       refreshUser();
       setRefreshKey((key) => key + 1);
       // Ré-afficher la modal à chaque retour sur l'écran si non vérifié
@@ -367,6 +377,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
 
       <Animated.ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -394,7 +405,13 @@ export default function HomeScreen() {
             userAvatar={user?.avatar}
             scrollY={scrollY}
             onNotifPress={() => router.push('/notifications')}
-            onProfilePress={() => router.push('/(tabs)/profile')}
+            onProfilePress={() => {
+              try {
+                (navigation as any).navigate('profile');
+              } catch {
+                router.navigate('/(tabs)/profile');
+              }
+            }}
             notifCount={notifCount}
           />
         </SafeAreaView>

@@ -146,8 +146,8 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
         except Vehicle.DoesNotExist:
             raise ValidationError({"error": "Le véhicule sélectionné est introuvable."})
     else:
-        first_v = driver_vehicles.first()
-        target_vehicle_id = first_v.id if first_v else None
+        vehicle_obj = driver_vehicles.first()
+        target_vehicle_id = vehicle_obj.id if vehicle_obj else None
 
     # ─── 2. Validation date/heure obligatoires ────────────────────────────────
     if not departure_date or not departure_time:
@@ -161,6 +161,39 @@ def validate_driver_and_vehicle(driver, vehicle_id, departure_date, departure_ti
             dep_date = departure_date
     except ValueError:
         raise ValidationError({"error": "Format de date invalide (attendu YYYY-MM-DD)."})
+
+    # ─── 3b. Vérification d'expiration du permis de conduire (Voiture) ───────
+    if vehicle_obj and getattr(vehicle_obj, 'vehicle_type', None) == 'voiture':
+        if not vehicle_obj.driver_license_number or not vehicle_obj.license_expiration:
+            raise ValidationError({"error": "Les informations du permis de conduire sont obligatoires pour publier un trajet en voiture."})
+        
+        today_date = timezone.now().date()
+        if vehicle_obj.license_expiration < today_date:
+            raise ValidationError({
+                "error": f"Votre permis de conduire a expiré le {vehicle_obj.license_expiration.strftime('%d/%m/%Y')}. Veuillez le renouveler dans votre profil avant de publier un trajet."
+            })
+        
+        if dep_date > vehicle_obj.license_expiration:
+            raise ValidationError({
+                "error": f"Votre permis de conduire expire le {vehicle_obj.license_expiration.strftime('%d/%m/%Y')}. Vous ne pouvez pas publier un trajet prévu pour le {dep_date.strftime('%d/%m/%Y')}."
+            })
+
+    # ─── 3c. Vérification d'assurance automobile ─────────────────────────────
+    if vehicle_obj:
+        if getattr(vehicle_obj, 'vehicle_type', None) == 'voiture':
+            if not vehicle_obj.insurance_expiration or not vehicle_obj.insurance_photo:
+                raise ValidationError({"error": "L'attestation d'assurance en cours de validité est obligatoire pour publier un trajet en voiture."})
+            
+            today_date = timezone.now().date()
+            if vehicle_obj.insurance_expiration < today_date:
+                raise ValidationError({
+                    "error": f"L'assurance de votre véhicule a expiré le {vehicle_obj.insurance_expiration.strftime('%d/%m/%Y')}. Veuillez mettre à jour votre attestation d'assurance pour publier un trajet."
+                })
+            
+            if dep_date > vehicle_obj.insurance_expiration:
+                raise ValidationError({
+                    "error": f"L'assurance de votre véhicule expire le {vehicle_obj.insurance_expiration.strftime('%d/%m/%Y')}. Vous ne pouvez pas publier un trajet prévu pour le {dep_date.strftime('%d/%m/%Y')}."
+                })
 
     # ─── 4. Parsing robuste de l'heure (HH:MM:SS, HH:MM, etc.) ───────────────
     try:

@@ -1,18 +1,26 @@
 /**
  * StepIndicator.tsx
- * Barre de progression multi-étapes animée pour le formulaire de publication de trajet.
+ * Barre de progression multi-étapes animée et interactive pour le formulaire de publication de trajet.
  */
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { theme } from '../../styles/theme';
 
 interface StepIndicatorProps {
   currentStep: number; // 1-indexed
   totalSteps: number;
   labels?: string[];
+  maxStepReached?: number;
+  onStepPress?: (step: number) => void;
 }
 
-export function StepIndicator({ currentStep, totalSteps, labels }: StepIndicatorProps) {
+export function StepIndicator({
+  currentStep,
+  totalSteps,
+  labels,
+  maxStepReached,
+  onStepPress,
+}: StepIndicatorProps) {
   const animatedWidth = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -24,6 +32,8 @@ export function StepIndicator({ currentStep, totalSteps, labels }: StepIndicator
       tension: 60,
     }).start();
   }, [currentStep, totalSteps]);
+
+  const maxAllowed = maxStepReached ?? currentStep;
 
   return (
     <View style={styles.container}>
@@ -47,29 +57,53 @@ export function StepIndicator({ currentStep, totalSteps, labels }: StepIndicator
             const stepNum = index + 1;
             const isCompleted = stepNum < currentStep;
             const isCurrent = stepNum === currentStep;
+            const isUnlocked = stepNum <= maxAllowed;
+            const isClickable = Boolean(onStepPress && isUnlocked && !isCurrent);
+
             return (
-              <View key={stepNum} style={styles.stepWrapper}>
+              <TouchableOpacity
+                key={stepNum}
+                disabled={!isClickable}
+                onPress={() => onStepPress?.(stepNum)}
+                activeOpacity={0.7}
+                style={styles.stepWrapper}
+                accessibilityRole={isClickable ? 'button' : undefined}
+                accessibilityLabel={labels && labels[index] ? `Étape ${labels[index]}` : `Étape ${stepNum}`}
+              >
                 <View
                   style={[
                     styles.circle,
                     isCompleted && styles.circleCompleted,
                     isCurrent && styles.circleCurrent,
+                    isUnlocked && !isCompleted && !isCurrent && styles.circleUnlocked,
                   ]}
                 >
                   {isCompleted ? (
                     <Text style={styles.checkmark}>✓</Text>
                   ) : (
-                    <Text style={[styles.stepNum, isCurrent && styles.stepNumCurrent]}>
+                    <Text
+                      style={[
+                        styles.stepNum,
+                        isCurrent && styles.stepNumCurrent,
+                        isUnlocked && !isCurrent && styles.stepNumUnlocked,
+                      ]}
+                    >
                       {stepNum}
                     </Text>
                   )}
                 </View>
                 {labels && labels[index] ? (
-                  <Text style={[styles.label, isCurrent && styles.labelActive]}>
+                  <Text
+                    style={[
+                      styles.label,
+                      isCurrent && styles.labelActive,
+                      isUnlocked && !isCurrent && styles.labelUnlocked,
+                    ]}
+                  >
                     {labels[index]}
                   </Text>
                 ) : null}
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -137,6 +171,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  circleUnlocked: {
+    borderColor: theme.colors.primary,
+    backgroundColor: '#EFF6FF',
+  },
   stepNum: {
     fontSize: 12,
     fontWeight: '600',
@@ -144,6 +182,10 @@ const styles = StyleSheet.create({
   },
   stepNumCurrent: {
     color: theme.colors.primary,
+  },
+  stepNumUnlocked: {
+    color: theme.colors.primary,
+    fontWeight: '700',
   },
   checkmark: {
     fontSize: 13,
@@ -158,6 +200,10 @@ const styles = StyleSheet.create({
     maxWidth: 60,
   },
   labelActive: {
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  labelUnlocked: {
     color: theme.colors.primary,
     fontWeight: '600',
   },

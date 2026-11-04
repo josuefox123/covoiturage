@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 from ...models.utilisateur import User, PasswordResetOTP
 from ...serializers import UserSerializer, RegisterSerializer
-from .helpers import send_zemy_reset_email
+from .helpers import send_zemy_reset_email, get_phone_candidates, normalize_phone
 
 
 import firebase_admin
@@ -118,9 +118,10 @@ def login_user(request):
         return Response({'error': 'Veuillez fournir un identifiant et un mot de passe.'}, status=status.HTTP_400_BAD_REQUEST)
 
     ident = identifier.strip()
-    user = User.objects.filter(phone__iexact=ident).first()
-    if not user and ident.isdigit():
-        user = User.objects.filter(phone__iexact=f'+229{ident}').first()
+    candidates = get_phone_candidates(ident)
+    user = None
+    if candidates:
+        user = User.objects.filter(phone__in=candidates).first()
     if not user:
         user = User.objects.filter(email__iexact=ident).first()
 

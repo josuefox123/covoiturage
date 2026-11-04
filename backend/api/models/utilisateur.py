@@ -101,6 +101,10 @@ class Vehicle(models.Model):
     driver_license_number = models.CharField(max_length=100, blank=True, null=True)
     license_expiration = models.DateField(blank=True, null=True)
     driver_license_photo = models.ImageField(upload_to='licenses/', blank=True, null=True)
+    insurance_number = models.CharField(max_length=100, blank=True, null=True)
+    insurance_expiration = models.DateField(blank=True, null=True)
+    insurance_photo = models.ImageField(upload_to='insurances/', blank=True, null=True)
+    is_verified = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "VÃ©hicule"

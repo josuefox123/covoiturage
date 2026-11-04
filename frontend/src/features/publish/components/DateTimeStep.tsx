@@ -57,6 +57,9 @@ interface DateTimeStepProps {
   onChangeDate: (event: any, date?: Date) => void;
   onChangeEndDate: (event: any, date?: Date) => void;
   onChangeTime: (event: any, date?: Date) => void;
+  availableVehicles?: any[];
+  selectedVehicleId?: string | number | null;
+  onSelectVehicle?: (v: any) => void;
 }
 
 const DAYS_FR = [
@@ -157,6 +160,9 @@ export function DateTimeStep({
   onChangeDate,
   onChangeEndDate,
   onChangeTime,
+  availableVehicles = [],
+  selectedVehicleId,
+  onSelectVehicle,
 }: DateTimeStepProps) {
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [showDayTimePicker, setShowDayTimePicker] = useState(false);
@@ -356,6 +362,10 @@ export function DateTimeStep({
       )
     );
 
+  const selectedVeh = availableVehicles.find((v: any) => v.id === selectedVehicleId);
+  const isMotoSelected = selectedVeh?.vehicle_type === 'moto';
+  const maxSeatsAllowed = isMotoSelected ? 1 : 8;
+
   return (
     <View>
       {/* =========================================
@@ -372,6 +382,75 @@ export function DateTimeStep({
       {/* =========================================
           TRAJET SIMPLE
       ========================================== */}
+
+      {availableVehicles && availableVehicles.length > 0 && (
+        <View style={{ marginBottom: 18, marginTop: 4 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textMuted, marginBottom: 8, textTransform: 'uppercase' }}>
+            Véhicule pour ce trajet
+          </Text>
+          <View style={{ gap: 8 }}>
+            {availableVehicles.map((v: any) => {
+              const isSelected = selectedVehicleId === v.id;
+              const isMoto = (v.vehicle_type || 'voiture') === 'moto';
+              const isTricycle = (v.vehicle_type || 'voiture') === 'tricycle';
+              return (
+                <TouchableOpacity
+                  key={v.id}
+                  onPress={() => onSelectVehicle?.(v)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderRadius: 14,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? theme.colors.primary : '#E2E8F0',
+                    backgroundColor: isSelected ? `${theme.colors.primary}10` : '#FFFFFF',
+                    gap: 10,
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: isSelected ? `${theme.colors.primary}20` : '#F1F5F9',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <Ionicons
+                      name={isMoto ? 'bicycle' : isTricycle ? 'car' : 'car-sport'}
+                      size={20}
+                      color={isSelected ? theme.colors.primary : '#64748B'}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: isSelected ? '700' : '600', color: isSelected ? theme.colors.primary : '#1E293B' }}>
+                      {v.brand_model}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>
+                        {v.vehicle_type ? v.vehicle_type.toUpperCase() : 'VOITURE'} • {v.license_plate}
+                      </Text>
+                      {v.insurance_expiration && new Date(v.insurance_expiration) >= new Date() ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                          <Ionicons name="shield-checkmark" size={10} color="#10B981" />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#10B981' }}>Assuré</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Ionicons
+                    name={isSelected ? 'checkmark-circle' : 'radio-button-off'}
+                    size={22}
+                    color={isSelected ? theme.colors.primary : '#CBD5E1'}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       {!isRecurrent && (
         <View style={styles.row}>
@@ -521,7 +600,7 @@ export function DateTimeStep({
 
           <TouchableOpacity
             onPress={() =>
-              setSeats(Math.min(8, seats + 1))
+              setSeats(Math.min(maxSeatsAllowed, seats + 1))
             }
             style={styles.seatBtn}
             activeOpacity={0.7}

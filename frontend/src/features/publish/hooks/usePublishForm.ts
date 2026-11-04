@@ -44,6 +44,7 @@ export function usePublishForm(authCtx: any) {
 
   // Multi-step
   const [formStep, setFormStep] = useState(1);
+  const [maxStepReached, setMaxStepReached] = useState(1);
   const [stopoverSubStep, setStopoverSubStep] = useState<1 | 2>(1);
   const stepAnim = useRef(new Animated.Value(0)).current;
 
@@ -55,6 +56,7 @@ export function usePublishForm(authCtx: any) {
   const goToStep = (step: number) => {
     animateStep();
     setFormStep(step);
+    setMaxStepReached((prev) => Math.max(prev, step));
   };
 
   // Locations & Routes
@@ -144,7 +146,8 @@ export function usePublishForm(authCtx: any) {
   const [driverLicensePhoto, setDriverLicensePhoto] = useState<string | null>(null);
 
   const [hasVehicle, setHasVehicle] = useState(false);
-  const [vehicleId, setVehicleId] = useState<number | null>(null);
+  const [vehicleId, setVehicleId] = useState<any>(null);
+  const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
   const [checkingVehicle, setCheckingVehicle] = useState(true);
   const [showVehicleWarning, setShowVehicleWarning] = useState(false);
   const [showExpiredLicenseWarning, setShowExpiredLicenseWarning] = useState(false);
@@ -176,6 +179,7 @@ export function usePublishForm(authCtx: any) {
     try {
       const data = await authFetch(`/vehicles/?owner=${user.id}`);
       const results = Array.isArray(data) ? data : data.results || [];
+      setAvailableVehicles(results);
       if (results.length > 0) {
         const primaryVehicle = results[0];
         setVehicleId(primaryVehicle.id);
@@ -214,12 +218,32 @@ export function usePublishForm(authCtx: any) {
     }
   }, [user, checkVehicle]);
 
+  const selectVehicle = useCallback((v: any) => {
+    if (!v) return;
+    setVehicleId(v.id);
+    setVehicleType(v.vehicle_type || 'voiture');
+    if ((v.vehicle_type || 'voiture') === 'moto') {
+      setSeats(1);
+    } else if ((v.vehicle_type || 'voiture') === 'voiture' && v.license_expiration) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expDate = new Date(v.license_expiration);
+      expDate.setHours(0, 0, 0, 0);
+      if (expDate < today) {
+        CustomAlert.alert(
+          'Permis expiré',
+          `Le permis de conduire associé à ce véhicule a expiré le ${expDate.toLocaleDateString('fr-FR')}. Vous devez le renouveler dans votre profil pour pouvoir publier.`
+        );
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const data = await authFetch('/financial-settings/');
         const results = Array.isArray(data) ? data : data.results || [];
-        if (results.length > 0) {
+      if (results.length > 0) {
           setFinancialSettings(results[0]);
         }
       } catch (_) { }
@@ -678,6 +702,110 @@ export function usePublishForm(authCtx: any) {
   };
 
   const validateStep2 = () => {
+    // 1. Contrôle du véhicule et de l'expiration du permis
+    const currentVeh = availableVehicles.find((v: any) => String(v.id) === String(vehicleId)) || availableVehicles[0];
+    const isCar = (currentVeh?.vehicle_type || vehicleType) === 'voiture';
+
+    if (isCar && currentVeh) {
+      if (!currentVeh.license_expiration || !currentVeh.driver_license_number) {
+        CustomAlert.alert(
+          'Permis requis',
+          'Les informations de votre permis de conduire sont obligatoires pour publier un trajet en voiture. Veuillez les renseigner dans votre profil.'
+        );
+        return false;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Date d'expiration du permis (normalisée à minuit)
+      const expDate = new Date(currentVeh.license_expiration);
+      expDate.setHours(0, 0, 0, 0);
+
+      if (expDate < today) {
+        const formattedExp = expDate.toLocaleDateString('fr-FR');
+        CustomAlert.alert(
+          'Permis de conduire expiré',
+          `Votre permis de conduire a expiré le ${formattedExp}. Vous devez renouveler vos informations de permis dans votre profil avant de pouvoir proposer un trajet.`
+        );
+        return false;
+      }
+
+      // Date du trajet (normalisée à minuit)
+      const tripDate = new Date(selectedDateObj);
+      tripDate.setHours(0, 0, 0, 0);
+
+      if (tripDate > expDate) {
+        const formattedTrip = tripDate.toLocaleDateString('fr-FR');
+        const formattedExp = expDate.toLocaleDateString('fr-FR');
+        CustomAlert.alert(
+          'Permis expiré pour cette date',
+          `Votre permis de conduire expire le ${formattedExp}.\n\nVous ne pouvez pas proposer un trajet prévu pour le ${formattedTrip}.`
+        );
+        return false;
+      }
+
+      // Trajet récurrent
+      if (isRecurrent && repeatType === 'weekly') {
+        const recEndDate = new Date(endDateObj);
+        recEndDate.setHours(0, 0, 0, 0);
+        if (recEndDate > expDate) {
+          const formattedEnd = recEndDate.toLocaleDateString('fr-FR');
+          const formattedExp = expDate.toLocaleDateString('fr-FR');
+          CustomAlert.alert(
+            'Permis expiré pour cette récurrence',
+            `Votre permis de conduire expire le ${formattedExp}.\n\nVos trajets récurrents ne peuvent pas s'étendre jusqu'au ${formattedEnd}.`
+          );
+          return false;
+        }
+      }
+
+      // Contrôle de l'attestation d'assurance
+      if (!currentVeh.insurance_expiration || !currentVeh.insurance_photo) {
+        CustomAlert.alert(
+          'Assurance obligatoire',
+          "L'attestation d'assurance est obligatoire pour publier un trajet en voiture. Veuillez l'ajouter dans les informations de votre véhicule."
+        );
+        return false;
+      }
+
+      const insExpDate = new Date(currentVeh.insurance_expiration);
+      insExpDate.setHours(0, 0, 0, 0);
+
+      if (insExpDate < today) {
+        const formattedInsExp = insExpDate.toLocaleDateString('fr-FR');
+        CustomAlert.alert(
+          'Assurance expirée',
+          `L'attestation d'assurance de votre véhicule a expiré le ${formattedInsExp}. Veuillez la renouveler dans votre profil avant de publier.`
+        );
+        return false;
+      }
+
+      if (tripDate > insExpDate) {
+        const formattedTrip = tripDate.toLocaleDateString('fr-FR');
+        const formattedInsExp = insExpDate.toLocaleDateString('fr-FR');
+        CustomAlert.alert(
+          'Assurance expirée pour cette date',
+          `L'assurance de votre véhicule expire le ${formattedInsExp}.\n\nVous ne pouvez pas proposer un trajet prévu pour le ${formattedTrip}.`
+        );
+        return false;
+      }
+
+      if (isRecurrent && repeatType === 'weekly') {
+        const recEndDate = new Date(endDateObj);
+        recEndDate.setHours(0, 0, 0, 0);
+        if (recEndDate > insExpDate) {
+          const formattedEnd = recEndDate.toLocaleDateString('fr-FR');
+          const formattedInsExp = insExpDate.toLocaleDateString('fr-FR');
+          CustomAlert.alert(
+            'Assurance expirée pendant la récurrence',
+            `L'assurance de votre véhicule expire le ${formattedInsExp}.\n\nVos trajets récurrents ne peuvent pas s'étendre jusqu'au ${formattedEnd}.`
+          );
+          return false;
+        }
+      }
+    }
+
     if (isRecurrent && selectedDays.length === 0) {
       CustomAlert.alert('Jours manquants', 'Veuillez sélectionner au moins un jour pour la récurrence.');
       return false;
@@ -740,6 +868,35 @@ export function usePublishForm(authCtx: any) {
     }
   };
 
+  const handleForward = () => {
+    Keyboard.dismiss();
+    if (formStep === 2 && stopoverSubStep === 1) {
+      setStopoverSubStep(2);
+      return;
+    }
+    if (formStep < maxStepReached) {
+      const nextStep = formStep + 1;
+      if (nextStep === 5 && estimation) {
+        fetchPriceSuggestion(estimation.distanceKm);
+      }
+      goToStep(nextStep);
+    }
+  };
+
+  const handleStepPress = (targetStep: number) => {
+    Keyboard.dismiss();
+    if (targetStep === formStep) return;
+    if (targetStep <= maxStepReached) {
+      if (targetStep === 2) {
+        setStopoverSubStep(1);
+      }
+      if (targetStep === 5 && estimation) {
+        fetchPriceSuggestion(estimation.distanceKm);
+      }
+      goToStep(targetStep);
+    }
+  };
+
   const handlePublishPress = () => {
     Keyboard.dismiss();
     const isProfileComplete = !!(user?.full_name && user.full_name.trim() !== '');
@@ -749,12 +906,15 @@ export function usePublishForm(authCtx: any) {
       setProfileModalVisible(true);
     } else if (!hasVehicle) {
       setShowVehicleWarning(true);
+    } else if (!validateStep2()) {
+      return;
     } else {
       setShowSummaryModal(true);
     }
   };
 
   const handlePublish = async () => {
+    if (!validateStep2()) return;
     setLoading(true);
     try {
       const dateString = selectedDateObj.toISOString().split('T')[0];
@@ -916,6 +1076,7 @@ export function usePublishForm(authCtx: any) {
           setIsRecurrent(false); setSelectedDays([]); setDaySchedules([]);
           setPriceSuggestion(null);
           goToStep(1);
+          setMaxStepReached(1);
         } else {
           CustomAlert.alert(alertTitle, detailedMsg || "Aucun trajet n'a pu être créé.");
         }
@@ -933,6 +1094,7 @@ export function usePublishForm(authCtx: any) {
         setIsRecurrent(false); setSelectedDays([]); setDaySchedules([]);
         setPriceSuggestion(null);
         goToStep(1);
+        setMaxStepReached(1);
       }
     } catch (error: any) {
       const isNetworkErr = error.message && (
@@ -1051,6 +1213,10 @@ export function usePublishForm(authCtx: any) {
 
   return {
     formStep,
+    maxStepReached,
+    handleForward,
+    handleStepPress,
+    setMaxStepReached,
     stopoverSubStep,
     stepAnim,
     departure,
@@ -1116,6 +1282,8 @@ export function usePublishForm(authCtx: any) {
     hasVehicle,
     vehicleId,
     checkingVehicle,
+    availableVehicles,
+    selectVehicle,
     checkVehicle,
     showVehicleWarning,
     showExpiredLicenseWarning,

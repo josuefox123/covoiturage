@@ -26,8 +26,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
         target = None
         if license_plate:
             target = existing.filter(license_plate__iexact=license_plate).first()
-        if not target and existing.exists():
-            target = existing.first()
+        # Ne pas forcer le premier vehicule si plaque differente
 
         if target:
             serializer = self.get_serializer(target, data=request.data, partial=True)
