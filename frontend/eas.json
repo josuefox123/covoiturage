@@ -17,11 +17,14 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -Pandroid.enableMinifyInReleaseBuilds=false -Pandroid.enableShrinkResourcesInReleaseBuilds=false"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://zemybackend.sinustic.com/api",
-        "EAS_BUILD_NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+        "EAS_BUILD_NPM_CONFIG_LEGACY_PEER_DEPS": "true",
+        "ORG_GRADLE_PROJECT_android.enableMinifyInReleaseBuilds": "false",
+        "ORG_GRADLE_PROJECT_android.enableShrinkResourcesInReleaseBuilds": "false"
       }
     },
     "production": {

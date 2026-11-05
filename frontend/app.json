@@ -50,7 +50,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#2563eb"
         }
-      ]
+      ],
+      "./plugins/withDisableMinify"
     ],
     "extra": {
       "router": {},

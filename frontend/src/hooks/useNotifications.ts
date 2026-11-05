@@ -198,123 +198,143 @@ export function useNotifications() {
   useEffect(() => {
     if (!Notifications) return;
 
-    // Notification reçue en premier plan (affichée)
-    notificationListener.current = Notifications.addNotificationReceivedListener(
-      (notification: any) => {
-        const data = notification.request.content.data;
-        const title = notification.request.content.title || '';
-        const body = notification.request.content.body || '';
+    try {
+      if (typeof Notifications.addNotificationReceivedListener === 'function') {
+        notificationListener.current = Notifications.addNotificationReceivedListener(
+          (notification: any) => {
+            try {
+              const data = notification?.request?.content?.data;
+              const title = notification?.request?.content?.title || '';
+              const body = notification?.request?.content?.body || '';
 
-        // Liste des types importants nécessitant une annonce vocale
-        const speakTypes = [
-          'new_booking_request',
-          'booking_accepted_passenger',
-          'booking_rejected_passenger',
-          'passenger_paid_driver',
-          'passenger_refused_offer',
-          'leg_seats_freed_driver',
-          'booking_cancelled',
-          'booking_expired'
-        ];
-        
-        if (data?.type && speakTypes.includes(data.type)) {
-          try {
-            Speech.speak(body || title, { language: 'fr' });
-          } catch (e) {
-            console.warn("TTS Error:", e);
-          }
-        }
+              const speakTypes = [
+                'new_booking_request',
+                'booking_accepted_passenger',
+                'booking_rejected_passenger',
+                'passenger_paid_driver',
+                'passenger_refused_offer',
+                'leg_seats_freed_driver',
+                'booking_cancelled',
+                'booking_expired'
+              ];
+              
+              if (data?.type && speakTypes.includes(data.type)) {
+                try {
+                  Speech.speak(body || title, { language: 'fr' });
+                } catch (e) {
+                  console.warn("TTS Error:", e);
+                }
+              }
 
-        if (data?.type === 'new_booking_request') {
-          DeviceEventEmitter.emit('showBookingRequest', {
-            id: data.booking_id,
-            departure_location: data.departure_location || '',
-            arrival_location: data.arrival_location || '',
-            seats_booked: parseInt(data.seats_booked || '1'),
-            total_amount: parseInt(data.total_amount || '0'),
-            created_at: data.created_at || new Date().toISOString(),
-            negotiation_message: data.negotiation_message || '',
-            passenger_details: {
-              full_name: data.passenger_name || 'Passager',
-              phone: data.passenger_phone || ''
-            },
-            pickup_surcharge: parseInt(data.pickup_surcharge || '0'),
-            dropoff_surcharge: parseInt(data.dropoff_surcharge || '0'),
-            pricing_breakdown: {
-              driver_price: parseInt(data.driver_price || '0') || undefined,
-              commission: parseInt(data.commission || '0') || undefined,
-              total_to_pay: parseInt(data.total_to_pay || '0') || undefined,
+              if (data?.type === 'new_booking_request') {
+                DeviceEventEmitter.emit('showBookingRequest', {
+                  id: data.booking_id,
+                  departure_location: data.departure_location || '',
+                  arrival_location: data.arrival_location || '',
+                  seats_booked: parseInt(data.seats_booked || '1'),
+                  total_amount: parseInt(data.total_amount || '0'),
+                  created_at: data.created_at || new Date().toISOString(),
+                  negotiation_message: data.negotiation_message || '',
+                  passenger_details: {
+                    full_name: data.passenger_name || 'Passager',
+                    phone: data.passenger_phone || ''
+                  },
+                  pickup_surcharge: parseInt(data.pickup_surcharge || '0'),
+                  dropoff_surcharge: parseInt(data.dropoff_surcharge || '0'),
+                  pricing_breakdown: {
+                    driver_price: parseInt(data.driver_price || '0') || undefined,
+                    commission: parseInt(data.commission || '0') || undefined,
+                    total_to_pay: parseInt(data.total_to_pay || '0') || undefined,
+                  }
+                });
+              } else if (data?.type === 'booking_accepted_passenger' || data?.type === 'booking_rejected_passenger') {
+                CustomAlert.alert(title || "Mise à jour de réservation", body || "Votre demande de réservation a été mise à jour.");
+                DeviceEventEmitter.emit('refreshRideDetails');
+                if (data?.ride_id) {
+                  rideEventBus.emit({
+                    type: 'SessionReloadRequested',
+                    rideId: String(data.ride_id),
+                    bookingId: data.booking_id ? String(data.booking_id) : undefined,
+                    timestamp: Date.now()
+                  });
+                }
+              }
+            } catch (err) {
+              console.warn('[Notifications] Error in received listener:', err);
             }
-          });
-        } else if (data?.type === 'booking_accepted_passenger' || data?.type === 'booking_rejected_passenger') {
-          // Ne pas afficher d'alerte pop-up bloquante OUI/NON globale ici.
-          // Mais afficher une alerte d'information visuelle Zemy à l'utilisateur.
-          CustomAlert.alert(title || "Mise à jour de réservation", body || "Votre demande de réservation a été mise à jour.");
-          DeviceEventEmitter.emit('refreshRideDetails');
-          if (data?.ride_id) {
-            rideEventBus.emit({
-              type: 'SessionReloadRequested',
-              rideId: String(data.ride_id),
-              bookingId: data.booking_id ? String(data.booking_id) : undefined,
-              timestamp: Date.now()
-            });
           }
-        }
+        );
       }
-    );
 
-    // Utilisateur clique sur une notification
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      (response: any) => {
-        const data = response.notification.request.content.data;
+      if (typeof Notifications.addNotificationResponseReceivedListener === 'function') {
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(
+          (response: any) => {
+            try {
+              const data = response?.notification?.request?.content?.data;
 
-        if (data?.type === 'new_booking_request') {
-          DeviceEventEmitter.emit('showBookingRequest', {
-            id: data.booking_id,
-            departure_location: data.departure_location || '',
-            arrival_location: data.arrival_location || '',
-            seats_booked: parseInt(data.seats_booked || '1'),
-            total_amount: parseInt(data.total_amount || '0'),
-            created_at: data.created_at || new Date().toISOString(),
-            negotiation_message: data.negotiation_message || '',
-            passenger_details: {
-              full_name: data.passenger_name || 'Passager',
-              phone: data.passenger_phone || ''
-            },
-            pickup_surcharge: parseInt(data.pickup_surcharge || '0'),
-            dropoff_surcharge: parseInt(data.dropoff_surcharge || '0'),
-            pricing_breakdown: {
-              driver_price: parseInt(data.driver_price || '0') || undefined,
-              commission: parseInt(data.commission || '0') || undefined,
-              total_to_pay: parseInt(data.total_to_pay || '0') || undefined,
+              if (data?.type === 'new_booking_request') {
+                DeviceEventEmitter.emit('showBookingRequest', {
+                  id: data.booking_id,
+                  departure_location: data.departure_location || '',
+                  arrival_location: data.arrival_location || '',
+                  seats_booked: parseInt(data.seats_booked || '1'),
+                  total_amount: parseInt(data.total_amount || '0'),
+                  created_at: data.created_at || new Date().toISOString(),
+                  negotiation_message: data.negotiation_message || '',
+                  passenger_details: {
+                    full_name: data.passenger_name || 'Passager',
+                    phone: data.passenger_phone || ''
+                  },
+                  pickup_surcharge: parseInt(data.pickup_surcharge || '0'),
+                  dropoff_surcharge: parseInt(data.dropoff_surcharge || '0'),
+                  pricing_breakdown: {
+                    driver_price: parseInt(data.driver_price || '0') || undefined,
+                    commission: parseInt(data.commission || '0') || undefined,
+                    total_to_pay: parseInt(data.total_to_pay || '0') || undefined,
+                  }
+                });
+              }
+
+              if (data?.screen === 'chat' && data?.conversation_id) {
+                router.push(`/chat/${data.conversation_id}`);
+              } else if (data?.screen === 'trips' && data?.booking_id) {
+                router.push(`/(tabs)/trips`);
+              } else if (data?.screen === 'rides' && data?.ride_id) {
+                router.push(`/(tabs)/rides`);
+              } else if (data?.screen === 'rides') {
+                router.push(`/(tabs)/rides`);
+              } else if (data?.screen === 'trips') {
+                router.push(`/(tabs)/trips`);
+              } else if (data?.ride_id) {
+                router.push(`/ride/${data.ride_id}`);
+              } else if (data?.screen === 'notifications') {
+                router.push('/notifications');
+              } else if (data?.screen === 'home') {
+                router.push('/(tabs)/home');
+              }
+            } catch (err) {
+              console.warn('[Notifications] Error in response listener:', err);
             }
-          });
-        }
-
-        // Deep linking vers la bonne page
-        if (data?.screen === 'chat' && data?.conversation_id) {
-          router.push(`/chat/${data.conversation_id}`);
-        } else if (data?.screen === 'trips' && data?.booking_id) {
-          router.push(`/(tabs)/trips`);
-        } else if (data?.screen === 'rides' && data?.ride_id) {
-          router.push(`/(tabs)/rides`);
-        } else if (data?.screen === 'rides') {
-          router.push(`/(tabs)/rides`);
-        } else if (data?.screen === 'trips') {
-          router.push(`/(tabs)/trips`);
-        } else if (data?.ride_id) {
-          router.push(`/ride/${data.ride_id}`);
-        } else if (data?.screen === 'notifications') {
-          router.push('/notifications');
-        } else if (data?.screen === 'home') {
-          router.push('/(tabs)/home');
-        }
+          }
+        );
       }
-    );
+    } catch (e) {
+      console.warn('[Notifications] Erreur attachement listeners:', e);
+    }
 
     return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
+      try {
+        if (notificationListener.current && typeof notificationListener.current.remove === 'function') {
+          notificationListener.current.remove();
+        } else if (notificationListener.current && Notifications?.removeNotificationSubscription) {
+          Notifications.removeNotificationSubscription(notificationListener.current);
+        }
+        if (responseListener.current && typeof responseListener.current.remove === 'function') {
+          responseListener.current.remove();
+        } else if (responseListener.current && Notifications?.removeNotificationSubscription) {
+          Notifications.removeNotificationSubscription(responseListener.current);
+        }
+      } catch (e) {}
     };
   }, [router]);
 
