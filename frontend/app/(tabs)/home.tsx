@@ -43,6 +43,9 @@ import { BusSection } from '../../src/components/home/BusSection';
 import LocationPicker from '../../src/components/LocationPicker';
 import { CustomAlert } from '../../src/utils/CustomAlert';
 
+// Indicateur pour n'afficher le pop-up de bienvenue qu'une seule fois au lancement de l'application
+let hasShownWelcomeOnLaunch = false;
+
 export default function HomeScreen() {
   const router = useRouter();
 
@@ -119,6 +122,28 @@ export default function HomeScreen() {
     user.verification_status !== 'pending';
 
   const [showVerifModal, setShowVerifModal] = useState(false);
+
+  // Pop-up de bienvenue facile à fermer au lancement pour les utilisateurs connectés
+  useEffect(() => {
+    if (!user) {
+      hasShownWelcomeOnLaunch = false;
+      return;
+    }
+    if (!hasShownWelcomeOnLaunch) {
+      hasShownWelcomeOnLaunch = true;
+      const timer = setTimeout(() => {
+        const firstName = user.full_name ? user.full_name.trim().split(' ')[0] : '';
+        CustomAlert.alert(
+          'Ravi de vous revoir ! 👋',
+          firstName
+            ? `Bonjour ${firstName}, nous sommes ravis de vous revoir sur Zemy !`
+            : 'Ravis de vous revoir sur Zemy !',
+          [{ text: 'Fermer', style: 'default' }]
+        );
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   // Affiche la modal dès l'arrivée sur home si l'utilisateur n'est pas vérifié
   React.useEffect(() => {

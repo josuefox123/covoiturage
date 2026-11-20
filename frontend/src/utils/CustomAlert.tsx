@@ -110,8 +110,15 @@ export const CustomAlertProvider = () => {
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={close}>
-      <View style={styles.overlay}>
-        <Animated.View style={[styles.alertBox, { opacity: opacityValue, transform: [{ scale: scaleValue }] }]}>
+      <TouchableOpacity 
+        style={styles.overlay} 
+        activeOpacity={1} 
+        onPress={close}
+      >
+        <Animated.View 
+          style={[styles.alertBox, { opacity: opacityValue, transform: [{ scale: scaleValue }] }]}
+          onStartShouldSetResponder={() => true}
+        >
           <View style={styles.iconContainer}>
             <Ionicons name={iconName as any} size={48} color={iconColor} />
           </View>
@@ -148,7 +155,7 @@ export const CustomAlertProvider = () => {
             })}
           </View>
         </Animated.View>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 };
