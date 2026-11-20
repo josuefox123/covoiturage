@@ -8,9 +8,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "updates": {
-      "enabled": false,
-      "checkAutomatically": "NEVER",
-      "fallbackToCacheTimeout": 0
+      "url": "https://u.expo.dev/7befcd51-2b86-4b54-a963-80ffb264a743",
+      "enabled": true,
+      "checkAutomatically": "NEVER"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
     "ios": {
       "supportsTablet": true

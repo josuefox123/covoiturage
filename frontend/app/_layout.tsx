@@ -39,6 +39,15 @@ import LiveRideModal from '../src/components/LiveRideModal';
 import BookingRequestModal from '../src/components/BookingRequestModal';
 import { CustomAlertProvider } from '../src/utils/CustomAlert';
 import { useNotifications } from '../src/hooks/useNotifications';
+import { useAppUpdates } from '../src/hooks/useAppUpdates';
+
+/**
+ * Composant interne qui gère les mises à jour Over-The-Air (EAS Update).
+ */
+function UpdatesInitializer() {
+  useAppUpdates();
+  return null;
+}
 
 /**
  * Composant interne qui initialise les notifications push.
@@ -67,6 +76,9 @@ export default function RootLayout() {
           <AuthProvider>
             <BadgeProvider>
         <StatusBar style="dark" />
+
+        {/* Vérification et alerte de mise à jour instantanée EAS Update */}
+        <UpdatesInitializer />
 
         {/* Initialisation silencieuse des notifications push */}
         <NotificationInitializer />
