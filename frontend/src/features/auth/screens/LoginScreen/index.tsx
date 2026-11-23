@@ -67,8 +67,8 @@ export default function LoginScreen() {
   }, [user, router]);
 
   // Refs
-  const phoneInputRef = useRef<TextInput>(null);
-  const passwordInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<any>(null);
+  const passwordInputRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Animations d'entrée légères et fluides
