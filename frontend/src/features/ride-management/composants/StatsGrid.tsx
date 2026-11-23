@@ -36,8 +36,8 @@ export function StatsGrid({ ride, totalRevenue, seatsBooked }: StatsGridProps) {
     },
     {
       iconName: 'car' as const,
-      value: ride.driver_details?.vehicles?.[0]?.vehicle_type?.toUpperCase() || '-',
-      label: 'Type véhicule',
+      value: ride.driver_details?.vehicles?.[0]?.brand_model || ride.driver_details?.vehicles?.[0]?.vehicle_type?.toUpperCase() || '-',
+      label: 'Véhicule',
       color: C.warning,
       bg: C.warningLight
     },
@@ -80,8 +80,8 @@ const styles = StyleSheet.create({
     ...SHsm
   },
   statVal: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
     marginBottom: 2
   },
   statLbl: {

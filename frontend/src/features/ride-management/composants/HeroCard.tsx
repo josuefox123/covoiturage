@@ -58,7 +58,7 @@ export function HeroCard({ ride }: HeroCardProps) {
         <View style={styles.heroRoute}>
           <View style={styles.heroRouteCol}>
             <View style={styles.heroDepDot} />
-            <Text style={styles.heroCity}>{depCity}</Text>
+            <Text style={styles.heroCity} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>{depCity}</Text>
             <Text style={styles.heroTime}>{ride.departure_time?.substring(0, 5)}</Text>
           </View>
 
@@ -72,7 +72,7 @@ export function HeroCard({ ride }: HeroCardProps) {
 
           <View style={[styles.heroRouteCol, { alignItems: 'flex-end' }]}>
             <View style={styles.heroArrDot} />
-            <Text style={[styles.heroCity, { textAlign: 'right' }]}>{arrCity}</Text>
+            <Text style={[styles.heroCity, { textAlign: 'right' }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>{arrCity}</Text>
             <Text style={[styles.heroTime, { textAlign: 'right' }]}>{ride.departure_date}</Text>
           </View>
         </View>
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   heroRouteCol: { flex: 1, gap: 4 },
   heroDepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.successLight, borderWidth: 2, borderColor: C.white, marginBottom: 2 },
   heroArrDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FCA5A5', borderWidth: 2, borderColor: C.white, marginBottom: 2 },
-  heroCity: { fontSize: 20, fontWeight: '900', color: C.white },
+  heroCity: { fontSize: 16, fontWeight: '900', color: C.white, flexShrink: 1 },
   heroTime: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.75)' },
   heroConnector: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 6 },
   heroConnLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.25)' },

@@ -134,7 +134,7 @@ export default function HomeScreen() {
       const timer = setTimeout(() => {
         const firstName = user.full_name ? user.full_name.trim().split(' ')[0] : '';
         CustomAlert.alert(
-          'Ravi de vous revoir ! 👋',
+          'Ravi de vous revoir',
           firstName
             ? `Bonjour ${firstName}, nous sommes ravis de vous revoir sur Zemy !`
             : 'Ravis de vous revoir sur Zemy !',

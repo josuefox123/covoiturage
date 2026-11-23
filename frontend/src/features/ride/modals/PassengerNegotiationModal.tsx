@@ -29,18 +29,14 @@ export function PassengerNegotiationModal({
 }: PassengerNegotiationModalProps) {
   const insets = useSafeAreaInsets();
   const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 16);
-  // Résolution stricte avec ordre de priorité explicite : driver_counter_price > custom_price > passenger_proposed_price > price
-  const unitPrice = myBooking?.driver_counter_price 
-    ?? myBooking?.custom_price 
-    ?? myBooking?.passenger_proposed_price 
-    ?? myBooking?.price 
-    ?? 0;
-  
   const seats = myBooking?.seats_booked || 1;
-  const commission = myBooking?.pricing_breakdown?.commission || 0;
   const surcharge = (myBooking?.pickup_surcharge || 0) + (myBooking?.dropoff_surcharge || 0);
-  const calculatedTotal = ((unitPrice + commission) * seats) + surcharge;
-  const totalAmount = myBooking?.total_amount || myBooking?.portion_price || myBooking?.amount_paid_online || calculatedTotal || 0;
+  // Total à payer par le passager : toujours utiliser total_amount du backend en priorité
+  const totalAmount = myBooking?.total_amount || myBooking?.portion_price || myBooking?.amount_paid_online || 0;
+  // Prix unitaire affiché = ce que le passager paye réellement par place (total / places)
+  const unitPrice = seats > 0 && totalAmount > 0
+    ? Math.round(totalAmount / seats)
+    : (myBooking?.driver_counter_price ?? myBooking?.custom_price ?? myBooking?.passenger_proposed_price ?? myBooking?.price ?? 0);
 
   return (
     <Modal

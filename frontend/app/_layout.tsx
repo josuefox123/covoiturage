@@ -40,13 +40,25 @@ import BookingRequestModal from '../src/components/BookingRequestModal';
 import { CustomAlertProvider } from '../src/utils/CustomAlert';
 import { useNotifications } from '../src/hooks/useNotifications';
 import { useAppUpdates } from '../src/hooks/useAppUpdates';
+import UpdateModal from '../src/components/UpdateModal';
 
 /**
  * Composant interne qui gère les mises à jour Over-The-Air (EAS Update).
  */
 function UpdatesInitializer() {
-  useAppUpdates();
-  return null;
+  const updateState = useAppUpdates();
+  return (
+    <UpdateModal
+      isAvailable={updateState.isAvailable}
+      isDownloading={updateState.isDownloading}
+      progress={updateState.progress}
+      statusText={updateState.statusText}
+      error={updateState.error}
+      onStartUpdate={updateState.startUpdate}
+      onDismiss={updateState.dismissUpdate}
+      onRetry={updateState.retryUpdate}
+    />
+  );
 }
 
 /**
@@ -77,9 +89,6 @@ export default function RootLayout() {
             <BadgeProvider>
         <StatusBar style="dark" />
 
-        {/* Vérification et alerte de mise à jour instantanée EAS Update */}
-        <UpdatesInitializer />
-
         {/* Initialisation silencieuse des notifications push */}
         <NotificationInitializer />
 
@@ -105,6 +114,8 @@ export default function RootLayout() {
         <LiveRideModal />
         <BookingRequestModal />
         <CustomAlertProvider />
+        {/* Vérification et alerte de mise à jour instantanée EAS Update (au premier plan) */}
+        <UpdatesInitializer />
             </BadgeProvider>
           </AuthProvider>
         </SafeAreaProvider>

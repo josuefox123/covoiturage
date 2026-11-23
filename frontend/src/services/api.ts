@@ -31,8 +31,14 @@ export const apiEventEmitter = {
   }
 };
 
-// L'URL de l'API est définie de manière unique dans .env / .env.local via EXPO_PUBLIC_API_URL
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
+// L'URL de l'API : En Release / APK / EAS Update, toujours forcer le backend HTTPS en ligne
+export const API_URL = (() => {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (!__DEV__) {
+    return 'https://zemybackend.sinustic.com/api';
+  }
+  return envUrl && envUrl.trim() !== '' ? envUrl : 'https://zemybackend.sinustic.com/api';
+})();
 console.log('[ZEMY MOBILE] API Target URL:', API_URL);
 
 export class ApiError extends Error {
