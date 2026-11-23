@@ -4,7 +4,7 @@
  * MessageSkeleton.tsx
  *
  * Description :
- * Composant ou logique de l'application Zemy.
+ * Squelette de chargement épuré et moderne pour la liste de conversations.
  *
  * Projet :
  * Zemy
@@ -12,96 +12,104 @@
  */
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { theme } from '../../styles/theme';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
-/**
- * Composant MessageSkeleton.
- *
- * Responsabilités :
- * - Affichage et gestion de l'état lié à MessageSkeleton.
- */
 export default function MessageSkeleton() {
-  const opacity = useSharedValue(0.5);
+  const opacity = useSharedValue(0.4);
 
   useEffect(() => {
     opacity.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 800 }),
-        withTiming(0.5, { duration: 800 })
+        withTiming(0.85, { duration: 750 }),
+        withTiming(0.4, { duration: 750 })
       ),
       -1,
       true
     );
-  }, []);
+  }, [opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));
 
   return (
-    <Animated.View style={[styles.card, animatedStyle]}>
+    <Animated.View style={[styles.itemContainer, animatedStyle]}>
+      {/* Avatar circulaire */}
       <View style={styles.avatar} />
+
+      {/* Contenu textuel */}
       <View style={styles.content}>
-        <View style={styles.header}>
-          <View style={styles.name} />
-          <View style={styles.time} />
+        {/* Ligne 1 : Nom & Heure */}
+        <View style={styles.headerRow}>
+          <View style={styles.nameBar} />
+          <View style={styles.timeBar} />
         </View>
-        <View style={styles.subtitle} />
-        <View style={styles.message} />
+
+        {/* Ligne 2 : Trajet / Contexte */}
+        <View style={styles.routeBar} />
+
+        {/* Ligne 3 : Dernier message */}
+        <View style={styles.messageBar} />
       </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  itemContainer: {
     flexDirection: 'row',
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.lg,
-    marginBottom: theme.spacing.md,
     alignItems: 'center',
-    ...theme.shadows.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.border,
-    marginRight: theme.spacing.md,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E2E8F0',
+    marginRight: 12,
   },
   content: {
     flex: 1,
+    justifyContent: 'center',
+    gap: 7,
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
   },
-  name: {
+  nameBar: {
     width: 120,
-    height: 16,
-    backgroundColor: theme.colors.border,
-    borderRadius: 4,
-  },
-  time: {
-    width: 40,
-    height: 12,
-    backgroundColor: theme.colors.border,
-    borderRadius: 4,
-  },
-  subtitle: {
-    width: 180,
-    height: 12,
-    backgroundColor: theme.colors.border,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  message: {
-    width: '80%',
     height: 14,
-    backgroundColor: theme.colors.border,
     borderRadius: 4,
+    backgroundColor: '#E2E8F0',
+  },
+  timeBar: {
+    width: 42,
+    height: 11,
+    borderRadius: 4,
+    backgroundColor: '#EEF2F6',
+  },
+  routeBar: {
+    width: 150,
+    height: 11,
+    borderRadius: 4,
+    backgroundColor: '#F1F5F9',
+  },
+  messageBar: {
+    width: '75%',
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: '#EEF2F6',
   },
 });

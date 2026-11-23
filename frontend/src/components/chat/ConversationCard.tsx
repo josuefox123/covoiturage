@@ -4,320 +4,309 @@
  * ConversationCard.tsx
  *
  * Description :
- * Composant ou logique de l'application Zemy.
+ * Élément de liste de conversation moderne, compact et épuré
+ * inspiré des meilleures applications de messagerie mobile.
  *
  * Projet :
  * Zemy
  * ==============================================================
  */
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
-import { theme } from '../../styles/theme';
-import { getMediaUrl } from '../../utils/media';
 import { useRouter } from 'expo-router';
+import { getMediaUrl } from '../../utils/media';
 
 interface ConversationCardProps {
   item: any;
   currentUserId: string;
-  onArchive?: (id: string) => void;
-  onDelete?: (id: string) => void;
-  onPin?: (id: string) => void;
 }
 
-/**
- * Composant ConversationCard.
- *
- * Responsabilités :
- * - Affichage et gestion de l'état lié à ConversationCard.
- */
-export default function ConversationCard({ item, currentUserId, onArchive, onDelete, onPin }: ConversationCardProps) {
+function formatTime(dateStr?: string) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (days === 0) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (days === 1) {
+    return 'Hier';
+  } else if (days < 7) {
+    return ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'][date.getDay()];
+  } else {
+    return date.toLocaleDateString([], { day: '2-digit', month: 'short' });
+  }
+}
+
+function getMessagePreview(lastMessage: any, isMe: boolean) {
+  if (!lastMessage) return { text: 'Nouvelle conversation', icon: null };
+
+  const prefix = isMe ? 'Vous : ' : '';
+  const type = lastMessage.message_type;
+
+  if (type === 'image') return { text: `${prefix}Photo`, icon: 'image-outline' };
+  if (type === 'audio') return { text: `${prefix}Message vocal`, icon: 'mic-outline' };
+  if (type === 'location') return { text: `${prefix}Position partagée`, icon: 'location-outline' };
+  if (type === 'document') return { text: `${prefix}Document`, icon: 'document-text-outline' };
+  if (type === 'video') return { text: `${prefix}Vidéo`, icon: 'videocam-outline' };
+
+  return { text: `${prefix}${lastMessage.content || ''}`, icon: null };
+}
+
+function ConversationCardComponent({ item, currentUserId }: ConversationCardProps) {
   const router = useRouter();
-  
-  // Determine the other participant
-  const otherUser = item.participant_1_details?.id === currentUserId 
-    ? item.participant_2_details 
-    : item.participant_1_details;
-  
-  const userName = otherUser?.full_name || 'Utilisateur Zemy';
-  const userAvatar = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+
+  // Identifier le correspondant
+  const otherUser =
+    item.participant_1_details?.id === currentUserId
+      ? item.participant_2_details
+      : item.participant_1_details;
+
+  const userName = otherUser?.full_name || 'Membre Zemy';
+  const userInitials = userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase() || 'Z';
+
   const avatarUrl = otherUser?.avatar;
-  const isOnline = otherUser?.is_online || false;
+  const isOnline = !!otherUser?.is_online;
 
   const lastMessage = item.last_message;
   const isMe = lastMessage?.sender_details?.id === currentUserId;
   const unreadCount = item.unread_count || 0;
-  
-  // formatting date
-  const formatTime = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (days === 1) {
-      return 'Hier';
-    } else if (days < 7) {
-      return ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'][date.getDay()];
-    } else {
-      return date.toLocaleDateString([], { day: '2-digit', month: 'short' });
-    }
-  };
+  const hasUnread = unreadCount > 0;
 
-  const getMessagePreview = () => {
-    if (!lastMessage) return 'Nouvelle conversation';
-    
-    const prefix = isMe ? 'Vous : ' : '';
-    let content = lastMessage.content || '';
-    
-    // Check for message types
-    if (lastMessage.message_type === 'image') return `${prefix}Photo`;
-    if (lastMessage.message_type === 'audio') return `${prefix}Vocal`;
-    if (lastMessage.message_type === 'location') return `${prefix}Position`;
-    if (lastMessage.message_type === 'document') return `${prefix}Document`;
-    if (lastMessage.message_type === 'video') return `${prefix}Vidéo`;
-    
-    return `${prefix}${content}`;
-  };
+  const timeFormatted = formatTime(lastMessage?.created_at || item.updated_at || item.created_at);
+  const preview = getMessagePreview(lastMessage, isMe);
 
-  const renderRightActions = () => {
-    return (
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.warning }]} onPress={() => onPin && onPin(item.id)}>
-          <Ionicons name="pin" size={24} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]} onPress={() => onArchive && onArchive(item.id)}>
-          <Ionicons name="archive" size={24} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.error }]} onPress={() => onDelete && onDelete(item.id)}>
-          <Ionicons name="trash" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  // Booking info if passenger portion exists, otherwise fallback to ride info
+  // Contexte de trajet
   const booking = item.booking_details;
   const ride = item.ride_details;
-  const rideStatus = booking?.status || ride?.status || 'Terminé';
+  const depCity = (booking?.departure_location || ride?.departure_location || '').split(',')[0].trim();
+  const arrCity = (booking?.arrival_location || ride?.arrival_location || '').split(',')[0].trim();
+  const hasRoute = !!depCity && !!arrCity;
+
+  const rideStatus = booking?.status || ride?.status;
+  const isConfirmed = ['confirmed', 'active', 'started'].includes(rideStatus);
 
   return (
-    <Swipeable
-      friction={2}
-      rightThreshold={40}
-      renderRightActions={renderRightActions}
+    <TouchableOpacity
+      style={[styles.row, hasUnread && styles.rowUnread]}
+      activeOpacity={0.65}
+      onPress={() => router.push(`/chat/${item.id}`)}
     >
-      <TouchableOpacity
-        style={styles.container}
-        activeOpacity={0.7}
-        onPress={() => router.push(`/chat/${item.id}`)}
-      >
-        <View style={styles.avatarContainer}>
-          {avatarUrl ? (
-            <Image source={{ uri: getMediaUrl(avatarUrl) }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{userAvatar}</Text>
-            </View>
-          )}
-          {isOnline && <View style={styles.onlineIndicator} />}
+      {/* ── Avatar du correspondant ── */}
+      <View style={styles.avatarWrap}>
+        {avatarUrl ? (
+          <Image source={{ uri: getMediaUrl(avatarUrl) }} style={styles.avatarImg} />
+        ) : (
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarInitials}>{userInitials}</Text>
+          </View>
+        )}
+        {isOnline && <View style={styles.onlineDot} />}
+      </View>
+
+      {/* ── Corps de la conversation ── */}
+      <View style={styles.mainContent}>
+        {/* Ligne 1 : Nom & Date */}
+        <View style={styles.topRow}>
+          <Text style={[styles.userName, hasUnread && styles.userNameUnread]} numberOfLines={1}>
+            {userName}
+          </Text>
+          <Text style={[styles.timeText, hasUnread && styles.timeTextUnread]}>
+            {timeFormatted}
+          </Text>
         </View>
 
-        <View style={styles.contentContainer}>
-          <View style={styles.headerRow}>
-            <Text style={styles.name} numberOfLines={1}>{userName}</Text>
-            <Text style={[styles.time, unreadCount > 0 && styles.timeUnread]}>
-              {formatTime(lastMessage?.created_at || item.created_at)}
+        {/* Ligne 2 : Itinéraire covoiturage (discret) */}
+        {hasRoute && (
+          <View style={styles.routeRow}>
+            <Ionicons name="car-outline" size={13} color="#64748B" />
+            <Text style={styles.routeText} numberOfLines={1}>
+              {depCity} → {arrCity}
             </Text>
-          </View>
-          
-          {(booking || ride) && (
-            <View style={styles.rideRow}>
-              <Ionicons name="car-outline" size={14} color={theme.colors.textMuted} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                <Text style={[styles.rideText, { flexShrink: 1 }]} numberOfLines={1}>
-                  {(booking?.departure_location || ride?.departure_location)?.split(',')[0]}
-                </Text>
-                <Ionicons name="arrow-forward" size={10} color={theme.colors.textMuted} style={{ marginHorizontal: 3 }} />
-                <Text style={[styles.rideText, { flexShrink: 1 }]} numberOfLines={1}>
-                  {(booking?.arrival_location || ride?.arrival_location)?.split(',')[0]}
-                </Text>
-              </View>
-              <View style={[
-                styles.badge, 
-                ['confirmed', 'active', 'started'].includes(rideStatus) 
-                  ? styles.badgeSuccess 
-                  : (rideStatus.startsWith('pending') ? styles.badgeWarning : styles.badgeDefault)
-              ]}>
-                <Text style={[
-                  styles.badgeText,
-                  rideStatus.startsWith('pending') && { color: '#B45309' }
-                ]}>
-                  {['confirmed', 'active', 'started'].includes(rideStatus) 
-                    ? 'Confirmé' 
-                    : (rideStatus.startsWith('pending') ? 'En attente' : 'Terminé')}
-                </Text>
-              </View>
-            </View>
-          )}
-          
-          <View style={styles.footerRow}>
-            <Text style={[styles.messagePreview, unreadCount > 0 && styles.messageUnread]} numberOfLines={1}>
-              {getMessagePreview()}
-            </Text>
-            
-            {unreadCount > 0 && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadText}>{unreadCount}</Text>
+            {isConfirmed && (
+              <View style={styles.statusPill}>
+                <Text style={styles.statusPillText}>Confirmé</Text>
               </View>
             )}
           </View>
+        )}
+
+        {/* Ligne 3 : Dernier message & Badge non lu */}
+        <View style={styles.bottomRow}>
+          <View style={styles.messageBox}>
+            {preview.icon && (
+              <Ionicons
+                name={preview.icon as any}
+                size={14}
+                color={hasUnread ? '#2563EB' : '#64748B'}
+                style={{ marginRight: 4 }}
+              />
+            )}
+            <Text
+              style={[styles.messageText, hasUnread && styles.messageTextUnread]}
+              numberOfLines={1}
+            >
+              {preview.text}
+            </Text>
+          </View>
+
+          {hasUnread && (
+            <View style={styles.unreadPill}>
+              <Text style={styles.unreadCountText}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          )}
         </View>
-      </TouchableOpacity>
-    </Swipeable>
+      </View>
+    </TouchableOpacity>
   );
 }
 
+export default memo(ConversationCardComponent);
+
 const styles = StyleSheet.create({
-  container: {
+  row: {
     flexDirection: 'row',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
   },
-  avatarContainer: {
+  rowUnread: {
+    backgroundColor: '#F8FAFC',
+  },
+  avatarWrap: {
     position: 'relative',
-    marginRight: theme.spacing.md,
+    marginRight: 12,
   },
-  avatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: theme.colors.white,
+  avatarImg: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F1F5F9',
   },
   avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: theme.colors.secondaryLight,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.white,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  avatarText: {
-    color: theme.colors.secondaryDark,
+  avatarInitials: {
+    fontSize: 17,
     fontWeight: '700',
-    fontSize: 20,
+    color: '#1D4ED8',
+    letterSpacing: -0.3,
   },
-  onlineIndicator: {
+  onlineDot: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: theme.colors.success,
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
     borderWidth: 2,
-    borderColor: theme.colors.white,
+    borderColor: '#FFFFFF',
   },
-  contentContainer: {
+  mainContent: {
     flex: 1,
     justifyContent: 'center',
   },
-  headerRow: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  name: {
-    ...theme.typography.h3,
-    fontSize: 16,
-    color: theme.colors.text,
+  userName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0F172A',
     flex: 1,
     marginRight: 8,
   },
-  time: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.textLight,
+  userNameUnread: {
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  timeUnread: {
-    color: theme.colors.primary,
+  timeText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  timeTextUnread: {
+    color: '#2563EB',
     fontWeight: '700',
   },
-  rideRow: {
+  routeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 4,
+    marginBottom: 3,
   },
-  rideText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.textMuted,
-    marginLeft: 4,
-    marginRight: 8,
-    flex: 1,
+  routeText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+    flexShrink: 1,
   },
-  badge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+  statusPill: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderRadius: 4,
+    marginLeft: 4,
   },
-  badgeDefault: {
-    backgroundColor: theme.colors.border,
-  },
-  badgeWarning: {
-    backgroundColor: '#FEF3C7', // light amber background
-  },
-  badgeSuccess: {
-    backgroundColor: theme.colors.success + '20', // transparent green
-  },
-  badgeText: {
+  statusPillText: {
     fontSize: 10,
-    fontWeight: '600',
-    color: theme.colors.text,
+    fontWeight: '700',
+    color: '#059669',
   },
-  footerRow: {
+  bottomRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  messagePreview: {
-    ...theme.typography.bodyMedium,
-    color: theme.colors.textLight,
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     marginRight: 8,
   },
-  messageUnread: {
-    color: theme.colors.text,
+  messageText: {
+    fontSize: 13,
+    color: '#64748B',
+    flexShrink: 1,
+  },
+  messageTextUnread: {
+    color: '#0F172A',
     fontWeight: '600',
   },
-  unreadBadge: {
-    backgroundColor: theme.colors.primary,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+  unreadPill: {
+    backgroundColor: '#2563EB',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
   },
-  unreadText: {
-    color: theme.colors.white,
+  unreadCountText: {
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    width: 192, // 3 * 64
-  },
-  actionBtn: {
-    width: 64,
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontWeight: '800',
   },
 });

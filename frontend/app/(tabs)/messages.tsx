@@ -4,16 +4,24 @@
  * messages.tsx
  *
  * Description :
- * Composant ou logique de l'application Zemy.
+ * Page Messages de l'application Zemy — Interface mobile épurée,
+ * moderne et fluide inspirée des standards de messagerie actuels.
  *
  * Projet :
  * Zemy
  * ==============================================================
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  StatusBar,
+} from 'react-native';
 import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
-import { theme } from '../../src/styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
@@ -21,53 +29,51 @@ import ConversationCard from '../../src/components/chat/ConversationCard';
 import MessageEmptyState from '../../src/components/chat/MessageEmptyState';
 import MessageSkeleton from '../../src/components/chat/MessageSkeleton';
 
-const FILTERS = ['Tous', 'Non lus', 'Conducteurs', 'Passagers', 'Actifs', 'Terminés', 'Favoris'];
+type FilterType = 'Tous' | 'Non lus';
 
-/**
- * Composant MessagesScreen.
- *
- * Responsabilités :
- * - Affichage et gestion de l'état lié à MessagesScreen.
- */
 export default function MessagesScreen() {
   const router = useRouter();
   const authCtx = useAuth();
   const user = authCtx?.user ?? null;
   const authFetch = authCtx?.authFetch ?? (async () => []);
-  
+
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('Tous');
-
-  // Real-time polling
-  const [pollInterval, setPollInterval] = useState<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchConversations = useCallback(async (isSilent = false) => {
-    try {
-      if (!isSilent) setLoading(true);
-      const data = await authFetch('/conversations/');
-      let filtered = Array.isArray(data) ? data : (data.results || []);
-      // Filter out support conversations
-      filtered = filtered.filter((c: any) => c.conversation_type !== 'support');
-      
-      // Sort by latest message
-      filtered.sort((a: any, b: any) => {
-        const dateA = a.last_message?.created_at || a.updated_at || a.created_at;
-        const dateB = b.last_message?.created_at || b.updated_at || b.created_at;
-        return new Date(dateB).getTime() - new Date(dateA).getTime();
-      });
-      
-      setConversations(filtered);
-    } catch (error) {
-    } finally {
-      if (!isSilent) setLoading(false);
-    }
-  }, [authFetch]);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('Tous');
 
   const scrollRef = useRef<any>(null);
   const navigation = useNavigation();
 
+  // Récupération des conversations
+  const fetchConversations = useCallback(
+    async (isSilent = false) => {
+      try {
+        if (!isSilent) setLoading(true);
+        const data = await authFetch('/conversations/');
+        let filtered = Array.isArray(data) ? data : data?.results || [];
+
+        // Exclure les conversations de support
+        filtered = filtered.filter((c: any) => c.conversation_type !== 'support');
+
+        // Trier par message le plus récent
+        filtered.sort((a: any, b: any) => {
+          const dateA = a.last_message?.created_at || a.updated_at || a.created_at;
+          const dateB = b.last_message?.created_at || b.updated_at || b.created_at;
+          return new Date(dateB).getTime() - new Date(dateA).getTime();
+        });
+
+        setConversations(filtered);
+      } catch (error) {
+        // En cas d'erreur réseau, on préserve l'état actuel
+      } finally {
+        if (!isSilent) setLoading(false);
+      }
+    },
+    [authFetch]
+  );
+
+  // Scroll to top sur tap de l'onglet
   useEffect(() => {
     const unsubscribe = navigation.addListener('tabPress' as any, () => {
       scrollRef.current?.scrollToOffset?.({ offset: 0, animated: true });
@@ -75,17 +81,15 @@ export default function MessagesScreen() {
     return unsubscribe;
   }, [navigation]);
 
-  // Handle Focus & Polling
+  // Focus & Polling silencieux (toutes les 10 secondes)
   useFocusEffect(
     useCallback(() => {
       scrollRef.current?.scrollToOffset?.({ offset: 0, animated: false });
       if (user) {
         fetchConversations();
-        // Start polling every 10 seconds for real-time updates without refreshing indicator
         const interval = setInterval(() => {
           fetchConversations(true);
         }, 10000);
-        setPollInterval(interval);
 
         return () => {
           clearInterval(interval);
@@ -94,132 +98,163 @@ export default function MessagesScreen() {
     }, [user, fetchConversations])
   );
 
-  // Swipe Actions
-  const handleArchive = useCallback((id: string) => {
-    // Optimistic UI update
-    setConversations(prev => prev.filter(c => c.id !== id));
-  }, []);
+  // Compteur global de messages non lus
+  const totalUnread = useMemo(() => {
+    return conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
+  }, [conversations]);
 
-  const handleDelete = useCallback((id: string) => {
-    setConversations(prev => prev.filter(c => c.id !== id));
-  }, []);
-
-  const handlePin = useCallback((id: string) => {
-    // Pin to top locally for now
-    setConversations(prev => {
-      const idx = prev.findIndex(c => c.id === id);
-      if (idx > -1) {
-        const item = prev[idx];
-        const newArr = [...prev];
-        newArr.splice(idx, 1);
-        newArr.unshift(item);
-        return newArr;
-      }
-      return prev;
-    });
-  }, []);
-
-  // Filter & Search Logic
+  // Filtrage et recherche
   const filteredConversations = useMemo(() => {
-    return conversations.filter(c => {
-      // 1. Search Query
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const otherUser = c.participant_1_details?.id === user?.id ? c.participant_2_details : c.participant_1_details;
-        const nameMatch = otherUser?.full_name?.toLowerCase().includes(q);
-        const msgMatch = c.last_message?.content?.toLowerCase().includes(q);
-        const rideMatch = c.ride_details?.departure_location?.toLowerCase().includes(q) || c.ride_details?.arrival_location?.toLowerCase().includes(q);
-        
-        if (!nameMatch && !msgMatch && !rideMatch) return false;
+    return conversations.filter((c) => {
+      // 1. Filtre Non lus
+      if (activeFilter === 'Non lus' && (c.unread_count || 0) <= 0) {
+        return false;
       }
 
-      // 2. Filters
-      switch(activeFilter) {
-        case 'Non lus':
-          return c.unread_count > 0;
-        case 'Conducteurs':
-          // Assuming user is passenger for this ride
-          return c.ride_details?.driver === c.participant_2_details?.id; // rough logic, adjust based on schema
-        case 'Passagers':
-          return c.ride_details?.driver === user?.id;
-        case 'Actifs':
-          return c.ride_details?.status === 'confirmed' || c.ride_details?.status === 'started';
-        case 'Terminés':
-          return c.ride_details?.status === 'completed';
-        default:
-          return true; // 'Tous'
+      // 2. Recherche textuelle
+      if (searchQuery.trim().length > 0) {
+        const q = searchQuery.toLowerCase().trim();
+        const otherUser =
+          c.participant_1_details?.id === user?.id
+            ? c.participant_2_details
+            : c.participant_1_details;
+
+        const nameMatch = (otherUser?.full_name || '').toLowerCase().includes(q);
+        const msgMatch = (c.last_message?.content || '').toLowerCase().includes(q);
+        const depMatch = (
+          c.booking_details?.departure_location ||
+          c.ride_details?.departure_location ||
+          ''
+        )
+          .toLowerCase()
+          .includes(q);
+        const arrMatch = (
+          c.booking_details?.arrival_location ||
+          c.ride_details?.arrival_location ||
+          ''
+        )
+          .toLowerCase()
+          .includes(q);
+
+        return nameMatch || msgMatch || depMatch || arrMatch;
       }
+
+      return true;
     });
   }, [conversations, searchQuery, activeFilter, user]);
 
-  const renderItem = useCallback(({ item }: { item: any }) => (
-    <ConversationCard 
-      item={item} 
-      currentUserId={user?.id || ''} 
-      onArchive={handleArchive}
-      onDelete={handleDelete}
-      onPin={handlePin}
-    />
-  ), [user, handleArchive, handleDelete, handlePin]);
+  const renderItem = useCallback(
+    ({ item }: { item: any }) => (
+      <ConversationCard item={item} currentUserId={user?.id || ''} />
+    ),
+    [user?.id]
+  );
 
   const keyExtractor = useCallback((item: any) => item.id.toString(), []);
 
+  // État non connecté
   if (!user) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }]}>
-        <Ionicons name="chatbubbles-outline" size={80} color={theme.colors.textMuted} />
-        <Text style={{ ...theme.typography.h3, marginTop: 16, marginBottom: 8, textAlign: 'center' }}>Vos messages</Text>
-        <Text style={{ ...theme.typography.bodyMedium, color: theme.colors.textLight, textAlign: 'center', marginBottom: 24 }}>Connectez-vous pour échanger avec les conducteurs et passagers.</Text>
-        <TouchableOpacity 
-          style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: theme.borderRadius.lg }}
-          onPress={() => router.push('/(auth)/login')}
-        >
-          <Text style={{ color: theme.colors.white, fontWeight: 'bold' }}>Se connecter</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.loggedOutContainer} edges={['top']}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.loggedOutContent}>
+          <View style={styles.loggedOutIconWrap}>
+            <Ionicons name="chatbubbles-outline" size={44} color="#2563EB" />
+          </View>
+          <Text style={styles.loggedOutTitle}>Vos messages</Text>
+          <Text style={styles.loggedOutSub}>
+            Connectez-vous pour échanger avec vos conducteurs et passagers.
+          </Text>
+          <TouchableOpacity
+            style={styles.loginBtn}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.loginBtnText}>Se connecter</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+      <StatusBar barStyle="dark-content" />
+
+      {/* ── Header épuré ── */}
       <View style={styles.header}>
-        <Text style={styles.title} accessibilityRole="header">Discussions</Text>
-        
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={theme.colors.textMuted} style={styles.searchIcon} />
-          <TextInput 
+        <View style={styles.headerTopRow}>
+          <View style={styles.titleRow}>
+            <Text style={styles.headerTitle}>Messages</Text>
+            {totalUnread > 0 && (
+              <View style={styles.unreadTotalBadge}>
+                <Text style={styles.unreadTotalText}>
+                  {totalUnread > 99 ? '99+' : totalUnread}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ── Barre de recherche ── */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color="#64748B" style={styles.searchIcon} />
+          <TextInput
             style={styles.searchInput}
-            placeholder="Rechercher (nom, ville, message)..."
-            placeholderTextColor={theme.colors.textMuted}
+            placeholder="Rechercher une discussion..."
+            placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            accessibilityLabel="Rechercher dans les conversations"
-            accessibilityHint="Saisissez un nom, une ville ou un mot-clé de message"
+            autoCorrect={false}
+            returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={theme.colors.textLight} />
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close-circle" size={17} color="#94A3B8" />
             </TouchableOpacity>
           )}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll} contentContainerStyle={styles.filtersContainer}>
-          {FILTERS.map(filter => (
-            <TouchableOpacity 
-              key={filter}
-              style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
-              onPress={() => setActiveFilter(filter)}
+        {/* ── Filtres compacts (Tous / Non lus) ── */}
+        <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={[styles.filterPill, activeFilter === 'Tous' && styles.filterPillActive]}
+            onPress={() => setActiveFilter('Tous')}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.filterPillText,
+                activeFilter === 'Tous' && styles.filterPillTextActive,
+              ]}
             >
-              <Text style={[styles.filterText, activeFilter === filter && styles.filterTextActive]}>{filter}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              Tous ({conversations.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterPill, activeFilter === 'Non lus' && styles.filterPillActive]}
+            onPress={() => setActiveFilter('Non lus')}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.filterPillText,
+                activeFilter === 'Non lus' && styles.filterPillTextActive,
+              ]}
+            >
+              Non lus {totalUnread > 0 ? `(${totalUnread})` : ''}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* List */}
+      {/* ── Liste des conversations ── */}
       {loading && conversations.length === 0 ? (
-        <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }}>
+        <View style={styles.skeletonList}>
           <MessageSkeleton />
           <MessageSkeleton />
           <MessageSkeleton />
@@ -237,11 +272,24 @@ export default function MessagesScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshing={loading && conversations.length > 0}
           onRefresh={() => fetchConversations(false)}
-          initialNumToRender={10}
+          initialNumToRender={12}
           maxToRenderPerBatch={10}
-          windowSize={5}
+          windowSize={7}
           removeClippedSubviews={true}
-          ListEmptyComponent={<MessageEmptyState />}
+          ListEmptyComponent={
+            <MessageEmptyState
+              type={
+                searchQuery.trim().length > 0
+                  ? 'no-search'
+                  : activeFilter === 'Non lus'
+                  ? 'no-unread'
+                  : 'empty'
+              }
+              searchQuery={searchQuery}
+              onResetSearch={() => setSearchQuery('')}
+              onResetFilter={() => setActiveFilter('Tous')}
+            />
+          }
         />
       )}
     </SafeAreaView>
@@ -249,73 +297,149 @@ export default function MessagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: theme.colors.background 
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  header: { 
-    paddingHorizontal: theme.spacing.lg, 
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.sm,
-    backgroundColor: theme.colors.background,
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: '#F1F5F9',
   },
-  title: { 
-    ...theme.typography.h2, 
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  searchContainer: {
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.md,
-    height: 48,
-    marginBottom: theme.spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+  },
+  unreadTotalBadge: {
+    backgroundColor: '#2563EB',
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  unreadTotalText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    height: 40,
+    marginBottom: 10,
   },
   searchIcon: {
-    marginRight: theme.spacing.sm,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    ...theme.typography.bodyMedium,
-    color: theme.colors.text,
-    height: '100%',
+    fontSize: 14,
+    color: '#0F172A',
+    paddingVertical: 0,
   },
-  filtersScroll: {
-    marginBottom: theme.spacing.xs,
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  filtersContainer: {
-    paddingRight: theme.spacing.xl,
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
   },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: theme.colors.border,
-    marginRight: 8,
+  filterPillActive: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
-  filterChipActive: {
-    backgroundColor: theme.colors.primary,
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
-  filterText: {
-    ...theme.typography.bodyMedium,
-    color: theme.colors.textLight,
-    fontWeight: '500',
-  },
-  filterTextActive: {
-    color: theme.colors.white,
+  filterPillTextActive: {
+    color: '#2563EB',
     fontWeight: '700',
   },
-  listContent: { 
-    paddingBottom: 110,
-    paddingTop: theme.spacing.md,
+  listContent: {
+    paddingBottom: 100,
   },
-  separator: { 
-    height: 1, 
-    backgroundColor: theme.colors.border,
-    marginLeft: 88, // Align with content, bypassing avatar
+  separator: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginLeft: 78,
+  },
+  skeletonList: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  loggedOutContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loggedOutContent: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    maxWidth: 320,
+  },
+  loggedOutIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  loggedOutTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  loggedOutSub: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  loginBtn: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  loginBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });
